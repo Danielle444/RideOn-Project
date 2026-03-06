@@ -1,6 +1,7 @@
 ﻿namespace RideOnServer.BL
 {
-    public class FederationMember
+    public class FederationMember : Person
     {
+
     }
 }

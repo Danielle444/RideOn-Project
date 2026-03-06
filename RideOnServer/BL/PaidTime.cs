@@ -1,6 +1,6 @@
 ﻿namespace RideOnServer.BL
 {
-    public class PaidTime
+    public class PaidTime : Product
     {
     }
 }

@@ -1,6 +1,7 @@
 ﻿namespace RideOnServer.BL
 {
-    public class PaidTimeRequest
+    public class PaidTimeRequest : ServiceRequest
     {
+
     }
 }

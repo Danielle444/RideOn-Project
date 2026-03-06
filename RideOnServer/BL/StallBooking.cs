@@ -1,6 +1,6 @@
 ﻿namespace RideOnServer.BL
 {
-    public class StallBooking
+    public class StallBooking : ProductRequest
     {
     }
 }

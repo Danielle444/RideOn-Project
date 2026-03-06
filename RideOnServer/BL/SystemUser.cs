@@ -1,6 +1,7 @@
 ﻿namespace RideOnServer.BL
 {
-    public class SystemUser
+    public class SystemUser : Person
     {
+
     }
 }

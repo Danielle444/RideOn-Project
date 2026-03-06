@@ -1,6 +1,6 @@
 ﻿namespace RideOnServer.BL
 {
-    public class ShavingsOrder
+    public class ShavingsOrder : ProductRequest
     {
     }
 }

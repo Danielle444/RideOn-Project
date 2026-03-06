@@ -1,6 +1,7 @@
 ﻿namespace RideOnServer.BL
 {
-    public class Entry
+    public class Entry : ServiceRequest
     {
+
     }
 }
