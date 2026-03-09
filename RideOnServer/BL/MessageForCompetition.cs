@@ -1,6 +1,6 @@
 ﻿namespace RideOnServer.BL
 {
-    public class MassageForCompetition
+    public class MessageForCompetition
     {
     }
 }
