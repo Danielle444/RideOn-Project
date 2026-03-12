@@ -6,6 +6,8 @@
 
         public string JudgeHebrewName { get; set; }
 
-        public string JudgeEnglishName { get; set; }
+        public string? JudgeEnglishName { get; set; }
+
+        public string? Country { get; set; }
     }
 }

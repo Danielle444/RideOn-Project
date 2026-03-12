@@ -2,6 +2,6 @@
 {
     public class PaidTimeProduct : Product
     {
-        public byte? DurationMinutes { get; set; }
+        public byte DurationMinutes { get; set; }
     }
 }

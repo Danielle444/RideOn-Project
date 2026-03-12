@@ -1,6 +1,6 @@
 ﻿namespace RideOnServer.BL
 {
-    public class ManeuverType
+    public class Maneuver
     {
         public byte ManeuverId { get; set; }
 

@@ -6,6 +6,6 @@
 
         public DateTime? MedicalCheckValidUntil { get; set; }
 
-        public string CertificationLevel { get; set; }
+        public string? CertificationLevel { get; set; }
     }
 }

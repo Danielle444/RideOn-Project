@@ -1,6 +1,6 @@
 ﻿namespace RideOnServer.BL
 {
-    public class PersonRanchRoleAffiliatedWith
+    public class PersonRanchRole
     {
         public int PersonId { get; set; }
 
@@ -8,6 +8,6 @@
 
         public byte RoleId { get; set; }
 
-        public string RollStatus { get; set; }
+        public string? RoleStatus { get; set; }
     }
 }

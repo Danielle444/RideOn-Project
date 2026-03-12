@@ -2,10 +2,10 @@
 {
     public class Product
     {
-        public short CatalogId { get; set; }
+        public short ProductId { get; set; }
+
+        public byte CategoryId { get; set; }
 
         public string ProductName { get; set; }
-
-        public short CategoryId { get; set; }
     }
 }

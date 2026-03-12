@@ -1,10 +1,10 @@
 ﻿namespace RideOnServer.BL
 {
-    public class ClassInCompetitionPrizeType
+    public class ClassPrize
     {
         public int ClassInCompId { get; set; }
 
-        public byte PrizeTypeId { get; set; }
+        public int PrizeTypeId { get; set; }
 
         public short? PrizeAmount { get; set; }
     }

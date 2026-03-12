@@ -4,14 +4,16 @@
     {
         public int ProductChangeRequestId { get; set; }
 
-        public DateTime? RequestDate { get; set; }
+        public int OriginalPRequestId { get; set; }
 
-        public byte? Amount { get; set; }
+        public int? NewPRequestId { get; set; }
 
-        public bool? IsCancelled { get; set; }
+        public int? AnsweredBySystemUserId { get; set; }
 
-        public int PRequestId { get; set; }
+        public string? Status { get; set; }
 
-        public int? AnsweredBy_SystemUserId { get; set; }
+        public DateTime RequestDate { get; set; }
+
+        public bool IsCancelled { get; set; }
     }
 }

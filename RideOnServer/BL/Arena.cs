@@ -4,9 +4,9 @@
     {
         public int RanchId { get; set; }
 
-        public short ArenaId { get; set; }
+        public byte ArenaId { get; set; }
 
-        public string ArenaName { get; set; }
+        public string ArenaName { get; set; } = string.Empty;
 
         public short? ArenaLength { get; set; }
 

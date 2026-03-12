@@ -6,6 +6,6 @@
 
         public string PrizeTypeName { get; set; }
 
-        public string PrizeDescription { get; set; }
+        public string? PrizeDescription { get; set; }
     }
 }

@@ -4,12 +4,14 @@
     {
         public int RanchId { get; set; }
 
-        public byte CompoundID { get; set; }
+        public byte CompoundId { get; set; }
 
-        public short StallNumber { get; set; }
+        public int StallId { get; set; }
 
-        public string StallType { get; set; }
+        public string StallNumber { get; set; }
 
-        public string StallNotes { get; set; }
+        public string? StallType { get; set; }
+
+        public string? StallNotes { get; set; }
     }
 }

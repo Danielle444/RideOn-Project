@@ -1,15 +1,15 @@
 ﻿namespace RideOnServer.BL
 {
-    public class PersonSystemUserManagedBy
+    public class PersonManagedBySystemUser
     {
-        public int PersonId { get; set; }
-
         public int SystemUserId { get; set; }
+
+        public int PersonId { get; set; }
 
         public DateTime? RequestDate { get; set; }
 
         public DateTime? UpdateDate { get; set; }
 
-        public string ApprovalStatus { get; set; }
+        public string? ApprovalStatus { get; set; }
     }
 }

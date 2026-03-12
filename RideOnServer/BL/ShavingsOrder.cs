@@ -2,8 +2,14 @@
 {
     public class ShavingsOrder : ProductRequest
     {
-        public short? BagQuantity { get; set; }
+        public int? WorkerSystemUserId { get; set; }
 
-        public DateTime? DeliveryTime { get; set; }
+        public byte BagQuantity { get; set; }
+
+        public DateTime? RequestedDeliveryTime { get; set; }
+
+        public DateTime? ArrivalTime { get; set; }
+
+        public DateTime? ResponseTime { get; set; }
     }
 }
