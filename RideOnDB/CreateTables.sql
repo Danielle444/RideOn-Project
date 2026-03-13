@@ -108,8 +108,10 @@ GO
 CREATE TABLE Judge
 (
     JudgeId INT IDENTITY(1,1) PRIMARY KEY,
-    JudgeHebrewName NVARCHAR(100) NOT NULL,
-    JudgeEnglishName NVARCHAR(100) NULL,
+    FirstNameHebrew NVARCHAR(50) NOT NULL,
+    LastNameHebrew NVARCHAR(50) NOT NULL,
+    FirstNameEnglish NVARCHAR(50) NULL,
+    LastNameEnglish NVARCHAR(50) NULL,
     Country NVARCHAR(50) NULL
 );
 GO
@@ -435,10 +437,13 @@ CREATE TABLE ReiningTypeManeuver
 (
     ReiningTypeId SMALLINT NOT NULL,
     ManeuverId TINYINT NOT NULL,
-    Order TINYINT NOT NULL,
+    [Order] TINYINT NOT NULL,
 
     CONSTRAINT PK_ReiningTypeManeuver
         PRIMARY KEY (ReiningTypeId, ManeuverId),
+
+     CONSTRAINT UQ_ReiningPatternTypeManeuver_Order
+        UNIQUE (ReiningTypeId, [Order]),
 
     CONSTRAINT FK_ReiningTypeManeuver_ReiningType
         FOREIGN KEY (ReiningTypeId) REFERENCES ReiningType(ReiningTypeId),
@@ -657,8 +662,8 @@ GO
 CREATE TABLE Fine
 (
     FineId INT IDENTITY(1,1) PRIMARY KEY,
-    FineTypeName NVARCHAR(100) NOT NULL UNIQUE,
-    FineDescription NVARCHAR(255) NULL
+    FineName NVARCHAR(100) NOT NULL,
+    FineDescription NVARCHAR(255) NULL,
     FineAmount DECIMAL(10,2) NOT NULL,
 
     CONSTRAINT CK_Fine_FineAmount
