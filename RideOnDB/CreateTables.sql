@@ -33,7 +33,7 @@ CREATE TABLE Person
         CHECK (NationalId IS NULL OR (NationalId NOT LIKE '%[^0-9]%' AND LEN(NationalId) = 9)),
 
     CONSTRAINT CK_Person_Gender
-        CHECK (Gender IN (N'גבר', N'אישה')),
+        CHECK (Gender IN (N'ֳ¢ֳ¡ֳ¸', N'ֳ ֳ©ֳ¹ֳ₪')),
 
     CONSTRAINT CK_Person_Email
         CHECK (Email IS NULL OR Email LIKE '_%@_%._%'),
@@ -122,13 +122,6 @@ CREATE TABLE PrizeType
 );
 GO
 
-CREATE TABLE FineType
-(
-    FineTypeId INT IDENTITY(1,1) PRIMARY KEY,
-    FineTypeName NVARCHAR(100) NOT NULL UNIQUE,
-    FineDescription NVARCHAR(255) NULL
-);
-GO
 
 CREATE TABLE PaymentMethod
 (
@@ -162,10 +155,10 @@ CREATE TABLE PaidTimeSlot
     TimeOfDay NVARCHAR(15) NOT NULL,
 
     CONSTRAINT CK_PaidTimeSlot_DayOfWeek
-        CHECK (DayOfWeek IN (N'ראשון', N'שני', N'שלישי', N'רביעי', N'חמישי', N'שישי', N'שבת')),
+        CHECK (DayOfWeek IN (N'ֳ¸ֳ ֳ¹ֳ¥ֳ¯', N'ֳ¹ֳ°ֳ©', N'ֳ¹ֳ¬ֳ©ֳ¹ֳ©', N'ֳ¸ֳ¡ֳ©ֳ²ֳ©', N'ֳ§ֳ®ֳ©ֳ¹ֳ©', N'ֳ¹ֳ©ֳ¹ֳ©', N'ֳ¹ֳ¡ֳ÷')),
 
     CONSTRAINT CK_PaidTimeSlot_TimeOfDay
-        CHECK (TimeOfDay IN (N'בוקר', N'צהריים', N'אחה''צ', N'ערב'))
+        CHECK (TimeOfDay IN (N'ֳ¡ֳ¥ֳ·ֳ¸', N'ֳ¶ֳ₪ֳ¸ֳ©ֳ©ֳ­', N'ֳ ֳ§ֳ₪''ֳ¶', N'ֳ²ֳ¸ֳ¡'))
 );
 GO
 
@@ -181,7 +174,7 @@ CREATE TABLE FederationMember
     CertificationLevel NVARCHAR(30) NULL,
 
     CONSTRAINT CK_FederationMember_CertificationLevel
-        CHECK (CertificationLevel IS NULL OR CertificationLevel IN (N'מאמן', N'מדריך רמה 2')),
+        CHECK (CertificationLevel IS NULL OR CertificationLevel IN (N'ֳ®ֳ ֳ®ֳ¯', N'ֳ®ֳ£ֳ¸ֳ©ֳ× ֳ¸ֳ®ֳ₪ 2')),
 
     CONSTRAINT FK_FederationMember_Person
         FOREIGN KEY (FederationMemberId) REFERENCES Person(PersonId)
@@ -217,7 +210,7 @@ CREATE TABLE PersonRanchRole
         PRIMARY KEY (PersonId, RanchId, RoleId),
 
     CONSTRAINT CK_PersonRanchRole_RoleStatus
-        CHECK (RoleStatus IS NULL OR RoleStatus IN (N'מאושר', N'ממתין', N'לא מאושר')),
+        CHECK (RoleStatus IS NULL OR RoleStatus IN (N'ֳ®ֳ ֳ¥ֳ¹ֳ¸', N'ֳ®ֳ®ֳ÷ֳ©ֳ¯', N'ֳ¬ֳ  ֳ®ֳ ֳ¥ֳ¹ֳ¸')),
 
     CONSTRAINT FK_PersonRanchRole_Person
         FOREIGN KEY (PersonId) REFERENCES Person(PersonId),
@@ -242,7 +235,7 @@ CREATE TABLE PersonManagedBySystemUser
         PRIMARY KEY (SystemUserId, PersonId),
 
     CONSTRAINT CK_PersonManagedBySystemUser_ApprovalStatus
-        CHECK (ApprovalStatus IS NULL OR ApprovalStatus IN (N'מאושר', N'ממתין', N'לא מאושר')),
+        CHECK (ApprovalStatus IS NULL OR ApprovalStatus IN (N'ֳ®ֳ ֳ¥ֳ¹ֳ¸', N'ֳ®ֳ®ֳ÷ֳ©ֳ¯', N'ֳ¬ֳ  ֳ®ֳ ֳ¥ֳ¹ֳ¸')),
 
     CONSTRAINT FK_PersonManagedBySystemUser_SystemUser
         FOREIGN KEY (SystemUserId) REFERENCES SystemUser(SystemUserId),
@@ -396,7 +389,7 @@ CREATE TABLE Competition
     StallMapUrl NVARCHAR(255) NULL,
 
     CONSTRAINT CK_Competition_Status
-        CHECK (CompetitionStatus IS NULL OR CompetitionStatus IN (N'עתידית', N'פתוחה', N'פעילה', N'הסתיימה')),
+        CHECK (CompetitionStatus IS NULL OR CompetitionStatus IN (N'ֳ²ֳ÷ֳ©ֳ£ֳ©ֳ÷', N'ֳ´ֳ÷ֳ¥ֳ§ֳ₪', N'ֳ´ֳ²ֳ©ֳ¬ֳ₪', N'ֳ₪ֳ±ֳ÷ֳ©ֳ©ֳ®ֳ₪')),
 
     CONSTRAINT CK_Competition_Dates
         CHECK (
@@ -442,6 +435,7 @@ CREATE TABLE ReiningTypeManeuver
 (
     ReiningTypeId SMALLINT NOT NULL,
     ManeuverId TINYINT NOT NULL,
+    Order TINYINT NOT NULL,
 
     CONSTRAINT PK_ReiningTypeManeuver
         PRIMARY KEY (ReiningTypeId, ManeuverId),
@@ -554,7 +548,7 @@ CREATE TABLE Horse
     Gender NVARCHAR(10) NULL,
 
     CONSTRAINT CK_Horse_Gender
-        CHECK (Gender IS NULL OR Gender IN (N'זכר', N'מסורס', N'נקבה')),
+        CHECK (Gender IS NULL OR Gender IN (N'ֳ¦ֳ«ֳ¸', N'ֳ®ֳ±ֳ¥ֳ¸ֳ±', N'ֳ°ֳ·ֳ¡ֳ₪')),
 
     CONSTRAINT FK_Horse_Ranch
         FOREIGN KEY (RanchId) REFERENCES Ranch(RanchId)
@@ -601,7 +595,7 @@ CREATE TABLE HorseParticipationInCompetition
         PRIMARY KEY (HorseId, CompetitionId),
 
     CONSTRAINT CK_HCHorseParticipationInCompetition_ApprovalStatus
-        CHECK (HCApprovalStatus IS NULL OR HCApprovalStatus IN (N'מאושר', N'ממתין', N'לא מאושר')),
+        CHECK (HCApprovalStatus IS NULL OR HCApprovalStatus IN (N'ֳ®ֳ ֳ¥ֳ¹ֳ¸', N'ֳ®ֳ®ֳ÷ֳ©ֳ¯', N'ֳ¬ֳ  ֳ®ֳ ֳ¥ֳ¹ֳ¸')),
 
     CONSTRAINT CK_HCHorseParticipationInCompetition_ApprovalConsistency
         CHECK (HCApprovalDate IS NULL OR HCApproverSystemUserId IS NOT NULL),
@@ -663,17 +657,16 @@ GO
 CREATE TABLE Fine
 (
     FineId INT IDENTITY(1,1) PRIMARY KEY,
-    FineTypeId INT NOT NULL,
+    FineTypeName NVARCHAR(100) NOT NULL UNIQUE,
+    FineDescription NVARCHAR(255) NULL
     FineAmount DECIMAL(10,2) NOT NULL,
-    [Date] DATETIME2(0) NOT NULL,
 
     CONSTRAINT CK_Fine_FineAmount
         CHECK (FineAmount >= 0),
 
-    CONSTRAINT FK_Fine_FineType
-        FOREIGN KEY (FineTypeId) REFERENCES FineType(FineTypeId)
 );
 GO
+
 
 /* =========================================================
    9) PAID TIME SLOTS IN COMPETITION
@@ -693,7 +686,7 @@ CREATE TABLE PaidTimeSlotInCompetition
     SlotNotes NVARCHAR(500) NULL,
 
     CONSTRAINT CK_PaidTimeSlotInCompetition_SlotStatus
-        CHECK (SlotStatus IS NULL OR SlotStatus IN (N'מלא', N'לא מלא')),
+        CHECK (SlotStatus IS NULL OR SlotStatus IN (N'ֳ®ֳ¬ֳ ', N'ֳ¬ֳ  ֳ®ֳ¬ֳ ')),
 
     CONSTRAINT CK_PaidTimeSlotInCompetition_Times
         CHECK (EndTime > StartTime),
@@ -815,7 +808,7 @@ CREATE TABLE ProductChangeRequest
     IsCancelled BIT NOT NULL CONSTRAINT DF_ProductChangeRequest_IsCancelled DEFAULT 0,
 
     CONSTRAINT CK_ProductChangeRequest_Status
-        CHECK ([Status] IS NULL OR [Status] IN (N'אושר', N'ממתין לאישור', N'לא אושר')),
+        CHECK ([Status] IS NULL OR [Status] IN (N'ֳ ֳ¥ֳ¹ֳ¸', N'ֳ®ֳ®ֳ÷ֳ©ֳ¯ ֳ¬ֳ ֳ©ֳ¹ֳ¥ֳ¸', N'ֳ¬ֳ  ֳ ֳ¥ֳ¹ֳ¸')),
 
     CONSTRAINT CK_ProductChangeRequest_CancelLogic
         CHECK (
@@ -919,24 +912,36 @@ CREATE TABLE Entry
 );
 GO
 
-CREATE TABLE ChangeClassRequest
+CREATE TABLE ChangeEntryRequest
 (
-    ChangeClassRequestId INT IDENTITY(1,1) PRIMARY KEY,
-    EntryId INT NOT NULL,
-    ClassInCompId INT NOT NULL,
+    ChangeEntryRequestId INT IDENTITY(1,1) PRIMARY KEY,
+    OriginalEntryId INT NOT NULL,
+    NewEntryId INT NULL,
     RequestDateTime DATETIME2(0) NOT NULL,
     [Status] NVARCHAR(20) NULL,
+    IsCancelled BIT NOT NULL CONSTRAINT DF_ChangeEntryRequest_IsCancelled DEFAULT 0,
 
-    CONSTRAINT CK_ChangeClassRequest_Status
-        CHECK ([Status] IS NULL OR [Status] IN (N'אושר', N'ממתין לאישור', N'לא אושר')),
+    CONSTRAINT CK_ChangeEntryRequest_Status
+        CHECK ([Status] IS NULL OR [Status] IN (N'׳׳•׳©׳¨', N'׳׳׳×׳™׳ ׳׳׳™׳©׳•׳¨', N'׳׳ ׳׳•׳©׳¨')),
 
-    CONSTRAINT FK_ChangeClassRequest_Entry
-        FOREIGN KEY (EntryId) REFERENCES Entry(EntryId),
+    CONSTRAINT CK_ChangeEntryRequest_CancelLogic
+        CHECK (
+            (IsCancelled = 1 AND NewEntryId IS NULL)
+            OR
+            (IsCancelled = 0 AND NewEntryId IS NOT NULL)
+        ),
 
-    CONSTRAINT FK_ChangeClassRequest_ClassInCompetition
-        FOREIGN KEY (ClassInCompId) REFERENCES ClassInCompetition(ClassInCompId)
+    CONSTRAINT CK_ChangeEntryRequest_DifferentEntries
+        CHECK (
+            NewEntryId IS NULL OR NewEntryId <> OriginalEntryId
+        ),
+
+    CONSTRAINT FK_ChangeEntryRequest_OriginalEntry
+        FOREIGN KEY (OriginalEntryId) REFERENCES Entry(EntryId),
+
+    CONSTRAINT FK_ChangeEntryRequest_NewEntry
+        FOREIGN KEY (NewEntryId) REFERENCES Entry(EntryId)
 );
-GO
 
 CREATE TABLE PaidTimeRequest
 (
@@ -949,7 +954,7 @@ CREATE TABLE PaidTimeRequest
     Notes NVARCHAR(500) NULL,
 
     CONSTRAINT CK_PaidTimeRequest_Status
-        CHECK ([Status] IS NULL OR [Status] IN (N'שובץ', N'ממתין לשיבוץ', N'בוטל')),
+        CHECK ([Status] IS NULL OR [Status] IN (N'ֳ¹ֳ¥ֳ¡ֳµ', N'ֳ®ֳ®ֳ÷ֳ©ֳ¯ ֳ¬ֳ¹ֳ©ֳ¡ֳ¥ֳµ', N'ֳ¡ֳ¥ֳ¨ֳ¬')),
 
     CONSTRAINT FK_PaidTimeRequest_ServiceRequest
         FOREIGN KEY (PaidTimeRequestId) REFERENCES ServiceRequest(SRequestId),
