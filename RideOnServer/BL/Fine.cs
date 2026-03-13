@@ -4,10 +4,10 @@
     {
         public int FineId { get; set; }
 
-        public int FineTypeId { get; set; }
+        public string FineName { get; set; }
+
+        public string? FineDescription { get; set; }
 
         public decimal FineAmount { get; set; }
-
-        public DateTime Date { get; set; }
     }
 }

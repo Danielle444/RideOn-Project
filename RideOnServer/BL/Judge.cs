@@ -4,9 +4,13 @@
     {
         public int JudgeId { get; set; }
 
-        public string JudgeHebrewName { get; set; }
+        public string FirstNameHebrew { get; set; }
 
-        public string? JudgeEnglishName { get; set; }
+        public string LastNameHebrew { get; set; }
+
+        public string? FirstNameEnglish { get; set; }
+
+        public string? LastNameEnglish { get; set; }
 
         public string? Country { get; set; }
     }
