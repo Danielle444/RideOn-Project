@@ -8,6 +8,5 @@
 
         public string CompoundName { get; set; }
 
-        public string? CompoundType { get; set; }
     }
 }

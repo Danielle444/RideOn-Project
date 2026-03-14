@@ -32,9 +32,6 @@ CREATE TABLE Person
     CONSTRAINT CK_Person_NationalId
         CHECK (NationalId IS NULL OR (NationalId NOT LIKE '%[^0-9]%' AND LEN(NationalId) = 9)),
 
-    CONSTRAINT CK_Person_Gender
-        CHECK (Gender IN (N'âáø', N'àéùä')),
-
     CONSTRAINT CK_Person_Email
         CHECK (Email IS NULL OR Email LIKE '_%@_%._%'),
 
@@ -101,6 +98,7 @@ GO
 CREATE TABLE Maneuver
 (
     ManeuverId TINYINT IDENTITY(1,1) PRIMARY KEY,
+	ManeuverName NVARCHAR(100) NOT NULL,
     ManeuverDescription NVARCHAR(255) NOT NULL
 );
 GO
@@ -154,13 +152,8 @@ CREATE TABLE PaidTimeSlot
 (
     PaidTimeSlotId INT IDENTITY(1,1) PRIMARY KEY,
     DayOfWeek NVARCHAR(15) NOT NULL,
-    TimeOfDay NVARCHAR(15) NOT NULL,
+    TimeOfDay NVARCHAR(15) NOT NULL
 
-    CONSTRAINT CK_PaidTimeSlot_DayOfWeek
-        CHECK (DayOfWeek IN (N'øàùåï', N'ùðé', N'ùìéùé', N'øáéòé', N'çîéùé', N'ùéùé', N'ùáú')),
-
-    CONSTRAINT CK_PaidTimeSlot_TimeOfDay
-        CHECK (TimeOfDay IN (N'áå÷ø', N'öäøééí', N'àçä''ö', N'òøá'))
 );
 GO
 
@@ -174,9 +167,6 @@ CREATE TABLE FederationMember
     HasValidMembership BIT NULL,
     MedicalCheckValidUntil DATE NULL,
     CertificationLevel NVARCHAR(30) NULL,
-
-    CONSTRAINT CK_FederationMember_CertificationLevel
-        CHECK (CertificationLevel IS NULL OR CertificationLevel IN (N'îàîï', N'îãøéê øîä 2')),
 
     CONSTRAINT FK_FederationMember_Person
         FOREIGN KEY (FederationMemberId) REFERENCES Person(PersonId)
@@ -201,6 +191,22 @@ GO
    3) PERSON / RANCH RELATIONS
    ========================================================= */
 
+CREATE TABLE PersonRanch
+(
+    PersonId INT NOT NULL,
+    RanchId INT NOT NULL,
+
+    CONSTRAINT PK_PersonRanch
+        PRIMARY KEY (PersonId, RanchId),
+
+    CONSTRAINT FK_PersonRanch_Person
+        FOREIGN KEY (PersonId) REFERENCES Person(PersonId),
+
+    CONSTRAINT FK_PersonRanch_Ranch
+        FOREIGN KEY (RanchId) REFERENCES Ranch(RanchId)
+);
+GO
+
 CREATE TABLE PersonRanchRole
 (
     PersonId INT NOT NULL,
@@ -211,14 +217,9 @@ CREATE TABLE PersonRanchRole
     CONSTRAINT PK_PersonRanchRole
         PRIMARY KEY (PersonId, RanchId, RoleId),
 
-    CONSTRAINT CK_PersonRanchRole_RoleStatus
-        CHECK (RoleStatus IS NULL OR RoleStatus IN (N'îàåùø', N'îîúéï', N'ìà îàåùø')),
-
-    CONSTRAINT FK_PersonRanchRole_Person
-        FOREIGN KEY (PersonId) REFERENCES Person(PersonId),
-
-    CONSTRAINT FK_PersonRanchRole_Ranch
-        FOREIGN KEY (RanchId) REFERENCES Ranch(RanchId),
+    CONSTRAINT FK_PersonRanchRole_Affiliation
+        FOREIGN KEY (PersonId, RanchId)
+        REFERENCES PersonRanch(PersonId, RanchId),
 
     CONSTRAINT FK_PersonRanchRole_Role
         FOREIGN KEY (RoleId) REFERENCES Role(RoleId)
@@ -235,9 +236,6 @@ CREATE TABLE PersonManagedBySystemUser
 
     CONSTRAINT PK_PersonManagedBySystemUser
         PRIMARY KEY (SystemUserId, PersonId),
-
-    CONSTRAINT CK_PersonManagedBySystemUser_ApprovalStatus
-        CHECK (ApprovalStatus IS NULL OR ApprovalStatus IN (N'îàåùø', N'îîúéï', N'ìà îàåùø')),
 
     CONSTRAINT FK_PersonManagedBySystemUser_SystemUser
         FOREIGN KEY (SystemUserId) REFERENCES SystemUser(SystemUserId),
@@ -282,7 +280,6 @@ CREATE TABLE StallCompound
     RanchId INT NOT NULL,
     CompoundId TINYINT NOT NULL,
     CompoundName NVARCHAR(100) NOT NULL,
-    CompoundType NVARCHAR(50) NULL,
 
     CONSTRAINT PK_StallCompound
         PRIMARY KEY (RanchId, CompoundId),
@@ -390,9 +387,6 @@ CREATE TABLE Competition
     Notes NVARCHAR(500) NULL,
     StallMapUrl NVARCHAR(255) NULL,
 
-    CONSTRAINT CK_Competition_Status
-        CHECK (CompetitionStatus IS NULL OR CompetitionStatus IN (N'òúéãéú', N'ôúåçä', N'ôòéìä', N'äñúééîä')),
-
     CONSTRAINT CK_Competition_Dates
         CHECK (
             CompetitionEndDate >= CompetitionStartDate
@@ -420,36 +414,6 @@ CREATE TABLE ClassType
 
     CONSTRAINT FK_ClassType_Field
         FOREIGN KEY (FieldId) REFERENCES Field(FieldId)
-);
-GO
-
-CREATE TABLE ReiningType
-(
-    ReiningTypeId SMALLINT PRIMARY KEY,
-    PatternNumber TINYINT NULL,
-
-    CONSTRAINT FK_ReiningType_ClassType
-        FOREIGN KEY (ReiningTypeId) REFERENCES ClassType(ClassTypeId)
-);
-GO
-
-CREATE TABLE ReiningTypeManeuver
-(
-    ReiningTypeId SMALLINT NOT NULL,
-    ManeuverId TINYINT NOT NULL,
-    [Order] TINYINT NOT NULL,
-
-    CONSTRAINT PK_ReiningTypeManeuver
-        PRIMARY KEY (ReiningTypeId, ManeuverId),
-
-     CONSTRAINT UQ_ReiningPatternTypeManeuver_Order
-        UNIQUE (ReiningTypeId, [Order]),
-
-    CONSTRAINT FK_ReiningTypeManeuver_ReiningType
-        FOREIGN KEY (ReiningTypeId) REFERENCES ReiningType(ReiningTypeId),
-
-    CONSTRAINT FK_ReiningTypeManeuver_Maneuver
-        FOREIGN KEY (ManeuverId) REFERENCES Maneuver(ManeuverId)
 );
 GO
 
@@ -498,6 +462,36 @@ CREATE TABLE ClassInCompetition
     CONSTRAINT FK_ClassInCompetition_Arena
         FOREIGN KEY (ArenaRanchId, ArenaId)
         REFERENCES Arena(RanchId, ArenaId)
+);
+GO
+
+CREATE TABLE ReiningType
+(
+    ReiningClassInCompId INT PRIMARY KEY,
+    PatternNumber TINYINT NULL,
+
+    CONSTRAINT FK_ReiningType_ClassInCompetition
+        FOREIGN KEY (ReiningClassInCompId) REFERENCES ClassInCompetition(ClassInCompId)
+);
+GO
+
+CREATE TABLE ReiningTypeManeuver
+(
+    ReiningClassInCompId INT NOT NULL,
+    ManeuverId TINYINT NOT NULL,
+    [Order] TINYINT NOT NULL,
+
+    CONSTRAINT PK_ReiningTypeManeuver
+        PRIMARY KEY (ReiningClassInCompId, ManeuverId),
+
+     CONSTRAINT UQ_ReiningPatternTypeManeuver_Order
+        UNIQUE (ReiningClassInCompId, [Order]),
+
+    CONSTRAINT FK_ReiningTypeManeuver_ReiningType
+        FOREIGN KEY (ReiningClassInCompId) REFERENCES ReiningType(ReiningClassInCompId),
+
+    CONSTRAINT FK_ReiningTypeManeuver_Maneuver
+        FOREIGN KEY (ManeuverId) REFERENCES Maneuver(ManeuverId)
 );
 GO
 
@@ -552,9 +546,6 @@ CREATE TABLE Horse
     BirthYear SMALLINT NULL,
     Gender NVARCHAR(10) NULL,
 
-    CONSTRAINT CK_Horse_Gender
-        CHECK (Gender IS NULL OR Gender IN (N'æëø', N'îñåøñ', N'ð÷áä')),
-
     CONSTRAINT FK_Horse_Ranch
         FOREIGN KEY (RanchId) REFERENCES Ranch(RanchId)
 );
@@ -598,9 +589,6 @@ CREATE TABLE HorseParticipationInCompetition
 
     CONSTRAINT PK_HorseParticipationInCompetition
         PRIMARY KEY (HorseId, CompetitionId),
-
-    CONSTRAINT CK_HCHorseParticipationInCompetition_ApprovalStatus
-        CHECK (HCApprovalStatus IS NULL OR HCApprovalStatus IN (N'îàåùø', N'îîúéï', N'ìà îàåùø')),
 
     CONSTRAINT CK_HCHorseParticipationInCompetition_ApprovalConsistency
         CHECK (HCApprovalDate IS NULL OR HCApproverSystemUserId IS NOT NULL),
@@ -667,7 +655,7 @@ CREATE TABLE Fine
     FineAmount DECIMAL(10,2) NOT NULL,
 
     CONSTRAINT CK_Fine_FineAmount
-        CHECK (FineAmount >= 0),
+        CHECK (FineAmount >= 0)
 
 );
 GO
@@ -689,9 +677,6 @@ CREATE TABLE PaidTimeSlotInCompetition
     EndTime TIME(0) NOT NULL,
     SlotStatus NVARCHAR(20) NULL,
     SlotNotes NVARCHAR(500) NULL,
-
-    CONSTRAINT CK_PaidTimeSlotInCompetition_SlotStatus
-        CHECK (SlotStatus IS NULL OR SlotStatus IN (N'îìà', N'ìà îìà')),
 
     CONSTRAINT CK_PaidTimeSlotInCompetition_Times
         CHECK (EndTime > StartTime),
@@ -812,9 +797,6 @@ CREATE TABLE ProductChangeRequest
     RequestDate DATETIME2(0) NOT NULL,
     IsCancelled BIT NOT NULL CONSTRAINT DF_ProductChangeRequest_IsCancelled DEFAULT 0,
 
-    CONSTRAINT CK_ProductChangeRequest_Status
-        CHECK ([Status] IS NULL OR [Status] IN (N'àåùø', N'îîúéï ìàéùåø', N'ìà àåùø')),
-
     CONSTRAINT CK_ProductChangeRequest_CancelLogic
         CHECK (
             (IsCancelled = 1 AND NewPRequestId IS NULL)
@@ -926,9 +908,6 @@ CREATE TABLE ChangeEntryRequest
     [Status] NVARCHAR(20) NULL,
     IsCancelled BIT NOT NULL CONSTRAINT DF_ChangeEntryRequest_IsCancelled DEFAULT 0,
 
-    CONSTRAINT CK_ChangeEntryRequest_Status
-        CHECK ([Status] IS NULL OR [Status] IN (N'אושר', N'ממתין לאישור', N'לא אושר')),
-
     CONSTRAINT CK_ChangeEntryRequest_CancelLogic
         CHECK (
             (IsCancelled = 1 AND NewEntryId IS NULL)
@@ -947,6 +926,7 @@ CREATE TABLE ChangeEntryRequest
     CONSTRAINT FK_ChangeEntryRequest_NewEntry
         FOREIGN KEY (NewEntryId) REFERENCES Entry(EntryId)
 );
+GO
 
 CREATE TABLE PaidTimeRequest
 (
@@ -957,9 +937,6 @@ CREATE TABLE PaidTimeRequest
     AssignedStartTime DATETIME2(0) NULL,
     [Status] NVARCHAR(20) NULL,
     Notes NVARCHAR(500) NULL,
-
-    CONSTRAINT CK_PaidTimeRequest_Status
-        CHECK ([Status] IS NULL OR [Status] IN (N'ùåáõ', N'îîúéï ìùéáåõ', N'áåèì')),
 
     CONSTRAINT FK_PaidTimeRequest_ServiceRequest
         FOREIGN KEY (PaidTimeRequestId) REFERENCES ServiceRequest(SRequestId),

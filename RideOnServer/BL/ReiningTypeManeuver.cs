@@ -2,7 +2,7 @@
 {
     public class ReiningTypeManeuver
     {
-        public short ReiningTypeId { get; set; }
+        public short ReiningClassInCompId { get; set; }
 
         public byte ManeuverId { get; set; }
 
