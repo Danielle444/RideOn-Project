@@ -292,24 +292,28 @@ CREATE TABLE StallCompound
 );
 GO
 
-CREATE TABLE Stall
+	CREATE TABLE dbo.Stall
 (
     RanchId INT NOT NULL,
-    CompoundId TINYINT NOT NULL,
-    StallId INT NOT NULL,
+    CompoundID TINYINT NOT NULL,
+    StallId SMALLINT NOT NULL, -- הותאם ל-SMALLINT לפי הסטנדרט שלנו
     StallNumber NVARCHAR(20) NOT NULL,
-    StallType NVARCHAR(50) NULL,
+    StallType SMALLINT NOT NULL, -- החליף את StallType בעקבות הקשר IsTypeOf
     StallNotes NVARCHAR(500) NULL,
 
     CONSTRAINT PK_Stall
-        PRIMARY KEY (RanchId, CompoundId, StallId),
+        PRIMARY KEY (RanchId, CompoundID, StallId),
 
     CONSTRAINT UQ_Stall_Ranch_Compound_StallNumber
-        UNIQUE (RanchId, CompoundId, StallNumber),
+        UNIQUE (RanchId, CompoundID, StallNumber),
 
     CONSTRAINT FK_Stall_StallCompound
-        FOREIGN KEY (RanchId, CompoundId)
-        REFERENCES StallCompound(RanchId, CompoundId)
+        FOREIGN KEY (RanchId, CompoundID)
+        REFERENCES dbo.StallCompound(RanchId, CompoundID),
+
+    CONSTRAINT FK_Stall_Product
+        FOREIGN KEY (CatalogId)
+        REFERENCES dbo.Product(CatalogId)
 );
 GO
 
