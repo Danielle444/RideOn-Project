@@ -176,7 +176,7 @@ GO
 CREATE TABLE SystemUser
 (
     SystemUserId INT PRIMARY KEY,
-    Username NVARCHAR(100) NOT NULL UNIQUE,
+    Username NVARCHAR(100) NOT NULL,
     PasswordHash NVARCHAR(255) NULL,
     IsActive BIT NOT NULL CONSTRAINT DF_SystemUser_IsActive DEFAULT 1,
     CreatedDate DATETIME2(0) NOT NULL CONSTRAINT DF_SystemUser_CreatedDate DEFAULT SYSDATETIME(),
