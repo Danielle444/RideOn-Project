@@ -140,3 +140,208 @@ BEGIN
         PersonId = @PersonId;
 END
 GO
+
+-- SystemUser SP
+-- 1. Get SystemUser for Login
+CREATE PROCEDURE SP_GetSystemUserForLogin
+    @Username NVARCHAR(100)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- ה-DAL שולף, ה-BL מוודא את תקינות הסיסמה מול ה-Hash
+    SELECT 
+        SU.SystemUserId, 
+        SU.PasswordHash, 
+        SU.IsActive,
+        P.FirstName,
+        P.LastName
+    FROM SystemUser SU
+    INNER JOIN Person P ON SU.SystemUserId = P.PersonId
+    WHERE SU.Username = @Username;
+END
+GO
+
+-- 2. Toggle Status (Logical Delete / Restore)
+CREATE PROCEDURE SP_ToggleSystemUserStatus
+    @SystemUserId INT,
+    @IsActive BIT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    UPDATE SystemUser
+    SET IsActive = @IsActive
+    WHERE SystemUserId = @SystemUserId;
+END
+GO
+
+-- Federation Members SP
+-- 1. Insert or Upgrade to Federation Member
+CREATE PROCEDURE SP_InsertOrUpgradeFederationMember
+    -- Person parameters (Optional if PersonId is provided)
+    @PersonId INT = NULL, 
+    @NationalId VARCHAR(9) = NULL,
+    @FirstName NVARCHAR(50) = NULL,
+    @LastName NVARCHAR(50) = NULL,
+    @Gender NVARCHAR(10) = NULL,
+    @DateOfBirth DATE = NULL,
+    @CellPhone VARCHAR(20) = NULL,
+    @Email NVARCHAR(254) = NULL,
+    
+    -- FederationMember parameters (Required)
+    @HasValidMembership BIT,
+    @MedicalCheckValidUntil DATE,
+    @CertificationLevel NVARCHAR(30)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        DECLARE @CurrentPersonId INT = @PersonId;
+
+        -- אם ה-Controller/BL לא שלחו PersonId, מדובר באדם חדש
+        IF @CurrentPersonId IS NULL
+        BEGIN
+            INSERT INTO Person (NationalId, FirstName, LastName, Gender, DateOfBirth, CellPhone, Email)
+            VALUES (@NationalId, @FirstName, @LastName, @Gender, @DateOfBirth, @CellPhone, @Email);
+
+            SET @CurrentPersonId = SCOPE_IDENTITY();
+        END
+
+        -- הוספת הרשומה לטבלת הבת (באמצעות ה-ID הקיים או החדש)
+        INSERT INTO FederationMember (FederationMemberId, HasValidMembership, MedicalCheckValidUntil, CertificationLevel)
+        VALUES (@CurrentPersonId, @HasValidMembership, @MedicalCheckValidUntil, @CertificationLevel);
+
+        COMMIT TRANSACTION;
+        
+        -- מחזירים את המזהה (הישן או החדש) ל-DAL
+        SELECT @CurrentPersonId AS FederationMemberId;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW; 
+    END CATCH
+END
+GO
+
+-- 2. Get All Federation Members
+CREATE PROCEDURE SP_GetAllFederationMembers
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- שליפת נתונים רלוונטיים מטבלת האב והבת יחד
+    SELECT 
+        FM.FederationMemberId,
+        P.NationalId,
+        P.FirstName,
+        P.LastName,
+        FM.HasValidMembership,
+        FM.MedicalCheckValidUntil,
+        FM.CertificationLevel
+    FROM FederationMember FM
+    INNER JOIN Person P ON FM.FederationMemberId = P.PersonId;
+END
+GO
+
+-- PersonRanchRole SP
+
+CREATE PROCEDURE SP_AssignPersonRoleAtRanch
+    @PersonId INT,
+    @RanchId INT,
+    @RoleId TINYINT,
+    @RoleStatus NVARCHAR(20) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        -- Step 1: Ensure the base Person-Ranch connection exists
+        IF NOT EXISTS (SELECT 1 FROM PersonRanch WHERE PersonId = @PersonId AND RanchId = @RanchId)
+        BEGIN
+            INSERT INTO PersonRanch (PersonId, RanchId) 
+            VALUES (@PersonId, @RanchId);
+        END
+
+        -- Step 2: Insert or Update the specific Role
+        IF NOT EXISTS (SELECT 1 FROM PersonRanchRole WHERE PersonId = @PersonId AND RanchId = @RanchId AND RoleId = @RoleId)
+        BEGIN
+            INSERT INTO PersonRanchRole (PersonId, RanchId, RoleId, RoleStatus)
+            VALUES (@PersonId, @RanchId, @RoleId, @RoleStatus);
+        END
+        ELSE
+        BEGIN
+            -- Update status if role already exists (e.g., from 'Pending' to 'Active')
+            UPDATE PersonRanchRole
+            SET RoleStatus = @RoleStatus
+            WHERE PersonId = @PersonId AND RanchId = @RanchId AND RoleId = @RoleId;
+        END
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+GO
+
+CREATE PROCEDURE SP_GetPersonRanchesAndRoles
+    @PersonId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- שליפה שטוחה (Flat) שה-BL ב-C# יצטרך למפות לאובייקטים מתאימים (DTOs)
+    SELECT 
+        PRR.RanchId,
+        R.RanchName,
+        PRR.RoleId,
+        Rl.RoleName,
+        PRR.RoleStatus
+    FROM PersonRanchRole PRR
+    INNER JOIN Ranch R ON PRR.RanchId = R.RanchId
+    INNER JOIN Role Rl ON PRR.RoleId = Rl.RoleId
+    WHERE PRR.PersonId = @PersonId;
+END
+GO
+
+-- Admin manages people 
+
+CREATE PROCEDURE SP_AddManagedPerson
+    @SystemUserId INT,
+    @PersonId INT,
+    @ApprovalStatus NVARCHAR(20) = 'Pending'
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- משתמשים ב-GETDATE() כדי למלא את תאריך הבקשה ברמת ה-DB
+    INSERT INTO PersonManagedBySystemUser (SystemUserId, PersonId, RequestDate, ApprovalStatus)
+    VALUES (@SystemUserId, @PersonId, SYSDATETIME(), @ApprovalStatus);
+END
+GO
+
+
+CREATE PROCEDURE SP_GetManagedPersons
+    @SystemUserId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- מחזירים גם את פרטי האדם מתוך טבלת Person כדי שה-Client יוכל להציג אותם
+    SELECT 
+        M.PersonId,
+        P.FirstName,
+        P.LastName,
+        P.NationalId,
+        M.RequestDate,
+        M.ApprovalStatus
+    FROM PersonManagedBySystemUser M
+    INNER JOIN Person P ON M.PersonId = P.PersonId
+    WHERE M.SystemUserId = @SystemUserId;
+END
+GO
