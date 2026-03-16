@@ -10,7 +10,7 @@
 
         public string StallNumber { get; set; }
 
-        public string? StallType { get; set; }
+        public int StallType { get; set; }
 
         public string? StallNotes { get; set; }
     }
