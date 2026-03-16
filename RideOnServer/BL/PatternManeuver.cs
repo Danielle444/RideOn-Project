@@ -1,8 +1,8 @@
 ﻿namespace RideOnServer.BL
 {
-    public class ReiningTypeManeuver
+    public class PatternManeuver
     {
-        public short ReiningClassInCompId { get; set; }
+        public byte PatternNumber { get; set; }
 
         public byte ManeuverId { get; set; }
 

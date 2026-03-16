@@ -1,9 +1,14 @@
 USE RideOn;
 GO
 
-/* =========================================
-   DOUBLE K RANCH
-   ========================================= */
+/* =========================================================
+   InsertData_05_DoubleKRanchSetup.sql
+   כולל:
+   - Arena
+   - StallCompound
+   - Stall
+   - PriceCatalog
+   ========================================================= */
 
 INSERT INTO Arena
 (RanchId, ArenaId, ArenaName, ArenaLength, ArenaWidth, IsCovered)
@@ -290,12 +295,30 @@ GO
    ========================================================= */
 
 INSERT INTO PriceCatalog (ProductId, RanchId, CreationDate, ItemPrice, IsActive)
-VALUES
-(1, 11, '2026-03-14 00:00:00', 170, 1), -- פייד טיים קצר
-(2, 11, '2026-03-14 00:00:00', 240, 1), -- פייד טיים ארוך
-(3, 11, '2026-03-14 00:00:00', 150, 1), -- תא רגיל
-(4, 11, '2026-03-14 00:00:00', 200, 1), -- תא משודרג
-(5, 11, '2026-03-14 00:00:00', 40, 1);  -- שק נסורת רגיל
+SELECT
+    p.ProductId,
+    r.RanchId,
+    CAST('2026-03-14 00:00:00' AS DATETIME2(0)),
+    v.ItemPrice,
+    1
+FROM (VALUES
+    (N'פייד טיים קצר', 170.00),
+    (N'פייד טיים ארוך', 240.00),
+    (N'תא רגיל', 150.00),
+    (N'תא משודרג', 200.00),
+    (N'שק נסורת רגיל', 40.00)
+) AS v(ProductName, ItemPrice)
+JOIN Product p
+    ON p.ProductName = v.ProductName
+JOIN Ranch r
+    ON r.RanchName = N'דאבל קיי'
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM PriceCatalog pc
+    WHERE pc.ProductId = p.ProductId
+      AND pc.RanchId = r.RanchId
+      AND pc.IsActive = 1
+);
 GO
 
 

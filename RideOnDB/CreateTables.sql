@@ -465,35 +465,49 @@ CREATE TABLE ClassInCompetition
 );
 GO
 
+CREATE TABLE Pattern
+(
+PatternNumber TINYINT PRIMARY KEY
+);
+GO
+
 CREATE TABLE ReiningType
 (
-    ReiningClassInCompId INT PRIMARY KEY,
-    PatternNumber TINYINT NULL,
+ReiningClassInCompId INT PRIMARY KEY,
+PatternNumber TINYINT NOT NULL,
 
-    CONSTRAINT FK_ReiningType_ClassInCompetition
-        FOREIGN KEY (ReiningClassInCompId) REFERENCES ClassInCompetition(ClassInCompId)
+CONSTRAINT FK_ReiningType_ClassInCompetition
+FOREIGN KEY (ReiningClassInCompId) REFERENCES ClassInCompetition(ClassInCompId),
+
+CONSTRAINT FK_ReiningType_Pattern
+FOREIGN KEY (PatternNumber) REFERENCES Pattern(PatternNumber)
 );
 GO
 
-CREATE TABLE ReiningTypeManeuver
+
+CREATE TABLE PatternManeuver
 (
-    ReiningClassInCompId INT NOT NULL,
-    ManeuverId TINYINT NOT NULL,
-    [Order] TINYINT NOT NULL,
+PatternNumber TINYINT NOT NULL,
+ManeuverId TINYINT NOT NULL,
+[Order] TINYINT NOT NULL,
 
-    CONSTRAINT PK_ReiningTypeManeuver
-        PRIMARY KEY (ReiningClassInCompId, ManeuverId),
+CONSTRAINT PK_PatternManeuver
+PRIMARY KEY (PatternNumber, ManeuverId),
 
-     CONSTRAINT UQ_ReiningPatternTypeManeuver_Order
-        UNIQUE (ReiningClassInCompId, [Order]),
+CONSTRAINT UQ_PatternManeuver_Order
+UNIQUE (PatternNumber, [Order]),
 
-    CONSTRAINT FK_ReiningTypeManeuver_ReiningType
-        FOREIGN KEY (ReiningClassInCompId) REFERENCES ReiningType(ReiningClassInCompId),
+CONSTRAINT CK_PatternManeuver_Order
+CHECK ([Order] > 0),
 
-    CONSTRAINT FK_ReiningTypeManeuver_Maneuver
-        FOREIGN KEY (ManeuverId) REFERENCES Maneuver(ManeuverId)
+CONSTRAINT FK_PatternManeuver_Pattern
+FOREIGN KEY (PatternNumber) REFERENCES Pattern(PatternNumber),
+
+CONSTRAINT FK_PatternManeuver_Maneuver
+FOREIGN KEY (ManeuverId) REFERENCES Maneuver(ManeuverId)
 );
-GO
+GO 
+
 
 CREATE TABLE ClassJudge
 (
