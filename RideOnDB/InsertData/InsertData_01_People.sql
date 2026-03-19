@@ -4275,6 +4275,7 @@ INSERT INTO Person
 VALUES
 ('303139471', N'נינה', N'פוס', N'אישה', '1988-12-07', NULL, N'ninavoss60@gmail.com'),
 (NULL, N'עינת', N'שבת כהן', N'אישה', NULL, NULL, N'rndy0609@gmail.com'),
+(NULL, N'אלימרה אחזקות', N'בע"מ', N'לא ידוע', NULL, NULL, NULL),
 (NULL, N'אורי', N'שי', N'גבר', NULL, NULL, N'ori.shay@icloud.com');
 GO
 
@@ -4358,6 +4359,7 @@ VALUES
 (NULL, N'אורי', N'שי', N'ori.shay@icloud.com'),
 ('212403208', N'רז', N'רחבי', N'razblue54@gmail.com'),
 ('036918258', N'שירן', N'וויץ כחלון', N'shirank7@gmail.com'),
+('025501610', N'תמיר', N'דניאל', N'tamirdaniel2@gmail.com'),
 ('033172248', N'יוסי', N'דקל', N'y.d.horsemanship@gmail.com');
 GO
 
