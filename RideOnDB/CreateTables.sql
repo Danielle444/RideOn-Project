@@ -246,79 +246,7 @@ CREATE TABLE PersonManagedBySystemUser
 GO
 
 /* =========================================================
-   4) RANCH FACILITIES
-   ========================================================= */
-
-CREATE TABLE Arena
-(
-    RanchId INT NOT NULL,
-    ArenaId TINYINT NOT NULL,
-    ArenaName NVARCHAR(100) NOT NULL,
-    ArenaLength SMALLINT NULL,
-    ArenaWidth SMALLINT NULL,
-    IsCovered BIT NULL,
-
-    CONSTRAINT PK_Arena
-        PRIMARY KEY (RanchId, ArenaId),
-
-    CONSTRAINT UQ_Arena_RanchId_ArenaName
-        UNIQUE (RanchId, ArenaName),
-
-    CONSTRAINT CK_Arena_ArenaLength
-        CHECK (ArenaLength IS NULL OR ArenaLength > 0),
-
-    CONSTRAINT CK_Arena_ArenaWidth
-        CHECK (ArenaWidth IS NULL OR ArenaWidth > 0),
-
-    CONSTRAINT FK_Arena_Ranch
-        FOREIGN KEY (RanchId) REFERENCES Ranch(RanchId)
-);
-GO
-
-CREATE TABLE StallCompound
-(
-    RanchId INT NOT NULL,
-    CompoundId TINYINT NOT NULL,
-    CompoundName NVARCHAR(100) NOT NULL,
-
-    CONSTRAINT PK_StallCompound
-        PRIMARY KEY (RanchId, CompoundId),
-
-    CONSTRAINT UQ_StallCompound_Ranch_CompoundName
-        UNIQUE (RanchId, CompoundName),
-
-    CONSTRAINT FK_StallCompound_Ranch
-        FOREIGN KEY (RanchId) REFERENCES Ranch(RanchId)
-);
-GO
-
-	CREATE TABLE dbo.Stall
-(
-    RanchId INT NOT NULL,
-    CompoundID TINYINT NOT NULL,
-    StallId SMALLINT NOT NULL, -- הותאם ל-SMALLINT לפי הסטנדרט שלנו
-    StallNumber NVARCHAR(20) NOT NULL,
-    StallType SMALLINT NOT NULL, -- החליף את StallType בעקבות הקשר IsTypeOf
-    StallNotes NVARCHAR(500) NULL,
-
-    CONSTRAINT PK_Stall
-        PRIMARY KEY (RanchId, CompoundID, StallId),
-
-    CONSTRAINT UQ_Stall_Ranch_Compound_StallNumber
-        UNIQUE (RanchId, CompoundID, StallNumber),
-
-    CONSTRAINT FK_Stall_StallCompound
-        FOREIGN KEY (RanchId, CompoundID)
-        REFERENCES dbo.StallCompound(RanchId, CompoundID),
-
-    CONSTRAINT FK_Stall_Product
-        FOREIGN KEY (CatalogId)
-        REFERENCES dbo.Product(CatalogId)
-);
-GO
-
-/* =========================================================
-   5) PRODUCT CATALOG
+   4) PRODUCT CATALOG
    ========================================================= */
 
 CREATE TABLE Product
@@ -370,6 +298,77 @@ ON PriceCatalog(ProductId, RanchId)
 WHERE IsActive = 1;
 GO
 
+/* =========================================================
+   5) RANCH FACILITIES
+   ========================================================= */
+
+CREATE TABLE Arena
+(
+    RanchId INT NOT NULL,
+    ArenaId TINYINT NOT NULL,
+    ArenaName NVARCHAR(100) NOT NULL,
+    ArenaLength SMALLINT NULL,
+    ArenaWidth SMALLINT NULL,
+    IsCovered BIT NULL,
+
+    CONSTRAINT PK_Arena
+        PRIMARY KEY (RanchId, ArenaId),
+
+    CONSTRAINT UQ_Arena_RanchId_ArenaName
+        UNIQUE (RanchId, ArenaName),
+
+    CONSTRAINT CK_Arena_ArenaLength
+        CHECK (ArenaLength IS NULL OR ArenaLength > 0),
+
+    CONSTRAINT CK_Arena_ArenaWidth
+        CHECK (ArenaWidth IS NULL OR ArenaWidth > 0),
+
+    CONSTRAINT FK_Arena_Ranch
+        FOREIGN KEY (RanchId) REFERENCES Ranch(RanchId)
+);
+GO
+
+CREATE TABLE StallCompound
+(
+    RanchId INT NOT NULL,
+    CompoundId TINYINT NOT NULL,
+    CompoundName NVARCHAR(100) NOT NULL,
+
+    CONSTRAINT PK_StallCompound
+        PRIMARY KEY (RanchId, CompoundId),
+
+    CONSTRAINT UQ_StallCompound_Ranch_CompoundName
+        UNIQUE (RanchId, CompoundName),
+
+    CONSTRAINT FK_StallCompound_Ranch
+        FOREIGN KEY (RanchId) REFERENCES Ranch(RanchId)
+);
+GO
+
+	CREATE TABLE dbo.Stall
+(
+    RanchId INT NOT NULL,
+    CompoundId TINYINT NOT NULL,
+    StallId SMALLINT NOT NULL, -- הותאם ל-SMALLINT לפי הסטנדרט שלנו
+    StallNumber NVARCHAR(20) NOT NULL,
+    StallType SMALLINT NOT NULL, -- החליף את StallType בעקבות הקשר IsTypeOf
+    StallNotes NVARCHAR(500) NULL,
+
+    CONSTRAINT PK_Stall
+        PRIMARY KEY (RanchId, CompoundId, StallId),
+
+    CONSTRAINT UQ_Stall_Ranch_Compound_StallNumber
+        UNIQUE (RanchId, CompoundId, StallNumber),
+
+    CONSTRAINT FK_Stall_StallCompound
+        FOREIGN KEY (RanchId, CompoundId)
+        REFERENCES dbo.StallCompound(RanchId, CompoundId),
+
+    CONSTRAINT FK_Stall_Product
+        FOREIGN KEY (StallType)
+        REFERENCES dbo.Product(ProductId)
+);
+GO
 /* =========================================================
    6) COMPETITIONS / CLASSES / JUDGING
    ========================================================= */
@@ -744,7 +743,7 @@ CREATE TABLE StallBooking
     StallBookingId INT PRIMARY KEY,
     StallRanchId INT NOT NULL,
     StallCompoundId TINYINT NOT NULL,
-    StallId INT NOT NULL,
+    StallId SMALLINT  NOT NULL,
     HorseId INT NULL,
     CheckInDate DATE NOT NULL,
     CheckOutDate DATE NULL,
