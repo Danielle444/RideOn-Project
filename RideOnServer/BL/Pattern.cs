@@ -1,7 +1,8 @@
 ﻿namespace RideOnServer.BL
 {
-    public class ReiningType : ClassInCompetition
+    public class Pattern
     {
         public byte PatternNumber { get; set; }
+
     }
 }

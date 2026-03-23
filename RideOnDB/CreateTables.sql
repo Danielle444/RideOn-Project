@@ -21,34 +21,29 @@ GO
 CREATE TABLE Person
 (
     PersonId INT IDENTITY(1,1) PRIMARY KEY,
-    NationalId VARCHAR(9) NULL,
+    NationalId VARCHAR(9) NOT NULL UNIQUE,
     FirstName NVARCHAR(50) NOT NULL,
     LastName NVARCHAR(50) NOT NULL,
-    Gender NVARCHAR(10) NOT NULL,
+    Gender NVARCHAR(10) NULL,
     DateOfBirth DATE NULL,
     CellPhone VARCHAR(20) NULL,
     Email NVARCHAR(254) NULL,
 
     CONSTRAINT CK_Person_NationalId
-        CHECK (NationalId IS NULL OR (NationalId NOT LIKE '%[^0-9]%' AND LEN(NationalId) = 9)),
+    CHECK (NationalId NOT LIKE '%[^0-9]%' AND LEN(NationalId) = 9),
 
     CONSTRAINT CK_Person_Email
-        CHECK (Email IS NULL OR Email LIKE '_%@_%._%'),
+    CHECK (Email IS NULL OR Email LIKE '_%@_%._%'),
 
-    CONSTRAINT CK_Person_CellPhone
-        CHECK (
-            CellPhone IS NULL
-            OR (
-                LEN(CellPhone) BETWEEN 9 AND 20
-                AND CellPhone NOT LIKE '%[^0-9+ -]%'
-            )
+	CONSTRAINT CK_Person_CellPhone
+    CHECK (
+        CellPhone IS NULL
+        OR (
+            LEN(CellPhone) BETWEEN 9 AND 20
+            AND CellPhone NOT LIKE '%[^0-9+ -]%'
         )
+    )
 );
-GO
-
-CREATE UNIQUE INDEX UX_Person_NationalId
-ON Person(NationalId)
-WHERE NationalId IS NOT NULL;
 GO
 
 CREATE TABLE Role
@@ -176,9 +171,11 @@ GO
 CREATE TABLE SystemUser
 (
     SystemUserId INT PRIMARY KEY,
-    Username NVARCHAR(100) NOT NULL,
-    PasswordHash NVARCHAR(255) NULL,
+    Username NVARCHAR(100) NOT NULL UNIQUE,
+    PasswordHash NVARCHAR(255) NOT NULL,
+    PasswordSalt NVARCHAR(255) NOT NULL,
     IsActive BIT NOT NULL CONSTRAINT DF_SystemUser_IsActive DEFAULT 1,
+    MustChangePassword BIT NOT NULL CONSTRAINT DF_SystemUser_MustChangePassword DEFAULT 0,
     CreatedDate DATETIME2(0) NOT NULL CONSTRAINT DF_SystemUser_CreatedDate DEFAULT SYSDATETIME(),
 
     CONSTRAINT FK_SystemUser_Person
@@ -212,7 +209,8 @@ CREATE TABLE PersonRanchRole
     PersonId INT NOT NULL,
     RanchId INT NOT NULL,
     RoleId TINYINT NOT NULL,
-    RoleStatus NVARCHAR(20) NULL,
+    RoleStatus NVARCHAR(20) NOT NULL
+    CONSTRAINT DF_PersonRanchRole_RoleStatus DEFAULT 'Pending',
 
     CONSTRAINT PK_PersonRanchRole
         PRIMARY KEY (PersonId, RanchId, RoleId),
@@ -222,7 +220,10 @@ CREATE TABLE PersonRanchRole
         REFERENCES PersonRanch(PersonId, RanchId),
 
     CONSTRAINT FK_PersonRanchRole_Role
-        FOREIGN KEY (RoleId) REFERENCES Role(RoleId)
+        FOREIGN KEY (RoleId) REFERENCES Role(RoleId),
+
+    CONSTRAINT CK_PersonRanchRole_RoleStatus
+    CHECK (RoleStatus IN ('Pending', 'Approved', 'Rejected'))
 );
 GO
 
@@ -230,9 +231,11 @@ CREATE TABLE PersonManagedBySystemUser
 (
     SystemUserId INT NOT NULL,
     PersonId INT NOT NULL,
-    RequestDate DATETIME2(0) NULL,
+    RequestDate DATETIME2(0) NOT NULL
+        CONSTRAINT DF_PersonManagedBySystemUser_RequestDate DEFAULT SYSDATETIME(),
     UpdateDate DATETIME2(0) NULL,
-    ApprovalStatus NVARCHAR(20) NULL,
+    ApprovalStatus NVARCHAR(20) NOT NULL
+    CONSTRAINT DF_PersonManagedBySystemUser_ApprovalStatus DEFAULT 'Pending',
 
     CONSTRAINT PK_PersonManagedBySystemUser
         PRIMARY KEY (SystemUserId, PersonId),
@@ -241,84 +244,15 @@ CREATE TABLE PersonManagedBySystemUser
         FOREIGN KEY (SystemUserId) REFERENCES SystemUser(SystemUserId),
 
     CONSTRAINT FK_PersonManagedBySystemUser_Person
-        FOREIGN KEY (PersonId) REFERENCES Person(PersonId)
+        FOREIGN KEY (PersonId) REFERENCES Person(PersonId),
+
+    CONSTRAINT CK_PersonManagedBySystemUser_ApprovalStatus
+        CHECK (ApprovalStatus IN ('Pending', 'Approved', 'Rejected'))
 );
 GO
 
 /* =========================================================
-   4) RANCH FACILITIES
-   ========================================================= */
-
-CREATE TABLE Arena
-(
-    RanchId INT NOT NULL,
-    ArenaId TINYINT NOT NULL,
-    ArenaName NVARCHAR(100) NOT NULL,
-    ArenaLength SMALLINT NULL,
-    ArenaWidth SMALLINT NULL,
-    IsCovered BIT NULL,
-
-    CONSTRAINT PK_Arena
-        PRIMARY KEY (RanchId, ArenaId),
-
-    CONSTRAINT UQ_Arena_RanchId_ArenaName
-        UNIQUE (RanchId, ArenaName),
-
-    CONSTRAINT CK_Arena_ArenaLength
-        CHECK (ArenaLength IS NULL OR ArenaLength > 0),
-
-    CONSTRAINT CK_Arena_ArenaWidth
-        CHECK (ArenaWidth IS NULL OR ArenaWidth > 0),
-
-    CONSTRAINT FK_Arena_Ranch
-        FOREIGN KEY (RanchId) REFERENCES Ranch(RanchId)
-);
-GO
-
-CREATE TABLE StallCompound
-(
-    RanchId INT NOT NULL,
-    CompoundId TINYINT NOT NULL,
-    CompoundName NVARCHAR(100) NOT NULL,
-
-    CONSTRAINT PK_StallCompound
-        PRIMARY KEY (RanchId, CompoundId),
-
-    CONSTRAINT UQ_StallCompound_Ranch_CompoundName
-        UNIQUE (RanchId, CompoundName),
-
-    CONSTRAINT FK_StallCompound_Ranch
-        FOREIGN KEY (RanchId) REFERENCES Ranch(RanchId)
-);
-GO
-
-	CREATE TABLE dbo.Stall
-(
-    RanchId INT NOT NULL,
-    CompoundID TINYINT NOT NULL,
-    StallId SMALLINT NOT NULL, -- הותאם ל-SMALLINT לפי הסטנדרט שלנו
-    StallNumber NVARCHAR(20) NOT NULL,
-    StallType SMALLINT NOT NULL, -- החליף את StallType בעקבות הקשר IsTypeOf
-    StallNotes NVARCHAR(500) NULL,
-
-    CONSTRAINT PK_Stall
-        PRIMARY KEY (RanchId, CompoundID, StallId),
-
-    CONSTRAINT UQ_Stall_Ranch_Compound_StallNumber
-        UNIQUE (RanchId, CompoundID, StallNumber),
-
-    CONSTRAINT FK_Stall_StallCompound
-        FOREIGN KEY (RanchId, CompoundID)
-        REFERENCES dbo.StallCompound(RanchId, CompoundID),
-
-    CONSTRAINT FK_Stall_Product
-        FOREIGN KEY (CatalogId)
-        REFERENCES dbo.Product(CatalogId)
-);
-GO
-
-/* =========================================================
-   5) PRODUCT CATALOG
+   4) PRODUCT CATALOG
    ========================================================= */
 
 CREATE TABLE Product
@@ -370,6 +304,77 @@ ON PriceCatalog(ProductId, RanchId)
 WHERE IsActive = 1;
 GO
 
+/* =========================================================
+   5) RANCH FACILITIES
+   ========================================================= */
+
+CREATE TABLE Arena
+(
+    RanchId INT NOT NULL,
+    ArenaId TINYINT NOT NULL,
+    ArenaName NVARCHAR(100) NOT NULL,
+    ArenaLength SMALLINT NULL,
+    ArenaWidth SMALLINT NULL,
+    IsCovered BIT NULL,
+
+    CONSTRAINT PK_Arena
+        PRIMARY KEY (RanchId, ArenaId),
+
+    CONSTRAINT UQ_Arena_RanchId_ArenaName
+        UNIQUE (RanchId, ArenaName),
+
+    CONSTRAINT CK_Arena_ArenaLength
+        CHECK (ArenaLength IS NULL OR ArenaLength > 0),
+
+    CONSTRAINT CK_Arena_ArenaWidth
+        CHECK (ArenaWidth IS NULL OR ArenaWidth > 0),
+
+    CONSTRAINT FK_Arena_Ranch
+        FOREIGN KEY (RanchId) REFERENCES Ranch(RanchId)
+);
+GO
+
+CREATE TABLE StallCompound
+(
+    RanchId INT NOT NULL,
+    CompoundId TINYINT NOT NULL,
+    CompoundName NVARCHAR(100) NOT NULL,
+
+    CONSTRAINT PK_StallCompound
+        PRIMARY KEY (RanchId, CompoundId),
+
+    CONSTRAINT UQ_StallCompound_Ranch_CompoundName
+        UNIQUE (RanchId, CompoundName),
+
+    CONSTRAINT FK_StallCompound_Ranch
+        FOREIGN KEY (RanchId) REFERENCES Ranch(RanchId)
+);
+GO
+
+	CREATE TABLE Stall
+(
+    RanchId INT NOT NULL,
+    CompoundId TINYINT NOT NULL,
+    StallId SMALLINT NOT NULL, -- הותאם ל-SMALLINT לפי הסטנדרט שלנו
+    StallNumber NVARCHAR(20) NOT NULL,
+    StallType SMALLINT NOT NULL, -- החליף את StallType בעקבות הקשר IsTypeOf
+    StallNotes NVARCHAR(500) NULL,
+
+    CONSTRAINT PK_Stall
+        PRIMARY KEY (RanchId, CompoundId, StallId),
+
+    CONSTRAINT UQ_Stall_Ranch_Compound_StallNumber
+        UNIQUE (RanchId, CompoundId, StallNumber),
+
+    CONSTRAINT FK_Stall_StallCompound
+        FOREIGN KEY (RanchId, CompoundId)
+        REFERENCES StallCompound(RanchId, CompoundId),
+
+    CONSTRAINT FK_Stall_Product
+        FOREIGN KEY (StallType)
+        REFERENCES Product(ProductId)
+);
+GO
 /* =========================================================
    6) COMPETITIONS / CLASSES / JUDGING
    ========================================================= */
@@ -469,35 +474,49 @@ CREATE TABLE ClassInCompetition
 );
 GO
 
+CREATE TABLE Pattern
+(
+PatternNumber TINYINT PRIMARY KEY
+);
+GO
+
 CREATE TABLE ReiningType
 (
-    ReiningClassInCompId INT PRIMARY KEY,
-    PatternNumber TINYINT NULL,
+ReiningClassInCompId INT PRIMARY KEY,
+PatternNumber TINYINT NOT NULL,
 
-    CONSTRAINT FK_ReiningType_ClassInCompetition
-        FOREIGN KEY (ReiningClassInCompId) REFERENCES ClassInCompetition(ClassInCompId)
+CONSTRAINT FK_ReiningType_ClassInCompetition
+FOREIGN KEY (ReiningClassInCompId) REFERENCES ClassInCompetition(ClassInCompId),
+
+CONSTRAINT FK_ReiningType_Pattern
+FOREIGN KEY (PatternNumber) REFERENCES Pattern(PatternNumber)
 );
 GO
 
-CREATE TABLE ReiningTypeManeuver
+
+CREATE TABLE PatternManeuver
 (
-    ReiningClassInCompId INT NOT NULL,
-    ManeuverId TINYINT NOT NULL,
-    [Order] TINYINT NOT NULL,
+PatternNumber TINYINT NOT NULL,
+ManeuverId TINYINT NOT NULL,
+[Order] TINYINT NOT NULL,
 
-    CONSTRAINT PK_ReiningTypeManeuver
-        PRIMARY KEY (ReiningClassInCompId, ManeuverId),
+CONSTRAINT PK_PatternManeuver
+PRIMARY KEY (PatternNumber, ManeuverId),
 
-     CONSTRAINT UQ_ReiningPatternTypeManeuver_Order
-        UNIQUE (ReiningClassInCompId, [Order]),
+CONSTRAINT UQ_PatternManeuver_Order
+UNIQUE (PatternNumber, [Order]),
 
-    CONSTRAINT FK_ReiningTypeManeuver_ReiningType
-        FOREIGN KEY (ReiningClassInCompId) REFERENCES ReiningType(ReiningClassInCompId),
+CONSTRAINT CK_PatternManeuver_Order
+CHECK ([Order] > 0),
 
-    CONSTRAINT FK_ReiningTypeManeuver_Maneuver
-        FOREIGN KEY (ManeuverId) REFERENCES Maneuver(ManeuverId)
+CONSTRAINT FK_PatternManeuver_Pattern
+FOREIGN KEY (PatternNumber) REFERENCES Pattern(PatternNumber),
+
+CONSTRAINT FK_PatternManeuver_Maneuver
+FOREIGN KEY (ManeuverId) REFERENCES Maneuver(ManeuverId)
 );
-GO
+GO 
+
 
 CREATE TABLE ClassJudge
 (
@@ -730,7 +749,7 @@ CREATE TABLE StallBooking
     StallBookingId INT PRIMARY KEY,
     StallRanchId INT NOT NULL,
     StallCompoundId TINYINT NOT NULL,
-    StallId INT NOT NULL,
+    StallId SMALLINT  NOT NULL,
     HorseId INT NULL,
     CheckInDate DATE NOT NULL,
     CheckOutDate DATE NULL,
