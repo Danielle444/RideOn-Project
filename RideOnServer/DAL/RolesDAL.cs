@@ -16,9 +16,9 @@ namespace RideOnServer.DAL
             {
                 connection = Connect("DefaultConnection");
             }
-            catch (Exception ex)
+            catch
             {
-                throw ex;
+                throw;
             }
 
             command = CreateCommandWithStoredProcedure("GetAllRoles", connection, null);
@@ -40,9 +40,9 @@ namespace RideOnServer.DAL
 
                 return roles;
             }
-            catch (Exception ex)
+            catch
             {
-                throw ex;
+                throw;
             }
             finally
             {

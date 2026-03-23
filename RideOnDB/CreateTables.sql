@@ -21,34 +21,29 @@ GO
 CREATE TABLE Person
 (
     PersonId INT IDENTITY(1,1) PRIMARY KEY,
-    NationalId VARCHAR(9) NULL,
+    NationalId VARCHAR(9) NOT NULL UNIQUE,
     FirstName NVARCHAR(50) NOT NULL,
     LastName NVARCHAR(50) NOT NULL,
-    Gender NVARCHAR(10) NOT NULL,
+    Gender NVARCHAR(10) NULL,
     DateOfBirth DATE NULL,
     CellPhone VARCHAR(20) NULL,
     Email NVARCHAR(254) NULL,
 
     CONSTRAINT CK_Person_NationalId
-        CHECK (NationalId IS NULL OR (NationalId NOT LIKE '%[^0-9]%' AND LEN(NationalId) = 9)),
+    CHECK (NationalId NOT LIKE '%[^0-9]%' AND LEN(NationalId) = 9),
 
     CONSTRAINT CK_Person_Email
-        CHECK (Email IS NULL OR Email LIKE '_%@_%._%'),
+    CHECK (Email IS NULL OR Email LIKE '_%@_%._%'),
 
-    CONSTRAINT CK_Person_CellPhone
-        CHECK (
-            CellPhone IS NULL
-            OR (
-                LEN(CellPhone) BETWEEN 9 AND 20
-                AND CellPhone NOT LIKE '%[^0-9+ -]%'
-            )
+	CONSTRAINT CK_Person_CellPhone
+    CHECK (
+        CellPhone IS NULL
+        OR (
+            LEN(CellPhone) BETWEEN 9 AND 20
+            AND CellPhone NOT LIKE '%[^0-9+ -]%'
         )
+    )
 );
-GO
-
-CREATE UNIQUE INDEX UX_Person_NationalId
-ON Person(NationalId)
-WHERE NationalId IS NOT NULL;
 GO
 
 CREATE TABLE Role
@@ -176,9 +171,11 @@ GO
 CREATE TABLE SystemUser
 (
     SystemUserId INT PRIMARY KEY,
-    Username NVARCHAR(100) NOT NULL,
-    PasswordHash NVARCHAR(255) NULL,
+    Username NVARCHAR(100) NOT NULL UNIQUE,
+    PasswordHash NVARCHAR(255) NOT NULL,
+    PasswordSalt NVARCHAR(255) NOT NULL,
     IsActive BIT NOT NULL CONSTRAINT DF_SystemUser_IsActive DEFAULT 1,
+    MustChangePassword BIT NOT NULL CONSTRAINT DF_SystemUser_MustChangePassword DEFAULT 0,
     CreatedDate DATETIME2(0) NOT NULL CONSTRAINT DF_SystemUser_CreatedDate DEFAULT SYSDATETIME(),
 
     CONSTRAINT FK_SystemUser_Person
@@ -212,7 +209,8 @@ CREATE TABLE PersonRanchRole
     PersonId INT NOT NULL,
     RanchId INT NOT NULL,
     RoleId TINYINT NOT NULL,
-    RoleStatus NVARCHAR(20) NULL,
+    RoleStatus NVARCHAR(20) NOT NULL
+    CONSTRAINT DF_PersonRanchRole_RoleStatus DEFAULT 'Pending',
 
     CONSTRAINT PK_PersonRanchRole
         PRIMARY KEY (PersonId, RanchId, RoleId),
@@ -222,7 +220,10 @@ CREATE TABLE PersonRanchRole
         REFERENCES PersonRanch(PersonId, RanchId),
 
     CONSTRAINT FK_PersonRanchRole_Role
-        FOREIGN KEY (RoleId) REFERENCES Role(RoleId)
+        FOREIGN KEY (RoleId) REFERENCES Role(RoleId),
+
+    CONSTRAINT CK_PersonRanchRole_RoleStatus
+    CHECK (RoleStatus IN ('Pending', 'Approved', 'Rejected'))
 );
 GO
 
@@ -230,9 +231,11 @@ CREATE TABLE PersonManagedBySystemUser
 (
     SystemUserId INT NOT NULL,
     PersonId INT NOT NULL,
-    RequestDate DATETIME2(0) NULL,
+    RequestDate DATETIME2(0) NOT NULL
+        CONSTRAINT DF_PersonManagedBySystemUser_RequestDate DEFAULT SYSDATETIME(),
     UpdateDate DATETIME2(0) NULL,
-    ApprovalStatus NVARCHAR(20) NULL,
+    ApprovalStatus NVARCHAR(20) NOT NULL
+    CONSTRAINT DF_PersonManagedBySystemUser_ApprovalStatus DEFAULT 'Pending',
 
     CONSTRAINT PK_PersonManagedBySystemUser
         PRIMARY KEY (SystemUserId, PersonId),
@@ -241,7 +244,10 @@ CREATE TABLE PersonManagedBySystemUser
         FOREIGN KEY (SystemUserId) REFERENCES SystemUser(SystemUserId),
 
     CONSTRAINT FK_PersonManagedBySystemUser_Person
-        FOREIGN KEY (PersonId) REFERENCES Person(PersonId)
+        FOREIGN KEY (PersonId) REFERENCES Person(PersonId),
+
+    CONSTRAINT CK_PersonManagedBySystemUser_ApprovalStatus
+        CHECK (ApprovalStatus IN ('Pending', 'Approved', 'Rejected'))
 );
 GO
 
@@ -345,7 +351,7 @@ CREATE TABLE StallCompound
 );
 GO
 
-	CREATE TABLE dbo.Stall
+	CREATE TABLE Stall
 (
     RanchId INT NOT NULL,
     CompoundId TINYINT NOT NULL,
@@ -362,11 +368,11 @@ GO
 
     CONSTRAINT FK_Stall_StallCompound
         FOREIGN KEY (RanchId, CompoundId)
-        REFERENCES dbo.StallCompound(RanchId, CompoundId),
+        REFERENCES StallCompound(RanchId, CompoundId),
 
     CONSTRAINT FK_Stall_Product
         FOREIGN KEY (StallType)
-        REFERENCES dbo.Product(ProductId)
+        REFERENCES Product(ProductId)
 );
 GO
 /* =========================================================
