@@ -1,6 +1,6 @@
---Arena SP
+--Arena usp
 
-CREATE PROCEDURE SP_InsertArena
+CREATE PROCEDURE usp_InsertArena
     @RanchId INT,
     @ArenaName NVARCHAR(100),
     @ArenaLength SMALLINT = NULL,
@@ -24,7 +24,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_GetArenasByRanchId
+CREATE PROCEDURE usp_GetArenasByRanchId
     @RanchId INT
 AS
 BEGIN
@@ -43,7 +43,7 @@ GO
 
 -- Compound and stall
 
-CREATE PROCEDURE SP_CreateCompoundWithStalls
+CREATE PROCEDURE usp_CreateCompoundWithStalls
     @RanchId INT,
     @CompoundName NVARCHAR(100),
     @NumberOfStalls SMALLINT,
@@ -91,7 +91,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_GetCompoundsByRanchId
+CREATE PROCEDURE usp_GetCompoundsByRanchId
     @RanchId INT
 AS
 BEGIN
@@ -105,7 +105,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_GetStallsByCompoundId
+CREATE PROCEDURE usp_GetStallsByCompoundId
     @RanchId INT,
     @CompoundId TINYINT
 AS
@@ -124,7 +124,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_GetTotalStallsCountByRanchId
+CREATE PROCEDURE usp_GetTotalStallsCountByRanchId
     @RanchId INT
 AS
 BEGIN
