@@ -1,66 +1,376 @@
-CREATE PROCEDURE SP_InsertPerson
-    @NationalId VARCHAR(9),
-    @FirstName NVARCHAR(50),
-    @LastName NVARCHAR(50),
-    @Gender NVARCHAR(10),
-    @DateOfBirth DATE,
-    @CellPhone VARCHAR(20),
-    @Email NVARCHAR(254)
+USE RideOn;
+GO
+/* =========================================================
+   1) VALIDATIONS (Pre-Registration Checks)
+   ========================================================= */
+   
+CREATE PROCEDURE usp_CheckNationalIdExists
+    @NationalId VARCHAR(9)
 AS
 BEGIN
-    INSERT INTO Person (NationalId, FirstName, LastName, Gender, DateOfBirth, CellPhone, Email)
-    VALUES (@NationalId, @FirstName, @LastName, @Gender, @DateOfBirth, @CellPhone, @Email);
-
-    -- מחזירים את ה-ID החדש שנוצר כדי שה-DAL יוכל להעביר אותו ל-BL
-    SELECT SCOPE_IDENTITY();
+    SET NOCOUNT ON;
+    
+    SELECT 
+        CASE 
+            WHEN EXISTS (
+                SELECT 1 
+                FROM Person 
+                WHERE NationalId = @NationalId
+            )
+            THEN 1 
+            ELSE 0 
+        END AS ExistsFlag;
 END
 GO
 
-CREATE PROCEDURE SP_RegisterSystemUser
-    -- Person parameters
+CREATE PROCEDURE usp_CheckUsernameExists
+    @Username NVARCHAR(100)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        CASE 
+            WHEN EXISTS (
+                SELECT 1
+                FROM SystemUser
+                WHERE Username = @Username
+            )
+            THEN 1
+            ELSE 0
+        END AS ExistsFlag;
+END
+GO
+
+
+/* =========================================================
+   2) REGISTRATION
+   ========================================================= */
+CREATE PROCEDURE usp_RegisterSystemUser
     @NationalId VARCHAR(9),
     @FirstName NVARCHAR(50),
     @LastName NVARCHAR(50),
-    @Gender NVARCHAR(10),
-    @DateOfBirth DATE,
+    @Gender NVARCHAR(10) = NULL,
+    @DateOfBirth DATE = NULL,
     @CellPhone VARCHAR(20),
     @Email NVARCHAR(254),
-    -- SystemUser parameters
     @Username NVARCHAR(100),
-    @PasswordHash NVARCHAR(255)
+    @PasswordHash NVARCHAR(255),
+    @PasswordSalt NVARCHAR(255)
 AS
 BEGIN
     SET NOCOUNT ON;
     
     BEGIN TRANSACTION;
     BEGIN TRY
-        -- 1. Insert into base table
+
+        IF EXISTS (SELECT 1 FROM SystemUser WHERE Username = @Username)
+        BEGIN
+            THROW 50001, 'Username already exists', 1;
+        END
+
+        IF EXISTS (SELECT 1 FROM Person WHERE NationalId = @NationalId)
+        BEGIN
+            THROW 50002, 'NationalId already exists', 1;
+        END
+
         INSERT INTO Person (NationalId, FirstName, LastName, Gender, DateOfBirth, CellPhone, Email)
         VALUES (@NationalId, @FirstName, @LastName, @Gender, @DateOfBirth, @CellPhone, @Email);
 
-        -- 2. Get the newly created PersonId
         DECLARE @NewPersonId INT = SCOPE_IDENTITY();
 
-        -- 3. Insert into derived table using the new ID
-        INSERT INTO SystemUser (SystemUserId, Username, PasswordHash)
-        VALUES (@NewPersonId, @Username, @PasswordHash);
+        INSERT INTO SystemUser (SystemUserId, Username, PasswordHash, PasswordSalt)
+        VALUES (@NewPersonId, @Username, @PasswordHash, @PasswordSalt);
 
-        -- If we got here, everything succeeded
         COMMIT TRANSACTION;
-        
-        -- Return the new ID to the DAL
+
         SELECT @NewPersonId AS NewPersonId;
+
     END TRY
     BEGIN CATCH
-        -- If anything failed, rollback everything
         ROLLBACK TRANSACTION;
         THROW; 
     END CATCH
 END
 GO
--- סינון לפי שם, ניתן להוסיף סינון לפי חווה, תפקיד, אחר כך
 
-CREATE PROCEDURE SP_SearchPersons
+/* =========================================================
+   3) PERSON-RANCH-ROLE ASSIGNMENT
+   ========================================================= */
+
+CREATE PROCEDURE usp_AssignPersonRoleAtRanch
+    @PersonId INT,
+    @RanchId INT,
+    @RoleId TINYINT,
+    @RoleStatus NVARCHAR(20) = 'Pending'
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    BEGIN TRANSACTION;
+    BEGIN TRY
+
+        -- 1. Validation - RoleStatus
+        IF @RoleStatus NOT IN ('Pending', 'Approved', 'Rejected')
+        BEGIN
+            THROW 50003, 'Invalid RoleStatus', 1;
+        END
+
+        -- 2. Validation - Person exists
+        IF NOT EXISTS (SELECT 1 FROM Person WHERE PersonId = @PersonId)
+        BEGIN
+            THROW 50004, 'Person does not exist', 1;
+        END
+
+        -- 3. Validation - Ranch exists
+        IF NOT EXISTS (SELECT 1 FROM Ranch WHERE RanchId = @RanchId)
+        BEGIN
+            THROW 50005, 'Ranch does not exist', 1;
+        END
+
+        -- 4. Validation - Role exists
+        IF NOT EXISTS (SELECT 1 FROM Role WHERE RoleId = @RoleId)
+        BEGIN
+            THROW 50006, 'Role does not exist', 1;
+        END
+
+        -- 5. Ensure Person-Ranch exists
+        IF NOT EXISTS (
+            SELECT 1 
+            FROM PersonRanch 
+            WHERE PersonId = @PersonId AND RanchId = @RanchId
+        )
+        BEGIN
+            INSERT INTO PersonRanch (PersonId, RanchId) 
+            VALUES (@PersonId, @RanchId);
+        END
+
+        -- 6. Insert or update role
+        IF NOT EXISTS (
+            SELECT 1 
+            FROM PersonRanchRole 
+            WHERE PersonId = @PersonId AND RanchId = @RanchId AND RoleId = @RoleId
+        )
+        BEGIN
+            INSERT INTO PersonRanchRole (PersonId, RanchId, RoleId, RoleStatus)
+            VALUES (@PersonId, @RanchId, @RoleId, @RoleStatus);
+        END
+        ELSE
+        BEGIN
+            UPDATE PersonRanchRole
+            SET RoleStatus = @RoleStatus
+            WHERE PersonId = @PersonId 
+              AND RanchId = @RanchId 
+              AND RoleId = @RoleId;
+        END
+
+        COMMIT TRANSACTION;
+
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+GO
+
+
+CREATE PROCEDURE usp_UpdatePersonRoleStatus
+    @PersonId INT,
+    @RanchId INT,
+    @RoleId TINYINT,
+    @RoleStatus NVARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRANSACTION;
+    BEGIN TRY
+
+        -- Validation - RoleStatus
+        IF @RoleStatus NOT IN ('Pending', 'Approved', 'Rejected')
+        BEGIN
+            THROW 50007, 'Invalid RoleStatus', 1;
+        END
+
+        -- Validation - row exists
+        IF NOT EXISTS (
+            SELECT 1
+            FROM PersonRanchRole
+            WHERE PersonId = @PersonId
+              AND RanchId = @RanchId
+              AND RoleId = @RoleId
+        )
+        BEGIN
+            THROW 50008, 'PersonRanchRole does not exist', 1;
+        END
+
+        UPDATE PersonRanchRole
+        SET RoleStatus = @RoleStatus
+        WHERE PersonId = @PersonId
+          AND RanchId = @RanchId
+          AND RoleId = @RoleId;
+
+        COMMIT TRANSACTION;
+
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+GO
+
+/* =========================================================
+   4) AUTHENTICATION (LOGIN)
+   ========================================================= */
+
+   CREATE PROCEDURE usp_GetSystemUserForLogin
+    @Username NVARCHAR(100)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    SELECT 
+    SU.SystemUserId,
+    SU.Username,
+    SU.PasswordHash,
+    SU.PasswordSalt,
+    SU.IsActive,
+    SU.MustChangePassword,
+    SU.CreatedDate,
+    P.FirstName,
+    P.LastName
+FROM SystemUser SU
+INNER JOIN Person P 
+    ON SU.SystemUserId = P.PersonId
+WHERE SU.Username = @Username;
+END
+GO
+
+
+CREATE PROCEDURE usp_GetApprovedPersonRanchesAndRoles
+    @PersonId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        PRR.RanchId,
+        R.RanchName,
+        PRR.RoleId,
+        RL.RoleName
+    FROM PersonRanchRole PRR
+    INNER JOIN Ranch R 
+        ON PRR.RanchId = R.RanchId
+    INNER JOIN Role RL 
+        ON PRR.RoleId = RL.RoleId
+    WHERE PRR.PersonId = @PersonId
+      AND PRR.RoleStatus = 'Approved';
+END
+GO
+
+/* =========================================================
+   5) PASSWORD MANAGEMENT
+   ========================================================= */
+
+   CREATE PROCEDURE usp_UpdateSystemUserPassword
+    @SystemUserId INT,
+    @NewPasswordHash NVARCHAR(255),
+    @NewPasswordSalt NVARCHAR(255)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE SystemUser
+    SET 
+        PasswordHash = @NewPasswordHash,
+        PasswordSalt = @NewPasswordSalt,
+        MustChangePassword = 0
+    WHERE SystemUserId = @SystemUserId
+      AND IsActive = 1;
+END
+GO
+
+CREATE PROCEDURE usp_SetMustChangePassword
+    @SystemUserId INT,
+    @MustChangePassword BIT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE SystemUser
+    SET MustChangePassword = @MustChangePassword
+    WHERE SystemUserId = @SystemUserId;
+END
+GO
+   /* =========================================================
+   6) USER STATUS MANAGEMENT
+   ========================================================= */
+
+   CREATE PROCEDURE usp_ToggleSystemUserStatus
+    @SystemUserId INT,
+    @IsActive BIT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    UPDATE SystemUser
+    SET IsActive = @IsActive
+    WHERE SystemUserId = @SystemUserId;
+END
+GO
+
+
+/* =========================================================
+   7) USER DATA MANAGEMENT
+   ========================================================= */
+
+   CREATE PROCEDURE usp_GetPersonRanchesAndRoles
+    @PersonId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- שליפה שטוחה (Flat) שה-BL ב-C# יצטרך למפות לאובייקטים מתאימים (DTOs)
+    SELECT 
+        PRR.RanchId,
+        R.RanchName,
+        PRR.RoleId,
+        Rl.RoleName,
+        PRR.RoleStatus
+    FROM PersonRanchRole PRR
+    INNER JOIN Ranch R ON PRR.RanchId = R.RanchId
+    INNER JOIN Role Rl ON PRR.RoleId = Rl.RoleId
+    WHERE PRR.PersonId = @PersonId;
+END
+GO
+
+
+   CREATE PROCEDURE usp_UpdatePerson
+    @PersonId INT,
+    @FirstName NVARCHAR(50),
+    @LastName NVARCHAR(50),
+    @Gender NVARCHAR(10),
+    @CellPhone VARCHAR(20),
+    @Email NVARCHAR(254)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE Person
+    SET 
+        FirstName = @FirstName,
+        LastName = @LastName,
+        Gender = @Gender,
+        CellPhone = @CellPhone,
+        Email = @Email
+    WHERE 
+        PersonId = @PersonId;
+END
+GO
+
+CREATE PROCEDURE usp_SearchPersons
     @SearchText NVARCHAR(100) = NULL, -- יכול להכיל חלק משם פרטי או משפחה
     @IsActive BIT = NULL
     -- TODO: Add @RanchId INT = NULL, @RoleId TINYINT = NULL when needed
@@ -90,95 +400,12 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_CheckEmailExists
-    @Email NVARCHAR(254)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    -- Returns the count of matching emails
-    SELECT COUNT(*) 
-    FROM Person 
-    WHERE Email = @Email;
-END
-GO
 
-CREATE PROCEDURE SP_CheckNationalIdExists
-    @NationalId VARCHAR(9)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    -- Returns the count of matching National IDs
-    SELECT COUNT(*) 
-    FROM Person 
-    WHERE NationalId = @NationalId;
-END
-GO
+/* =========================================================
+   8) FEDERATION MEMBERS
+   ========================================================= */
 
---update
-
-CREATE PROCEDURE SP_UpdatePerson
-    @PersonId INT,
-    @FirstName NVARCHAR(50),
-    @LastName NVARCHAR(50),
-    @Gender NVARCHAR(10),
-    @CellPhone VARCHAR(20),
-    @Email NVARCHAR(254)
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    UPDATE Person
-    SET 
-        FirstName = @FirstName,
-        LastName = @LastName,
-        Gender = @Gender,
-        CellPhone = @CellPhone,
-        Email = @Email
-    WHERE 
-        PersonId = @PersonId;
-END
-GO
-
--- SystemUser SP
--- 1. Get SystemUser for Login
-CREATE PROCEDURE SP_GetSystemUserForLogin
-    @Username NVARCHAR(100)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    -- ה-DAL שולף, ה-BL מוודא את תקינות הסיסמה מול ה-Hash
-    SELECT 
-        SU.SystemUserId, 
-        SU.PasswordHash, 
-        SU.IsActive,
-        P.FirstName,
-        P.LastName
-    FROM SystemUser SU
-    INNER JOIN Person P ON SU.SystemUserId = P.PersonId
-    WHERE SU.Username = @Username;
-END
-GO
-
--- 2. Toggle Status (Logical Delete / Restore)
-CREATE PROCEDURE SP_ToggleSystemUserStatus
-    @SystemUserId INT,
-    @IsActive BIT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    UPDATE SystemUser
-    SET IsActive = @IsActive
-    WHERE SystemUserId = @SystemUserId;
-END
-GO
-
--- Federation Members SP
--- 1. Insert or Upgrade to Federation Member
-CREATE PROCEDURE SP_InsertOrUpgradeFederationMember
+   CREATE PROCEDURE usp_InsertOrUpgradeFederationMember
     -- Person parameters (Optional if PersonId is provided)
     @PersonId INT = NULL, 
     @NationalId VARCHAR(9) = NULL,
@@ -226,8 +453,8 @@ BEGIN
 END
 GO
 
--- 2. Get All Federation Members
-CREATE PROCEDURE SP_GetAllFederationMembers
+
+CREATE PROCEDURE usp_GetAllFederationMembers
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -246,72 +473,12 @@ BEGIN
 END
 GO
 
--- PersonRanchRole SP
 
-CREATE PROCEDURE SP_AssignPersonRoleAtRanch
-    @PersonId INT,
-    @RanchId INT,
-    @RoleId TINYINT,
-    @RoleStatus NVARCHAR(20) = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    BEGIN TRANSACTION;
-    BEGIN TRY
-        -- Step 1: Ensure the base Person-Ranch connection exists
-        IF NOT EXISTS (SELECT 1 FROM PersonRanch WHERE PersonId = @PersonId AND RanchId = @RanchId)
-        BEGIN
-            INSERT INTO PersonRanch (PersonId, RanchId) 
-            VALUES (@PersonId, @RanchId);
-        END
+/* =========================================================
+   9) ADMIN MANAGED USERS
+   ========================================================= */
 
-        -- Step 2: Insert or Update the specific Role
-        IF NOT EXISTS (SELECT 1 FROM PersonRanchRole WHERE PersonId = @PersonId AND RanchId = @RanchId AND RoleId = @RoleId)
-        BEGIN
-            INSERT INTO PersonRanchRole (PersonId, RanchId, RoleId, RoleStatus)
-            VALUES (@PersonId, @RanchId, @RoleId, @RoleStatus);
-        END
-        ELSE
-        BEGIN
-            -- Update status if role already exists (e.g., from 'Pending' to 'Active')
-            UPDATE PersonRanchRole
-            SET RoleStatus = @RoleStatus
-            WHERE PersonId = @PersonId AND RanchId = @RanchId AND RoleId = @RoleId;
-        END
-
-        COMMIT TRANSACTION;
-    END TRY
-    BEGIN CATCH
-        ROLLBACK TRANSACTION;
-        THROW;
-    END CATCH
-END
-GO
-
-CREATE PROCEDURE SP_GetPersonRanchesAndRoles
-    @PersonId INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    -- שליפה שטוחה (Flat) שה-BL ב-C# יצטרך למפות לאובייקטים מתאימים (DTOs)
-    SELECT 
-        PRR.RanchId,
-        R.RanchName,
-        PRR.RoleId,
-        Rl.RoleName,
-        PRR.RoleStatus
-    FROM PersonRanchRole PRR
-    INNER JOIN Ranch R ON PRR.RanchId = R.RanchId
-    INNER JOIN Role Rl ON PRR.RoleId = Rl.RoleId
-    WHERE PRR.PersonId = @PersonId;
-END
-GO
-
--- Admin manages people 
-
-CREATE PROCEDURE SP_AddManagedPerson
+   CREATE PROCEDURE usp_AddManagedPerson
     @SystemUserId INT,
     @PersonId INT,
     @ApprovalStatus NVARCHAR(20) = 'Pending'
@@ -326,7 +493,7 @@ END
 GO
 
 
-CREATE PROCEDURE SP_GetManagedPersons
+CREATE PROCEDURE usp_GetManagedPersons
     @SystemUserId INT
 AS
 BEGIN
@@ -345,3 +512,46 @@ BEGIN
     WHERE M.SystemUserId = @SystemUserId;
 END
 GO
+
+
+/* =========================================================
+   10) LEGACY / NOT USED IN CURRENT FLOW
+   ========================================================= */
+
+CREATE PROCEDURE usp_InsertPerson
+    @NationalId VARCHAR(9),
+    @FirstName NVARCHAR(50),
+    @LastName NVARCHAR(50),
+    @Gender NVARCHAR(10),
+    @DateOfBirth DATE,
+    @CellPhone VARCHAR(20),
+    @Email NVARCHAR(254)
+AS
+BEGIN
+    INSERT INTO Person (NationalId, FirstName, LastName, Gender, DateOfBirth, CellPhone, Email)
+    VALUES (@NationalId, @FirstName, @LastName, @Gender, @DateOfBirth, @CellPhone, @Email);
+
+    SELECT SCOPE_IDENTITY();
+END
+GO
+
+
+CREATE PROCEDURE usp_CheckEmailExists
+    @Email NVARCHAR(254)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Returns the count of matching emails
+    SELECT COUNT(*) 
+    FROM Person 
+    WHERE Email = @Email;
+END
+GO
+
+
+
+
+
+
+
