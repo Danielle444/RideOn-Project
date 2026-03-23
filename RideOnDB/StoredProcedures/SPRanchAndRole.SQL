@@ -1,6 +1,6 @@
 --Role maybe unneccesery
 
-CREATE PROCEDURE SP_GetAllRoles
+CREATE PROCEDURE usp_GetAllRoles
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -15,7 +15,7 @@ GO
 
 -- Ranch
 
-CREATE PROCEDURE SP_InsertRanch
+CREATE PROCEDURE usp_InsertRanch
     @RanchName NVARCHAR(100),
     @ContactEmail NVARCHAR(254) = NULL,
     @ContactPhone VARCHAR(20) = NULL,
@@ -41,7 +41,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_InsertRanch
+CREATE PROCEDURE usp_InsertRanch
     @RanchName NVARCHAR(100),
     @ContactEmail NVARCHAR(254) = NULL,
     @ContactPhone VARCHAR(20) = NULL,
@@ -67,7 +67,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_UpdateRanch
+CREATE PROCEDURE usp_UpdateRanch
     @RanchId INT,
     @RanchName NVARCHAR(100),
     @ContactEmail NVARCHAR(254) = NULL,
@@ -97,7 +97,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_GetAllRanches
+CREATE PROCEDURE usp_GetAllRanches
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -115,7 +115,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_GetRanchById
+CREATE PROCEDURE usp_GetRanchById
     @RanchId INT
 AS
 BEGIN
