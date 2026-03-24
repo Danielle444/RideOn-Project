@@ -1,368 +1,265 @@
-﻿using Microsoft.Data.SqlClient;
-using RideOnServer.BL;
+using Microsoft.Data.SqlClient;
 using System.Data;
+using RideOnServer.BL;
 using RideOnServer.BL.DTOs;
+using System.Collections.Generic;
+using System;
 
 namespace RideOnServer.DAL
 {
     public class SystemUserDAL : DBServices
     {
-        private SqlDataReader reader;
-        private SqlConnection connection;
-        private SqlCommand command;
-
         public SystemUser? GetSystemUserForLogin(string username)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@Username", username);
-
-            try
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
-                connection = Connect("DefaultConnection");
-            }
-            catch
+                { "@Username", username }
+            };
+
+            using (SqlConnection connection = Connect("DefaultConnection"))
+            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetSystemUserForLogin", connection, paramDic))
             {
-                throw;
-            }
-
-            command = CreateCommandWithStoredProcedure("usp_GetSystemUserForLogin", connection, paramDic);
-
-            try
-            {
-                reader = command.ExecuteReader(CommandBehavior.CloseConnection);
-
-                if (reader.Read())
+                try
                 {
-                    SystemUser systemUser = new SystemUser
+                    connection.Open();
+                    using (SqlDataReader reader = command.ExecuteReader())
                     {
-                        PersonId = Convert.ToInt32(reader["SystemUserId"]),
-                        Username = reader["Username"].ToString(),
-                        PasswordHash = reader["PasswordHash"].ToString(),
-                        PasswordSalt = reader["PasswordSalt"].ToString(),
-                        IsActive = Convert.ToBoolean(reader["IsActive"]),
-                        MustChangePassword = Convert.ToBoolean(reader["MustChangePassword"]),
-                        CreatedDate = Convert.ToDateTime(reader["CreatedDate"]),
-                        FirstName = reader["FirstName"].ToString(),
-                        LastName = reader["LastName"].ToString()
-                    };
-
-                    return systemUser;
+                        if (reader.Read())
+                        {
+                            return new SystemUser
+                            {
+                                PersonId = Convert.ToInt32(reader["SystemUserId"]),
+                                Username = reader["Username"].ToString()!,
+                                PasswordHash = reader["PasswordHash"].ToString()!,
+                                PasswordSalt = reader["PasswordSalt"].ToString()!,
+                                IsActive = Convert.ToBoolean(reader["IsActive"]),
+                                MustChangePassword = Convert.ToBoolean(reader["MustChangePassword"]),
+                                CreatedDate = Convert.ToDateTime(reader["CreatedDate"]),
+                                FirstName = reader["FirstName"].ToString()!,
+                                LastName = reader["LastName"].ToString()!
+                            };
+                        }
+                        return null;
+                    }
                 }
-
-                return null;
-            }
-            catch
-            {
-                throw;
-            }
-            finally
-            {
-                if (connection != null)
+                catch (SqlException ex)
                 {
-                    connection.Close();
+                    throw new Exception($"Database error: {ex.Message}");
                 }
             }
         }
 
         public List<ApprovedRoleRanch> GetApprovedPersonRanchesAndRoles(int personId)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@PersonId", personId);
-
-            try
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
-                connection = Connect("DefaultConnection");
-            }
-            catch
+                { "@PersonId", personId }
+            };
+
+            using (SqlConnection connection = Connect("DefaultConnection"))
+            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetApprovedPersonRanchesAndRoles", connection, paramDic))
             {
-                throw;
-            }
-
-            command = CreateCommandWithStoredProcedure("usp_GetApprovedPersonRanchesAndRoles", connection, paramDic);
-
-            try
-            {
-                List<ApprovedRoleRanch> approvedRolesAndRanches = new List<ApprovedRoleRanch>();
-
-                reader = command.ExecuteReader(CommandBehavior.CloseConnection);
-
-                while (reader.Read())
+                try
                 {
-                    approvedRolesAndRanches.Add(new ApprovedRoleRanch
+                    List<ApprovedRoleRanch> approvedRolesAndRanches = new List<ApprovedRoleRanch>();
+                    
+                    connection.Open();
+                    using (SqlDataReader reader = command.ExecuteReader())
                     {
-                        RanchId = Convert.ToInt32(reader["RanchId"]),
-                        RanchName = reader["RanchName"].ToString(),
-                        RoleId = Convert.ToByte(reader["RoleId"]),
-                        RoleName = reader["RoleName"].ToString()
-                    });
-                }
+                        while (reader.Read())
+                        {
+                            approvedRolesAndRanches.Add(new ApprovedRoleRanch
+                            {
+                                RanchId = Convert.ToInt32(reader["RanchId"]),
+                                RanchName = reader["RanchName"].ToString()!,
+                                RoleId = Convert.ToByte(reader["RoleId"]),
+                                RoleName = reader["RoleName"].ToString()!
+                            });
+                        }
+                    }
 
-                return approvedRolesAndRanches;
-            }
-            catch
-            {
-                throw;
-            }
-            finally
-            {
-                if (connection != null)
+                    return approvedRolesAndRanches;
+                }
+                catch (SqlException ex)
                 {
-                    connection.Close();
+                    throw new Exception($"Database error: {ex.Message}");
                 }
             }
         }
 
         public bool CheckNationalIdExists(string nationalId)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@NationalId", nationalId);
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@NationalId", nationalId }
+            };
 
-            try
+            using (SqlConnection connection = Connect("DefaultConnection"))
+            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_CheckNationalIdExists", connection, paramDic))
             {
-                connection = Connect("DefaultConnection");
-            }
-            catch
-            {
-                throw;
-            }
-
-            command = CreateCommandWithStoredProcedure("usp_CheckNationalIdExists", connection, paramDic);
-
-            try
-            {
-                object result = command.ExecuteScalar();
-                return Convert.ToInt32(result) == 1;
-            }
-            catch
-            {
-                throw;
-            }
-            finally
-            {
-                if (connection != null)
+                try
                 {
-                    connection.Close();
+                    connection.Open();
+                    object result = command.ExecuteScalar();
+                    return Convert.ToInt32(result) == 1;
+                }
+                catch (SqlException ex)
+                {
+                    throw new Exception($"Database error: {ex.Message}");
                 }
             }
         }
 
         public bool CheckUsernameExists(string username)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@Username", username);
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@Username", username }
+            };
 
-            try
+            using (SqlConnection connection = Connect("DefaultConnection"))
+            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_CheckUsernameExists", connection, paramDic))
             {
-                connection = Connect("DefaultConnection");
-            }
-            catch
-            {
-                throw;
-            }
-
-            command = CreateCommandWithStoredProcedure("usp_CheckUsernameExists", connection, paramDic);
-
-            try
-            {
-                object result = command.ExecuteScalar();
-                return Convert.ToInt32(result) == 1;
-            }
-            catch
-            {
-                throw;
-            }
-            finally
-            {
-                if (connection != null)
+                try
                 {
-                    connection.Close();
+                    connection.Open();
+                    object result = command.ExecuteScalar();
+                    return Convert.ToInt32(result) == 1;
+                }
+                catch (SqlException ex)
+                {
+                    throw new Exception($"Database error: {ex.Message}");
                 }
             }
         }
 
         public int RegisterSystemUser(RegisterRequest request, string passwordHash, string passwordSalt)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@NationalId", request.NationalId);
-            paramDic.Add("@FirstName", request.FirstName);
-            paramDic.Add("@LastName", request.LastName);
-            paramDic.Add("@Gender", request.Gender ?? (object)DBNull.Value);
-            paramDic.Add("@DateOfBirth", request.DateOfBirth ?? (object)DBNull.Value);
-            paramDic.Add("@CellPhone", request.CellPhone);
-            paramDic.Add("@Email", request.Email);
-            paramDic.Add("@Username", request.Username);
-            paramDic.Add("@PasswordHash", passwordHash);
-            paramDic.Add("@PasswordSalt", passwordSalt);
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@NationalId", request.NationalId },
+                { "@FirstName", request.FirstName },
+                { "@LastName", request.LastName },
+                { "@Gender", request.Gender ?? (object)DBNull.Value },
+                { "@DateOfBirth", request.DateOfBirth ?? (object)DBNull.Value },
+                { "@CellPhone", request.CellPhone },
+                { "@Email", request.Email },
+                { "@Username", request.Username },
+                { "@PasswordHash", passwordHash },
+                { "@PasswordSalt", passwordSalt }
+            };
 
-            try
+            using (SqlConnection connection = Connect("DefaultConnection"))
+            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_RegisterSystemUser", connection, paramDic))
             {
-                connection = Connect("DefaultConnection");
-            }
-            catch
-            {
-                throw;
-            }
-
-            command = CreateCommandWithStoredProcedure("usp_RegisterSystemUser", connection, paramDic);
-
-            try
-            {
-                object result = command.ExecuteScalar();
-                return Convert.ToInt32(result);
-            }
-            catch
-            {
-                throw;
-            }
-            finally
-            {
-                if (connection != null)
+                try
                 {
-                    connection.Close();
+                    connection.Open();
+                    object result = command.ExecuteScalar();
+                    return Convert.ToInt32(result);
+                }
+                catch (SqlException ex)
+                {
+                    throw new Exception($"Database error: {ex.Message}");
                 }
             }
         }
 
         public void AssignPersonRoleAtRanch(int personId, int ranchId, byte roleId, string roleStatus = "Pending")
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@PersonId", personId);
-            paramDic.Add("@RanchId", ranchId);
-            paramDic.Add("@RoleId", roleId);
-            paramDic.Add("@RoleStatus", roleStatus);
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@PersonId", personId },
+                { "@RanchId", ranchId },
+                { "@RoleId", roleId },
+                { "@RoleStatus", roleStatus }
+            };
 
-            try
+            using (SqlConnection connection = Connect("DefaultConnection"))
+            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_AssignPersonRoleAtRanch", connection, paramDic))
             {
-                connection = Connect("DefaultConnection");
-            }
-            catch
-            {
-                throw;
-            }
-
-            command = CreateCommandWithStoredProcedure("usp_AssignPersonRoleAtRanch", connection, paramDic);
-
-            try
-            {
-                command.ExecuteNonQuery();
-            }
-            catch
-            {
-                throw;
-            }
-            finally
-            {
-                if (connection != null)
+                try
                 {
-                    connection.Close();
+                    connection.Open();
+                    command.ExecuteNonQuery();
+                }
+                catch (SqlException ex)
+                {
+                    throw new Exception($"Database error: {ex.Message}");
                 }
             }
         }
 
         public void UpdatePersonRoleStatus(int personId, int ranchId, byte roleId, string roleStatus)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@PersonId", personId);
-            paramDic.Add("@RanchId", ranchId);
-            paramDic.Add("@RoleId", roleId);
-            paramDic.Add("@RoleStatus", roleStatus);
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@PersonId", personId },
+                { "@RanchId", ranchId },
+                { "@RoleId", roleId },
+                { "@RoleStatus", roleStatus }
+            };
 
-            try
+            using (SqlConnection connection = Connect("DefaultConnection"))
+            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdatePersonRoleStatus", connection, paramDic))
             {
-                connection = Connect("DefaultConnection");
-            }
-            catch
-            {
-                throw;
-            }
-
-            command = CreateCommandWithStoredProcedure("usp_UpdatePersonRoleStatus", connection, paramDic);
-
-            try
-            {
-                command.ExecuteNonQuery();
-            }
-            catch
-            {
-                throw;
-            }
-            finally
-            {
-                if (connection != null)
+                try
                 {
-                    connection.Close();
+                    connection.Open();
+                    command.ExecuteNonQuery();
+                }
+                catch (SqlException ex)
+                {
+                    throw new Exception($"Database error: {ex.Message}");
                 }
             }
         }
 
         public void UpdateSystemUserPassword(int systemUserId, string newPasswordHash, string newPasswordSalt)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@SystemUserId", systemUserId);
-            paramDic.Add("@NewPasswordHash", newPasswordHash);
-            paramDic.Add("@NewPasswordSalt", newPasswordSalt);
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@SystemUserId", systemUserId },
+                { "@NewPasswordHash", newPasswordHash },
+                { "@NewPasswordSalt", newPasswordSalt }
+            };
 
-            try
+            using (SqlConnection connection = Connect("DefaultConnection"))
+            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateSystemUserPassword", connection, paramDic))
             {
-                connection = Connect("DefaultConnection");
-            }
-            catch
-            {
-                throw;
-            }
-
-            command = CreateCommandWithStoredProcedure("usp_UpdateSystemUserPassword", connection, paramDic);
-
-            try
-            {
-                command.ExecuteNonQuery();
-            }
-            catch
-            {
-                throw;
-            }
-            finally
-            {
-                if (connection != null)
+                try
                 {
-                    connection.Close();
+                    connection.Open();
+                    command.ExecuteNonQuery();
+                }
+                catch (SqlException ex)
+                {
+                    throw new Exception($"Database error: {ex.Message}");
                 }
             }
         }
 
         public void SetMustChangePassword(int systemUserId, bool mustChangePassword)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>();
-            paramDic.Add("@SystemUserId", systemUserId);
-            paramDic.Add("@MustChangePassword", mustChangePassword);
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@SystemUserId", systemUserId },
+                { "@MustChangePassword", mustChangePassword }
+            };
 
-            try
+            using (SqlConnection connection = Connect("DefaultConnection"))
+            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_SetMustChangePassword", connection, paramDic))
             {
-                connection = Connect("DefaultConnection");
-            }
-            catch
-            {
-                throw;
-            }
-
-            command = CreateCommandWithStoredProcedure("usp_SetMustChangePassword", connection, paramDic);
-
-            try
-            {
-                command.ExecuteNonQuery();
-            }
-            catch
-            {
-                throw;
-            }
-            finally
-            {
-                if (connection != null)
+                try
                 {
-                    connection.Close();
+                    connection.Open();
+                    command.ExecuteNonQuery();
+                }
+                catch (SqlException ex)
+                {
+                    throw new Exception($"Database error: {ex.Message}");
                 }
             }
         }
-
     }
 }
