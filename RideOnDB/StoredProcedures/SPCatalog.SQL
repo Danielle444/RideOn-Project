@@ -1,4 +1,4 @@
-CREATE PROCEDURE SP_GetAllProductCategories
+CREATE PROCEDURE usp_GetAllProductCategories
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -6,7 +6,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_GetProductsByCategory
+CREATE PROCEDURE usp_GetProductsByCategory
     @CategoryId TINYINT = NULL
 AS
 BEGIN
@@ -24,7 +24,7 @@ GO
 
 -- Prices
 
-CREATE PROCEDURE SP_SetProductPriceForRanch
+CREATE PROCEDURE usp_SetProductPriceForRanch
     @ProductId SMALLINT,
     @RanchId INT,
     @NewPrice DECIMAL(10,2)
@@ -54,7 +54,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_GetPriceHistoryForProduct
+CREATE PROCEDURE usp_GetPriceHistoryForProduct
     @ProductId SMALLINT,
     @RanchId INT
 AS
@@ -73,7 +73,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_GetActivePricesByCategory
+CREATE PROCEDURE usp_GetActivePricesByCategory
     @CategoryId TINYINT,
     @RanchId INT
 AS
