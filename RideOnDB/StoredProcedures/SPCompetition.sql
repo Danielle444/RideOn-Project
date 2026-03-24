@@ -43,3 +43,57 @@ BEGIN
     ORDER BY C.CompetitionStartDate DESC; -- בדרך כלל חוות רוצות לראות את החדש ביותר קודם
 END
 GO
+
+
+CREATE PROCEDURE SP_InsertCompetition
+    @HostRanchId INT,
+    @FieldId TINYINT,
+    @CreatedBySystemUserId INT,
+    @CompetitionName NVARCHAR(100),
+    @CompetitionStartDate DATE,
+    @CompetitionEndDate DATE,
+    @RegistrationOpenDate DATE = NULL,
+    @RegistrationEndDate DATE = NULL,
+    @PaidTimeRegistrationDate DATE = NULL,
+    @PaidTimePublicationDate DATE = NULL,
+    @CompetitionStatus NVARCHAR(20) = 'Draft', -- מקבל 'Draft' מה-BL, או משתמש בברירת המחדל של ה-SP
+    @Notes NVARCHAR(500) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    INSERT INTO Competition (
+        HostRanchId, 
+        FieldId, 
+        CreatedBySystemUserId, 
+        CompetitionName, 
+        CompetitionStartDate, 
+        CompetitionEndDate, 
+        RegistrationOpenDate, 
+        RegistrationEndDate, 
+        PaidTimeRegistrationDate, 
+        PaidTimePublicationDate, 
+        CompetitionStatus, 
+        Notes, 
+        StallMapUrl -- נשאר NULL כרגע לפי ההחלטה
+    )
+    VALUES (
+        @HostRanchId, 
+        @FieldId, 
+        @CreatedBySystemUserId, 
+        @CompetitionName, 
+        @CompetitionStartDate, 
+        @CompetitionEndDate, 
+        @RegistrationOpenDate, 
+        @RegistrationEndDate, 
+        @PaidTimeRegistrationDate, 
+        @PaidTimePublicationDate, 
+        @CompetitionStatus, 
+        @Notes, 
+        NULL
+    );
+    
+    -- מחזירים ל-BL את המזהה החדש של התחרות שנוצרה
+    SELECT SCOPE_IDENTITY() AS NewCompetitionId;
+END
+GO
