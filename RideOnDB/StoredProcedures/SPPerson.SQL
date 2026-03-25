@@ -88,6 +88,7 @@ BEGIN
 
     END TRY
     BEGIN CATCH
+      IF @@TRANCOUNT > 0
         ROLLBACK TRANSACTION;
         THROW; 
     END CATCH
