@@ -5,15 +5,15 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class RolesController : ControllerBase
+    public class RanchesController : ControllerBase
     {
         [HttpGet]
-        public IActionResult GetAllRoles()
+        public IActionResult GetAllRanchesNames()
         {
             try
             {
-                List<Role> roles = Role.GetAllRoles();
-                return Ok(roles);
+                List<Ranch> ranches = Ranch.GetAllRanchesNames();
+                return Ok(ranches);
             }
             catch (Exception ex)
             {

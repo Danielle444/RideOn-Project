@@ -5,12 +5,12 @@ namespace RideOnServer.BL
     public class Role
     {
         public byte RoleId { get; set; }
-        public string RoleName { get; set; }
+        public string RoleName { get; set; } = string.Empty;
 
         internal static List<Role> GetAllRoles()
         {
-            RolesDAL rolesDAL = new RolesDAL();
-            return rolesDAL.GetAllRoles();
+            RoleDAL dal = new RoleDAL();
+            return dal.GetAllRoles();
         }
     }
 }

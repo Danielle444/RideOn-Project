@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs;
-using Microsoft.AspNetCore.Authorization;
+using RideOnServer.DAL;
 
 namespace RideOnServer.Controllers
 {
@@ -66,26 +67,24 @@ namespace RideOnServer.Controllers
                 return BadRequest(ex.Message);
             }
         }
-        [HttpPost("{personId}/roles")] // Resource Routing!
-public IActionResult AssignRoleToPerson(int personId, [FromBody] AssignRoleRequest request)
-{
-    // וולידציה בסיסית שמוודאת שה-ID בנתיב תואם ל-ID ב-Body (Best Practice)
-    if (personId != request.PersonId)
-    {
-        return BadRequest("PersonId in URL does not match body.");
-    }
+        [HttpPost("{personId}/roles")]
+        public IActionResult AssignRoleToPerson(int personId, [FromBody] AssignRoleRequest request)
+        {
+            if (personId != request.PersonId)
+            {
+                return BadRequest("PersonId in URL does not match body.");
+            }
 
-    try
-    {
-        // 2. קריאה ל-BL שקורא ל-DAL (usp_AssignPersonRoleAtRanch)
-        SystemUser.AssignPersonRoleAtRanch(request.PersonId, request.RanchId, request.RoleId);
-        return Ok("Role assigned successfully.");
-    }
-    catch (Exception ex)
-    {
-        return BadRequest(ex.Message);
-    }
-}
+            try
+            {
+                SystemUser.AssignRoleToExistingUser(request.PersonId, request.RanchId, request.RoleId);
+                return Ok("Role assigned successfully.");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
 
         [HttpPut("role-status")]
         public IActionResult UpdatePersonRoleStatus([FromBody] UpdatePersonRoleStatusRequest request)
@@ -128,6 +127,20 @@ public IActionResult AssignRoleToPerson(int personId, [FromBody] AssignRoleReque
             {
                 SystemUser.SetMustChangePassword(request.SystemUserId, request.MustChangePassword);
                 return Ok("MustChangePassword updated successfully");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("check-username")]
+        public IActionResult CheckUsername([FromQuery] string username)
+        {
+            try
+            {
+                bool exists = SystemUser.CheckUsernameExists(username);
+                return Ok(new { exists });
             }
             catch (Exception ex)
             {

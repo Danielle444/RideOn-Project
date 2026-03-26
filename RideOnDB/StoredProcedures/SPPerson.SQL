@@ -46,7 +46,13 @@ GO
 /* =========================================================
    2) REGISTRATION
    ========================================================= */
-CREATE PROCEDURE usp_RegisterSystemUser
+   CREATE TYPE RegisterRanchRoleTableType AS TABLE
+(
+    RanchId INT NOT NULL,
+    RoleId TINYINT NOT NULL
+);
+GO
+CREATE PROCEDURE usp_RegisterSystemUserWithRoles
     @NationalId VARCHAR(9),
     @FirstName NVARCHAR(50),
     @LastName NVARCHAR(50),
@@ -56,11 +62,12 @@ CREATE PROCEDURE usp_RegisterSystemUser
     @Email NVARCHAR(254),
     @Username NVARCHAR(100),
     @PasswordHash NVARCHAR(255),
-    @PasswordSalt NVARCHAR(255)
+    @PasswordSalt NVARCHAR(255),
+    @RanchRoles RegisterRanchRoleTableType READONLY
 AS
 BEGIN
     SET NOCOUNT ON;
-    
+
     BEGIN TRANSACTION;
     BEGIN TRY
 
@@ -74,6 +81,31 @@ BEGIN
             THROW 50002, 'NationalId already exists', 1;
         END
 
+        IF NOT EXISTS (SELECT 1 FROM @RanchRoles)
+        BEGIN
+            THROW 50003, 'At least one ranch-role pair is required', 1;
+        END
+
+        IF EXISTS (
+            SELECT 1
+            FROM @RanchRoles rr
+            LEFT JOIN Ranch r ON rr.RanchId = r.RanchId
+            WHERE r.RanchId IS NULL
+        )
+        BEGIN
+            THROW 50004, 'One or more ranches do not exist', 1;
+        END
+
+        IF EXISTS (
+            SELECT 1
+            FROM @RanchRoles rr
+            LEFT JOIN Role rl ON rr.RoleId = rl.RoleId
+            WHERE rl.RoleId IS NULL
+        )
+        BEGIN
+            THROW 50005, 'One or more roles do not exist', 1;
+        END
+
         INSERT INTO Person (NationalId, FirstName, LastName, Gender, DateOfBirth, CellPhone, Email)
         VALUES (@NationalId, @FirstName, @LastName, @Gender, @DateOfBirth, @CellPhone, @Email);
 
@@ -82,15 +114,23 @@ BEGIN
         INSERT INTO SystemUser (SystemUserId, Username, PasswordHash, PasswordSalt)
         VALUES (@NewPersonId, @Username, @PasswordHash, @PasswordSalt);
 
+        INSERT INTO PersonRanch (PersonId, RanchId)
+        SELECT DISTINCT @NewPersonId, rr.RanchId
+        FROM @RanchRoles rr;
+
+        INSERT INTO PersonRanchRole (PersonId, RanchId, RoleId, RoleStatus)
+        SELECT @NewPersonId, rr.RanchId, rr.RoleId, 'Pending'
+        FROM @RanchRoles rr;
+
         COMMIT TRANSACTION;
 
         SELECT @NewPersonId AS NewPersonId;
 
     END TRY
     BEGIN CATCH
-      IF @@TRANCOUNT > 0
-        ROLLBACK TRANSACTION;
-        THROW; 
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        THROW;
     END CATCH
 END
 GO
@@ -516,7 +556,7 @@ GO
 
 
 /* =========================================================
-   10) LEGACY / NOT USED IN CURRENT FLOW
+   10) LEGACY
    ========================================================= */
 
 CREATE PROCEDURE usp_InsertPerson
@@ -536,19 +576,6 @@ BEGIN
 END
 GO
 
-
-CREATE PROCEDURE usp_CheckEmailExists
-    @Email NVARCHAR(254)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    -- Returns the count of matching emails
-    SELECT COUNT(*) 
-    FROM Person 
-    WHERE Email = @Email;
-END
-GO
 
 
 
