@@ -2,8 +2,6 @@ using Microsoft.Data.SqlClient;
 using System.Data;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs;
-using System.Collections.Generic;
-using System;
 
 namespace RideOnServer.DAL
 {
@@ -16,12 +14,13 @@ namespace RideOnServer.DAL
                 { "@Username", username }
             };
 
-            using (SqlConnection connection = Connect("DefaultConnection"))
-            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetSystemUserForLogin", connection, paramDic))
+            try
             {
-                try
+                using (SqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
+
+                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetSystemUserForLogin", connection, paramDic))
                     using (SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
@@ -39,13 +38,14 @@ namespace RideOnServer.DAL
                                 LastName = reader["LastName"].ToString()!
                             };
                         }
+
                         return null;
                     }
                 }
-                catch (SqlException ex)
-                {
-                    throw new Exception($"Database error: {ex.Message}");
-                }
+            }
+            catch (SqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
             }
         }
 
@@ -56,16 +56,17 @@ namespace RideOnServer.DAL
                 { "@PersonId", personId }
             };
 
-            using (SqlConnection connection = Connect("DefaultConnection"))
-            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetApprovedPersonRanchesAndRoles", connection, paramDic))
+            try
             {
-                try
+                using (SqlConnection connection = Connect("DefaultConnection"))
                 {
-                    List<ApprovedRoleRanch> approvedRolesAndRanches = new List<ApprovedRoleRanch>();
-                    
                     connection.Open();
+
+                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetApprovedPersonRanchesAndRoles", connection, paramDic))
                     using (SqlDataReader reader = command.ExecuteReader())
                     {
+                        List<ApprovedRoleRanch> approvedRolesAndRanches = new List<ApprovedRoleRanch>();
+
                         while (reader.Read())
                         {
                             approvedRolesAndRanches.Add(new ApprovedRoleRanch
@@ -76,14 +77,14 @@ namespace RideOnServer.DAL
                                 RoleName = reader["RoleName"].ToString()!
                             });
                         }
-                    }
 
-                    return approvedRolesAndRanches;
+                        return approvedRolesAndRanches;
+                    }
                 }
-                catch (SqlException ex)
-                {
-                    throw new Exception($"Database error: {ex.Message}");
-                }
+            }
+            catch (SqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
             }
         }
 
@@ -94,19 +95,22 @@ namespace RideOnServer.DAL
                 { "@NationalId", nationalId }
             };
 
-            using (SqlConnection connection = Connect("DefaultConnection"))
-            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_CheckNationalIdExists", connection, paramDic))
+            try
             {
-                try
+                using (SqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
-                    object result = command.ExecuteScalar();
-                    return Convert.ToInt32(result) == 1;
+
+                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_CheckNationalIdExists", connection, paramDic))
+                    {
+                        object result = command.ExecuteScalar()!;
+                        return Convert.ToInt32(result) == 1;
+                    }
                 }
-                catch (SqlException ex)
-                {
-                    throw new Exception($"Database error: {ex.Message}");
-                }
+            }
+            catch (SqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
             }
         }
 
@@ -117,55 +121,26 @@ namespace RideOnServer.DAL
                 { "@Username", username }
             };
 
-            using (SqlConnection connection = Connect("DefaultConnection"))
-            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_CheckUsernameExists", connection, paramDic))
+            try
             {
-                try
+                using (SqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
-                    object result = command.ExecuteScalar();
-                    return Convert.ToInt32(result) == 1;
+
+                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_CheckUsernameExists", connection, paramDic))
+                    {
+                        object result = command.ExecuteScalar()!;
+                        return Convert.ToInt32(result) == 1;
+                    }
                 }
-                catch (SqlException ex)
-                {
-                    throw new Exception($"Database error: {ex.Message}");
-                }
+            }
+            catch (SqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
             }
         }
 
-        public int RegisterSystemUser(RegisterRequest request, string passwordHash, string passwordSalt)
-        {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
-            {
-                { "@NationalId", request.NationalId },
-                { "@FirstName", request.FirstName },
-                { "@LastName", request.LastName },
-                { "@Gender", request.Gender ?? (object)DBNull.Value },
-                { "@DateOfBirth", request.DateOfBirth ?? (object)DBNull.Value },
-                { "@CellPhone", request.CellPhone },
-                { "@Email", request.Email },
-                { "@Username", request.Username },
-                { "@PasswordHash", passwordHash },
-                { "@PasswordSalt", passwordSalt }
-            };
-
-            using (SqlConnection connection = Connect("DefaultConnection"))
-            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_RegisterSystemUser", connection, paramDic))
-            {
-                try
-                {
-                    connection.Open();
-                    object result = command.ExecuteScalar();
-                    return Convert.ToInt32(result);
-                }
-                catch (SqlException ex)
-                {
-                    throw new Exception($"Database error: {ex.Message}");
-                }
-            }
-        }
-
-        public void AssignPersonRoleAtRanch(int personId, int ranchId, byte roleId, string roleStatus = "Pending")
+        public void AssignRoleToExistingUser(int personId, int ranchId, byte roleId, string roleStatus = "Pending")
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
@@ -175,18 +150,21 @@ namespace RideOnServer.DAL
                 { "@RoleStatus", roleStatus }
             };
 
-            using (SqlConnection connection = Connect("DefaultConnection"))
-            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_AssignPersonRoleAtRanch", connection, paramDic))
+            try
             {
-                try
+                using (SqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
-                    command.ExecuteNonQuery();
+
+                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_AssignPersonRoleAtRanch", connection, paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
                 }
-                catch (SqlException ex)
-                {
-                    throw new Exception($"Database error: {ex.Message}");
-                }
+            }
+            catch (SqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
             }
         }
 
@@ -200,18 +178,21 @@ namespace RideOnServer.DAL
                 { "@RoleStatus", roleStatus }
             };
 
-            using (SqlConnection connection = Connect("DefaultConnection"))
-            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdatePersonRoleStatus", connection, paramDic))
+            try
             {
-                try
+                using (SqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
-                    command.ExecuteNonQuery();
+
+                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdatePersonRoleStatus", connection, paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
                 }
-                catch (SqlException ex)
-                {
-                    throw new Exception($"Database error: {ex.Message}");
-                }
+            }
+            catch (SqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
             }
         }
 
@@ -224,18 +205,21 @@ namespace RideOnServer.DAL
                 { "@NewPasswordSalt", newPasswordSalt }
             };
 
-            using (SqlConnection connection = Connect("DefaultConnection"))
-            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateSystemUserPassword", connection, paramDic))
+            try
             {
-                try
+                using (SqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
-                    command.ExecuteNonQuery();
+
+                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateSystemUserPassword", connection, paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
                 }
-                catch (SqlException ex)
-                {
-                    throw new Exception($"Database error: {ex.Message}");
-                }
+            }
+            catch (SqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
             }
         }
 
@@ -247,18 +231,68 @@ namespace RideOnServer.DAL
                 { "@MustChangePassword", mustChangePassword }
             };
 
-            using (SqlConnection connection = Connect("DefaultConnection"))
-            using (SqlCommand command = CreateCommandWithStoredProcedure("usp_SetMustChangePassword", connection, paramDic))
+            try
             {
-                try
+                using (SqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
-                    command.ExecuteNonQuery();
+
+                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_SetMustChangePassword", connection, paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
                 }
-                catch (SqlException ex)
+            }
+            catch (SqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public int RegisterSystemUserWithRoles(RegisterRequest request, string passwordHash, string passwordSalt)
+        {
+            try
+            {
+                using (SqlConnection connection = Connect("DefaultConnection"))
                 {
-                    throw new Exception($"Database error: {ex.Message}");
+                    connection.Open();
+
+                    using (SqlCommand command = new SqlCommand("usp_RegisterSystemUserWithRoles", connection))
+                    {
+                        command.CommandType = CommandType.StoredProcedure;
+
+                        command.Parameters.AddWithValue("@NationalId", request.NationalId);
+                        command.Parameters.AddWithValue("@FirstName", request.FirstName);
+                        command.Parameters.AddWithValue("@LastName", request.LastName);
+                        command.Parameters.AddWithValue("@Gender", (object?)request.Gender ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@DateOfBirth", (object?)request.DateOfBirth ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@CellPhone", request.CellPhone);
+                        command.Parameters.AddWithValue("@Email", request.Email);
+                        command.Parameters.AddWithValue("@Username", request.Username);
+                        command.Parameters.AddWithValue("@PasswordHash", passwordHash);
+                        command.Parameters.AddWithValue("@PasswordSalt", passwordSalt);
+
+                        DataTable ranchRolesTable = new DataTable();
+                        ranchRolesTable.Columns.Add("RanchId", typeof(int));
+                        ranchRolesTable.Columns.Add("RoleId", typeof(byte));
+
+                        foreach (RegisterRanchRoleRequest pair in request.RanchRoles)
+                        {
+                            ranchRolesTable.Rows.Add(pair.RanchId, pair.RoleId);
+                        }
+
+                        SqlParameter ranchRolesParam = command.Parameters.AddWithValue("@RanchRoles", ranchRolesTable);
+                        ranchRolesParam.SqlDbType = SqlDbType.Structured;
+                        ranchRolesParam.TypeName = "RegisterRanchRoleTableType";
+
+                        object result = command.ExecuteScalar()!;
+                        return Convert.ToInt32(result);
+                    }
                 }
+            }
+            catch (SqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
             }
         }
     }

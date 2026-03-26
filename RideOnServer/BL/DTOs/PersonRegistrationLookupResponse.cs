@@ -1,9 +1,6 @@
-﻿using RideOnServer.DAL;
-using RideOnServer.BL.DTOs;
-
-namespace RideOnServer.BL
+﻿namespace RideOnServer.BL.DTOs
 {
-    public class Person
+    public class PersonRegistrationLookupResponse
     {
         public int PersonId { get; set; }
 
@@ -21,10 +18,6 @@ namespace RideOnServer.BL
 
         public string? Email { get; set; }
 
-        internal static PersonRegistrationLookupResponse? GetPersonByNationalIdForRegistration(string nationalId)
-        {
-            PersonDAL dal = new PersonDAL();
-            return dal.GetPersonByNationalIdForRegistration(nationalId);
-        }
+        public bool HasSystemUser { get; set; }
     }
 }
