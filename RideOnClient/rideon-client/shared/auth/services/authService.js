@@ -1,6 +1,7 @@
-import axios from 'axios';
+import axios from "axios";
+import { API_BASE_URL } from "../../config/apiBaseUrl";
 
-const API = import.meta.env.VITE_API_BASE_URL;
+const API = API_BASE_URL;
 
 function login(username, password) {
   return axios.post(`${API}/SystemUsers/login`, {

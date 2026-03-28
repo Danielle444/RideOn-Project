@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { login } from "../../services/authService";
 import {
   saveToken,
   saveUser,
@@ -8,9 +7,10 @@ import {
   saveRememberMe,
   clearAuthStorage,
 } from "../../services/storageService";
-import { getApiErrorMessage } from "../../utils/auth/authApiErrors";
-import { getPostLoginRoute } from "../../utils/auth/authNavigation";
-import { validateLoginForm } from "../../utils/auth/loginValidation";
+import { login } from "../../../../shared/auth/services/authService";
+import { getApiErrorMessage } from "../../../../shared/auth/utils/authApiErrors";
+import { getPostLoginRoute } from "../../../../shared/auth/utils/authNavigation";
+import { validateLoginForm } from "../../../../shared/auth/validations/loginValidation";
 
 export default function LoginScreen() {
   const navigate = useNavigate();

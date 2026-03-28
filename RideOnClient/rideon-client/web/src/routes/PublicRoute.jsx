@@ -1,6 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { getToken, getUser, getActiveRole } from '../services/storageService';
-import { getPostLoginRoute } from "../utils/auth/authNavigation";
+import { getPostLoginRoute } from "../../../shared/auth/utils/authNavigation";
 
 export default function PublicRoute({ children }) {
   const token = getToken();

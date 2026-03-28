@@ -1,27 +1,29 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
+import logo from "../../assets/logo.png";
+import Field from "../common/Field";
+import CustomDropdown from "../common/CustomDropdown";
 import {
   register,
   getRanches,
   getRoles,
   checkUsername,
   getPersonByNationalIdForRegistration,
-} from "../../services/authService";
-import logo from "../../assets/logo.png";
-import { getApiErrorMessage } from "../../utils/auth/authApiErrors";
+} from "../../../../shared/auth/services/authService";
+
+import { getApiErrorMessage } from "../../../../shared/auth/utils/authApiErrors";
+
 import {
   mapGenderToFormValue,
   filterRegisterRoles,
-} from "../../utils/auth/authMappings";
+} from "../../../../shared/auth/mappings/authMappings";
+
 import {
   validateRegisterForm,
   validatePersonalSection,
   validateUserSection,
-} from "../../utils/auth/registerValidation";
-import Field from "../common/Field";
-import CustomDropdown from "../common/CustomDropdown";
-
+} from "../../../../shared/auth/validations/registerValidation";
 
 
 
