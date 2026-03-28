@@ -42,7 +42,31 @@ BEGIN
 END
 GO
 
+CREATE PROCEDURE usp_GetPersonByNationalIdForRegistration
+    @NationalId VARCHAR(9)
+AS
+BEGIN
+    SET NOCOUNT ON;
 
+    SELECT 
+        P.PersonId,
+        P.NationalId,
+        P.FirstName,
+        P.LastName,
+        P.Gender,
+        P.DateOfBirth,
+        P.CellPhone,
+        P.Email,
+        CASE 
+            WHEN SU.SystemUserId IS NULL THEN CAST(0 AS BIT)
+            ELSE CAST(1 AS BIT)
+        END AS HasSystemUser
+    FROM Person P
+    LEFT JOIN SystemUser SU
+        ON P.PersonId = SU.SystemUserId
+    WHERE P.NationalId = @NationalId;
+END
+GO
 /* =========================================================
    2) REGISTRATION
    ========================================================= */
@@ -52,6 +76,7 @@ GO
     RoleId TINYINT NOT NULL
 );
 GO
+
 CREATE PROCEDURE usp_RegisterSystemUserWithRoles
     @NationalId VARCHAR(9),
     @FirstName NVARCHAR(50),
@@ -71,14 +96,11 @@ BEGIN
     BEGIN TRANSACTION;
     BEGIN TRY
 
+        DECLARE @PersonId INT;
+
         IF EXISTS (SELECT 1 FROM SystemUser WHERE Username = @Username)
         BEGIN
             THROW 50001, 'Username already exists', 1;
-        END
-
-        IF EXISTS (SELECT 1 FROM Person WHERE NationalId = @NationalId)
-        BEGIN
-            THROW 50002, 'NationalId already exists', 1;
         END
 
         IF NOT EXISTS (SELECT 1 FROM @RanchRoles)
@@ -106,25 +128,70 @@ BEGIN
             THROW 50005, 'One or more roles do not exist', 1;
         END
 
-        INSERT INTO Person (NationalId, FirstName, LastName, Gender, DateOfBirth, CellPhone, Email)
-        VALUES (@NationalId, @FirstName, @LastName, @Gender, @DateOfBirth, @CellPhone, @Email);
+        -- אם האדם כבר קיים – נשתמש בו
+        SELECT @PersonId = PersonId
+        FROM Person
+        WHERE NationalId = @NationalId;
 
-        DECLARE @NewPersonId INT = SCOPE_IDENTITY();
+        IF @PersonId IS NOT NULL
+        BEGIN
+            -- אם כבר יש לו משתמש מערכת – זו שגיאה
+            IF EXISTS (
+                SELECT 1
+                FROM SystemUser
+                WHERE SystemUserId = @PersonId
+            )
+            BEGIN
+                THROW 50002, 'NationalId already belongs to an existing system user', 1;
+            END
+
+            -- עדכון שדות חסרים בלבד, כדי לא לדרוס מידע קיים
+            UPDATE Person
+            SET
+                FirstName = CASE WHEN (FirstName IS NULL OR LTRIM(RTRIM(FirstName)) = '') THEN @FirstName ELSE FirstName END,
+                LastName = CASE WHEN (LastName IS NULL OR LTRIM(RTRIM(LastName)) = '') THEN @LastName ELSE LastName END,
+                Gender = CASE WHEN (Gender IS NULL OR LTRIM(RTRIM(Gender)) = '') THEN @Gender ELSE Gender END,
+                DateOfBirth = CASE WHEN DateOfBirth IS NULL THEN @DateOfBirth ELSE DateOfBirth END,
+                CellPhone = CASE WHEN (CellPhone IS NULL OR LTRIM(RTRIM(CellPhone)) = '') THEN @CellPhone ELSE CellPhone END,
+                Email = CASE WHEN (Email IS NULL OR LTRIM(RTRIM(Email)) = '') THEN @Email ELSE Email END
+            WHERE PersonId = @PersonId;
+        END
+        ELSE
+        BEGIN
+            -- אדם חדש
+            INSERT INTO Person (NationalId, FirstName, LastName, Gender, DateOfBirth, CellPhone, Email)
+            VALUES (@NationalId, @FirstName, @LastName, @Gender, @DateOfBirth, @CellPhone, @Email);
+
+            SET @PersonId = SCOPE_IDENTITY();
+        END
 
         INSERT INTO SystemUser (SystemUserId, Username, PasswordHash, PasswordSalt)
-        VALUES (@NewPersonId, @Username, @PasswordHash, @PasswordSalt);
+        VALUES (@PersonId, @Username, @PasswordHash, @PasswordSalt);
 
         INSERT INTO PersonRanch (PersonId, RanchId)
-        SELECT DISTINCT @NewPersonId, rr.RanchId
-        FROM @RanchRoles rr;
+        SELECT DISTINCT @PersonId, rr.RanchId
+        FROM @RanchRoles rr
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM PersonRanch pr
+            WHERE pr.PersonId = @PersonId
+              AND pr.RanchId = rr.RanchId
+        );
 
         INSERT INTO PersonRanchRole (PersonId, RanchId, RoleId, RoleStatus)
-        SELECT @NewPersonId, rr.RanchId, rr.RoleId, 'Pending'
-        FROM @RanchRoles rr;
+        SELECT @PersonId, rr.RanchId, rr.RoleId, 'Pending'
+        FROM @RanchRoles rr
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM PersonRanchRole prr
+            WHERE prr.PersonId = @PersonId
+              AND prr.RanchId = rr.RanchId
+              AND prr.RoleId = rr.RoleId
+        );
 
         COMMIT TRANSACTION;
 
-        SELECT @NewPersonId AS NewPersonId;
+        SELECT @PersonId AS NewPersonId;
 
     END TRY
     BEGIN CATCH
