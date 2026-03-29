@@ -183,6 +183,18 @@ CREATE TABLE SystemUser
 );
 GO
 
+	CREATE TABLE SuperUser
+(
+    SuperUserId INT IDENTITY(1,1) PRIMARY KEY,
+    Email NVARCHAR(100) NOT NULL UNIQUE,
+    PasswordHash NVARCHAR(255) NOT NULL,
+    PasswordSalt NVARCHAR(255) NOT NULL,
+    IsActive BIT NOT NULL CONSTRAINT DF_SuperUser_IsActive DEFAULT 1,
+    MustChangePassword BIT NOT NULL CONSTRAINT DF_SuperUser_MustChangePassword DEFAULT 0,
+    CreatedDate DATETIME2(0) NOT NULL CONSTRAINT DF_SuperUser_CreatedDate DEFAULT SYSDATETIME(),
+    LastLoginDate DATETIME2(0) NULL
+);
+GO
 
 /* =========================================================
    3) PERSON / RANCH RELATIONS
