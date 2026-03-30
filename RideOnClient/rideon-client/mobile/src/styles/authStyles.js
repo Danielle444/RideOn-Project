@@ -514,6 +514,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  passwordLabelRow: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    gap: 6,
+  },
+
+  infoButton: {
+    padding: 2,
+  },
+
+  passwordInfoBox: {
+    backgroundColor: "#F8F3F0",
+    borderWidth: 1,
+    borderColor: "#E6D7CF",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: 8,
+  },
+
+  passwordInfoText: {
+    fontSize: 12,
+    color: "#6D4C41",
+    textAlign: "right",
+    lineHeight: 18,
+  },
 });
 
 export default styles;

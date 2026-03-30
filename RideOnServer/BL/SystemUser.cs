@@ -49,6 +49,11 @@ namespace RideOnServer.BL
         {
             SystemUserDAL dal = new SystemUserDAL();
 
+            if (string.IsNullOrWhiteSpace(request.Username))
+            {
+                throw new Exception("Username is required");
+            }
+
             if (dal.CheckUsernameExists(request.Username))
             {
                 throw new Exception("Username already exists");
@@ -71,6 +76,8 @@ namespace RideOnServer.BL
                     throw new Exception("Invalid RoleId");
                 }
             }
+
+            PasswordPolicyValidator.ValidateOrThrow(request.Password);
 
             string passwordSalt = PasswordHelper.GenerateSalt();
             string passwordHash = PasswordHelper.HashPassword(request.Password, passwordSalt);
@@ -111,6 +118,13 @@ namespace RideOnServer.BL
             {
                 throw new Exception("Current password is incorrect");
             }
+
+            if (request.CurrentPassword == request.NewPassword)
+            {
+                throw new Exception("New password must be different from current password");
+            }
+
+            PasswordPolicyValidator.ValidateOrThrow(request.NewPassword);
 
             string newSalt = PasswordHelper.GenerateSalt();
             string newHash = PasswordHelper.HashPassword(request.NewPassword, newSalt);

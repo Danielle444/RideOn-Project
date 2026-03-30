@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, LockKeyhole } from "lucide-react";
+import { Eye, EyeOff, LockKeyhole, Info } from "lucide-react";
 import { changePassword } from "../services/authService";
 import {
   getUser,
@@ -9,12 +9,16 @@ import {
   saveUser,
   clearAuthStorage,
 } from "../services/storageService";
+import { getPasswordValidationMessage } from "../../../shared/auth/validations/passwordValidation";
+import Field from "../components/common/Field";
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate();
   const user = getUser();
   const activeRole = getActiveRole();
   const rememberMe = getRememberMe();
+
+  const [showPasswordInfo, setShowPasswordInfo] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -43,13 +47,15 @@ export default function ChangePasswordPage() {
       return false;
     }
 
-    if (newPassword.length < 6) {
-      setErrorMessage("הסיסמה החדשה חייבת להכיל לפחות 6 תווים");
+    if (currentPassword === newPassword) {
+      setErrorMessage("הסיסמה החדשה חייבת להיות שונה מהסיסמה הנוכחית");
       return false;
     }
 
-    if (currentPassword === newPassword) {
-      setErrorMessage("הסיסמה החדשה חייבת להיות שונה מהסיסמה הנוכחית");
+    const passwordValidationMessage = getPasswordValidationMessage(newPassword);
+
+    if (passwordValidationMessage) {
+      setErrorMessage(passwordValidationMessage);
       return false;
     }
 
@@ -204,11 +210,38 @@ export default function ChangePasswordPage() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-[#4E342E] mb-1.5">
-                סיסמה חדשה
-              </label>
+            <Field
+              label="סיסמה חדשה"
+              info={<Info size={14} />}
+              showInfoPopup={showPasswordInfo}
+              onInfoClick={function () {
+                setShowPasswordInfo(function (prev) {
+                  return !prev;
+                });
+              }}
+              onCloseInfo={function () {
+                setShowPasswordInfo(false);
+              }}
+              infoPopup={
+                showPasswordInfo ? (
+                  <div className="absolute top-6 right-0 z-30 w-72 rounded-xl border border-[#E0D2C8] bg-white shadow-lg p-3 text-right">
+                    <div className="absolute -top-2 right-3 h-3 w-3 rotate-45 border-l border-t border-[#E0D2C8] bg-white" />
 
+                    <p className="text-xs font-semibold text-[#5D4037] mb-2">
+                      הסיסמה חייבת לכלול:
+                    </p>
+
+                    <ul className="text-xs text-[#6D4C41] space-y-1 leading-5">
+                      <li>• לפחות 8 תווים</li>
+                      <li>• לפחות אות אנגלית גדולה אחת</li>
+                      <li>• לפחות אות אנגלית קטנה אחת</li>
+                      <li>• לפחות ספרה אחת</li>
+                      <li>• ללא רווחים</li>
+                    </ul>
+                  </div>
+                ) : null
+              }
+            >
               <div className="relative">
                 <input
                   type={showNewPassword ? "text" : "password"}
@@ -233,7 +266,7 @@ export default function ChangePasswordPage() {
                   {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-            </div>
+            </Field>
 
             <div>
               <label className="block text-sm font-semibold text-[#4E342E] mb-1.5">

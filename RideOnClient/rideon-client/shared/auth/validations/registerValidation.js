@@ -1,3 +1,5 @@
+import { getPasswordValidationMessage } from "./passwordValidation";
+
 function validateRegisterForm(form, existingSystemUserFound) {
   var nationalId = form.nationalId;
   var firstName = form.firstName;
@@ -29,8 +31,10 @@ function validateRegisterForm(form, existingSystemUserFound) {
     return "תעודת זהות חייבת להכיל 9 ספרות בדיוק";
   }
 
-  if (password.length < 6) {
-    return "סיסמה חייבת להכיל לפחות 6 תווים";
+  var passwordValidationMessage = getPasswordValidationMessage(password);
+
+  if (passwordValidationMessage) {
+    return passwordValidationMessage;
   }
 
   if (password !== confirmPassword) {
@@ -105,8 +109,10 @@ function validateUserSection(form) {
     return "יש למלא סיסמה";
   }
 
-  if (form.password.length < 6) {
-    return "סיסמה חייבת להכיל לפחות 6 תווים";
+  var passwordValidationMessage = getPasswordValidationMessage(form.password);
+
+  if (passwordValidationMessage) {
+    return passwordValidationMessage;
   }
 
   if (!form.confirmPassword) {
