@@ -7,7 +7,7 @@ import {
   saveRememberMe,
   clearAuthStorage,
 } from "../../services/storageService";
-import { login } from "../../../../shared/auth/services/authService";
+import { login } from "../../services/authService";
 import { getApiErrorMessage } from "../../../../shared/auth/utils/authApiErrors";
 import { getPostLoginRoute } from "../../../../shared/auth/utils/authNavigation";
 import { validateLoginForm } from "../../../../shared/auth/validations/loginValidation";

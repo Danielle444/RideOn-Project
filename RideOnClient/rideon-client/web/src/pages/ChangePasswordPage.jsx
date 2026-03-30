@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LockKeyhole } from "lucide-react";
-import { changePassword } from "../../../shared/auth/services/authService";
+import { changePassword } from "../services/authService";
 import {
   getUser,
   getActiveRole,

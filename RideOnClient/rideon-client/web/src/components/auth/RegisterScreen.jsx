@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
-import logo from "../../assets/logo.png";
+import logo from "../../../../shared/assets/logo.png";
 import Field from "../common/Field";
 import CustomDropdown from "../common/CustomDropdown";
 import {
@@ -10,7 +10,7 @@ import {
   getRoles,
   checkUsername,
   getPersonByNationalIdForRegistration,
-} from "../../../../shared/auth/services/authService";
+} from "../../services/authService";
 
 import { getApiErrorMessage } from "../../../../shared/auth/utils/authApiErrors";
 
