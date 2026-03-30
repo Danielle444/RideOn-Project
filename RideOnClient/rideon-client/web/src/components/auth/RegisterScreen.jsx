@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Info } from "lucide-react";
 import logo from "../../../../shared/assets/logo.png";
 import Field from "../common/Field";
 import CustomDropdown from "../common/CustomDropdown";
@@ -25,13 +25,12 @@ import {
   validateUserSection,
 } from "../../../../shared/auth/validations/registerValidation";
 
-
-
 export default function RegisterScreen() {
   const navigate = useNavigate();
 
   const [activeSection, setActiveSection] = useState(1);
   const [openDropdownKey, setOpenDropdownKey] = useState("");
+  const [showPasswordInfo, setShowPasswordInfo] = useState(false);
 
   const [form, setForm] = useState({
     nationalId: "",
@@ -555,14 +554,45 @@ export default function RegisterScreen() {
                   </Field>
 
                   <div className="hidden sm:block" />
+                  <Field
+                    label="סיסמה"
+                    required
+                    info={<Info size={14} />}
+                    showInfoPopup={showPasswordInfo}
+                    onInfoClick={function () {
+                      setShowPasswordInfo(function (prev) {
+                        return !prev;
+                      });
+                    }}
+                    onCloseInfo={function () {
+                      setShowPasswordInfo(false);
+                    }}
+                    infoPopup={
+                      showPasswordInfo ? (
+                        <div className="absolute top-6 right-0 z-30 w-72 rounded-xl border border-[#E0D2C8] bg-white shadow-lg p-3 text-right">
+                          <div className="absolute -top-2 right-3 h-3 w-3 rotate-45 border-l border-t border-[#E0D2C8] bg-white" />
 
-                  <Field label="סיסמה" required>
+                          <p className="text-xs font-semibold text-[#5D4037] mb-2">
+                            הסיסמה חייבת לכלול:
+                          </p>
+
+                          <ul className="text-xs text-[#6D4C41] space-y-1 leading-5">
+                            <li>• לפחות 8 תווים</li>
+                            <li>• לפחות אות אנגלית גדולה אחת</li>
+                            <li>• לפחות אות אנגלית קטנה אחת</li>
+                            <li>• לפחות ספרה אחת</li>
+                            <li>• ללא רווחים</li>
+                          </ul>
+                        </div>
+                      ) : null
+                    }
+                  >
                     <div className="relative">
                       <input
                         type={showPass ? "text" : "password"}
                         value={form.password}
                         onChange={set("password")}
-                        placeholder="לפחות 6 תווים"
+                        placeholder="בחרי סיסמה"
                         autoComplete="new-password"
                         className={inputCls + " pl-10"}
                       />
@@ -573,7 +603,7 @@ export default function RegisterScreen() {
                             return !prev;
                           });
                         }}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1887F] hover:text-[#5D4037] transition-colors"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1887F] hover:text-[#5D4037]"
                       >
                         {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>

@@ -43,6 +43,8 @@ export default function RegisterScreen() {
 
   var [activeSection, setActiveSection] = useState(1);
 
+  var [showPasswordInfo, setShowPasswordInfo] = useState(false);
+
   var [form, setForm] = useState({
     nationalId: "",
     firstName: "",
@@ -88,7 +90,7 @@ export default function RegisterScreen() {
       .then(function ([rolesResponse, ranchesResponse]) {
         setRoles(Array.isArray(rolesResponse.data) ? rolesResponse.data : []);
         setRanches(
-          Array.isArray(ranchesResponse.data) ? ranchesResponse.data : []
+          Array.isArray(ranchesResponse.data) ? ranchesResponse.data : [],
         );
       })
       .catch(function () {
@@ -118,11 +120,7 @@ export default function RegisterScreen() {
       return new Date();
     }
 
-    return new Date(
-      Number(parts[0]),
-      Number(parts[1]) - 1,
-      Number(parts[2])
-    );
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
   }
 
   function set(fieldName) {
@@ -260,7 +258,7 @@ export default function RegisterScreen() {
 
       if (response.data.exists) {
         setUsernameSuggestionMessage(
-          "האימייל הזה כבר תפוס כשם משתמש. יש לבחור שם משתמש אחר."
+          "האימייל הזה כבר תפוס כשם משתמש. יש לבחור שם משתמש אחר.",
         );
       } else {
         setForm(function (prevForm) {
@@ -308,7 +306,7 @@ export default function RegisterScreen() {
         setExistingSystemUserFound(true);
         setNationalIdChecked(true);
         setNationalIdMessage(
-          "לאדם עם תעודת זהות זו כבר קיים משתמש במערכת. יש להתחבר או להשתמש בתעודת זהות אחרת."
+          "לאדם עם תעודת זהות זו כבר קיים משתמש במערכת. יש להתחבר או להשתמש בתעודת זהות אחרת.",
         );
         return;
       }
@@ -334,7 +332,7 @@ export default function RegisterScreen() {
       setPersonLoadedFromSystem(true);
       setNationalIdChecked(true);
       setNationalIdMessage(
-        "האדם כבר קיים במערכת. הפרטים מולאו אוטומטית. שדות חסרים ניתן להשלים ידנית."
+        "האדם כבר קיים במערכת. הפרטים מולאו אוטומטית. שדות חסרים ניתן להשלים ידנית.",
       );
     } catch (err) {
       if (err.response && err.response.status === 404) {
@@ -343,7 +341,7 @@ export default function RegisterScreen() {
         setExistingSystemUserFound(false);
         setNationalIdChecked(true);
         setNationalIdMessage(
-          "האדם לא קיים במערכת. ניתן להמשיך ולמלא את הפרטים ידנית."
+          "האדם לא קיים במערכת. ניתן להמשיך ולמלא את הפרטים ידנית.",
         );
       } else {
         setError("לא ניתן היה לבדוק את תעודת הזהות כרגע");
@@ -377,7 +375,7 @@ export default function RegisterScreen() {
     var sectionError = validatePersonalSection(
       form,
       nationalIdChecked,
-      existingSystemUserFound
+      existingSystemUserFound,
     );
 
     if (sectionError) {
@@ -492,7 +490,7 @@ export default function RegisterScreen() {
     placeholder,
     extraProps,
     helperText,
-    isLocked
+    isLocked,
   ) {
     return (
       <View style={styles.fieldGroup}>
@@ -520,11 +518,39 @@ export default function RegisterScreen() {
     onChangeText,
     placeholder,
     isVisible,
-    toggleVisible
+    toggleVisible,
+    showInfo,
+    toggleInfo,
   ) {
     return (
       <View style={styles.fieldGroup}>
-        <Text style={styles.label}>{label}</Text>
+        <View style={styles.passwordLabelRow}>
+          {toggleInfo ? (
+            <Pressable onPress={toggleInfo} style={styles.infoButton}>
+              <Ionicons
+                name="information-circle-outline"
+                size={18}
+                color="#8B6352"
+              />
+            </Pressable>
+          ) : null}
+
+          <Text style={styles.label}>{label}</Text>
+        </View>
+
+        {showInfo ? (
+          <View style={styles.passwordInfoBox}>
+            <Text style={styles.passwordInfoText}>• לפחות 8 תווים</Text>
+            <Text style={styles.passwordInfoText}>
+              • לפחות אות אנגלית גדולה אחת
+            </Text>
+            <Text style={styles.passwordInfoText}>
+              • לפחות אות אנגלית קטנה אחת
+            </Text>
+            <Text style={styles.passwordInfoText}>• לפחות ספרה אחת</Text>
+            <Text style={styles.passwordInfoText}>• ללא רווחים</Text>
+          </View>
+        ) : null}
 
         <View style={styles.passwordWrapper}>
           <Pressable onPress={toggleVisible} style={styles.eyeButton}>
@@ -827,7 +853,7 @@ export default function RegisterScreen() {
                     checkingNationalId
                       ? "בודק תעודת זהות..."
                       : nationalIdMessage,
-                    false
+                    false,
                   )}
 
                   {renderTextField(
@@ -837,7 +863,7 @@ export default function RegisterScreen() {
                     "הזן שם פרטי",
                     {},
                     "",
-                    firstNameLocked
+                    firstNameLocked,
                   )}
 
                   {renderTextField(
@@ -847,7 +873,7 @@ export default function RegisterScreen() {
                     "הזן שם משפחה",
                     {},
                     "",
-                    lastNameLocked
+                    lastNameLocked,
                   )}
 
                   {renderGenderSelector(genderLocked)}
@@ -863,7 +889,7 @@ export default function RegisterScreen() {
                       keyboardType: "phone-pad",
                     },
                     "",
-                    cellPhoneLocked
+                    cellPhoneLocked,
                   )}
 
                   {renderTextField(
@@ -877,10 +903,13 @@ export default function RegisterScreen() {
                       onBlur: handleEmailBlur,
                     },
                     "",
-                    emailLocked
+                    emailLocked,
                   )}
 
-                  <Pressable style={styles.primaryButton} onPress={goToUserSection}>
+                  <Pressable
+                    style={styles.primaryButton}
+                    onPress={goToUserSection}
+                  >
                     <Text style={styles.primaryButtonText}>המשך לשלב הבא</Text>
                   </Pressable>
                 </View>
@@ -900,21 +929,29 @@ export default function RegisterScreen() {
                     {
                       autoCapitalize: "none",
                     },
-                    checkingUsername ? "בודק זמינות..." : usernameSuggestionMessage,
-                    false
+                    checkingUsername
+                      ? "בודק זמינות..."
+                      : usernameSuggestionMessage,
+                    false,
                   )}
 
                   {renderPasswordField(
                     "סיסמה",
                     form.password,
                     set("password"),
-                    "לפחות 6 תווים",
+                    "בחרי סיסמה",
                     showPassword,
                     function () {
                       setShowPassword(function (prev) {
                         return !prev;
                       });
-                    }
+                    },
+                    showPasswordInfo,
+                    function () {
+                      setShowPasswordInfo(function (prev) {
+                        return !prev;
+                      });
+                    },
                   )}
 
                   {renderPasswordField(
@@ -927,7 +964,9 @@ export default function RegisterScreen() {
                       setShowConfirmPassword(function (prev) {
                         return !prev;
                       });
-                    }
+                    },
+                    false,
+                    null,
                   )}
 
                   <View style={styles.stepButtonsRow}>
@@ -968,7 +1007,8 @@ export default function RegisterScreen() {
 
                   <View style={styles.noticeBox}>
                     <Text style={styles.noticeText}>
-                      הבקשה תועבר לאישור, ולא ניתן יהיה להתחבר עד לאישור מנהל המערכת.
+                      הבקשה תועבר לאישור, ולא ניתן יהיה להתחבר עד לאישור מנהל
+                      המערכת.
                     </Text>
                   </View>
 
