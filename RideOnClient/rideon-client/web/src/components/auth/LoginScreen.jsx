@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import {
   saveToken,
   saveUser,
@@ -18,6 +19,7 @@ export default function LoginScreen() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -26,7 +28,6 @@ export default function LoginScreen() {
     event.preventDefault();
     setErrorMessage("");
 
-    // ✅ ולידציה חיצונית
     const validationError = validateLoginForm(username, password);
 
     if (validationError) {
@@ -37,7 +38,6 @@ export default function LoginScreen() {
     setIsLoading(true);
 
     try {
-      // ניקוי מידע ישן לפני התחברות חדשה
       clearAuthStorage();
 
       const response = await login(username.trim(), password);
@@ -57,7 +57,6 @@ export default function LoginScreen() {
       saveToken(data.token, rememberMe);
       saveUser(userData, rememberMe);
 
-      // ❗ בדיקה אם אין תפקידים מאושרים
       if (
         !data.approvedRolesAndRanches ||
         data.approvedRolesAndRanches.length === 0
@@ -67,20 +66,15 @@ export default function LoginScreen() {
         return;
       }
 
-      // אם יש רק תפקיד אחד → שמירה אוטומטית
+      var nextActiveRole = null;
+
       if (data.approvedRolesAndRanches.length === 1) {
-        saveActiveRole(data.approvedRolesAndRanches[0], rememberMe);
+        nextActiveRole = data.approvedRolesAndRanches[0];
+        saveActiveRole(nextActiveRole, rememberMe);
       }
 
-      // ✅ ניווט מרכזי אחיד
-      navigate(
-        getPostLoginRoute(
-          userData,
-          data.approvedRolesAndRanches[0] || null
-        )
-      );
+      navigate(getPostLoginRoute(userData, nextActiveRole));
     } catch (error) {
-      // ✅ טיפול שגיאות אחיד
       setErrorMessage(
         getApiErrorMessage(error, "אירעה שגיאה בהתחברות לשרת")
       );
@@ -107,7 +101,9 @@ export default function LoginScreen() {
             <input
               type="text"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={function (e) {
+                setUsername(e.target.value);
+              }}
               className="w-full rounded-xl border border-[#D7CCC8] px-4 py-2 text-right focus:border-[#795548] focus:outline-none"
             />
           </div>
@@ -116,12 +112,30 @@ export default function LoginScreen() {
             <label className="mb-1 block text-sm text-[#5D4037]">
               סיסמה
             </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-[#D7CCC8] px-4 py-2 text-right focus:border-[#795548] focus:outline-none"
-            />
+
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={function (e) {
+                  setPassword(e.target.value);
+                }}
+                className="w-full rounded-xl border border-[#D7CCC8] px-4 py-2 pl-11 text-right focus:border-[#795548] focus:outline-none"
+              />
+
+              <button
+                type="button"
+                onClick={function () {
+                  setShowPassword(function (prev) {
+                    return !prev;
+                  });
+                }}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8D6E63] hover:text-[#5D4037] transition-colors"
+                title={showPassword ? "הסתרת סיסמה" : "הצגת סיסמה"}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center justify-between text-sm text-[#5D4037]">
@@ -129,14 +143,18 @@ export default function LoginScreen() {
               <input
                 type="checkbox"
                 checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
+                onChange={function (e) {
+                  setRememberMe(e.target.checked);
+                }}
               />
               זכור אותי
             </label>
 
             <button
               type="button"
-              onClick={() => navigate("/forgot-password")}
+              onClick={function () {
+                navigate("/forgot-password");
+              }}
               className="text-[#795548] hover:underline"
             >
               שכחתי סיסמה
@@ -161,7 +179,9 @@ export default function LoginScreen() {
         <p className="mt-6 text-center text-sm text-[#6D4C41]">
           אין לך חשבון?{" "}
           <span
-            onClick={() => navigate("/register")}
+            onClick={function () {
+              navigate("/register");
+            }}
             className="cursor-pointer font-semibold text-[#795548] hover:underline"
           >
             להרשמה

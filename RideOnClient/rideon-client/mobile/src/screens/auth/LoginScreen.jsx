@@ -6,21 +6,27 @@ import {
   Pressable,
   Image,
   Alert,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
 import { login } from "../../services/authService";
-import { saveToken, saveUser } from "../../services/storageService";
+import {
+  saveToken,
+  saveUser,
+  saveActiveRole,
+  clearAuthStorage,
+} from "../../services/storageService";
 import { validateLoginForm } from "../../../../shared/auth/validations/loginValidation";
 import { getApiErrorMessage } from "../../../../shared/auth/utils/authApiErrors";
+import { isRoleSupportedOnMobile } from "../../../../shared/auth/utils/platformRoles";
 
 import styles from "../../styles/authStyles";
 
-export default function LoginScreen() {
+export default function LoginScreen(props) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -40,6 +46,8 @@ export default function LoginScreen() {
     setIsLoading(true);
 
     try {
+      await clearAuthStorage();
+
       const response = await login(username.trim(), password);
       const data = response.data;
 
@@ -56,13 +64,26 @@ export default function LoginScreen() {
       await saveToken(data.token);
       await saveUser(userData);
 
-      Alert.alert("הצלחה", "התחברת בהצלחה");
-    } catch (err) {
-      console.log("LOGIN ERROR FULL:", err);
-      console.log("LOGIN ERROR RESPONSE:", err?.response);
-      console.log("LOGIN ERROR DATA:", err?.response?.data);
-      console.log("LOGIN ERROR MESSAGE:", err?.message);
+      if (
+        !data.approvedRolesAndRanches ||
+        data.approvedRolesAndRanches.length === 0
+      ) {
+        await clearAuthStorage();
+        Alert.alert("שגיאה", "אין למשתמש תפקיד מאושר במערכת");
+        return;
+      }
 
+      if (
+        data.approvedRolesAndRanches.length === 1 &&
+        isRoleSupportedOnMobile(data.approvedRolesAndRanches[0].roleName)
+      ) {
+        await saveActiveRole(data.approvedRolesAndRanches[0]);
+      }
+
+      if (props.onLoginSuccess) {
+        await props.onLoginSuccess();
+      }
+    } catch (err) {
       const message = getApiErrorMessage(err, "שגיאה בהתחברות");
       Alert.alert("שגיאה", String(message));
     } finally {

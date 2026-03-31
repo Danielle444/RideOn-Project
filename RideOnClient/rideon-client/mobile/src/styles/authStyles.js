@@ -541,6 +541,217 @@ const styles = StyleSheet.create({
     textAlign: "right",
     lineHeight: 18,
   },
+
+  /* ---------- GENERIC MOBILE SCREENS ---------- */
+
+screenWrapper: {
+  flex: 1,
+  backgroundColor: "#F5EDE8",
+},
+
+centeredContainer: {
+  flex: 1,
+  justifyContent: "center",
+  padding: 20,
+},
+
+basicCard: {
+  backgroundColor: "#FFFFFF",
+  borderRadius: 28,
+  borderWidth: 1,
+  borderColor: "#E8D5C9",
+  paddingHorizontal: 24,
+  paddingVertical: 28,
+},
+
+logoMedium: {
+  width: 120,
+  height: 90,
+  alignSelf: "center",
+  marginBottom: 20,
+},
+
+titleCenter: {
+  textAlign: "center",
+  fontSize: 28,
+  fontWeight: "800",
+  color: "#3E2723",
+},
+
+subtitleCenter: {
+  textAlign: "center",
+  fontSize: 16,
+  color: "#795548",
+  marginTop: 10,
+  lineHeight: 24,
+},
+
+primaryButtonLarge: {
+  marginTop: 26,
+  alignSelf: "center",
+  backgroundColor: "#8B6352",
+  paddingHorizontal: 26,
+  paddingVertical: 14,
+  borderRadius: 18,
+},
+
+primaryButtonTextLarge: {
+  color: "#FFFFFF",
+  fontWeight: "700",
+  fontSize: 17,
+},
+
+userCard: {
+  marginTop: 28,
+  borderRadius: 22,
+  backgroundColor: "#FCFAF8",
+  borderWidth: 1,
+  borderColor: "#E7D8CF",
+  padding: 18,
+},
+
+userNameCenter: {
+  textAlign: "center",
+  fontSize: 21,
+  fontWeight: "700",
+  color: "#5D4037",
+},
+
+userMetaCenter: {
+  textAlign: "center",
+  fontSize: 16,
+  color: "#8B6352",
+  marginTop: 10,
+},
+
+loadingScreen: {
+  flex: 1,
+  backgroundColor: "#F5EDE8",
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+/* ---------- ROLE SELECTION ---------- */
+
+roleCard: {
+  backgroundColor: "#FFFFFF",
+  borderRadius: 28,
+  borderWidth: 1,
+  borderColor: "#E8D5C9",
+  overflow: "hidden",
+},
+
+roleHeader: {
+  paddingHorizontal: 24,
+  paddingTop: 28,
+  paddingBottom: 20,
+  borderBottomWidth: 1,
+  borderBottomColor: "#F1E6DF",
+},
+
+roleTitle: {
+  textAlign: "right",
+  fontSize: 28,
+  fontWeight: "800",
+  color: "#212121",
+},
+
+roleSubtitle: {
+  textAlign: "right",
+  fontSize: 16,
+  color: "#795548",
+  marginTop: 8,
+},
+
+roleListContainer: {
+  paddingHorizontal: 20,
+  paddingVertical: 20,
+},
+
+roleItem: {
+  borderWidth: 2,
+  borderColor: "#E4D6CE",
+  backgroundColor: "#FFFFFF",
+  borderRadius: 24,
+  paddingHorizontal: 18,
+  paddingVertical: 20,
+  marginBottom: 14,
+},
+
+roleItemSelected: {
+  borderColor: "#8B6352",
+},
+
+roleItemDisabled: {
+  backgroundColor: "#F7F3F1",
+  opacity: 0.75,
+},
+
+roleRow: {
+  flexDirection: "row-reverse",
+  alignItems: "center",
+  justifyContent: "space-between",
+},
+
+roleTextWrap: {
+  flex: 1,
+  paddingLeft: 16,
+},
+
+roleMainText: {
+  textAlign: "right",
+  fontSize: 18,
+  fontWeight: "800",
+  color: "#3E2723",
+},
+
+roleSubText: {
+  textAlign: "right",
+  fontSize: 15,
+  fontWeight: "600",
+  color: "#6D4C41",
+  marginTop: 6,
+},
+
+roleDisabledText: {
+  textAlign: "right",
+  fontSize: 13,
+  fontWeight: "600",
+  color: "#B08978",
+  marginTop: 10,
+},
+
+roleIconBox: {
+  width: 58,
+  height: 58,
+  borderRadius: 18,
+  backgroundColor: "#F3ECE8",
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+roleActionsRow: {
+  marginTop: 10,
+  flexDirection: "row-reverse",
+  justifyContent: "space-between",
+  alignItems: "center",
+},
+
+logoutButtonSecondary: {
+  borderWidth: 1,
+  borderColor: "#D7CCC8",
+  paddingHorizontal: 22,
+  paddingVertical: 16,
+  borderRadius: 18,
+  flexDirection: "row-reverse",
+  alignItems: "center",
+},
+
+logoutTextSecondary: {
+  color: "#5D4037",
+  fontWeight: "600",
+  fontSize: 17,
+},
 });
 
 export default styles;

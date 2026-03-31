@@ -1,19 +1,6 @@
---Role maybe unneccesery
-
-CREATE PROCEDURE usp_GetAllRoles
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    SELECT 
-        RoleId, 
-        RoleName 
-    FROM Role
-    ORDER BY RoleName;
-END
+USE RideOn;
 GO
 
--- Ranch
 
 GO
 
@@ -73,18 +60,6 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_GetAllRanchesNames
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    -- ה-DAL יקבל שתי עמודות פשוטות של מספרים עשרוניים
-    SELECT 
-        RanchId, 
-        RanchName
-    FROM Ranch;
-END
-GO
 
 CREATE PROCEDURE usp_GetRanchById
     @RanchId INT
