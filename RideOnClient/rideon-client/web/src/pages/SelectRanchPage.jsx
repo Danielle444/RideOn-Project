@@ -51,7 +51,6 @@ export default function SelectRanchPage() {
     return getWebSupportedRoleOptions(approvedRolesAndRanches);
   }, [approvedRolesAndRanches]);
 
-  const [selectedIndex, setSelectedIndex] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(
@@ -76,15 +75,11 @@ export default function SelectRanchPage() {
     navigate("/login");
   }
 
-  function handleContinue() {
+  // 🔥 הפונקציה החדשה — במקום handleContinue
+  function handleRoleSelect(index) {
     setErrorMessage("");
 
-    if (selectedIndex === null) {
-      setErrorMessage("יש לבחור חווה ותפקיד כדי להמשיך");
-      return;
-    }
-
-    const selectedRole = roleOptionsForWeb[selectedIndex];
+    const selectedRole = roleOptionsForWeb[index];
 
     if (!selectedRole.isSupportedOnWeb) {
       setErrorMessage("התפקיד שנבחר זמין רק במובייל");
@@ -151,7 +146,6 @@ export default function SelectRanchPage() {
           <div className="px-10 py-8">
             <div className="space-y-5">
               {roleOptionsForWeb.map(function (item, index) {
-                const isSelected = selectedIndex === index;
                 const isDisabled = !item.isSupportedOnWeb;
 
                 return (
@@ -160,32 +154,26 @@ export default function SelectRanchPage() {
                     type="button"
                     disabled={isDisabled}
                     onClick={function () {
-                      if (isDisabled) {
-                        return;
-                      }
-
-                      setSelectedIndex(index);
-                      setErrorMessage("");
+                      if (isDisabled) return;
+                      handleRoleSelect(index);
                     }}
                     className={
                       "w-full rounded-[24px] border-2 px-8 py-7 text-right transition-all " +
                       (isDisabled
                         ? "border-[#E4D6CE] bg-[#F7F3F1] opacity-80 cursor-not-allowed"
-                        : isSelected
-                        ? "border-[#8B6352] bg-[#FCFAF8] shadow-md"
                         : "border-[#E4D6CE] bg-white hover:border-[#BCAAA4] hover:bg-[#FCFAF8]")
                     }
                   >
                     <div className="flex items-center justify-between gap-5">
                       <div className="flex-1 text-right">
-                        <div className="flex items-center justify-start gap-2 mb-2">
+                        <div className="flex items-center gap-2 mb-2">
                           <Building2 size={18} className="text-[#7B5A4D]" />
-                          <span className="text-[2rem] leading-none font-bold text-[#3E2723]">
+                          <span className="text-[2rem] font-bold text-[#3E2723]">
                             {item.displayTitle}
                           </span>
                         </div>
 
-                        <div className="flex items-center justify-start gap-2 text-[#6D4C41]">
+                        <div className="flex items-center gap-2 text-[#6D4C41]">
                           <Briefcase size={16} className="text-[#8B6352]" />
                           <span className="text-lg font-semibold">
                             {item.displaySubtitle}
@@ -193,13 +181,13 @@ export default function SelectRanchPage() {
                         </div>
 
                         {isDisabled && (
-                          <p className="mt-4 text-sm font-medium text-[#B08978]">
+                          <p className="mt-4 text-sm text-[#B08978]">
                             {item.platformMessage}
                           </p>
                         )}
                       </div>
 
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#F3ECE8] text-[#8B6352]">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#F3ECE8] text-[#8B6352]">
                         {isDisabled ? (
                           <Smartphone size={26} />
                         ) : (
@@ -218,22 +206,14 @@ export default function SelectRanchPage() {
               </div>
             )}
 
-            <div className="mt-9 flex items-center justify-between">
+            <div className="mt-9 flex justify-start">
               <button
                 type="button"
                 onClick={handleLogout}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#D7CCC8] px-6 py-4 text-[#5D4037] transition hover:bg-[#F8F5F2]"
+                className="inline-flex items-center gap-2 rounded-2xl border border-[#D7CCC8] px-6 py-4 text-[#5D4037] hover:bg-[#F8F5F2]"
               >
                 <LogOut size={18} />
                 התנתקות
-              </button>
-
-              <button
-                type="button"
-                onClick={handleContinue}
-                className="bg-[#8B6352] hover:bg-[#774E3E] text-white font-semibold py-4 px-8 rounded-2xl transition-all shadow-sm"
-              >
-                המשך לעבודה
               </button>
             </div>
           </div>
