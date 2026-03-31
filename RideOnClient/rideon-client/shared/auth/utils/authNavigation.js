@@ -7,22 +7,23 @@ function getPostLoginRoute(user, activeRole) {
     return "/change-password";
   }
 
-  if (
-    !activeRole &&
-    user.approvedRolesAndRanches &&
-    user.approvedRolesAndRanches.length > 1
-  ) {
-    return "/select-ranch";
+  var approvedRolesAndRanches = Array.isArray(user.approvedRolesAndRanches)
+    ? user.approvedRolesAndRanches
+    : [];
+
+  if (activeRole) {
+    return "/competitions";
   }
 
-  if (
-    user.approvedRolesAndRanches &&
-    user.approvedRolesAndRanches.length >= 1
-  ) {
-    return "/dashboard";
+  if (approvedRolesAndRanches.length === 0) {
+    return "/login";
   }
 
-  return "/login";
+  if (approvedRolesAndRanches.length === 1) {
+    return "/competitions";
+  }
+
+  return "/select-ranch";
 }
 
 export { getPostLoginRoute };

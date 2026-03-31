@@ -1,12 +1,22 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Check, LogOut, MapPin, Shield } from 'lucide-react';
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Briefcase,
+  LogOut,
+  Building2,
+  Smartphone,
+  BadgeCheck,
+} from "lucide-react";
 import {
   getUser,
   getRememberMe,
   saveActiveRole,
-  clearAuthStorage
-} from '../services/storageService';
+  clearAuthStorage,
+} from "../services/storageService";
+import {
+  mapRoleOptionForWeb,
+  getWebSupportedRoleOptions,
+} from "../../../shared/auth/utils/platformRoles";
 
 export default function SelectRanchPage() {
   const navigate = useNavigate();
@@ -14,32 +24,84 @@ export default function SelectRanchPage() {
   const rememberMe = getRememberMe();
 
   const approvedRolesAndRanches = useMemo(function () {
-    if (!user || !user.approvedRolesAndRanches) {
+    if (!user || !Array.isArray(user.approvedRolesAndRanches)) {
       return [];
     }
 
     return user.approvedRolesAndRanches;
   }, [user]);
 
+  const roleOptionsForWeb = useMemo(function () {
+    const mapped = approvedRolesAndRanches.map(mapRoleOptionForWeb);
+
+    return mapped.sort(function (a, b) {
+      if (a.isSupportedOnWeb && !b.isSupportedOnWeb) {
+        return -1;
+      }
+
+      if (!a.isSupportedOnWeb && b.isSupportedOnWeb) {
+        return 1;
+      }
+
+      return 0;
+    });
+  }, [approvedRolesAndRanches]);
+
+  const supportedWebRoles = useMemo(function () {
+    return getWebSupportedRoleOptions(approvedRolesAndRanches);
+  }, [approvedRolesAndRanches]);
+
   const [selectedIndex, setSelectedIndex] = useState(null);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(
+    function () {
+      if (!user) {
+        return;
+      }
+
+      if (
+        approvedRolesAndRanches.length === 1 &&
+        supportedWebRoles.length === 1
+      ) {
+        saveActiveRole(supportedWebRoles[0], rememberMe);
+        navigate("/competitions", { replace: true });
+      }
+    },
+    [user, approvedRolesAndRanches, supportedWebRoles, rememberMe, navigate]
+  );
 
   function handleLogout() {
     clearAuthStorage();
-    navigate('/login');
+    navigate("/login");
   }
 
   function handleContinue() {
-    setErrorMessage('');
+    setErrorMessage("");
 
     if (selectedIndex === null) {
-      setErrorMessage('יש לבחור חווה ותפקיד כדי להמשיך');
+      setErrorMessage("יש לבחור חווה ותפקיד כדי להמשיך");
       return;
     }
 
-    const selectedRole = approvedRolesAndRanches[selectedIndex];
-    saveActiveRole(selectedRole, rememberMe);
-    navigate('/dashboard');
+    const selectedRole = roleOptionsForWeb[selectedIndex];
+
+    if (!selectedRole.isSupportedOnWeb) {
+      setErrorMessage("התפקיד שנבחר זמין רק במובייל");
+      return;
+    }
+
+    saveActiveRole(
+      {
+        ranchId: selectedRole.ranchId,
+        ranchName: selectedRole.ranchName,
+        roleId: selectedRole.roleId,
+        roleName: selectedRole.roleName,
+      },
+      rememberMe
+    );
+
+    navigate("/competitions");
   }
 
   if (!user) {
@@ -49,14 +111,16 @@ export default function SelectRanchPage() {
         className="min-h-screen flex items-center justify-center px-4 py-8 bg-gradient-to-br from-[#EFEBE9] to-[#F5EDE8]"
       >
         <div className="w-full max-w-[420px] bg-white rounded-2xl shadow-xl border border-[#E8D5C9] p-8 text-center">
-          <h1 className="text-2xl font-bold text-[#3E2723] mb-3">אין נתוני משתמש</h1>
+          <h1 className="text-2xl font-bold text-[#3E2723] mb-3">
+            אין נתוני משתמש
+          </h1>
           <p className="text-[#795548] mb-6">
             לא נמצאו פרטי התחברות שמורים. יש להתחבר מחדש.
           </p>
 
           <button
             onClick={function () {
-              navigate('/login');
+              navigate("/login");
             }}
             className="w-full bg-[#5D4037] hover:bg-[#4E342E] text-white font-semibold py-3 rounded-xl transition-all shadow-sm"
           >
@@ -72,49 +136,75 @@ export default function SelectRanchPage() {
       dir="rtl"
       className="min-h-screen flex items-center justify-center px-4 py-8 bg-gradient-to-br from-[#EFEBE9] to-[#F5EDE8]"
     >
-      <div className="w-full max-w-[680px]">
-        <div className="bg-white rounded-2xl shadow-xl border border-[#E8D5C9] overflow-hidden">
-          <div className="px-8 pt-8 pb-6 border-b border-[#F5EBE4]">
-            <h1 className="text-2xl font-bold text-[#212121]">בחירת חווה ותפקיד</h1>
-            <p className="text-sm text-[#795548] mt-1">
-              שלום {user.firstName} {user.lastName}, בחר/י את החווה והתפקיד שדרכם תרצה/י להיכנס
+      <div className="w-full max-w-[1020px]">
+        <div className="bg-white rounded-[28px] shadow-xl border border-[#E8D5C9] overflow-hidden">
+          <div className="px-10 pt-10 pb-7 border-b border-[#F1E6DF] text-right">
+            <h1 className="text-[2rem] font-bold text-[#212121] leading-tight">
+              על איזו חווה את עובדת עכשיו?
+            </h1>
+
+            <p className="text-base text-[#795548] mt-2">
+              בחרי את החווה והתפקיד שדרכם תרצי לעבוד בחשבון זה
             </p>
           </div>
 
-          <div className="px-8 py-6">
-            <div className="space-y-4">
-              {approvedRolesAndRanches.map(function (item, index) {
+          <div className="px-10 py-8">
+            <div className="space-y-5">
+              {roleOptionsForWeb.map(function (item, index) {
                 const isSelected = selectedIndex === index;
+                const isDisabled = !item.isSupportedOnWeb;
 
                 return (
                   <button
                     key={`${item.ranchId}-${item.roleId}-${index}`}
                     type="button"
+                    disabled={isDisabled}
                     onClick={function () {
+                      if (isDisabled) {
+                        return;
+                      }
+
                       setSelectedIndex(index);
-                      setErrorMessage('');
+                      setErrorMessage("");
                     }}
                     className={
-                      'w-full rounded-2xl border-2 p-5 text-right transition-all ' +
-                      (isSelected
-                        ? 'border-[#795548] bg-[#F8F5F2] shadow-md'
-                        : 'border-[#E5D7CF] bg-white hover:border-[#BCAAA4] hover:bg-[#FCFAF8]')
+                      "w-full rounded-[24px] border-2 px-8 py-7 text-right transition-all " +
+                      (isDisabled
+                        ? "border-[#E4D6CE] bg-[#F7F3F1] opacity-80 cursor-not-allowed"
+                        : isSelected
+                        ? "border-[#8B6352] bg-[#FCFAF8] shadow-md"
+                        : "border-[#E4D6CE] bg-white hover:border-[#BCAAA4] hover:bg-[#FCFAF8]")
                     }
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#F3ECE8] text-[#5D4037]">
-                        {isSelected ? <Check size={20} /> : <Shield size={20} />}
-                      </div>
-
-                      <div className="flex-1">
-                        <div className="mb-2 flex items-center justify-start gap-2 text-[#3E2723]">
-                          <MapPin size={16} />
-                          <span className="text-lg font-bold">{item.ranchName}</span>
+                    <div className="flex items-center justify-between gap-5">
+                      <div className="flex-1 text-right">
+                        <div className="flex items-center justify-start gap-2 mb-2">
+                          <Building2 size={18} className="text-[#7B5A4D]" />
+                          <span className="text-[2rem] leading-none font-bold text-[#3E2723]">
+                            {item.displayTitle}
+                          </span>
                         </div>
 
-                        <p className="text-sm text-[#6D4C41]">
-                          תפקיד: <span className="font-semibold">{item.roleName}</span>
-                        </p>
+                        <div className="flex items-center justify-start gap-2 text-[#6D4C41]">
+                          <Briefcase size={16} className="text-[#8B6352]" />
+                          <span className="text-lg font-semibold">
+                            {item.displaySubtitle}
+                          </span>
+                        </div>
+
+                        {isDisabled && (
+                          <p className="mt-4 text-sm font-medium text-[#B08978]">
+                            {item.platformMessage}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#F3ECE8] text-[#8B6352]">
+                        {isDisabled ? (
+                          <Smartphone size={26} />
+                        ) : (
+                          <BadgeCheck size={28} />
+                        )}
                       </div>
                     </div>
                   </button>
@@ -123,16 +213,16 @@ export default function SelectRanchPage() {
             </div>
 
             {errorMessage && (
-              <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 text-right">
                 {errorMessage}
               </div>
             )}
 
-            <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+            <div className="mt-9 flex items-center justify-between">
               <button
                 type="button"
                 onClick={handleLogout}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D7CCC8] px-5 py-3 text-[#5D4037] transition hover:bg-[#F8F5F2]"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#D7CCC8] px-6 py-4 text-[#5D4037] transition hover:bg-[#F8F5F2]"
               >
                 <LogOut size={18} />
                 התנתקות
@@ -141,9 +231,9 @@ export default function SelectRanchPage() {
               <button
                 type="button"
                 onClick={handleContinue}
-                className="bg-[#5D4037] hover:bg-[#4E342E] text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-sm"
+                className="bg-[#8B6352] hover:bg-[#774E3E] text-white font-semibold py-4 px-8 rounded-2xl transition-all shadow-sm"
               >
-                המשך
+                המשך לעבודה
               </button>
             </div>
           </div>

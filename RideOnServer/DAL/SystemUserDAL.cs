@@ -295,5 +295,7 @@ namespace RideOnServer.DAL
                 throw new Exception($"Database error: {ex.Message}");
             }
         }
+
+
     }
 }
