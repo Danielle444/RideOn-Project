@@ -4,7 +4,7 @@ import RegisterScreen from "../screens/auth/RegisterScreen";
 
 const Stack = createNativeStackNavigator();
 
-export default function AuthNavigator() {
+export default function AuthNavigator(props) {
   return (
     <Stack.Navigator
       screenOptions={{
@@ -12,7 +12,17 @@ export default function AuthNavigator() {
       }}
       initialRouteName="Login"
     >
-      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Login">
+        {function (screenProps) {
+          return (
+            <LoginScreen
+              {...screenProps}
+              onLoginSuccess={props.onLoginSuccess}
+            />
+          );
+        }}
+      </Stack.Screen>
+
       <Stack.Screen name="Register" component={RegisterScreen} />
     </Stack.Navigator>
   );
