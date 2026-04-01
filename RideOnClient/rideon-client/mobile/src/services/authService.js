@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://10.0.0.16:5268/api";
+const API = "http://10.0.0.6:5268/api";
 
 function login(username, password) {
   return axios.post(
@@ -47,6 +47,20 @@ function getPersonByNationalIdForRegistration(nationalId) {
   });
 }
 
+function changePassword(username, currentPassword, newPassword) {
+  return axios.put(
+    `${API}/SystemUsers/change-password`,
+    {
+      username: username,
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    },
+    {
+      timeout: 8000,
+    }
+  );
+}
+
 export {
   login,
   register,
@@ -54,4 +68,5 @@ export {
   getRoles,
   checkUsername,
   getPersonByNationalIdForRegistration,
+  changePassword,
 };

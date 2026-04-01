@@ -1,15 +1,22 @@
 import { Navigate } from "react-router-dom";
-import { getToken, getUser, getActiveRole } from '../services/storageService';
+import { useAuth } from "../context/AuthContext";
+import { useUser } from "../context/UserContext";
+import { useActiveRole } from "../context/ActiveRoleContext";
 import { getPostLoginRoute } from "../../../shared/auth/utils/authNavigation";
 
 export default function PublicRoute({ children }) {
-  const token = getToken();
-  const user = getUser();
-  const activeRole = getActiveRole();
+  const { isLoading, isAuthenticated } = useAuth();
+  const { user } = useUser();
+  const { activeRole } = useActiveRole();
 
-  if (token && user) {
-  return <Navigate to={getPostLoginRoute(user, activeRole)} replace />;
-}
+  // מחכים לטעינה
+  if (isLoading) {
+    return null;
+  }
+
+  if (isAuthenticated && user) {
+    return <Navigate to={getPostLoginRoute(user, activeRole)} replace />;
+  }
 
   return children;
 }

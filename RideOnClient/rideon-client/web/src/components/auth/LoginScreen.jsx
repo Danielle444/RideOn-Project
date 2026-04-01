@@ -1,20 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
-import {
-  saveToken,
-  saveUser,
-  saveActiveRole,
-  saveRememberMe,
-  clearAuthStorage,
-} from "../../services/storageService";
-import { login } from "../../services/authService";
-import { getApiErrorMessage } from "../../../../shared/auth/utils/authApiErrors";
 import { getPostLoginRoute } from "../../../../shared/auth/utils/authNavigation";
 import { validateLoginForm } from "../../../../shared/auth/validations/loginValidation";
+import { useAuth } from "../../context/AuthContext";
 
 export default function LoginScreen() {
   const navigate = useNavigate();
+  const { loginAndInitialize } = useAuth();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -38,46 +31,16 @@ export default function LoginScreen() {
     setIsLoading(true);
 
     try {
-      clearAuthStorage();
+      const result = await loginAndInitialize(username, password, rememberMe);
 
-      const response = await login(username.trim(), password);
-      const data = response.data;
-
-      const userData = {
-        personId: data.personId,
-        username: data.username,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        isActive: data.isActive,
-        mustChangePassword: data.mustChangePassword,
-        approvedRolesAndRanches: data.approvedRolesAndRanches,
-      };
-
-      saveRememberMe(rememberMe);
-      saveToken(data.token, rememberMe);
-      saveUser(userData, rememberMe);
-
-      if (
-        !data.approvedRolesAndRanches ||
-        data.approvedRolesAndRanches.length === 0
-      ) {
-        clearAuthStorage();
-        setErrorMessage("אין למשתמש תפקיד מאושר במערכת");
+      if (!result.ok) {
+        setErrorMessage(result.message);
         return;
       }
 
-      var nextActiveRole = null;
-
-      if (data.approvedRolesAndRanches.length === 1) {
-        nextActiveRole = data.approvedRolesAndRanches[0];
-        saveActiveRole(nextActiveRole, rememberMe);
-      }
-
-      navigate(getPostLoginRoute(userData, nextActiveRole));
-    } catch (error) {
-      setErrorMessage(
-        getApiErrorMessage(error, "אירעה שגיאה בהתחברות לשרת")
-      );
+      navigate(getPostLoginRoute(result.user, result.activeRole), {
+        replace: true,
+      });
     } finally {
       setIsLoading(false);
     }

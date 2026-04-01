@@ -1,32 +1,22 @@
 import { Alert, Text } from "react-native";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
 import AdminHomeCard from "../components/AdminHomeCard";
-import { getUser, getActiveRole } from "../../../../services/storageService";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import { getAdminMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { getAdminCompetitionMenuItems } from "../../../../navigation/competitionMenuConfigs";
+import { useUser } from "../../../../context/UserContext";
+import { useActiveRole } from "../../../../context/ActiveRoleContext";
 
 export default function AdminCompetitionsBoardScreen(props) {
-  const [user, setUser] = useState(null);
-  const [activeRole, setActiveRole] = useState(null);
+  const { user } = useUser();
+  const { activeRole } = useActiveRole();
+
   const [menuMode, setMenuMode] = useState("general");
   const [selectedCompetition, setSelectedCompetition] = useState(null);
-
-  useEffect(function () {
-    loadData();
-  }, []);
-
-  async function loadData() {
-    const storedUser = await getUser();
-    const storedActiveRole = await getActiveRole();
-
-    setUser(storedUser);
-    setActiveRole(storedActiveRole);
-  }
 
   const competitions = [
     {

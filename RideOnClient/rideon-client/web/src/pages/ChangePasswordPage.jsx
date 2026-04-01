@@ -1,22 +1,18 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LockKeyhole, Info } from "lucide-react";
-import { changePassword } from "../services/authService";
-import {
-  getUser,
-  getActiveRole,
-  getRememberMe,
-  saveUser,
-  clearAuthStorage,
-} from "../services/storageService";
+import { useUser } from "../context/UserContext";
+import { useActiveRole } from "../context/ActiveRoleContext";
+import { useAuth } from "../context/AuthContext";
 import { getPasswordValidationMessage } from "../../../shared/auth/validations/passwordValidation";
 import Field from "../components/common/Field";
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate();
-  const user = getUser();
-  const activeRole = getActiveRole();
-  const rememberMe = getRememberMe();
+
+  const { user } = useUser();
+  const { activeRole } = useActiveRole();
+  const { changePasswordAndRefresh, logout } = useAuth();
 
   const [showPasswordInfo, setShowPasswordInfo] = useState(false);
 
@@ -81,40 +77,36 @@ export default function ChangePasswordPage() {
     setIsLoading(true);
 
     try {
-      await changePassword(user.username, currentPassword, newPassword);
+      const result = await changePasswordAndRefresh(
+        currentPassword,
+        newPassword
+      );
 
-      const updatedUser = {
-        ...user,
-        mustChangePassword: false,
-      };
+      if (!result.ok) {
+        setErrorMessage(result.message);
+        return;
+      }
 
-      saveUser(updatedUser, rememberMe);
       setSuccessMessage("הסיסמה הוחלפה בהצלחה");
 
       setTimeout(function () {
         if (activeRole) {
           navigate("/dashboard");
         } else if (
-          updatedUser.approvedRolesAndRanches &&
-          updatedUser.approvedRolesAndRanches.length > 1
+          result.user.approvedRolesAndRanches &&
+          result.user.approvedRolesAndRanches.length > 1
         ) {
           navigate("/select-ranch");
         } else if (
-          updatedUser.approvedRolesAndRanches &&
-          updatedUser.approvedRolesAndRanches.length === 1
+          result.user.approvedRolesAndRanches &&
+          result.user.approvedRolesAndRanches.length === 1
         ) {
           navigate("/dashboard");
         } else {
-          clearAuthStorage();
+          logout();
           navigate("/login");
         }
       }, 1200);
-    } catch (error) {
-      if (error.response && typeof error.response.data === "string") {
-        setErrorMessage(error.response.data);
-      } else {
-        setErrorMessage("אירעה שגיאה בהחלפת הסיסמה");
-      }
     } finally {
       setIsLoading(false);
     }

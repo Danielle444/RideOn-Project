@@ -13,20 +13,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
-import { login } from "../../services/authService";
-import {
-  saveToken,
-  saveUser,
-  saveActiveRole,
-  clearAuthStorage,
-} from "../../services/storageService";
 import { validateLoginForm } from "../../../../shared/auth/validations/loginValidation";
-import { getApiErrorMessage } from "../../../../shared/auth/utils/authApiErrors";
-import { isRoleSupportedOnMobile } from "../../../../shared/auth/utils/platformRoles";
+import { useAuth } from "../../context/AuthContext";
 
 import styles from "../../styles/authStyles";
 
-export default function LoginScreen(props) {
+export default function LoginScreen() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -34,6 +26,7 @@ export default function LoginScreen(props) {
   const [isLoading, setIsLoading] = useState(false);
 
   const navigation = useNavigation();
+  const { loginAndInitialize } = useAuth();
 
   async function handleLogin() {
     const validationError = validateLoginForm(username, password);
@@ -46,46 +39,11 @@ export default function LoginScreen(props) {
     setIsLoading(true);
 
     try {
-      await clearAuthStorage();
+      const result = await loginAndInitialize(username, password);
 
-      const response = await login(username.trim(), password);
-      const data = response.data;
-
-      const userData = {
-        personId: data.personId,
-        username: data.username,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        isActive: data.isActive,
-        mustChangePassword: data.mustChangePassword,
-        approvedRolesAndRanches: data.approvedRolesAndRanches,
-      };
-
-      await saveToken(data.token);
-      await saveUser(userData);
-
-      if (
-        !data.approvedRolesAndRanches ||
-        data.approvedRolesAndRanches.length === 0
-      ) {
-        await clearAuthStorage();
-        Alert.alert("שגיאה", "אין למשתמש תפקיד מאושר במערכת");
-        return;
+      if (!result.ok) {
+        Alert.alert("שגיאה", result.message);
       }
-
-      if (
-        data.approvedRolesAndRanches.length === 1 &&
-        isRoleSupportedOnMobile(data.approvedRolesAndRanches[0].roleName)
-      ) {
-        await saveActiveRole(data.approvedRolesAndRanches[0]);
-      }
-
-      if (props.onLoginSuccess) {
-        await props.onLoginSuccess();
-      }
-    } catch (err) {
-      const message = getApiErrorMessage(err, "שגיאה בהתחברות");
-      Alert.alert("שגיאה", String(message));
     } finally {
       setIsLoading(false);
     }

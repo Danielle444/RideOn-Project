@@ -1,28 +1,16 @@
-import { useEffect, useState } from "react";
 import { Alert, Text, View, Pressable } from "react-native";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
-import { getUser, getActiveRole } from "../../../../services/storageService";
 import PayerHomeCard from "../components/PayerHomeCard";
-import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
+import { getPayerBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import { getPayerMenuItems } from "../../../../navigation/sideMenuConfigs";
+import { useUser } from "../../../../context/UserContext";
+import { useActiveRole } from "../../../../context/ActiveRoleContext";
 
 export default function PayerHomeScreen(props) {
-  const [user, setUser] = useState(null);
-  const [activeRole, setActiveRole] = useState(null);
-
-  useEffect(function () {
-    loadData();
-  }, []);
-
-  async function loadData() {
-    const storedUser = await getUser();
-    const storedActiveRole = await getActiveRole();
-
-    setUser(storedUser);
-    setActiveRole(storedActiveRole);
-  }
+  const { user } = useUser();
+  const { activeRole } = useActiveRole();
 
   const competitions = [
     {
@@ -47,14 +35,6 @@ export default function PayerHomeScreen(props) {
     props.navigation.navigate("PayerCompetitionsBoard");
   }
 
-  function goToProfile() {
-    Alert.alert("בהמשך", "מסך פרופיל של משלם יתחבר בהמשך");
-  }
-
-  function goToHome() {
-    props.navigation.navigate("PayerHome");
-  }
-
   async function handleLogout() {
     if (props.onLogout) {
       await props.onLogout();
@@ -66,7 +46,7 @@ export default function PayerHomeScreen(props) {
       title="דף הבית"
       subtitle=""
       activeBottomTab="home"
-      bottomNavItems={getAdminBottomNavConfig(props.navigation)}
+      bottomNavItems={getPayerBottomNavConfig(props.navigation)}
       menuContent={function ({ closeMenu }) {
         return (
           <SideMenuTemplate

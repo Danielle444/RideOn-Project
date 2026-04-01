@@ -1,35 +1,15 @@
 import { View, Text } from "react-native";
-import { useEffect, useState } from "react";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
-import { getUser, getActiveRole } from "../../../../services/storageService";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import { getAdminMenuItems } from "../../../../navigation/sideMenuConfigs";
+import { useUser } from "../../../../context/UserContext";
+import { useActiveRole } from "../../../../context/ActiveRoleContext";
 
 export default function AdminProfileScreen(props) {
-  const [user, setUser] = useState(null);
-  const [activeRole, setActiveRole] = useState(null);
-
-  useEffect(function () {
-    loadData();
-  }, []);
-
-  async function loadData() {
-    const storedUser = await getUser();
-    const storedActiveRole = await getActiveRole();
-
-    setUser(storedUser);
-    setActiveRole(storedActiveRole);
-  }
-
-  function goToProfile() {
-    props.navigation.navigate("AdminProfile");
-  }
-
-  function goToHome() {
-    props.navigation.navigate("AdminHome");
-  }
+  const { user } = useUser();
+  const { activeRole } = useActiveRole();
 
   async function handleLogout() {
     if (props.onLogout) {
