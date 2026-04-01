@@ -18,8 +18,8 @@ import {
 import {
   mapRoleOptionForMobile,
   getMobileSupportedRoleOptions,
-  getMobileHomeScreenName,
 } from "../../../../shared/auth/utils/platformRoles";
+import { resolveMobileRoleSelection } from "../../../../shared/auth/utils/activeRoleSelection";
 
 export default function SelectActiveRoleScreen(props) {
   const [storedUser, setStoredUser] = useState(null);
@@ -60,30 +60,18 @@ export default function SelectActiveRoleScreen(props) {
       return;
     }
 
-    if (!item.isSupportedOnMobile) {
-      Alert.alert("שגיאה", "התפקיד שנבחר זמין רק בווב");
+    const result = resolveMobileRoleSelection(item);
+
+    if (!result.ok) {
+      Alert.alert("שגיאה", result.message);
       return;
     }
 
     setIsNavigating(true);
 
     try {
-      await saveActiveRole({
-        ranchId: item.ranchId,
-        ranchName: item.ranchName,
-        roleId: item.roleId,
-        roleName: item.roleName,
-      });
-
-      const screenName = getMobileHomeScreenName(item.roleName);
-
-      if (!screenName) {
-        Alert.alert("שגיאה", "לא נמצא מסך מתאים לתפקיד זה");
-        setIsNavigating(false);
-        return;
-      }
-
-      props.navigation.replace(screenName);
+      await saveActiveRole(result.activeRole);
+      props.navigation.replace(result.destination);
     } catch (error) {
       setIsNavigating(false);
       Alert.alert("שגיאה", "אירעה שגיאה במעבר לתפקיד שנבחר");
