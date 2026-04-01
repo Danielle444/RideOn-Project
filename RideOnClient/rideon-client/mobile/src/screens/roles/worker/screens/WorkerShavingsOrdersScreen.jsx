@@ -1,30 +1,20 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import workerStyles from "../../../../styles/workerStyles";
-import { getUser, getActiveRole } from "../../../../services/storageService";
 import WorkerShavingsOrderCard from "../components/WorkerShavingsOrderCard";
-import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
+import { getWorkerBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import { getWorkerMenuItems } from "../../../../navigation/sideMenuConfigs";
+import { useUser } from "../../../../context/UserContext";
+import { useActiveRole } from "../../../../context/ActiveRoleContext";
 
 export default function WorkerShavingsOrdersScreen(props) {
-  const [user, setUser] = useState(null);
-  const [activeRole, setActiveRole] = useState(null);
+  const { user } = useUser();
+  const { activeRole } = useActiveRole();
+
   const [activeFilter, setActiveFilter] = useState("needs-treatment");
-
-  useEffect(function () {
-    loadData();
-  }, []);
-
-  async function loadData() {
-    const storedUser = await getUser();
-    const storedActiveRole = await getActiveRole();
-
-    setUser(storedUser);
-    setActiveRole(storedActiveRole);
-  }
 
   const orders = [
     {
@@ -53,14 +43,6 @@ export default function WorkerShavingsOrdersScreen(props) {
     },
   ];
 
-  function goToProfile() {
-    Alert.alert("בהמשך", "מסך פרופיל עובד יתחבר בהמשך");
-  }
-
-  function goToShavingsOrders() {
-    props.navigation.navigate("WorkerShavingsOrders");
-  }
-
   async function handleLogout() {
     if (props.onLogout) {
       await props.onLogout();
@@ -87,7 +69,7 @@ export default function WorkerShavingsOrdersScreen(props) {
       title="הזמנות נסורת"
       subtitle=""
       activeBottomTab="home"
-      bottomNavItems={getAdminBottomNavConfig(props.navigation)}
+      bottomNavItems={getWorkerBottomNavConfig(props.navigation)}
       menuContent={function ({ closeMenu }) {
         return (
           <SideMenuTemplate

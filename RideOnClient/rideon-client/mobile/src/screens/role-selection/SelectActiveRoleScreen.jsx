@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,35 +11,27 @@ import { Ionicons } from "@expo/vector-icons";
 import styles from "../../styles/authStyles";
 
 import {
-  getUser,
-  saveActiveRole,
-} from "../../services/storageService";
-
-import {
   mapRoleOptionForMobile,
   getMobileSupportedRoleOptions,
 } from "../../../../shared/auth/utils/platformRoles";
 import { resolveMobileRoleSelection } from "../../../../shared/auth/utils/activeRoleSelection";
 
+import { useUser } from "../../context/UserContext";
+import { useActiveRole } from "../../context/ActiveRoleContext";
+
 export default function SelectActiveRoleScreen(props) {
-  const [storedUser, setStoredUser] = useState(null);
+  const { user } = useUser();
+  const { setActiveRoleAndPersist } = useActiveRole();
+
   const [isNavigating, setIsNavigating] = useState(false);
 
-  useEffect(function () {
-    loadUser();
-  }, []);
-
-  async function loadUser() {
-    const value = await getUser();
-    setStoredUser(value);
-  }
-
   const approvedRolesAndRanches = useMemo(function () {
-    if (!storedUser || !Array.isArray(storedUser.approvedRolesAndRanches)) {
+    if (!user || !Array.isArray(user.approvedRolesAndRanches)) {
       return [];
     }
-    return storedUser.approvedRolesAndRanches;
-  }, [storedUser]);
+
+    return user.approvedRolesAndRanches;
+  }, [user]);
 
   const roleOptionsForMobile = useMemo(function () {
     const mapped = approvedRolesAndRanches.map(mapRoleOptionForMobile);
@@ -70,7 +62,7 @@ export default function SelectActiveRoleScreen(props) {
     setIsNavigating(true);
 
     try {
-      await saveActiveRole(result.activeRole);
+      await setActiveRoleAndPersist(result.activeRole);
       props.navigation.replace(result.destination);
     } catch (error) {
       setIsNavigating(false);

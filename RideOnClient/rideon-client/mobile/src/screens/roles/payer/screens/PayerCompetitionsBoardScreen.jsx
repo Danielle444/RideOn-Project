@@ -1,32 +1,22 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Alert, Text } from "react-native";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
-import { getUser, getActiveRole } from "../../../../services/storageService";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
 import PayerHomeCard from "../components/PayerHomeCard";
 import { getPayerMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { getPayerCompetitionMenuItems } from "../../../../navigation/competitionMenuConfigs";
 import { getPayerBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
+import { useUser } from "../../../../context/UserContext";
+import { useActiveRole } from "../../../../context/ActiveRoleContext";
 
 export default function PayerCompetitionsBoardScreen(props) {
-  const [user, setUser] = useState(null);
-  const [activeRole, setActiveRole] = useState(null);
+  const { user } = useUser();
+  const { activeRole } = useActiveRole();
+
   const [menuMode, setMenuMode] = useState("general");
   const [selectedCompetition, setSelectedCompetition] = useState(null);
-
-  useEffect(function () {
-    loadData();
-  }, []);
-
-  async function loadData() {
-    const storedUser = await getUser();
-    const storedActiveRole = await getActiveRole();
-
-    setUser(storedUser);
-    setActiveRole(storedActiveRole);
-  }
 
   const competitions = [
     {
