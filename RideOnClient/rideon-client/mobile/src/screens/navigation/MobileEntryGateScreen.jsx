@@ -8,9 +8,9 @@ import {
 } from "../../services/storageService";
 import {
   isRoleSupportedOnMobile,
-  getMobileSupportedRoleOptions,
   getMobileHomeScreenName,
 } from "../../../../shared/auth/utils/platformRoles";
+import { resolveSingleMobileRoleSelection } from "../../../../shared/auth/utils/autoRoleSelection";
 
 export default function MobileEntryGateScreen(props) {
   useEffect(function () {
@@ -21,7 +21,9 @@ export default function MobileEntryGateScreen(props) {
     const user = await getUser();
     const activeRole = await getActiveRole();
 
-    if (!user) return;
+    if (!user) {
+      return;
+    }
 
     if (user.mustChangePassword) {
       props.navigation.replace("ChangePassword");
@@ -41,17 +43,12 @@ export default function MobileEntryGateScreen(props) {
       ? user.approvedRolesAndRanches
       : [];
 
-    const supported = getMobileSupportedRoleOptions(roles);
+    const autoSelection = resolveSingleMobileRoleSelection(roles);
 
-    if (roles.length === 1 && supported.length === 1) {
-      await saveActiveRole(supported[0]);
-
-      const screenName = getMobileHomeScreenName(supported[0].roleName);
-
-      if (screenName) {
-        props.navigation.replace(screenName);
-        return;
-      }
+    if (autoSelection.shouldAutoSelect && autoSelection.result?.ok) {
+      await saveActiveRole(autoSelection.result.activeRole);
+      props.navigation.replace(autoSelection.result.destination);
+      return;
     }
 
     props.navigation.replace("SelectActiveRole");

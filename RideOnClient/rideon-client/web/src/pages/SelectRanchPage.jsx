@@ -13,43 +13,44 @@ import {
   saveActiveRole,
   clearAuthStorage,
 } from "../services/storageService";
-import {
-  mapRoleOptionForWeb,
-  getWebSupportedRoleOptions,
-} from "../../../shared/auth/utils/platformRoles";
+import { mapRoleOptionForWeb } from "../../../shared/auth/utils/platformRoles";
+import { resolveWebRoleSelection } from "../../../shared/auth/utils/activeRoleSelection";
+import { resolveSingleWebRoleSelection } from "../../../shared/auth/utils/autoRoleSelection";
 
 export default function SelectRanchPage() {
   const navigate = useNavigate();
   const user = getUser();
   const rememberMe = getRememberMe();
 
-  const approvedRolesAndRanches = useMemo(function () {
-    if (!user || !Array.isArray(user.approvedRolesAndRanches)) {
-      return [];
-    }
-
-    return user.approvedRolesAndRanches;
-  }, [user]);
-
-  const roleOptionsForWeb = useMemo(function () {
-    const mapped = approvedRolesAndRanches.map(mapRoleOptionForWeb);
-
-    return mapped.sort(function (a, b) {
-      if (a.isSupportedOnWeb && !b.isSupportedOnWeb) {
-        return -1;
+  const approvedRolesAndRanches = useMemo(
+    function () {
+      if (!user || !Array.isArray(user.approvedRolesAndRanches)) {
+        return [];
       }
 
-      if (!a.isSupportedOnWeb && b.isSupportedOnWeb) {
-        return 1;
-      }
+      return user.approvedRolesAndRanches;
+    },
+    [user],
+  );
 
-      return 0;
-    });
-  }, [approvedRolesAndRanches]);
+  const roleOptionsForWeb = useMemo(
+    function () {
+      const mapped = approvedRolesAndRanches.map(mapRoleOptionForWeb);
 
-  const supportedWebRoles = useMemo(function () {
-    return getWebSupportedRoleOptions(approvedRolesAndRanches);
-  }, [approvedRolesAndRanches]);
+      return mapped.sort(function (a, b) {
+        if (a.isSupportedOnWeb && !b.isSupportedOnWeb) {
+          return -1;
+        }
+
+        if (!a.isSupportedOnWeb && b.isSupportedOnWeb) {
+          return 1;
+        }
+
+        return 0;
+      });
+    },
+    [approvedRolesAndRanches],
+  );
 
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -59,15 +60,16 @@ export default function SelectRanchPage() {
         return;
       }
 
-      if (
-        approvedRolesAndRanches.length === 1 &&
-        supportedWebRoles.length === 1
-      ) {
-        saveActiveRole(supportedWebRoles[0], rememberMe);
-        navigate("/competitions", { replace: true });
+      const autoSelection = resolveSingleWebRoleSelection(
+        approvedRolesAndRanches,
+      );
+
+      if (autoSelection.shouldAutoSelect && autoSelection.result?.ok) {
+        saveActiveRole(autoSelection.result.activeRole, rememberMe);
+        navigate(autoSelection.result.destination, { replace: true });
       }
     },
-    [user, approvedRolesAndRanches, supportedWebRoles, rememberMe, navigate]
+    [user, approvedRolesAndRanches, rememberMe, navigate],
   );
 
   function handleLogout() {
@@ -75,28 +77,19 @@ export default function SelectRanchPage() {
     navigate("/login");
   }
 
-  // 🔥 הפונקציה החדשה — במקום handleContinue
   function handleRoleSelect(index) {
     setErrorMessage("");
 
     const selectedRole = roleOptionsForWeb[index];
+    const result = resolveWebRoleSelection(selectedRole);
 
-    if (!selectedRole.isSupportedOnWeb) {
-      setErrorMessage("התפקיד שנבחר זמין רק במובייל");
+    if (!result.ok) {
+      setErrorMessage(result.message);
       return;
     }
 
-    saveActiveRole(
-      {
-        ranchId: selectedRole.ranchId,
-        ranchName: selectedRole.ranchName,
-        roleId: selectedRole.roleId,
-        roleName: selectedRole.roleName,
-      },
-      rememberMe
-    );
-
-    navigate("/competitions");
+    saveActiveRole(result.activeRole, rememberMe);
+    navigate(result.destination);
   }
 
   if (!user) {
