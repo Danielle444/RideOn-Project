@@ -1,11 +1,17 @@
 import { Navigate } from "react-router-dom";
-import { getToken, getUser } from '../services/storageService';
+import { useAuth } from "../context/AuthContext";
+import { useUser } from "../context/UserContext";
 
 export default function ProtectedRoute({ children }) {
-  const token = getToken();
-  const user = getUser();
+  const { isLoading, isAuthenticated } = useAuth();
+  const { user } = useUser();
 
-  if (!token || !user) {
+  // מחכים לטעינה הראשונית מה-storage
+  if (isLoading) {
+    return null;
+  }
+
+  if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;
   }
 

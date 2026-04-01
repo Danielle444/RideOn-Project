@@ -7,20 +7,19 @@ import {
   Smartphone,
   BadgeCheck,
 } from "lucide-react";
-import {
-  getUser,
-  getRememberMe,
-  saveActiveRole,
-  clearAuthStorage,
-} from "../services/storageService";
+import { useUser } from "../context/UserContext";
+import { useActiveRole } from "../context/ActiveRoleContext";
+import { useAuth } from "../context/AuthContext";
 import { mapRoleOptionForWeb } from "../../../shared/auth/utils/platformRoles";
 import { resolveWebRoleSelection } from "../../../shared/auth/utils/activeRoleSelection";
 import { resolveSingleWebRoleSelection } from "../../../shared/auth/utils/autoRoleSelection";
 
 export default function SelectRanchPage() {
   const navigate = useNavigate();
-  const user = getUser();
-  const rememberMe = getRememberMe();
+
+  const { user } = useUser();
+  const { setActiveRoleAndPersist } = useActiveRole();
+  const { logout } = useAuth();
 
   const approvedRolesAndRanches = useMemo(
     function () {
@@ -65,15 +64,15 @@ export default function SelectRanchPage() {
       );
 
       if (autoSelection.shouldAutoSelect && autoSelection.result?.ok) {
-        saveActiveRole(autoSelection.result.activeRole, rememberMe);
+        setActiveRoleAndPersist(autoSelection.result.activeRole);
         navigate(autoSelection.result.destination, { replace: true });
       }
     },
-    [user, approvedRolesAndRanches, rememberMe, navigate],
+    [user, approvedRolesAndRanches, navigate, setActiveRoleAndPersist],
   );
 
   function handleLogout() {
-    clearAuthStorage();
+    logout();
     navigate("/login");
   }
 
@@ -88,7 +87,7 @@ export default function SelectRanchPage() {
       return;
     }
 
-    saveActiveRole(result.activeRole, rememberMe);
+    setActiveRoleAndPersist(result.activeRole);
     navigate(result.destination);
   }
 

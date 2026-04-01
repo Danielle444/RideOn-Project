@@ -1,20 +1,20 @@
 import { useNavigate } from "react-router-dom";
-import {
-  getUser,
-  getActiveRole,
-  clearAuthStorage,
-} from "../../services/storageService";
+import { useUser } from "../../context/UserContext";
+import { useActiveRole } from "../../context/ActiveRoleContext";
+import { useAuth } from "../../context/AuthContext";
 import SecretaryTopBar from "./SecretaryTopBar";
 import SecretarySidebarGeneral from "./SecretarySidebarGeneral";
 import SecretarySidebarCompetition from "./SecretarySidebarCompetition";
 
 export default function SecretaryLayout(props) {
   const navigate = useNavigate();
-  const user = getUser();
-  const activeRole = getActiveRole();
+
+  const { user } = useUser();
+  const { activeRole } = useActiveRole();
+  const { logout } = useAuth();
 
   function handleLogout() {
-    clearAuthStorage();
+    logout();
     navigate("/login");
   }
 
