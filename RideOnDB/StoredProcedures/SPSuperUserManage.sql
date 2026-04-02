@@ -180,3 +180,53 @@ BEGIN
     WHERE JudgeId = @JudgeId AND FieldId = @FieldId;
 END
 GO
+
+--Prizes
+
+CREATE PROCEDURE usp_InsertPrizeType
+    @PrizeTypeName NVARCHAR(100),
+    @PrizeDescription NVARCHAR(500) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    INSERT INTO PrizeType (PrizeTypeName, PrizeDescription)
+    VALUES (@PrizeTypeName, @PrizeDescription);
+    
+    SELECT SCOPE_IDENTITY() AS NewPrizeTypeId;
+END
+GO
+
+CREATE PROCEDURE usp_UpdatePrizeType
+    @PrizeTypeId TINYINT,
+    @PrizeTypeName NVARCHAR(100),
+    @PrizeDescription NVARCHAR(500) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    UPDATE PrizeType
+    SET 
+        PrizeTypeName = @PrizeTypeName,
+        PrizeDescription = @PrizeDescription
+    WHERE PrizeTypeId = @PrizeTypeId;
+END
+GO
+
+CREATE PROCEDURE usp_DeletePrizeType
+    @PrizeTypeId TINYINT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- ולידציה: האם סוג הפרס הזה כבר הוגדר לחלוקה במקצה כלשהו (בעבר או בעתיד)?
+    IF EXISTS (SELECT 1 FROM ClassPrize WHERE PrizeTypeId = @PrizeTypeId)
+    BEGIN
+        THROW 50017, 'Cannot delete prize type: It is already associated with existing or historical classes.', 1;
+    END
+
+    -- אם הוא לא בשימוש, אפשר למחוק
+    DELETE FROM PrizeType
+    WHERE PrizeTypeId = @PrizeTypeId;
+END
+GO
