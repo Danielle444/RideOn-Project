@@ -132,3 +132,51 @@ END
 GO
 
 --judges 
+
+CREATE PROCEDURE usp_DeleteJudge
+    @JudgeId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- ולידציה 1: האם שובץ למקצה כלשהו אי פעם?
+    IF EXISTS (SELECT 1 FROM ClassJudge WHERE JudgeId = @JudgeId)
+    BEGIN
+        THROW 50013, 'Cannot delete judge: Judge is assigned to specific classes.', 1;
+    END
+
+    -- ולידציה 2: האם שובץ לתחרות כלשהי אי פעם?
+    IF EXISTS (SELECT 1 FROM CompetitionJudge WHERE JudgeId = @JudgeId)
+    BEGIN
+        THROW 50014, 'Cannot delete judge: Judge is assigned to competitions.', 1;
+    END
+
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        -- מחיקת השיוכים לענפים קודם (כדי לא לחטוף שגיאת Foreign Key)
+        DELETE FROM JudgeField WHERE JudgeId = @JudgeId;
+        
+        -- מחיקת השופט עצמו
+        DELETE FROM Judge WHERE JudgeId = @JudgeId;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+GO
+
+CREATE PROCEDURE usp_RemoveJudgeFromField
+    @JudgeId INT,
+    @FieldId TINYINT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- כאן לא חייבים לזרוק שגיאה אם השיוך לא קיים, מספיק פשוט למחוק (אם קיים - יימחק, אם לא - לא יקרה כלום)
+    DELETE FROM JudgeField 
+    WHERE JudgeId = @JudgeId AND FieldId = @FieldId;
+END
+GO
