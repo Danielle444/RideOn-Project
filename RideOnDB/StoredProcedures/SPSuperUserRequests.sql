@@ -26,5 +26,43 @@ BEGIN
 END
 GO
 
+--new ranch requests
+CREATE PROCEDURE usp_GetPendingNewRanchRequests
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    SELECT 
+        NRR.RequestId,
+        NRR.RequestDate,
+        R.RanchName,
+        P.FirstName + ' ' + P.LastName AS FullName,
+        P.NationalId,
+        P.Phone,
+        P.Email,
+        NRR.RequestStatus
+    FROM NewRanchRequest NRR
+    INNER JOIN Ranch R ON NRR.RanchId = R.RanchId
+    INNER JOIN Person P ON NRR.SubmittedBySystemUserId = P.PersonId
+    WHERE NRR.RequestStatus = 'Pending'
+    ORDER BY NRR.RequestDate ASC;
+END
+GO
 
+CREATE PROCEDURE usp_UpdateNewRanchRequestStatus
+    @RequestId INT,
+    @ResolvedBySuperUserId INT,
+    @NewStatus NVARCHAR(20) -- 'Approved' או 'Rejected'
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    UPDATE NewRanchRequest
+    SET 
+        RequestStatus = @NewStatus,
+        ResolvedBySuperUserId = @ResolvedBySuperUserId,
+        ResolvedDate = SYSDATETIME()
+    WHERE RequestId = @RequestId;
+END
+GO
 
