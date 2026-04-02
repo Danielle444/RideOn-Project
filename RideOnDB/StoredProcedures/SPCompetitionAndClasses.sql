@@ -294,8 +294,8 @@ END
 GO
 
 --Prizes
-
-CREATE PROCEDURE SP_GetAllPrizeTypes
+    
+CREATE PROCEDURE usp_GetAllPrizeTypes
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -305,7 +305,7 @@ BEGIN
         PrizeTypeName, 
         PrizeDescription
     FROM PrizeType
-    ORDER BY PrizeTypeId;
+    ORDER BY PrizeTypeName ASC;
 END
 GO
 
