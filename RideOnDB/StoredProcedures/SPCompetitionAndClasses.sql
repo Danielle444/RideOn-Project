@@ -273,20 +273,23 @@ END
 GO
 
 --ClassType
-CREATE PROCEDURE SP_GetClassTypesByField
-    @FieldId TINYINT
+CREATE PROCEDURE usp_GetAllClassTypes
+    @FieldId TINYINT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
     
     SELECT 
-        ClassTypeId, 
-        ClassName, 
-        JudgingSheetFormat, 
-        QualificationDescription
-    FROM ClassType
-    WHERE FieldId = @FieldId
-    ORDER BY ClassName;
+        CT.ClassTypeId,
+        CT.FieldId,
+        F.FieldName,
+        CT.ClassName,
+        CT.QualificationDescription,
+        CT.JudgingSheetFormat
+    FROM ClassType CT
+    INNER JOIN Field F ON CT.FieldId = F.FieldId
+    WHERE (@FieldId IS NULL OR CT.FieldId = @FieldId)
+    ORDER BY F.FieldName ASC, CT.ClassName ASC;
 END
 GO
 
