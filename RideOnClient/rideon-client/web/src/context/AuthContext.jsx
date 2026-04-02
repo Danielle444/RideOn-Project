@@ -1,5 +1,10 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { login as loginRequest, changePassword as changePasswordRequest } from "../services/authService";
+import {
+  login as loginRequest,
+  loginSuperUser as loginSuperUserRequest,
+  changePassword as changePasswordRequest,
+  changeSuperUserPassword as changeSuperUserPasswordRequest,
+} from "../services/authService";
 import {
   getToken,
   getUser,
@@ -17,7 +22,7 @@ import { useActiveRole } from "./ActiveRoleContext";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const { user, setUser, setIsUserHydrated } = useUser();
+  const { setUser, setIsUserHydrated } = useUser();
   const { setActiveRole, clearActiveRole, setActiveRoleAndPersist } =
     useActiveRole();
 
@@ -116,19 +121,64 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function loginSuperUser(email, password, rememberMe) {
+    try {
+      clearAuthStorage();
+      setUser(null);
+      setActiveRole(null);
+
+      const response = await loginSuperUserRequest(email.trim(), password);
+      const data = response.data;
+
+      const superUserData = {
+        superUserId: data.superUserId,
+        email: data.email,
+        isActive: data.isActive,
+        mustChangePassword: data.mustChangePassword,
+        userType: "superUser",
+      };
+
+      saveRememberMe(rememberMe);
+      saveToken(data.token, rememberMe);
+      saveUser(superUserData, rememberMe);
+
+      setUser(superUserData);
+      setIsUserHydrated(true);
+      setIsAuthenticated(true);
+      clearActiveRole();
+
+      return {
+        ok: true,
+        user: superUserData,
+        activeRole: null,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        message: String(getApiErrorMessage(error, "שגיאה בהתחברות מנהל מערכת")),
+      };
+    }
+  }
+
   async function changePasswordAndRefresh(currentPassword, newPassword) {
     try {
-      if (!user || !user.username) {
+      const storedUser = getUser();
+
+      if (!storedUser || !storedUser.username) {
         return {
           ok: false,
           message: "לא נמצאו פרטי משתמש. יש להתחבר מחדש.",
         };
       }
 
-      await changePasswordRequest(user.username, currentPassword, newPassword);
+      await changePasswordRequest(
+        storedUser.username,
+        currentPassword,
+        newPassword
+      );
 
       const updatedUser = {
-        ...user,
+        ...storedUser,
         mustChangePassword: false,
       };
 
@@ -152,6 +202,44 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function changeSuperUserPasswordAndRefresh(currentPassword, newPassword) {
+    try {
+      const storedUser = getUser();
+
+      if (!storedUser || storedUser.userType !== "superUser") {
+        return {
+          ok: false,
+          message: "לא נמצאו פרטי מנהל מערכת. יש להתחבר מחדש.",
+        };
+      }
+
+      await changeSuperUserPasswordRequest(currentPassword, newPassword);
+
+      const updatedUser = {
+        ...storedUser,
+        mustChangePassword: false,
+      };
+
+      const rememberMe = getRememberMe();
+      saveUser(updatedUser, rememberMe);
+      setUser(updatedUser);
+
+      return { ok: true, user: updatedUser };
+    } catch (error) {
+      if (error.response && typeof error.response.data === "string") {
+        return {
+          ok: false,
+          message: error.response.data,
+        };
+      }
+
+      return {
+        ok: false,
+        message: "אירעה שגיאה בהחלפת סיסמת מנהל המערכת",
+      };
+    }
+  }
+
   function logout() {
     clearAuthStorage();
     setUser(null);
@@ -167,7 +255,9 @@ export function AuthProvider({ children }) {
         isAuthenticated,
         login,
         loginAndInitialize,
+        loginSuperUser,
         changePasswordAndRefresh,
+        changeSuperUserPasswordAndRefresh,
         logout,
         reloadAuthState: loadAuthState,
       }}

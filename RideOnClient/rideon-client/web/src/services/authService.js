@@ -1,11 +1,18 @@
-import axios from 'axios';
+import axios from "axios";
 
 const API = import.meta.env.VITE_API_BASE_URL;
 
 function login(username, password) {
   return axios.post(`${API}/SystemUsers/login`, {
     username: username,
-    password: password
+    password: password,
+  });
+}
+
+function loginSuperUser(email, password) {
+  return axios.post(`${API}/SuperUsers/login`, {
+    email: email,
+    password: password,
   });
 }
 
@@ -25,28 +32,48 @@ function changePassword(username, currentPassword, newPassword) {
   return axios.put(`${API}/SystemUsers/change-password`, {
     username: username,
     currentPassword: currentPassword,
-    newPassword: newPassword
+    newPassword: newPassword,
   });
+}
+
+function changeSuperUserPassword(currentPassword, newPassword) {
+  const token =
+    localStorage.getItem("rideon_token") || sessionStorage.getItem("rideon_token");
+
+  return axios.put(
+    `${API}/SuperUsers/change-password`,
+    {
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
 }
 
 function checkUsername(username) {
   return axios.get(`${API}/SystemUsers/check-username`, {
-    params: { username: username }
+    params: { username: username },
   });
 }
 
 function getPersonByNationalIdForRegistration(nationalId) {
   return axios.get(`${API}/Persons/by-national-id`, {
-    params: { nationalId: nationalId }
+    params: { nationalId: nationalId },
   });
 }
 
 export {
   login,
+  loginSuperUser,
   register,
   getRanches,
   getRoles,
   changePassword,
+  changeSuperUserPassword,
   checkUsername,
-  getPersonByNationalIdForRegistration
+  getPersonByNationalIdForRegistration,
 };

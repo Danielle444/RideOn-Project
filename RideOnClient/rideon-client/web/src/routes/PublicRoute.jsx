@@ -9,12 +9,23 @@ export default function PublicRoute({ children }) {
   const { user } = useUser();
   const { activeRole } = useActiveRole();
 
-  // מחכים לטעינה
+  function getSuperUserRoute() {
+    if (user && user.mustChangePassword) {
+      return "/superuser-change-password";
+    }
+
+    return "/superuser-dashboard";
+  }
+
   if (isLoading) {
     return null;
   }
 
   if (isAuthenticated && user) {
+    if (user.userType === "superUser") {
+      return <Navigate to={getSuperUserRoute()} replace />;
+    }
+
     return <Navigate to={getPostLoginRoute(user, activeRole)} replace />;
   }
 

@@ -6,6 +6,8 @@ import PublicRoute from "../routes/PublicRoute";
 import ChangePasswordPage from "../pages/ChangePasswordPage";
 import SelectRanchPage from "../pages/SelectRanchPage";
 import CompetitionsBoardPage from "../pages/CompetitionsBoardPage";
+import SuperUserDashboardPage from "../pages/SuperUserDashboardPage";
+import SuperUserChangePasswordPage from "../pages/SuperUserChangePasswordPage";
 
 const router = createBrowserRouter([
   {
@@ -59,6 +61,22 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <CompetitionsBoardPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/superuser-dashboard",
+    element: (
+      <ProtectedRoute requireSuperUser={true}>
+        <SuperUserDashboardPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/superuser-change-password",
+    element: (
+      <ProtectedRoute requireSuperUser={true}>
+        <SuperUserChangePasswordPage />
       </ProtectedRoute>
     ),
   },
