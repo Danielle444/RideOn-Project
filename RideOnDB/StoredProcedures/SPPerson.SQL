@@ -23,80 +23,9 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_CheckUsernameExists
-    @Username NVARCHAR(100)
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    SELECT 
-        CASE 
-            WHEN EXISTS (
-                SELECT 1
-                FROM SystemUser
-                WHERE Username = @Username
-            )
-            THEN 1
-            ELSE 0
-        END AS ExistsFlag;
-END
-GO
-
 
 /* =========================================================
-   2) REGISTRATION
-   ========================================================= */
-CREATE PROCEDURE usp_RegisterSystemUser
-    @NationalId VARCHAR(9),
-    @FirstName NVARCHAR(50),
-    @LastName NVARCHAR(50),
-    @Gender NVARCHAR(10) = NULL,
-    @DateOfBirth DATE = NULL,
-    @CellPhone VARCHAR(20),
-    @Email NVARCHAR(254),
-    @Username NVARCHAR(100),
-    @PasswordHash NVARCHAR(255),
-    @PasswordSalt NVARCHAR(255)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    BEGIN TRANSACTION;
-    BEGIN TRY
-
-        IF EXISTS (SELECT 1 FROM SystemUser WHERE Username = @Username)
-        BEGIN
-            THROW 50001, 'Username already exists', 1;
-        END
-
-        IF EXISTS (SELECT 1 FROM Person WHERE NationalId = @NationalId)
-        BEGIN
-            THROW 50002, 'NationalId already exists', 1;
-        END
-
-        INSERT INTO Person (NationalId, FirstName, LastName, Gender, DateOfBirth, CellPhone, Email)
-        VALUES (@NationalId, @FirstName, @LastName, @Gender, @DateOfBirth, @CellPhone, @Email);
-
-        DECLARE @NewPersonId INT = SCOPE_IDENTITY();
-
-        INSERT INTO SystemUser (SystemUserId, Username, PasswordHash, PasswordSalt)
-        VALUES (@NewPersonId, @Username, @PasswordHash, @PasswordSalt);
-
-        COMMIT TRANSACTION;
-
-        SELECT @NewPersonId AS NewPersonId;
-
-    END TRY
-    BEGIN CATCH
-      IF @@TRANCOUNT > 0
-        ROLLBACK TRANSACTION;
-        THROW; 
-    END CATCH
-END
-GO
-
-/* =========================================================
-   3) PERSON-RANCH-ROLE ASSIGNMENT
+   2) PERSON-RANCH-ROLE ASSIGNMENT
    ========================================================= */
 
 CREATE PROCEDURE usp_AssignPersonRoleAtRanch
@@ -223,75 +152,9 @@ END
 GO
 
 /* =========================================================
-   4) AUTHENTICATION (LOGIN)
+   3) PASSWORD MANAGEMENT
    ========================================================= */
 
-   CREATE PROCEDURE usp_GetSystemUserForLogin
-    @Username NVARCHAR(100)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    SELECT 
-    SU.SystemUserId,
-    SU.Username,
-    SU.PasswordHash,
-    SU.PasswordSalt,
-    SU.IsActive,
-    SU.MustChangePassword,
-    SU.CreatedDate,
-    P.FirstName,
-    P.LastName
-FROM SystemUser SU
-INNER JOIN Person P 
-    ON SU.SystemUserId = P.PersonId
-WHERE SU.Username = @Username;
-END
-GO
-
-
-CREATE PROCEDURE usp_GetApprovedPersonRanchesAndRoles
-    @PersonId INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    SELECT 
-        PRR.RanchId,
-        R.RanchName,
-        PRR.RoleId,
-        RL.RoleName
-    FROM PersonRanchRole PRR
-    INNER JOIN Ranch R 
-        ON PRR.RanchId = R.RanchId
-    INNER JOIN Role RL 
-        ON PRR.RoleId = RL.RoleId
-    WHERE PRR.PersonId = @PersonId
-      AND PRR.RoleStatus = 'Approved';
-END
-GO
-
-/* =========================================================
-   5) PASSWORD MANAGEMENT
-   ========================================================= */
-
-   CREATE PROCEDURE usp_UpdateSystemUserPassword
-    @SystemUserId INT,
-    @NewPasswordHash NVARCHAR(255),
-    @NewPasswordSalt NVARCHAR(255)
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    UPDATE SystemUser
-    SET 
-        PasswordHash = @NewPasswordHash,
-        PasswordSalt = @NewPasswordSalt,
-        MustChangePassword = 0
-    WHERE SystemUserId = @SystemUserId
-      AND IsActive = 1;
-END
-GO
 
 CREATE PROCEDURE usp_SetMustChangePassword
     @SystemUserId INT,
@@ -306,7 +169,7 @@ BEGIN
 END
 GO
    /* =========================================================
-   6) USER STATUS MANAGEMENT
+   4) USER STATUS MANAGEMENT
    ========================================================= */
 
    CREATE PROCEDURE usp_ToggleSystemUserStatus
@@ -324,7 +187,7 @@ GO
 
 
 /* =========================================================
-   7) USER DATA MANAGEMENT
+   5) USER DATA MANAGEMENT
    ========================================================= */
 
    CREATE PROCEDURE usp_GetPersonRanchesAndRoles
@@ -403,7 +266,7 @@ GO
 
 
 /* =========================================================
-   8) FEDERATION MEMBERS
+   6) FEDERATION MEMBERS
    ========================================================= */
 
    CREATE PROCEDURE usp_InsertOrUpgradeFederationMember
@@ -476,7 +339,7 @@ GO
 
 
 /* =========================================================
-   9) ADMIN MANAGED USERS
+   7) ADMIN MANAGED USERS
    ========================================================= */
 
    CREATE PROCEDURE usp_AddManagedPerson
@@ -516,7 +379,7 @@ GO
 
 
 /* =========================================================
-   10) LEGACY / NOT USED IN CURRENT FLOW
+   8) LEGACY
    ========================================================= */
 
 CREATE PROCEDURE usp_InsertPerson
@@ -536,19 +399,6 @@ BEGIN
 END
 GO
 
-
-CREATE PROCEDURE usp_CheckEmailExists
-    @Email NVARCHAR(254)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    -- Returns the count of matching emails
-    SELECT COUNT(*) 
-    FROM Person 
-    WHERE Email = @Email;
-END
-GO
 
 
 

@@ -1,19 +1,6 @@
---Role maybe unneccesery
-
-CREATE PROCEDURE usp_GetAllRoles
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    SELECT 
-        RoleId, 
-        RoleName 
-    FROM Role
-    ORDER BY RoleName;
-END
+USE RideOn;
 GO
 
--- Ranch
 
 GO
 
@@ -120,7 +107,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE usp_GetAllRanchesNames
+CREATE PROCEDURE usp_GetAllRanchesNames
 AS
 BEGIN
     SET NOCOUNT ON;

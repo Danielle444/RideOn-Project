@@ -8,11 +8,12 @@ namespace RideOnServer.Controllers
     public class RolesController : ControllerBase
     {
         [HttpGet]
-        public IActionResult Get()
+        public IActionResult GetAllRoles()
         {
             try
             {
-                return Ok(Role.GetAllRoles());
+                List<Role> roles = Role.GetAllRoles();
+                return Ok(roles);
             }
             catch (Exception ex)
             {

@@ -14,8 +14,8 @@ namespace RideOnServer.BL
 
         internal static SystemUser? GetSystemUserForLogin(string username)
         {
-            SystemUserDAL systemUserDAL = new SystemUserDAL();
-            return systemUserDAL.GetSystemUserForLogin(username);
+            SystemUserDAL dal = new SystemUserDAL();
+            return dal.GetSystemUserForLogin(username);
         }
 
         internal static SystemUser? Login(string username, string password)
@@ -25,7 +25,7 @@ namespace RideOnServer.BL
             if (systemUser == null)
                 return null;
 
-            if (systemUser.IsActive == false)
+            if (!systemUser.IsActive)
                 return null;
 
             if (!PasswordHelper.VerifyPassword(password, systemUser.PasswordSalt, systemUser.PasswordHash))
@@ -41,17 +41,17 @@ namespace RideOnServer.BL
 
         internal static List<ApprovedRoleRanch> GetApprovedPersonRanchesAndRoles(int personId)
         {
-            SystemUserDAL systemUserDAL = new SystemUserDAL();
-            return systemUserDAL.GetApprovedPersonRanchesAndRoles(personId);
+            SystemUserDAL dal = new SystemUserDAL();
+            return dal.GetApprovedPersonRanchesAndRoles(personId);
         }
 
         internal static RegisterResponse Register(RegisterRequest request)
         {
             SystemUserDAL dal = new SystemUserDAL();
 
-            if (dal.CheckNationalIdExists(request.NationalId))
+            if (string.IsNullOrWhiteSpace(request.Username))
             {
-                throw new Exception("NationalId already exists");
+                throw new Exception("Username is required");
             }
 
             if (dal.CheckUsernameExists(request.Username))
@@ -59,12 +59,30 @@ namespace RideOnServer.BL
                 throw new Exception("Username already exists");
             }
 
+            if (request.RanchRoles == null || request.RanchRoles.Count == 0)
+            {
+                throw new Exception("At least one ranch and role pair is required");
+            }
+
+            foreach (RegisterRanchRoleRequest pair in request.RanchRoles)
+            {
+                if (pair.RanchId <= 0)
+                {
+                    throw new Exception("Invalid RanchId");
+                }
+
+                if (pair.RoleId <= 0)
+                {
+                    throw new Exception("Invalid RoleId");
+                }
+            }
+
+            PasswordPolicyValidator.ValidateOrThrow(request.Password);
+
             string passwordSalt = PasswordHelper.GenerateSalt();
             string passwordHash = PasswordHelper.HashPassword(request.Password, passwordSalt);
 
-            int newPersonId = dal.RegisterSystemUser(request, passwordHash, passwordSalt);
-
-            dal.AssignPersonRoleAtRanch(newPersonId, request.RanchId, request.RoleId);
+            int newPersonId = dal.RegisterSystemUserWithRoles(request, passwordHash, passwordSalt);
 
             return new RegisterResponse
             {
@@ -101,6 +119,13 @@ namespace RideOnServer.BL
                 throw new Exception("Current password is incorrect");
             }
 
+            if (request.CurrentPassword == request.NewPassword)
+            {
+                throw new Exception("New password must be different from current password");
+            }
+
+            PasswordPolicyValidator.ValidateOrThrow(request.NewPassword);
+
             string newSalt = PasswordHelper.GenerateSalt();
             string newHash = PasswordHelper.HashPassword(request.NewPassword, newSalt);
 
@@ -112,6 +137,21 @@ namespace RideOnServer.BL
             SystemUserDAL dal = new SystemUserDAL();
             dal.SetMustChangePassword(systemUserId, mustChangePassword);
         }
+
+        internal static void AssignRoleToExistingUser(int personId, int ranchId, byte roleId)
+        {
+            SystemUserDAL dal = new SystemUserDAL();
+            dal.AssignRoleToExistingUser(personId, ranchId, roleId);
+        }
+
+        internal static bool CheckUsernameExists(string username)
+        {
+            SystemUserDAL dal = new SystemUserDAL();
+            return dal.CheckUsernameExists(username);
+        }
+
+
+
 
     }
 }
