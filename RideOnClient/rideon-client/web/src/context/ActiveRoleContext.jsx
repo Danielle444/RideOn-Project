@@ -1,5 +1,5 @@
 import { createContext, useContext, useState } from "react";
-import { saveActiveRole, getRememberMe } from "../services/storageService";
+import { saveActiveRole, removeActiveRole, getRememberMe } from "../services/storageService";
 
 const ActiveRoleContext = createContext(null);
 
@@ -12,12 +12,18 @@ export function ActiveRoleProvider({ children }) {
     setActiveRole(role);
   }
 
+  function clearActiveRole() {
+    removeActiveRole();
+    setActiveRole(null);
+  }
+
   return (
     <ActiveRoleContext.Provider
       value={{
         activeRole,
         setActiveRole,
         setActiveRoleAndPersist,
+        clearActiveRole,
       }}
     >
       {children}

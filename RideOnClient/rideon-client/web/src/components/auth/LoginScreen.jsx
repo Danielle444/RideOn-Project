@@ -7,15 +7,24 @@ import { useAuth } from "../../context/AuthContext";
 
 export default function LoginScreen() {
   const navigate = useNavigate();
-  const { loginAndInitialize } = useAuth();
+  const { loginAndInitialize, loginSuperUser } = useAuth();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isSuperUserMode, setIsSuperUserMode] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  function getSuperUserRoute(user) {
+    if (user && user.mustChangePassword) {
+      return "/superuser-change-password";
+    }
+
+    return "/superuser-dashboard";
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -31,10 +40,23 @@ export default function LoginScreen() {
     setIsLoading(true);
 
     try {
-      const result = await loginAndInitialize(username, password, rememberMe);
+      let result;
+
+      if (isSuperUserMode) {
+        result = await loginSuperUser(username, password, rememberMe);
+      } else {
+        result = await loginAndInitialize(username, password, rememberMe);
+      }
 
       if (!result.ok) {
         setErrorMessage(result.message);
+        return;
+      }
+
+      if (result.user && result.user.userType === "superUser") {
+        navigate(getSuperUserRoute(result.user), {
+          replace: true,
+        });
         return;
       }
 
@@ -46,23 +68,41 @@ export default function LoginScreen() {
     }
   }
 
+  function toggleSuperUserMode() {
+    setIsSuperUserMode(function (prev) {
+      return !prev;
+    });
+
+    setErrorMessage("");
+    setUsername("");
+    setPassword("");
+    setRememberMe(false);
+    setShowPassword(false);
+  }
+
   return (
     <div
       className="flex min-h-screen items-center justify-center bg-[#F5EDE8]"
       dir="rtl"
     >
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
-        <h2 className="mb-6 text-center text-2xl font-bold text-[#4E342E]">
+        <h2 className="mb-4 text-center text-2xl font-bold text-[#4E342E]">
           התחברות למערכת
         </h2>
+
+        {isSuperUserMode && (
+          <p className="mb-4 text-center text-sm font-semibold text-[#8B0000]">
+            מצב מנהל מערכת
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm text-[#5D4037]">
-              שם משתמש
+              {isSuperUserMode ? "כתובת מייל" : "שם משתמש"}
             </label>
             <input
-              type="text"
+              type={isSuperUserMode ? "email" : "text"}
               value={username}
               onChange={function (e) {
                 setUsername(e.target.value);
@@ -93,7 +133,7 @@ export default function LoginScreen() {
                     return !prev;
                   });
                 }}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8D6E63] hover:text-[#5D4037] transition-colors"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8D6E63] transition-colors hover:text-[#5D4037]"
                 title={showPassword ? "הסתרת סיסמה" : "הצגת סיסמה"}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -113,15 +153,17 @@ export default function LoginScreen() {
               זכור אותי
             </label>
 
-            <button
-              type="button"
-              onClick={function () {
-                navigate("/forgot-password");
-              }}
-              className="text-[#795548] hover:underline"
-            >
-              שכחתי סיסמה
-            </button>
+            {!isSuperUserMode && (
+              <button
+                type="button"
+                onClick={function () {
+                  navigate("/forgot-password");
+                }}
+                className="text-[#795548] hover:underline"
+              >
+                שכחתי סיסמה
+              </button>
+            )}
           </div>
 
           {errorMessage && (
@@ -135,21 +177,37 @@ export default function LoginScreen() {
             disabled={isLoading}
             className="w-full rounded-xl bg-[#795548] py-2 text-white transition hover:bg-[#6D4C41] disabled:opacity-60"
           >
-            {isLoading ? "מתחבר..." : "התחבר"}
+            {isLoading
+              ? "מתחבר..."
+              : isSuperUserMode
+              ? "כניסת מנהל מערכת"
+              : "התחבר"}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-[#6D4C41]">
-          אין לך חשבון?{" "}
+        {!isSuperUserMode && (
+          <p className="mt-6 text-center text-sm text-[#6D4C41]">
+            אין לך חשבון?{" "}
+            <span
+              onClick={function () {
+                navigate("/register");
+              }}
+              className="cursor-pointer font-semibold text-[#795548] hover:underline"
+            >
+              להרשמה
+            </span>
+          </p>
+        )}
+
+        <div className="mt-2 text-center text-xs text-[#BCAAA4]">
           <span
-            onClick={function () {
-              navigate("/register");
-            }}
-            className="cursor-pointer font-semibold text-[#795548] hover:underline"
+            onClick={toggleSuperUserMode}
+            className="cursor-pointer select-none hover:text-[#8D6E63]"
+            title="כניסת מנהל מערכת"
           >
-            להרשמה
+            © RideOn
           </span>
-        </p>
+        </div>
       </div>
     </div>
   );

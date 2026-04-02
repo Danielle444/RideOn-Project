@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs;
+using System.Security.Claims;
 
 namespace RideOnServer.Controllers
 {
@@ -46,12 +48,21 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [Authorize]
         [HttpPost]
         public IActionResult CreateSuperUser([FromBody] CreateSuperUserRequest request)
         {
             try
             {
+                string? userType = User.Claims.FirstOrDefault(c => c.Type == "UserType")?.Value;
+
+                if (userType != "SuperUser")
+                {
+                    return Forbid("Only super users can create new super users");
+                }
+
                 int newSuperUserId = SuperUser.CreateSuperUser(request.Email, request.Password);
+
                 return Ok(new
                 {
                     SuperUserId = newSuperUserId,
@@ -64,13 +75,74 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [Authorize]
         [HttpPut("change-password")]
         public IActionResult ChangePassword([FromBody] ChangeSuperUserPasswordRequest request)
         {
             try
             {
-                SuperUser.ChangePassword(request.SuperUserId, request.CurrentPassword, request.NewPassword);
+                string? userType = User.Claims.FirstOrDefault(c => c.Type == "UserType")?.Value;
+
+                if (userType != "SuperUser")
+                {
+                    return Forbid("Only super users can change password here");
+                }
+
+                string? superUserIdClaim = User.Claims.FirstOrDefault(c => c.Type == "SuperUserId")?.Value;
+
+                if (string.IsNullOrWhiteSpace(superUserIdClaim))
+                {
+                    return Unauthorized("SuperUserId claim is missing");
+                }
+
+                int superUserId = int.Parse(superUserIdClaim);
+
+                SuperUser.ChangePassword(superUserId, request.CurrentPassword, request.NewPassword);
+
                 return Ok("Password changed successfully");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize]
+        [HttpGet("me")]
+        public IActionResult GetMe()
+        {
+            try
+            {
+                string? userType = User.Claims.FirstOrDefault(c => c.Type == "UserType")?.Value;
+
+                if (userType != "SuperUser")
+                {
+                    return Forbid("Only super users can access this endpoint");
+                }
+
+                string? superUserIdClaim = User.Claims.FirstOrDefault(c => c.Type == "SuperUserId")?.Value;
+
+                if (string.IsNullOrWhiteSpace(superUserIdClaim))
+                {
+                    return Unauthorized("SuperUserId claim is missing");
+                }
+
+                int superUserId = int.Parse(superUserIdClaim);
+
+                SuperUser? superUser = SuperUser.GetSuperUserById(superUserId);
+
+                if (superUser == null)
+                {
+                    return NotFound("Super user not found");
+                }
+
+                return Ok(new
+                {
+                    superUser.SuperUserId,
+                    superUser.Email,
+                    superUser.IsActive,
+                    superUser.MustChangePassword
+                });
             }
             catch (Exception ex)
             {
