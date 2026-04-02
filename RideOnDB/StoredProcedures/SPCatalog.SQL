@@ -92,3 +92,28 @@ BEGIN
       AND PC.IsActive = 1;
 END
 GO
+
+
+--SP to get prices for secrotery view
+CREATE PROCEDURE usp_GetProductPricingGrid
+    @RanchId INT,
+    @CategoryId TINYINT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    SELECT 
+        P.ProductId,
+        P.ProductName,
+        PC.CatalogItemId, -- יהיה NULL אם מעולם לא הוגדר מחיר
+        PC.ItemPrice,     -- יהיה NULL אם מעולם לא הוגדר מחיר
+        PC.CreationDate   -- תאריך העדכון האחרון (אם קיים)
+    FROM Product P
+    LEFT JOIN PriceCatalog PC 
+        ON P.ProductId = PC.ProductId 
+        AND PC.RanchId = @RanchId 
+        AND PC.IsActive = 1
+    WHERE P.CategoryId = @CategoryId
+    ORDER BY P.ProductName;
+END
+GO
