@@ -1,5 +1,4 @@
 --Ranch Admin and secrotery Requests
-
 CREATE PROCEDURE usp_GetPendingRoleRequests
     @RoleId TINYINT
 AS
@@ -14,7 +13,7 @@ BEGIN
         -- שימי לב: ייתכן שתצטרכי להתאים את השמות של 3 העמודות הבאות לשמות המדויקים בטבלת Person שלך
         P.NationalId AS IdNumber, 
         P.Email,
-        P.Phone AS PhoneNumber,
+        P.CellPhone AS PhoneNumber,
         R.RanchName,
         PRR.RoleStatus
     FROM PersonRanchRole PRR
