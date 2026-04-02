@@ -41,6 +41,20 @@ BEGIN
     
     SELECT SCOPE_IDENTITY() AS NewRanchId;
 END
+
+GO
+CREATE PROCEDURE usp_InsertNewRanchRequest
+    @RanchId INT,
+    @SubmittedBySystemUserId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    INSERT INTO NewRanchRequest (RanchId, SubmittedBySystemUserId)
+    VALUES (@RanchId, @SubmittedBySystemUserId);
+    
+    SELECT SCOPE_IDENTITY() AS NewRequestId;
+END
 GO
 
 CREATE PROCEDURE usp_UpdateRanch
