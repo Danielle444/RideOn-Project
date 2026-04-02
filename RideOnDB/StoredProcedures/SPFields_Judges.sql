@@ -60,4 +60,19 @@ BEGIN
 END
 GO
 
-
+CREATE PROCEDURE usp_InsertJudge
+    @FirstNameHebrew NVARCHAR(50),
+    @LastNameHebrew NVARCHAR(50),
+    @FirstNameEnglish NVARCHAR(50),
+    @LastNameEnglish NVARCHAR(50),
+    @Country NVARCHAR(50)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    INSERT INTO Judge (FirstNameHebrew, LastNameHebrew, FirstNameEnglish, LastNameEnglish, Country)
+    VALUES (@FirstNameHebrew, @LastNameHebrew, @FirstNameEnglish, @LastNameEnglish, @Country);
+    
+    SELECT SCOPE_IDENTITY() AS NewJudgeId;
+END
+GO
