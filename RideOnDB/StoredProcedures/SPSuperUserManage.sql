@@ -58,3 +58,57 @@ GO
 
 --Class
 
+CREATE PROCEDURE usp_InsertClassType
+    @FieldId TINYINT,
+    @ClassName NVARCHAR(100),
+    @JudgingSheetFormat NVARCHAR(100),
+    @QualificationDescription NVARCHAR(500) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    INSERT INTO ClassType (FieldId, ClassName, JudgingSheetFormat, QualificationDescription)
+    VALUES (@FieldId, @ClassName, @JudgingSheetFormat, @QualificationDescription);
+    
+    SELECT SCOPE_IDENTITY() AS NewClassTypeId;
+END
+GO
+
+CREATE PROCEDURE usp_UpdateClassType
+    @ClassTypeId SMALLINT,
+    @FieldId TINYINT,
+    @ClassName NVARCHAR(100),
+    @JudgingSheetFormat NVARCHAR(100),
+    @QualificationDescription NVARCHAR(500) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    UPDATE ClassType
+    SET 
+        FieldId = @FieldId,
+        ClassName = @ClassName,
+        JudgingSheetFormat = @JudgingSheetFormat,
+        QualificationDescription = @QualificationDescription
+    WHERE ClassTypeId = @ClassTypeId;
+END
+GO
+
+CREATE PROCEDURE usp_DeleteClassType
+    @ClassTypeId SMALLINT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- ולידציה: האם סוג המקצה הזה כבר שובץ לתחרויות קיימות/היסטוריות?
+    IF EXISTS (SELECT 1 FROM ClassInCompetition WHERE ClassTypeId = @ClassTypeId)
+    BEGIN
+        THROW 50012, 'Cannot delete class type: It is already used in existing or historical competitions.', 1;
+    END
+
+    -- אם הוא לא בשימוש, אפשר למחוק
+    DELETE FROM ClassType
+    WHERE ClassTypeId = @ClassTypeId;
+END
+GO
+
