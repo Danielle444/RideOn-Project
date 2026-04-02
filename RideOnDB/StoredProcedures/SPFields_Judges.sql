@@ -29,7 +29,7 @@ BEGIN
             SELECT STRING_AGG(F.FieldName, ', ')
             FROM JudgeField JF
             INNER JOIN Field F ON JF.FieldId = F.FieldId
-            WHERE JF.JudgeId = J.JudgeId
+            WHERE JF.eId = J.eId
         ) AS QualifiedFields
     FROM Judge J
     -- הסינון: נביא את השופט רק אם הוא משויך לענף המבוקש (או אם לא נבחר ענף כלל)
@@ -187,3 +187,5 @@ BEGIN
     VALUES (@JudgeId, @FieldId);
 END
 GO
+
+
