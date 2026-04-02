@@ -53,6 +53,7 @@ CREATE TABLE Role
 );
 GO
 
+-- עדכון טבלת Ranch עם עמודת סטטוס
 CREATE TABLE Ranch
 (
     RanchId INT IDENTITY(1,1) PRIMARY KEY,
@@ -61,21 +62,35 @@ CREATE TABLE Ranch
     ContactPhone VARCHAR(20) NULL,
     WebsiteUrl NVARCHAR(255) NULL,
     Location GEOGRAPHY NULL,
+    -- הוספת סטטוס: ברירת מחדל 'Pending'
+    RanchStatus NVARCHAR(20) NOT NULL CONSTRAINT DF_Ranch_Status DEFAULT 'Pending',
 
-    CONSTRAINT CK_Ranch_ContactEmail
-        CHECK (ContactEmail IS NULL OR ContactEmail LIKE '_%@_%._%'),
-
-    CONSTRAINT CK_Ranch_ContactPhone
-        CHECK (
-            ContactPhone IS NULL
-            OR (
-                LEN(ContactPhone) BETWEEN 9 AND 20
-                AND ContactPhone NOT LIKE '%[^0-9+ -]%'
-            )
-        )
+    CONSTRAINT CK_Ranch_ContactEmail CHECK (ContactEmail IS NULL OR ContactEmail LIKE '_%@_%._%'),
+    CONSTRAINT CK_Ranch_ContactPhone CHECK (
+        ContactPhone IS NULL OR (LEN(ContactPhone) BETWEEN 9 AND 20 AND ContactPhone NOT LIKE '%[^0-9+ -]%')
+    )
 );
 GO
 
+-- יצירת טבלת בקשות עם המפתח הזר ל-SuperUser
+CREATE TABLE NewRanchRequest
+(
+    RequestId INT IDENTITY(1,1) PRIMARY KEY,
+    RanchId INT NOT NULL,
+    SubmittedBySystemUserId INT NOT NULL,
+    RequestDate DATETIME2(0) NOT NULL CONSTRAINT DF_NewRanchRequest_Date DEFAULT SYSDATETIME(),
+    RequestStatus NVARCHAR(20) NOT NULL CONSTRAINT DF_NewRanchRequest_Status DEFAULT 'Pending',
+    ResolvedBySuperUserId INT NULL, -- המזהה שאישר/דחה
+    ResolvedDate DATETIME2(0) NULL,
+
+    CONSTRAINT UQ_NewRanchRequest_Ranch UNIQUE (RanchId), 
+    CONSTRAINT FK_NewRanchRequest_Ranch FOREIGN KEY (RanchId) REFERENCES Ranch(RanchId),
+    CONSTRAINT FK_NewRanchRequest_SystemUser FOREIGN KEY (SubmittedBySystemUserId) REFERENCES SystemUser(SystemUserId),
+    -- הקישור שהיה חסר:
+    CONSTRAINT FK_NewRanchRequest_SuperUser FOREIGN KEY (ResolvedBySuperUserId) REFERENCES SuperUser(SuperUserId)
+);
+GO
+	
 CREATE TABLE ProductCategory
 (
     CategoryId TINYINT IDENTITY(1,1) PRIMARY KEY,
