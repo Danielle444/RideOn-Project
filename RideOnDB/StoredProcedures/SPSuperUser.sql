@@ -14,6 +14,24 @@ BEGIN
 END
 GO
 
+CREATE PROCEDURE usp_GetSuperUserById
+    @SuperUserId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        SuperUserId,
+        Email,
+        PasswordHash,
+        PasswordSalt,
+        IsActive,
+        MustChangePassword
+    FROM SuperUser
+    WHERE SuperUserId = @SuperUserId;
+END
+GO
+
 CREATE PROCEDURE usp_GetSuperUserForLogin
     @Email NVARCHAR(100)
 AS
@@ -44,19 +62,39 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_UpdateSuperUserPassword
+ALTER PROCEDURE usp_UpdateSuperUserPassword
     @SuperUserId INT,
     @NewPasswordHash NVARCHAR(255),
     @NewPasswordSalt NVARCHAR(255)
 AS
 BEGIN
     SET NOCOUNT ON;
-    
+
     UPDATE SuperUser
-    SET 
+    SET
         PasswordHash = @NewPasswordHash,
         PasswordSalt = @NewPasswordSalt,
-        MustChangePassword = 0 -- איפוס הדרישה להחלפת סיסמה
-    WHERE SuperUserId = @SuperUserId;
+        MustChangePassword = 0
+    WHERE SuperUserId = @SuperUserId
+      AND IsActive = 1;
+END
+GO
+
+CREATE PROCEDURE usp_CheckSuperUserEmailExists
+    @Email NVARCHAR(100)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        CASE
+            WHEN EXISTS (
+                SELECT 1
+                FROM SuperUser
+                WHERE Email = @Email
+            )
+            THEN 1
+            ELSE 0
+        END AS ExistsFlag;
 END
 GO
