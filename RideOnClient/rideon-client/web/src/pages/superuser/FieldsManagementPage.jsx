@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import SuperUserLayout from "../../components/superuser/SuperUserLayout";
 import FieldsTable from "../../components/superuser/FieldsTable";
 import FieldModal from "../../components/superuser/FieldModal";
+import ConfirmDialog from "../../components/superuser/ConfirmDialog";
+import ToastMessage from "../../components/common/ToastMessage";
 import {
   getAllFields,
   createField,
@@ -11,7 +13,6 @@ import {
 
 export default function FieldsManagementPage() {
   const [fields, setFields] = useState([]);
-  const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const [search, setSearch] = useState("");
@@ -20,35 +21,82 @@ export default function FieldsManagementPage() {
   const [editItem, setEditItem] = useState(null);
   const [error, setError] = useState("");
 
-  async function load() {
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+  });
+
+  const [toast, setToast] = useState({
+    isOpen: false,
+    type: "success",
+    message: "",
+  });
+
+  // =========================
+  // LOAD
+  // =========================
+  async function loadFields() {
     try {
       setLoading(true);
       const res = await getAllFields();
       setFields(res.data || []);
-      setFiltered(res.data || []);
     } catch (err) {
-      alert(err.response?.data || "שגיאה בטעינת ענפים");
+      console.error(err);
+      showToast("error", err.response?.data || "שגיאה בטעינת ענפים");
+      setFields([]);
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(function () {
-    load();
+    loadFields();
   }, []);
 
-  useEffect(
+  // =========================
+  // FILTER
+  // =========================
+  const filteredFields = useMemo(
     function () {
-      const s = search.toLowerCase();
-      setFiltered(
-        fields.filter(function (f) {
-          return f.fieldName.toLowerCase().includes(s);
-        }),
-      );
+      const s = search.trim().toLowerCase();
+
+      if (!s) {
+        return fields;
+      }
+
+      return fields.filter(function (item) {
+        return (
+          (item.fieldName || "").toLowerCase().includes(s)
+        );
+      });
     },
-    [search, fields],
+    [fields, search],
   );
 
+  // =========================
+  // TOAST
+  // =========================
+  function showToast(type, message) {
+    setToast({
+      isOpen: true,
+      type,
+      message,
+    });
+  }
+
+  function closeToast() {
+    setToast({
+      isOpen: false,
+      type: "success",
+      message: "",
+    });
+  }
+
+  // =========================
+  // MODAL
+  // =========================
   function openCreate() {
     setEditItem(null);
     setError("");
@@ -61,35 +109,73 @@ export default function FieldsManagementPage() {
     setModalOpen(true);
   }
 
-  async function handleSubmit(name) {
+  function closeModal() {
+    setModalOpen(false);
+    setEditItem(null);
+    setError("");
+  }
+
+  // =========================
+  // CONFIRM
+  // =========================
+  function closeConfirmDialog() {
+    setConfirmDialog({
+      isOpen: false,
+      title: "",
+      message: "",
+      onConfirm: null,
+    });
+  }
+
+  // =========================
+  // SAVE
+  // =========================
+  async function handleSubmit(formData) {
     try {
-      if (!editItem) {
-        await createField({ fieldName: name });
+      setError("");
+
+      if (editItem) {
+        await updateField(formData);
+        showToast("success", "הענף עודכן בהצלחה");
       } else {
-        await updateField({
-          fieldId: editItem.fieldId,
-          fieldName: name,
-        });
+        await createField(formData);
+        showToast("success", "הענף נוצר בהצלחה");
       }
 
-      setModalOpen(false);
-      load();
+      closeModal();
+      await loadFields();
     } catch (err) {
-      setError(err.response?.data || "שגיאה");
+      console.error(err);
+      setError(err.response?.data || "שגיאה בשמירת הענף");
     }
   }
 
-  async function handleDelete(item) {
-    if (!window.confirm("בטוח למחוק את הענף?")) return;
-
-    try {
-      await deleteField(item.fieldId);
-      load();
-    } catch (err) {
-      alert(err.response?.data || "שגיאה במחיקה");
-    }
+  // =========================
+  // DELETE
+  // =========================
+  function handleDelete(item) {
+    setConfirmDialog({
+      isOpen: true,
+      title: "מחיקת ענף",
+      message: "האם את בטוחה שברצונך למחוק את הענף?",
+      onConfirm: async function () {
+        try {
+          await deleteField(item.fieldId);
+          closeConfirmDialog();
+          showToast("success", "הענף נמחק בהצלחה");
+          await loadFields();
+        } catch (err) {
+          console.error(err);
+          closeConfirmDialog();
+          showToast("error", err.response?.data || "שגיאה במחיקת הענף");
+        }
+      },
+    });
   }
 
+  // =========================
+  // UI
+  // =========================
   return (
     <SuperUserLayout activeItemKey="fields">
       <div className="rounded-[26px] border border-[#E6DCD5] bg-white shadow-sm overflow-hidden">
@@ -98,6 +184,7 @@ export default function FieldsManagementPage() {
             <h1 className="text-[2rem] font-bold text-[#3F312B]">ניהול ענפים</h1>
 
             <button
+              type="button"
               onClick={openCreate}
               className="rounded-xl bg-[#8B6352] px-5 py-3 font-semibold text-white shadow-sm hover:bg-[#7A5547] transition-colors"
             >
@@ -108,9 +195,7 @@ export default function FieldsManagementPage() {
           <div className="mt-8 flex justify-start">
             <input
               value={search}
-              onChange={function (e) {
-                setSearch(e.target.value);
-              }}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="חיפוש לפי שם ענף"
               className="h-11 w-[320px] rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm placeholder:text-[#A08D84] focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
             />
@@ -119,7 +204,7 @@ export default function FieldsManagementPage() {
 
         <div className="border-t border-[#EFE5DF] px-6 pb-4">
           <FieldsTable
-            fields={filtered}
+            fields={filteredFields}
             loading={loading}
             onEdit={openEdit}
             onDelete={handleDelete}
@@ -129,11 +214,25 @@ export default function FieldsManagementPage() {
 
       <FieldModal
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={closeModal}
         onSubmit={handleSubmit}
-        initialValue={editItem?.fieldName}
-        isEdit={!!editItem}
+        initialValue={editItem}
         error={error}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onCancel={closeConfirmDialog}
+        onConfirm={confirmDialog.onConfirm}
+      />
+
+      <ToastMessage
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
       />
     </SuperUserLayout>
   );

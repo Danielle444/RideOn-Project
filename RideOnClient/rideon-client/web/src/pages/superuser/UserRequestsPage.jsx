@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import SuperUserLayout from "../../components/superuser/SuperUserLayout";
 import RequestsTabs from "../../components/superuser/RequestsTabs";
 import RequestsFiltersBar from "../../components/superuser/RequestsFiltersBar";
@@ -9,16 +10,31 @@ import {
   getRanchRequests,
   updateRoleRequestStatus,
   updateRanchRequestStatus,
+  getPendingRequestsSummary,
 } from "../../services/superUserService";
 
 export default function UserRequestsPage() {
-  const [activeTab, setActiveTab] = useState("ranch");
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+
+  const [activeTab, setActiveTab] = useState(
+    tabFromUrl === "secretary" || tabFromUrl === "ranch" || tabFromUrl === "admin"
+      ? tabFromUrl
+      : "admin",
+  );
+
   const [status, setStatus] = useState("Pending");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [actionLoadingKey, setActionLoadingKey] = useState("");
+  const [pendingCounts, setPendingCounts] = useState({
+    admin: 0,
+    secretary: 0,
+    ranch: 0,
+  });
+
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
     title: "",
@@ -27,6 +43,38 @@ export default function UserRequestsPage() {
   });
 
   const pageTitle = "ניהול בקשות משתמשים וחוות";
+
+  useEffect(
+    function () {
+      if (
+        tabFromUrl === "secretary" ||
+        tabFromUrl === "ranch" ||
+        tabFromUrl === "admin"
+      ) {
+        setActiveTab(tabFromUrl);
+      }
+    },
+    [tabFromUrl],
+  );
+
+  async function loadPendingCounts() {
+    try {
+      const summary = await getPendingRequestsSummary();
+
+      setPendingCounts({
+        admin: summary.admin || 0,
+        secretary: summary.secretary || 0,
+        ranch: summary.ranch || 0,
+      });
+    } catch (err) {
+      console.error("Failed loading pending request counts:", err);
+      setPendingCounts({
+        admin: 0,
+        secretary: 0,
+        ranch: 0,
+      });
+    }
+  }
 
   async function loadData() {
     try {
@@ -49,7 +97,11 @@ export default function UserRequestsPage() {
     }
   }
 
-  useEffect(() => {
+  useEffect(function () {
+    loadPendingCounts();
+  }, []);
+
+  useEffect(function () {
     loadData();
   }, [activeTab, status, search]);
 
@@ -73,6 +125,10 @@ export default function UserRequestsPage() {
     return `role-${item.personId}-${item.ranchId}-${item.roleId}`;
   }
 
+  async function refreshAfterAction() {
+    await Promise.all([loadData(), loadPendingCounts()]);
+  }
+
   async function handleApprove(item) {
     const rowKey = getRowKey(item);
 
@@ -93,7 +149,7 @@ export default function UserRequestsPage() {
         });
       }
 
-      await loadData();
+      await refreshAfterAction();
     } catch (err) {
       console.error("Approve failed:", err);
       alert(err.response?.data || "שגיאה באישור הבקשה");
@@ -122,7 +178,7 @@ export default function UserRequestsPage() {
         });
       }
 
-      await loadData();
+      await refreshAfterAction();
     } catch (err) {
       console.error("Reject failed:", err);
       alert(err.response?.data || "שגיאה בדחיית הבקשה");
@@ -156,14 +212,8 @@ export default function UserRequestsPage() {
             });
           }
 
-          setConfirmDialog({
-            isOpen: false,
-            title: "",
-            message: "",
-            onConfirm: null,
-          });
-
-          await loadData();
+          closeConfirmDialog();
+          await refreshAfterAction();
         } catch (err) {
           console.error("Undo approve failed:", err);
           alert(err.response?.data || "שגיאה בביטול האישור");
@@ -199,14 +249,8 @@ export default function UserRequestsPage() {
             });
           }
 
-          setConfirmDialog({
-            isOpen: false,
-            title: "",
-            message: "",
-            onConfirm: null,
-          });
-
-          await loadData();
+          closeConfirmDialog();
+          await refreshAfterAction();
         } catch (err) {
           console.error("Approve rejected request failed:", err);
           alert(err.response?.data || "שגיאה באישור מחדש של הבקשה");
@@ -234,7 +278,11 @@ export default function UserRequestsPage() {
             {pageTitle}
           </h1>
 
-          <RequestsTabs activeTab={activeTab} onChange={handleTabChange} />
+          <RequestsTabs
+            activeTab={activeTab}
+            onChange={handleTabChange}
+            pendingCounts={pendingCounts}
+          />
 
           <RequestsFiltersBar
             status={status}

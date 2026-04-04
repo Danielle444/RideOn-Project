@@ -52,6 +52,26 @@ function updateRanchRequestStatus(data) {
   );
 }
 
+// REQUESTS SUMMARY
+async function getPendingRequestsSummary() {
+  const [adminRes, secretaryRes, ranchRes] = await Promise.all([
+    getRoleRequests(2, "Pending", null),
+    getRoleRequests(3, "Pending", null),
+    getRanchRequests("Pending", null),
+  ]);
+
+  const adminCount = Array.isArray(adminRes.data) ? adminRes.data.length : 0;
+  const secretaryCount = Array.isArray(secretaryRes.data) ? secretaryRes.data.length : 0;
+  const ranchCount = Array.isArray(ranchRes.data) ? ranchRes.data.length : 0;
+
+  return {
+    admin: adminCount,
+    secretary: secretaryCount,
+    ranch: ranchCount,
+    total: adminCount + secretaryCount + ranchCount,
+  };
+}
+
 // SUPER USERS MANAGEMENT
 function getAllSuperUsers() {
   return axios.get(`${API}/SuperUsers`, getAuthHeaders());
@@ -100,11 +120,68 @@ function deleteJudge(id) {
   return axios.delete(`${API}/Judges/${id}`, getAuthHeaders());
 }
 
+// PRIZE TYPES
+function getAllPrizeTypes() {
+  return axios.get(`${API}/PrizeTypes`, getAuthHeaders());
+}
+
+function createPrizeType(data) {
+  return axios.post(`${API}/PrizeTypes`, data, getAuthHeaders());
+}
+
+function updatePrizeType(data) {
+  return axios.put(`${API}/PrizeTypes`, data, getAuthHeaders());
+}
+
+function deletePrizeType(id) {
+  return axios.delete(`${API}/PrizeTypes/${id}`, getAuthHeaders());
+}
+
+// CLASS TYPES
+function getAllClassTypes(fieldId) {
+  return axios.get(`${API}/ClassTypes`, {
+    params: {
+      fieldId: fieldId || null,
+    },
+    ...getAuthHeaders(),
+  });
+}
+
+function createClassType(data) {
+  return axios.post(`${API}/ClassTypes`, data, getAuthHeaders());
+}
+
+function updateClassType(data) {
+  return axios.put(`${API}/ClassTypes`, data, getAuthHeaders());
+}
+
+function deleteClassType(id) {
+  return axios.delete(`${API}/ClassTypes/${id}`, getAuthHeaders());
+}
+
+// FINES
+function getAllFines() {
+  return axios.get(`${API}/Fines`, getAuthHeaders());
+}
+
+function createFine(data) {
+  return axios.post(`${API}/Fines`, data, getAuthHeaders());
+}
+
+function updateFine(data) {
+  return axios.put(`${API}/Fines`, data, getAuthHeaders());
+}
+
+function deleteFine(id) {
+  return axios.delete(`${API}/Fines/${id}`, getAuthHeaders());
+}
+
 export {
   getRoleRequests,
   updateRoleRequestStatus,
   getRanchRequests,
   updateRanchRequestStatus,
+  getPendingRequestsSummary,
   getAllSuperUsers,
   createSuperUser,
   getAllFields,
@@ -115,4 +192,16 @@ export {
   createJudge,
   updateJudge,
   deleteJudge,
+  getAllPrizeTypes,
+  createPrizeType,
+  updatePrizeType,
+  deletePrizeType,
+  getAllClassTypes,
+  createClassType,
+  updateClassType,
+  deleteClassType,
+  getAllFines,
+  createFine,
+  updateFine,
+  deleteFine,
 };

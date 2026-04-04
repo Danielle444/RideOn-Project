@@ -230,3 +230,62 @@ BEGIN
     WHERE PrizeTypeId = @PrizeTypeId;
 END
 GO
+
+CREATE PROCEDURE usp_GetAllFines
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        FineId,
+        FineName,
+        FineDescription,
+        FineAmount
+    FROM Fine
+    ORDER BY FineName ASC;
+END
+GO
+
+CREATE PROCEDURE usp_InsertFine
+    @FineName NVARCHAR(100),
+    @FineDescription NVARCHAR(255) = NULL,
+    @FineAmount DECIMAL(10,2)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Fine (FineName, FineDescription, FineAmount)
+    VALUES (@FineName, @FineDescription, @FineAmount);
+
+    SELECT SCOPE_IDENTITY() AS NewFineId;
+END
+GO
+
+CREATE PROCEDURE usp_UpdateFine
+    @FineId INT,
+    @FineName NVARCHAR(100),
+    @FineDescription NVARCHAR(255) = NULL,
+    @FineAmount DECIMAL(10,2)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE Fine
+    SET 
+        FineName = @FineName,
+        FineDescription = @FineDescription,
+        FineAmount = @FineAmount
+    WHERE FineId = @FineId;
+END
+GO
+
+CREATE PROCEDURE usp_DeleteFine
+    @FineId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DELETE FROM Fine
+    WHERE FineId = @FineId;
+END
+GO
