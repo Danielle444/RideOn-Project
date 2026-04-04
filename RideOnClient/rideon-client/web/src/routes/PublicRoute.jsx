@@ -14,7 +14,7 @@ export default function PublicRoute({ children }) {
       return "/superuser-change-password";
     }
 
-    return "/superuser-dashboard";
+    return "/superuser/requests";
   }
 
   if (isLoading) {

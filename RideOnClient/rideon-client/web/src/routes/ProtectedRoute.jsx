@@ -15,7 +15,7 @@ export default function ProtectedRoute({ children, requireSuperUser = false }) {
       return "/superuser-change-password";
     }
 
-    return "/superuser-dashboard";
+    return "/superuser/requests";
   }
 
   if (isLoading) {

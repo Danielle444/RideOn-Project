@@ -1,6 +1,14 @@
-import SecretaryLayout from "../components/secretary/SecretaryLayout";
+import { useNavigate } from "react-router-dom";
+import { useUser } from "../../context/UserContext";
+import { useActiveRole } from "../../context/ActiveRoleContext";
+import AppLayout from "../../components/layout/AppLayout";
+import secretaryGeneralMenu from "../../components/secretary/secretaryGeneralMenu";
 
 export default function CompetitionsBoardPage() {
+  const navigate = useNavigate();
+  const { user } = useUser();
+  const { activeRole } = useActiveRole();
+
   const competitions = [
     {
       name: "ריינינג 1+2 2026",
@@ -32,6 +40,15 @@ export default function CompetitionsBoardPage() {
     },
   ];
 
+  function handleGeneralNavigate(itemKey) {
+    if (itemKey === "competitions-board") {
+      navigate("/competitions");
+      return;
+    }
+
+    alert("המסך יתחבר כאן בהמשך");
+  }
+
   function getStatusClass(status) {
     if (status === "כעת") {
       return "bg-green-100 text-green-700";
@@ -48,8 +65,19 @@ export default function CompetitionsBoardPage() {
     return "bg-blue-100 text-blue-700";
   }
 
+  const userName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
+  const subtitle =
+    [activeRole?.roleName, activeRole?.ranchName].filter(Boolean).join(" · ") ||
+    "לא נבחר תפקיד וחווה";
+
   return (
-    <SecretaryLayout sidebarMode="general" activeItemKey="competitions-board">
+    <AppLayout
+      userName={userName}
+      subtitle={subtitle}
+      menuItems={secretaryGeneralMenu}
+      activeItemKey="competitions-board"
+      onNavigate={handleGeneralNavigate}
+    >
       <div className="bg-white rounded-[28px] border border-[#E2D6CF] shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-8 py-6 border-b border-[#EFE5E0]">
           <h1 className="text-[2.2rem] font-bold text-[#3E2723]">
@@ -140,6 +168,6 @@ export default function CompetitionsBoardPage() {
           </div>
         </div>
       </div>
-    </SecretaryLayout>
+    </AppLayout>
   );
 }

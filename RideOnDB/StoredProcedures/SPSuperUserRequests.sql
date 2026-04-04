@@ -26,6 +26,7 @@ END
 GO
 
 --new ranch requests
+
 CREATE PROCEDURE usp_GetPendingNewRanchRequests
 AS
 BEGIN
@@ -64,4 +65,3 @@ BEGIN
     WHERE RequestId = @RequestId;
 END
 GO
-
