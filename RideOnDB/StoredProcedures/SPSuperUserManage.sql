@@ -1,5 +1,5 @@
 -- fields
-CREATE PROCEDURE usp_InsertField
+CREATE OR ALTER PROCEDURE usp_InsertField
     @FieldName NVARCHAR(100)
 AS
 BEGIN
@@ -13,7 +13,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_UpdateField
+CREATE OR ALTER PROCEDURE usp_UpdateField
     @FieldId TINYINT,
     @FieldName NVARCHAR(100)
 AS
@@ -26,7 +26,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_DeleteField
+CREATE OR ALTER PROCEDURE usp_DeleteField
     @FieldId TINYINT
 AS
 BEGIN
@@ -58,7 +58,7 @@ GO
 
 --Class
 
-CREATE PROCEDURE usp_InsertClassType
+CREATE OR ALTER PROCEDURE usp_InsertClassType
     @FieldId TINYINT,
     @ClassName NVARCHAR(100),
     @JudgingSheetFormat NVARCHAR(100),
@@ -74,7 +74,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_UpdateClassType
+CREATE OR ALTER PROCEDURE usp_UpdateClassType
     @ClassTypeId SMALLINT,
     @FieldId TINYINT,
     @ClassName NVARCHAR(100),
@@ -94,7 +94,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_DeleteClassType
+CREATE OR ALTER PROCEDURE usp_DeleteClassType
     @ClassTypeId SMALLINT
 AS
 BEGIN
@@ -114,7 +114,7 @@ GO
 
 --Judge
 
-CREATE PROCEDURE usp_InsertJudge
+CREATE OR ALTER PROCEDURE usp_InsertJudge
     @FirstNameHebrew NVARCHAR(50),
     @LastNameHebrew NVARCHAR(50),
     @FirstNameEnglish NVARCHAR(50),
@@ -133,7 +133,7 @@ GO
 
 --judges 
 
-CREATE PROCEDURE usp_DeleteJudge
+CREATE OR ALTER PROCEDURE usp_DeleteJudge
     @JudgeId INT
 AS
 BEGIN
@@ -146,7 +146,7 @@ BEGIN
     END
 
     -- ולידציה 2: האם שובץ לתחרות כלשהי אי פעם?
-    IF EXISTS (SELECT 1 FROM CompetitionJudge WHERE JudgeId = @JudgeId)
+    IF EXISTS (SELECT 1 FROM ClassJudge WHERE JudgeId = @JudgeId)
     BEGIN
         THROW 50014, 'Cannot delete judge: Judge is assigned to competitions.', 1;
     END
@@ -168,7 +168,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_RemoveJudgeFromField
+CREATE OR ALTER PROCEDURE usp_RemoveJudgeFromField
     @JudgeId INT,
     @FieldId TINYINT
 AS
@@ -183,7 +183,7 @@ GO
 
 --Prizes
 
-CREATE PROCEDURE usp_InsertPrizeType
+CREATE OR ALTER PROCEDURE usp_InsertPrizeType
     @PrizeTypeName NVARCHAR(100),
     @PrizeDescription NVARCHAR(500) = NULL
 AS
@@ -197,7 +197,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_UpdatePrizeType
+CREATE OR ALTER PROCEDURE usp_UpdatePrizeType
     @PrizeTypeId TINYINT,
     @PrizeTypeName NVARCHAR(100),
     @PrizeDescription NVARCHAR(500) = NULL
@@ -213,7 +213,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_DeletePrizeType
+CREATE OR ALTER PROCEDURE usp_DeletePrizeType
     @PrizeTypeId TINYINT
 AS
 BEGIN

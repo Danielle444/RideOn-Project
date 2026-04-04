@@ -1,4 +1,4 @@
-CREATE PROCEDURE usp_GetAllFields
+CREATE OR ALTER PROCEDURE usp_GetAllFields
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -11,7 +11,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_GetAllJudges
+CREATE OR ALTER PROCEDURE usp_GetAllJudges
     @FieldId TINYINT = NULL
 AS
 BEGIN
@@ -24,23 +24,25 @@ BEGIN
         J.FirstNameEnglish,
         J.LastNameEnglish,
         J.Country,
-        -- קיבוץ כל הענפים של השופט למחרוזת אחת מופרדת בפסיקים לטובת התצוגה:
         (
             SELECT STRING_AGG(F.FieldName, ', ')
             FROM JudgeField JF
             INNER JOIN Field F ON JF.FieldId = F.FieldId
-            WHERE JF.eId = J.eId
+            WHERE JF.JudgeId = J.JudgeId
         ) AS QualifiedFields
     FROM Judge J
-    -- הסינון: נביא את השופט רק אם הוא משויך לענף המבוקש (או אם לא נבחר ענף כלל)
     WHERE (@FieldId IS NULL OR EXISTS (
-        SELECT 1 FROM JudgeField JF2 
-        WHERE JF2.JudgeId = J.JudgeId AND JF2.FieldId = @FieldId
+        SELECT 1
+        FROM JudgeField JF2
+        WHERE JF2.JudgeId = J.JudgeId
+          AND JF2.FieldId = @FieldId
     ))
     ORDER BY J.FirstNameHebrew ASC;
 END
 GO
-CREATE PROCEDURE usp_GetJudgesByCompetitionId
+
+
+CREATE OR ALTER PROCEDURE usp_GetJudgesByCompetitionId
     @CompetitionId INT
 AS
 BEGIN
@@ -60,24 +62,8 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_InsertJudge
-    @FirstNameHebrew NVARCHAR(50),
-    @LastNameHebrew NVARCHAR(50),
-    @FirstNameEnglish NVARCHAR(50),
-    @LastNameEnglish NVARCHAR(50),
-    @Country NVARCHAR(50)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    INSERT INTO Judge (FirstNameHebrew, LastNameHebrew, FirstNameEnglish, LastNameEnglish, Country)
-    VALUES (@FirstNameHebrew, @LastNameHebrew, @FirstNameEnglish, @LastNameEnglish, @Country);
-    
-    SELECT SCOPE_IDENTITY() AS NewJudgeId;
-END
-GO
 
-CREATE PROCEDURE usp_UpdateJudge
+CREATE OR ALTER PROCEDURE usp_UpdateJudge
     @JudgeId INT,
     @FirstNameHebrew NVARCHAR(50),
     @LastNameHebrew NVARCHAR(50),
@@ -124,18 +110,17 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_InsertJudge
+CREATE OR ALTER PROCEDURE usp_InsertJudge
     @FirstNameHebrew NVARCHAR(50),
     @LastNameHebrew NVARCHAR(50),
     @FirstNameEnglish NVARCHAR(50),
     @LastNameEnglish NVARCHAR(50),
     @Country NVARCHAR(50),
-    @FieldIdsCsv NVARCHAR(MAX) -- מחרוזת של מזהי ענפים (לדוגמה: "1,2,5")
+    @FieldIdsCsv NVARCHAR(MAX)
 AS
 BEGIN
     SET NOCOUNT ON;
     
-    -- ולידציה: חייבים לספק לפחות ענף אחד
     IF ISNULL(@FieldIdsCsv, '') = ''
     BEGIN
         THROW 50015, 'Cannot create judge: At least one field must be provided.', 1;
@@ -145,21 +130,31 @@ BEGIN
     BEGIN TRY
         DECLARE @NewJudgeId INT;
 
-        -- 1. יצירת השופט
-        INSERT INTO Judge (FirstNameHebrew, LastNameHebrew, FirstNameEnglish, LastNameEnglish, Country)
-        VALUES (@FirstNameHebrew, @LastNameHebrew, @FirstNameEnglish, @LastNameEnglish, @Country);
-        
+        INSERT INTO Judge
+        (
+            FirstNameHebrew,
+            LastNameHebrew,
+            FirstNameEnglish,
+            LastNameEnglish,
+            Country
+        )
+        VALUES
+        (
+            @FirstNameHebrew,
+            @LastNameHebrew,
+            @FirstNameEnglish,
+            @LastNameEnglish,
+            @Country
+        );
+
         SET @NewJudgeId = SCOPE_IDENTITY();
 
-        -- 2. הוספת הענפים לטבלת הגישור JudgeField
-        -- משתמשים ב-STRING_SPLIT כדי לפרק את המחרוזת ולהכניס כל מספר כשורה
         INSERT INTO JudgeField (JudgeId, FieldId)
         SELECT @NewJudgeId, CAST(value AS TINYINT)
         FROM STRING_SPLIT(@FieldIdsCsv, ',');
 
         COMMIT TRANSACTION;
-        
-        -- מחזירים את המזהה החדש
+
         SELECT @NewJudgeId AS NewJudgeId;
     END TRY
     BEGIN CATCH
@@ -169,7 +164,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_AddJudgeToField
+CREATE OR ALTER PROCEDURE usp_AddJudgeToField
     @JudgeId INT,
     @FieldId TINYINT
 AS

@@ -78,6 +78,27 @@ function deleteField(id) {
   return axios.delete(`${API}/Fields/${id}`, getAuthHeaders());
 }
 
+// JUDGES
+function getAllJudges(fieldId) {
+  return axios.get(`${API}/Judges`, {
+    params: {
+      fieldId: fieldId || null,
+    },
+    ...getAuthHeaders(),
+  });
+}
+
+function createJudge(data) {
+  return axios.post(`${API}/Judges`, data, getAuthHeaders());
+}
+
+function updateJudge(data) {
+  return axios.put(`${API}/Judges`, data, getAuthHeaders());
+}
+
+function deleteJudge(id) {
+  return axios.delete(`${API}/Judges/${id}`, getAuthHeaders());
+}
 
 export {
   getRoleRequests,
@@ -89,5 +110,9 @@ export {
   getAllFields,
   createField,
   updateField,
-  deleteField
+  deleteField,
+  getAllJudges,
+  createJudge,
+  updateJudge,
+  deleteJudge,
 };
