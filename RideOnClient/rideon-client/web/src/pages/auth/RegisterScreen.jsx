@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Info } from "lucide-react";
 import logo from "../../../../shared/assets/logo.png";
-import Field from "../common/Field";
-import CustomDropdown from "../common/CustomDropdown";
+import Field from "../../components/common/Field";
+import CustomDropdown from "../../components/common/CustomDropdown";
 import {
   register,
   getRanches,

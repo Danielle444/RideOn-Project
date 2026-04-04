@@ -1,4 +1,4 @@
-CREATE PROCEDURE SP_GetAllFields
+CREATE PROCEDURE usp_GetAllFields
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -40,7 +40,7 @@ BEGIN
     ORDER BY J.FirstNameHebrew ASC;
 END
 GO
-CREATE PROCEDURE SP_GetJudgesByCompetitionId
+CREATE PROCEDURE usp_GetJudgesByCompetitionId
     @CompetitionId INT
 AS
 BEGIN

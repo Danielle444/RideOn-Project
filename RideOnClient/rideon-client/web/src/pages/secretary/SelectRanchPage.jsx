@@ -7,12 +7,12 @@ import {
   Smartphone,
   BadgeCheck,
 } from "lucide-react";
-import { useUser } from "../context/UserContext";
-import { useActiveRole } from "../context/ActiveRoleContext";
-import { useAuth } from "../context/AuthContext";
-import { mapRoleOptionForWeb } from "../../../shared/auth/utils/platformRoles";
-import { resolveWebRoleSelection } from "../../../shared/auth/utils/activeRoleSelection";
-import { resolveSingleWebRoleSelection } from "../../../shared/auth/utils/autoRoleSelection";
+import { useUser } from "../../context/UserContext";
+import { useActiveRole } from "../../context/ActiveRoleContext";
+import { useAuth } from "../../context/AuthContext";
+import { mapRoleOptionForWeb } from "../../../../shared/auth/utils/platformRoles";
+import { resolveWebRoleSelection } from "../../../../shared/auth/utils/activeRoleSelection";
+import { resolveSingleWebRoleSelection } from "../../../../shared/auth/utils/autoRoleSelection";
 
 export default function SelectRanchPage() {
   const navigate = useNavigate();

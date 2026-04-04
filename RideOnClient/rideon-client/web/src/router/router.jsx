@@ -1,13 +1,19 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
-import LoginScreen from "../components/auth/LoginScreen";
-import RegisterScreen from "../components/auth/RegisterScreen";
+import LoginScreen from "../pages/auth/LoginScreen";
+import RegisterScreen from "../pages/auth/RegisterScreen";
 import ProtectedRoute from "../routes/ProtectedRoute";
 import PublicRoute from "../routes/PublicRoute";
-import ChangePasswordPage from "../pages/ChangePasswordPage";
-import SelectRanchPage from "../pages/SelectRanchPage";
-import CompetitionsBoardPage from "../pages/CompetitionsBoardPage";
-import SuperUserDashboardPage from "../pages/SuperUserDashboardPage";
-import SuperUserChangePasswordPage from "../pages/SuperUserChangePasswordPage";
+import ChangePasswordPage from "../pages/shared/ChangePasswordPage";
+import SelectRanchPage from "../pages/secretary/SelectRanchPage";
+import CompetitionsBoardPage from "../pages/secretary/CompetitionsBoardPage";
+import UserRequestsPage from "../pages/superuser/UserRequestsPage";
+import SuperUsersManagementPage from "../pages/superuser/SuperUsersManagementPage";
+import FieldsManagementPage from "../pages/superuser/FieldsManagementPage";
+import ClassesManagementPage from "../pages/superuser/ClassesManagementPage";
+import JudgesManagementPage from "../pages/superuser/JudgesManagementPage";
+import PrizesManagementPage from "../pages/superuser/PrizesManagementPage";
+import FinesManagementPage from "../pages/superuser/FinesManagementPage";
+import NotificationsManagementPage from "../pages/superuser/NotificationsManagementPage";
 
 const router = createBrowserRouter([
   {
@@ -65,18 +71,70 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: "/superuser-dashboard",
+    path: "/superuser",
+    element: <Navigate to="/superuser/requests" replace />,
+  },
+  {
+    path: "/superuser/requests",
     element: (
       <ProtectedRoute requireSuperUser={true}>
-        <SuperUserDashboardPage />
+        <UserRequestsPage />
       </ProtectedRoute>
     ),
   },
   {
-    path: "/superuser-change-password",
+    path: "/superuser/super-users",
     element: (
       <ProtectedRoute requireSuperUser={true}>
-        <SuperUserChangePasswordPage />
+        <SuperUsersManagementPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/superuser/fields",
+    element: (
+      <ProtectedRoute requireSuperUser={true}>
+        <FieldsManagementPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/superuser/classes",
+    element: (
+      <ProtectedRoute requireSuperUser={true}>
+        <ClassesManagementPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/superuser/judges",
+    element: (
+      <ProtectedRoute requireSuperUser={true}>
+        <JudgesManagementPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/superuser/prizes",
+    element: (
+      <ProtectedRoute requireSuperUser={true}>
+        <PrizesManagementPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/superuser/fines",
+    element: (
+      <ProtectedRoute requireSuperUser={true}>
+        <FinesManagementPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/superuser/notifications",
+    element: (
+      <ProtectedRoute requireSuperUser={true}>
+        <NotificationsManagementPage />
       </ProtectedRoute>
     ),
   },

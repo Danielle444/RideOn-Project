@@ -71,25 +71,6 @@ CREATE TABLE Ranch
     )
 );
 GO
-
--- יצירת טבלת בקשות עם המפתח הזר ל-SuperUser
-CREATE TABLE NewRanchRequest
-(
-    RequestId INT IDENTITY(1,1) PRIMARY KEY,
-    RanchId INT NOT NULL,
-    SubmittedBySystemUserId INT NOT NULL,
-    RequestDate DATETIME2(0) NOT NULL CONSTRAINT DF_NewRanchRequest_Date DEFAULT SYSDATETIME(),
-    RequestStatus NVARCHAR(20) NOT NULL CONSTRAINT DF_NewRanchRequest_Status DEFAULT 'Pending',
-    ResolvedBySuperUserId INT NULL, -- המזהה שאישר/דחה
-    ResolvedDate DATETIME2(0) NULL,
-
-    CONSTRAINT UQ_NewRanchRequest_Ranch UNIQUE (RanchId), 
-    CONSTRAINT FK_NewRanchRequest_Ranch FOREIGN KEY (RanchId) REFERENCES Ranch(RanchId),
-    CONSTRAINT FK_NewRanchRequest_SystemUser FOREIGN KEY (SubmittedBySystemUserId) REFERENCES SystemUser(SystemUserId),
-    -- הקישור שהיה חסר:
-    CONSTRAINT FK_NewRanchRequest_SuperUser FOREIGN KEY (ResolvedBySuperUserId) REFERENCES SuperUser(SuperUserId)
-);
-GO
 	
 CREATE TABLE ProductCategory
 (
@@ -214,6 +195,25 @@ GO
 /* =========================================================
    3) PERSON / RANCH RELATIONS
    ========================================================= */
+
+
+-- יצירת טבלת בקשות עם המפתח הזר ל-SuperUser
+CREATE TABLE NewRanchRequest
+(
+    RequestId INT IDENTITY(1,1) PRIMARY KEY,
+    RanchId INT NOT NULL,
+    SubmittedBySystemUserId INT NOT NULL,
+    RequestDate DATETIME2(0) NOT NULL CONSTRAINT DF_NewRanchRequest_Date DEFAULT SYSDATETIME(),
+    RequestStatus NVARCHAR(20) NOT NULL CONSTRAINT DF_NewRanchRequest_Status DEFAULT 'Pending',
+    ResolvedBySuperUserId INT NULL, -- המזהה שאישר/דחה
+    ResolvedDate DATETIME2(0) NULL,
+
+    CONSTRAINT UQ_NewRanchRequest_Ranch UNIQUE (RanchId), 
+    CONSTRAINT FK_NewRanchRequest_Ranch FOREIGN KEY (RanchId) REFERENCES Ranch(RanchId),
+    CONSTRAINT FK_NewRanchRequest_SystemUser FOREIGN KEY (SubmittedBySystemUserId) REFERENCES SystemUser(SystemUserId),
+    CONSTRAINT FK_NewRanchRequest_SuperUser FOREIGN KEY (ResolvedBySuperUserId) REFERENCES SuperUser(SuperUserId)
+);
+GO
 
 CREATE TABLE PersonRanch
 (

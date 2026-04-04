@@ -1,54 +1,26 @@
 import logo from "../../../../shared/assets/logo.png";
-import { Trophy, CalendarDays, TableProperties, Settings } from "lucide-react";
 
-export default function SecretarySidebarGeneral(props) {
-  const items = [
-    {
-      key: "competitions-board",
-      label: "לוח תחרויות",
-      icon: Trophy,
-    },
-    {
-      key: "service-prices",
-      label: "מחירון שירותים",
-      icon: CalendarDays,
-    },
-    {
-      key: "arenas-and-stalls",
-      label: "מגרשים ותאים",
-      icon: TableProperties,
-    },
-    {
-      key: "profile-settings",
-      label: "פרופיל והגדרות",
-      icon: Settings,
-    },
-  ];
-
-  const roleAndRanchText = [props.roleName, props.ranchName]
-    .filter(Boolean)
-    .join(" · ");
-
+export default function Sidebar(props) {
   return (
     <aside className="w-[290px] border-l border-[#D9CDC6] bg-white flex flex-col">
       <div className="pt-8 pb-6 px-6 border-b border-[#EEE3DD]">
-        {" "}
         <div className="flex flex-col items-center">
           <img src={logo} alt="RideOn" className="h-28 object-contain mb-3" />
         </div>
+
         <div className="text-center">
           <p className="text-[1.35rem] font-bold text-[#5D4037] leading-8">
             {props.userName}
           </p>
 
           <p className="mt-2 text-[1.02rem] font-medium text-[#8B6352] leading-7">
-            {roleAndRanchText || "לא נבחר תפקיד וחווה"}
+            {props.subtitle}
           </p>
         </div>
       </div>
 
       <nav className="flex-1 py-5">
-        {items.map(function (item) {
+        {props.items.map(function (item) {
           const Icon = item.icon;
           const isActive = props.activeItemKey === item.key;
 

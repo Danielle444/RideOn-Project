@@ -1,18 +1,22 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LockKeyhole, Info } from "lucide-react";
-import { useUser } from "../context/UserContext";
-import { useActiveRole } from "../context/ActiveRoleContext";
-import { useAuth } from "../context/AuthContext";
-import { getPasswordValidationMessage } from "../../../shared/auth/validations/passwordValidation";
-import Field from "../components/common/Field";
+import { useUser } from "../../context/UserContext";
+import { useActiveRole } from "../../context/ActiveRoleContext";
+import { useAuth } from "../../context/AuthContext";
+import { getPasswordValidationMessage } from "../../../../shared/auth/validations/passwordValidation";
+import Field from "../../components/common/Field";
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate();
 
   const { user } = useUser();
   const { activeRole } = useActiveRole();
-  const { changePasswordAndRefresh, logout } = useAuth();
+  const {
+    changePasswordAndRefresh,
+    changeSuperUserPasswordAndRefresh,
+    logout,
+  } = useAuth();
 
   const [showPasswordInfo, setShowPasswordInfo] = useState(false);
 
@@ -28,8 +32,27 @@ export default function ChangePasswordPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const isSuperUser = user && user.userType === "superUser";
+
+  function getDisplayIdentifier() {
+    if (!user) {
+      return "";
+    }
+
+    if (isSuperUser) {
+      return user.email || "";
+    }
+
+    return user.username || "";
+  }
+
   function validateForm() {
-    if (!user || !user.username) {
+    if (!user) {
+      setErrorMessage("לא נמצאו פרטי משתמש. יש להתחבר מחדש.");
+      return false;
+    }
+
+    if (!isSuperUser && !user.username) {
       setErrorMessage("לא נמצאו פרטי משתמש. יש להתחבר מחדש.");
       return false;
     }
@@ -63,6 +86,34 @@ export default function ChangePasswordPage() {
     return true;
   }
 
+  function getSuccessRedirect(resultUser) {
+    if (resultUser && resultUser.userType === "superUser") {
+      return "/superuser/requests";
+    }
+
+    if (activeRole) {
+      return "/dashboard";
+    }
+
+    if (
+      resultUser &&
+      resultUser.approvedRolesAndRanches &&
+      resultUser.approvedRolesAndRanches.length > 1
+    ) {
+      return "/select-ranch";
+    }
+
+    if (
+      resultUser &&
+      resultUser.approvedRolesAndRanches &&
+      resultUser.approvedRolesAndRanches.length === 1
+    ) {
+      return "/dashboard";
+    }
+
+    return null;
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setErrorMessage("");
@@ -77,10 +128,16 @@ export default function ChangePasswordPage() {
     setIsLoading(true);
 
     try {
-      const result = await changePasswordAndRefresh(
-        currentPassword,
-        newPassword
-      );
+      let result;
+
+      if (isSuperUser) {
+        result = await changeSuperUserPasswordAndRefresh(
+          currentPassword,
+          newPassword
+        );
+      } else {
+        result = await changePasswordAndRefresh(currentPassword, newPassword);
+      }
 
       if (!result.ok) {
         setErrorMessage(result.message);
@@ -90,22 +147,15 @@ export default function ChangePasswordPage() {
       setSuccessMessage("הסיסמה הוחלפה בהצלחה");
 
       setTimeout(function () {
-        if (activeRole) {
-          navigate("/dashboard");
-        } else if (
-          result.user.approvedRolesAndRanches &&
-          result.user.approvedRolesAndRanches.length > 1
-        ) {
-          navigate("/select-ranch");
-        } else if (
-          result.user.approvedRolesAndRanches &&
-          result.user.approvedRolesAndRanches.length === 1
-        ) {
-          navigate("/dashboard");
-        } else {
+        const destination = getSuccessRedirect(result.user);
+
+        if (!destination) {
           logout();
           navigate("/login");
+          return;
         }
+
+        navigate(destination, { replace: true });
       }, 1200);
     } finally {
       setIsLoading(false);
@@ -162,7 +212,8 @@ export default function ChangePasswordPage() {
             </div>
 
             <p className="text-sm text-[#8D6E63]">
-              משתמש: <span className="font-semibold">{user.username}</span>
+              {isSuperUser ? "מנהל מערכת:" : "משתמש:"}{" "}
+              <span className="font-semibold">{getDisplayIdentifier()}</span>
             </p>
           </div>
 

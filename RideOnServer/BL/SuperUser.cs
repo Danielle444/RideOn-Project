@@ -1,4 +1,5 @@
-﻿using RideOnServer.DAL;
+﻿using RideOnServer.BL.DTOs;
+using RideOnServer.DAL;
 
 namespace RideOnServer.BL
 {
@@ -69,7 +70,7 @@ namespace RideOnServer.BL
             string passwordSalt = PasswordHelper.GenerateSalt();
             string passwordHash = PasswordHelper.HashPassword(password, passwordSalt);
 
-            return dal.InsertSuperUser(email, passwordHash, passwordSalt);
+            return dal.InsertSuperUser(email, passwordHash, passwordSalt, true);
         }
 
         internal static void ChangePassword(int superUserId, string currentPassword, string newPassword)
@@ -103,5 +104,47 @@ namespace RideOnServer.BL
                    && email.Contains("@")
                    && email.Contains(".");
         }
+
+        internal static List<RoleRequest> GetRoleRequests(byte roleId, string? status, string? searchText)
+        {
+            SuperUserDAL dal = new SuperUserDAL();
+            return dal.GetRoleRequests(roleId, status, searchText);
+        }
+
+        internal static List<NewRanchRequest> GetNewRanchRequests(string? status, string? searchText)
+        {
+            SuperUserDAL dal = new SuperUserDAL();
+            return dal.GetNewRanchRequests(status, searchText);
+        }
+
+        internal static void UpdateRoleRequestStatus(int personId, int ranchId, byte roleId, string roleStatus)
+        {
+            if (roleStatus != "Approved" && roleStatus != "Rejected")
+            {
+                throw new Exception("Invalid role status. Only Approved or Rejected are allowed.");
+            }
+
+            SuperUserDAL dal = new SuperUserDAL();
+            dal.UpdateRoleRequestStatus(personId, ranchId, roleId, roleStatus);
+        }
+
+        internal static void UpdateNewRanchRequestStatus(int requestId, int resolvedBySuperUserId, string newStatus)
+        {
+            if (newStatus != "Approved" && newStatus != "Rejected")
+            {
+                throw new Exception("Invalid request status. Only Approved or Rejected are allowed.");
+            }
+
+            SuperUserDAL dal = new SuperUserDAL();
+            dal.UpdateNewRanchRequestStatus(requestId, resolvedBySuperUserId, newStatus);
+        }
+
+        internal static List<SuperUserListItem> GetAllSuperUsers()
+        {
+            SuperUserDAL dal = new SuperUserDAL();
+            return dal.GetAllSuperUsers();
+        }
+
+
     }
 }

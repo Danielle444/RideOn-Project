@@ -1,6 +1,6 @@
 import { Bell, LogOut } from "lucide-react";
 
-export default function SecretaryTopBar(props) {
+export default function TopBar(props) {
   return (
     <div className="h-12 bg-gradient-to-l from-[#7B5243] to-[#5D4037] flex items-center justify-between px-5 text-white">
       <div />
@@ -13,9 +13,6 @@ export default function SecretaryTopBar(props) {
           title="התראות"
         >
           <Bell size={18} />
-          <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#F05C5C] text-[10px] font-bold text-white">
-            4
-          </span>
         </button>
 
         <button

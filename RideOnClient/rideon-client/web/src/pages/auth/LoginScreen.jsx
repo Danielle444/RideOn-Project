@@ -20,10 +20,10 @@ export default function LoginScreen() {
 
   function getSuperUserRoute(user) {
     if (user && user.mustChangePassword) {
-      return "/superuser-change-password";
+      return "/change-password";
     }
 
-    return "/superuser-dashboard";
+    return "/superuser/requests";
   }
 
   async function handleSubmit(event) {
@@ -112,9 +112,7 @@ export default function LoginScreen() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm text-[#5D4037]">
-              סיסמה
-            </label>
+            <label className="mb-1 block text-sm text-[#5D4037]">סיסמה</label>
 
             <div className="relative">
               <input
@@ -199,7 +197,7 @@ export default function LoginScreen() {
           </p>
         )}
 
-        <div className="mt-2 text-center text-xs text-[#BCAAA4]">
+        <div className="mt-6 text-center text-xs text-[#BCAAA4]">
           <span
             onClick={toggleSuperUserMode}
             className="cursor-pointer select-none hover:text-[#8D6E63]"
