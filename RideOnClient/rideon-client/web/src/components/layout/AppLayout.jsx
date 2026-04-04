@@ -17,8 +17,6 @@ export default function AppLayout(props) {
       props.onNotificationsClick();
       return;
     }
-
-    alert("מסך התראות יתחבר כאן בהמשך");
   }
 
   return (
@@ -26,6 +24,10 @@ export default function AppLayout(props) {
       <TopBar
         onLogout={handleLogout}
         onNotificationsClick={handleNotificationsClick}
+        notificationCount={props.notificationCount}
+        notificationsOpen={props.notificationsOpen}
+        notificationItems={props.notificationItems}
+        onNotificationItemClick={props.onNotificationItemClick}
       />
 
       <div className="min-h-[calc(100vh-48px)] flex">

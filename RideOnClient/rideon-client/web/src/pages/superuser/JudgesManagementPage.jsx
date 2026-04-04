@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import SuperUserLayout from "../../components/superuser/SuperUserLayout";
 import JudgesTable from "../../components/superuser/JudgesTable";
 import JudgeModal from "../../components/superuser/JudgeModal";
+import ConfirmDialog from "../../components/superuser/ConfirmDialog";
+import ToastMessage from "../../components/common/ToastMessage";
 import {
   getAllJudges,
   createJudge,
@@ -23,13 +25,26 @@ export default function JudgesManagementPage() {
   const [editItem, setEditItem] = useState(null);
   const [error, setError] = useState("");
 
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+  });
+
+  const [toast, setToast] = useState({
+    isOpen: false,
+    type: "success",
+    message: "",
+  });
+
   async function loadFields() {
     try {
       const res = await getAllFields();
       setFields(res.data || []);
     } catch (err) {
       console.error(err);
-      alert(err.response?.data || "שגיאה בטעינת ענפים");
+      showToast("error", err.response?.data || "שגיאה בטעינת ענפים");
     }
   }
 
@@ -40,7 +55,7 @@ export default function JudgesManagementPage() {
       setJudges(res.data || []);
     } catch (err) {
       console.error(err);
-      alert(err.response?.data || "שגיאה בטעינת שופטים");
+      showToast("error", err.response?.data || "שגיאה בטעינת שופטים");
       setJudges([]);
     } finally {
       setLoading(false);
@@ -82,6 +97,22 @@ export default function JudgesManagementPage() {
     [judges, search],
   );
 
+  function showToast(type, message) {
+    setToast({
+      isOpen: true,
+      type,
+      message,
+    });
+  }
+
+  function closeToast() {
+    setToast({
+      isOpen: false,
+      type: "success",
+      message: "",
+    });
+  }
+
   function openCreate() {
     setEditItem(null);
     setError("");
@@ -100,14 +131,25 @@ export default function JudgesManagementPage() {
     setError("");
   }
 
+  function closeConfirmDialog() {
+    setConfirmDialog({
+      isOpen: false,
+      title: "",
+      message: "",
+      onConfirm: null,
+    });
+  }
+
   async function handleSubmit(formData) {
     try {
       setError("");
 
       if (editItem) {
         await updateJudge(formData);
+        showToast("success", "השופט עודכן בהצלחה");
       } else {
         await createJudge(formData);
+        showToast("success", "השופט נוצר בהצלחה");
       }
 
       closeModal();
@@ -118,20 +160,24 @@ export default function JudgesManagementPage() {
     }
   }
 
-  async function handleDelete(item) {
-    const confirmed = window.confirm("בטוח למחוק את השופט?");
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await deleteJudge(item.judgeId);
-      await loadJudges();
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data || "שגיאה במחיקת שופט");
-    }
+  function handleDelete(item) {
+    setConfirmDialog({
+      isOpen: true,
+      title: "מחיקת שופט",
+      message: "האם את בטוחה שברצונך למחוק את השופט?",
+      onConfirm: async function () {
+        try {
+          await deleteJudge(item.judgeId);
+          closeConfirmDialog();
+          showToast("success", "השופט נמחק בהצלחה");
+          await loadJudges();
+        } catch (err) {
+          console.error(err);
+          closeConfirmDialog();
+          showToast("error", err.response?.data || "שגיאה במחיקת שופט");
+        }
+      },
+    });
   }
 
   return (
@@ -192,6 +238,21 @@ export default function JudgesManagementPage() {
         initialJudge={editItem}
         fields={fields}
         error={error}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onCancel={closeConfirmDialog}
+        onConfirm={confirmDialog.onConfirm}
+      />
+
+      <ToastMessage
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
       />
     </SuperUserLayout>
   );
