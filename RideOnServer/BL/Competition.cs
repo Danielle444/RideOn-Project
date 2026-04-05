@@ -1,4 +1,4 @@
-﻿using RideOnServer.BL.DTOs;
+﻿using RideOnServer.BL.DTOs.Competition;
 using RideOnServer.DAL;
 
 namespace RideOnServer.BL
@@ -29,7 +29,14 @@ namespace RideOnServer.BL
             }
 
             CompetitionDAL dal = new CompetitionDAL();
-            return dal.GetCompetitionsByHostRanch(filters);
+            List<Competition> list = dal.GetCompetitionsByHostRanch(filters);
+
+            foreach (Competition item in list)
+            {
+                item.CompetitionStatus = CalculateEffectiveStatus(item);
+            }
+
+            return list;
         }
 
         internal static Competition? GetCompetitionById(int competitionId)
@@ -40,7 +47,14 @@ namespace RideOnServer.BL
             }
 
             CompetitionDAL dal = new CompetitionDAL();
-            return dal.GetCompetitionById(competitionId);
+            Competition? competition = dal.GetCompetitionById(competitionId);
+
+            if (competition != null)
+            {
+                competition.CompetitionStatus = CalculateEffectiveStatus(competition);
+            }
+
+            return competition;
         }
 
         internal static int CreateCompetition(CreateCompetitionRequest request, int createdBySystemUserId)
@@ -73,9 +87,7 @@ namespace RideOnServer.BL
                 RegistrationEndDate = request.RegistrationEndDate,
                 PaidTimeRegistrationDate = request.PaidTimeRegistrationDate,
                 PaidTimePublicationDate = request.PaidTimePublicationDate,
-                CompetitionStatus = string.IsNullOrWhiteSpace(request.CompetitionStatus)
-                    ? "Draft"
-                    : request.CompetitionStatus.Trim(),
+                CompetitionStatus = CompetitionStatuses.Draft,
                 Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim()
             };
 
@@ -98,6 +110,8 @@ namespace RideOnServer.BL
                 request.RegistrationEndDate
             );
 
+            string? normalizedStatus = NormalizeManualStatus(request.CompetitionStatus);
+
             CompetitionDAL dal = new CompetitionDAL();
 
             Competition competition = new Competition
@@ -112,9 +126,7 @@ namespace RideOnServer.BL
                 RegistrationEndDate = request.RegistrationEndDate,
                 PaidTimeRegistrationDate = request.PaidTimeRegistrationDate,
                 PaidTimePublicationDate = request.PaidTimePublicationDate,
-                CompetitionStatus = string.IsNullOrWhiteSpace(request.CompetitionStatus)
-                    ? null
-                    : request.CompetitionStatus.Trim(),
+                CompetitionStatus = normalizedStatus,
                 Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim()
             };
 
@@ -149,6 +161,76 @@ namespace RideOnServer.BL
             {
                 throw new Exception("Registration end date cannot be earlier than registration open date");
             }
+        }
+
+        private static string? NormalizeManualStatus(string? status)
+        {
+            if (string.IsNullOrWhiteSpace(status))
+            {
+                return null;
+            }
+
+            string trimmed = status.Trim();
+
+            if (trimmed == CompetitionStatuses.Draft)
+            {
+                return CompetitionStatuses.Draft;
+            }
+
+            if (trimmed == CompetitionStatuses.Cancelled)
+            {
+                return CompetitionStatuses.Cancelled;
+            }
+
+            return null;
+        }
+
+        private static string CalculateEffectiveStatus(Competition competition)
+        {
+            string savedStatus = competition.CompetitionStatus?.Trim() ?? string.Empty;
+            DateTime today = DateTime.Today;
+
+            if (savedStatus == CompetitionStatuses.Draft)
+            {
+                return CompetitionStatuses.Draft;
+            }
+
+            if (savedStatus == CompetitionStatuses.Cancelled)
+            {
+                return CompetitionStatuses.Cancelled;
+            }
+
+            if (today > competition.CompetitionEndDate.Date)
+            {
+                return CompetitionStatuses.Finished;
+            }
+
+            if (today >= competition.CompetitionStartDate.Date &&
+                today <= competition.CompetitionEndDate.Date)
+            {
+                return CompetitionStatuses.Current;
+            }
+
+            if (competition.RegistrationOpenDate.HasValue)
+            {
+                if (today < competition.RegistrationOpenDate.Value.Date)
+                {
+                    return CompetitionStatuses.Future;
+                }
+
+                if (today >= competition.RegistrationOpenDate.Value.Date &&
+                    today < competition.CompetitionStartDate.Date)
+                {
+                    return CompetitionStatuses.Active;
+                }
+            }
+
+            if (today < competition.CompetitionStartDate.Date)
+            {
+                return CompetitionStatuses.Future;
+            }
+
+            return CompetitionStatuses.Future;
         }
     }
 }

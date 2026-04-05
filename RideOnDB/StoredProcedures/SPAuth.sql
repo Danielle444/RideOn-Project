@@ -18,7 +18,7 @@ GO
    1. VALIDATION
    ========================= */
 
-CREATE PROCEDURE usp_CheckUsernameExists
+CREATE OR ALTER PROCEDURE usp_CheckUsernameExists
     @Username NVARCHAR(100)
 AS
 BEGIN
@@ -42,7 +42,7 @@ GO
    2. REGISTRATION
    ========================= */
 
-   CREATE TYPE RegisterRanchRoleTableType AS TABLE
+   CREATE OR ALTER TYPE RegisterRanchRoleTableType AS TABLE
 (
     RanchId INT NOT NULL,
     RoleId TINYINT NOT NULL
@@ -50,7 +50,7 @@ GO
 GO
 
 
-CREATE PROCEDURE usp_GetPersonByNationalIdForRegistration
+CREATE OR ALTER PROCEDURE usp_GetPersonByNationalIdForRegistration
     @NationalId VARCHAR(9)
 AS
 BEGIN
@@ -78,7 +78,7 @@ GO
 
 
 
-CREATE PROCEDURE usp_RegisterSystemUserWithRoles
+CREATE OR ALTER PROCEDURE usp_RegisterSystemUserWithRoles
     @NationalId VARCHAR(9),
     @FirstName NVARCHAR(50),
     @LastName NVARCHAR(50),
@@ -208,7 +208,7 @@ GO
    3. LOGIN
    ========================= */
 
-   CREATE PROCEDURE usp_GetSystemUserForLogin
+   CREATE OR ALTER PROCEDURE usp_GetSystemUserForLogin
     @Username NVARCHAR(100)
 AS
 BEGIN
@@ -232,7 +232,7 @@ END
 GO
 
 
-CREATE PROCEDURE usp_GetApprovedPersonRanchesAndRoles
+CREATE OR ALTER PROCEDURE usp_GetApprovedPersonRanchesAndRoles
     @PersonId INT
 AS
 BEGIN
@@ -258,7 +258,7 @@ GO
    4. PASSWORD MANAGEMENT
    ========================= */
 
-   CREATE PROCEDURE usp_UpdateSystemUserPassword
+   CREATE OR ALTER PROCEDURE usp_UpdateSystemUserPassword
     @SystemUserId INT,
     @NewPasswordHash NVARCHAR(255),
     @NewPasswordSalt NVARCHAR(255)
@@ -281,7 +281,7 @@ GO
    5. LOOKUPS
    ========================= */
 
-CREATE PROCEDURE usp_GetAllRoles
+CREATE OR ALTER PROCEDURE usp_GetAllRoles
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -295,7 +295,7 @@ END
 GO
 
 
-CREATE PROCEDURE usp_GetAllRanchesNames
+CREATE OR ALTER PROCEDURE usp_GetAllRanchesNames
 AS
 BEGIN
     SET NOCOUNT ON;

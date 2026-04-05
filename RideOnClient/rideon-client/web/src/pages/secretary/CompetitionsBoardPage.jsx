@@ -4,17 +4,10 @@ import AppLayout from "../../components/layout/AppLayout";
 import secretaryGeneralMenu from "../../components/secretary/secretaryGeneralMenu";
 import CompetitionsSearchBar from "../../components/secretary/CompetitionsSearchBar";
 import CompetitionsTable from "../../components/secretary/CompetitionsTable";
-import CompetitionModal from "../../components/secretary/CompetitionModal";
 import ToastMessage from "../../components/common/ToastMessage";
 import { useUser } from "../../context/UserContext";
 import { useActiveRole } from "../../context/ActiveRoleContext";
-import {
-  getCompetitionsByHostRanch,
-  getCompetitionById,
-  createCompetition,
-  updateCompetition,
-} from "../../services/competitionService";
-import { getAllFields } from "../../services/superUserService";
+import { getCompetitionsByHostRanch } from "../../services/competitionService";
 
 export default function CompetitionsBoardPage() {
   const navigate = useNavigate();
@@ -22,9 +15,11 @@ export default function CompetitionsBoardPage() {
   const { activeRole } = useActiveRole();
 
   const [competitions, setCompetitions] = useState([]);
-  const [fields, setFields] = useState([]);
   const [loading, setLoading] = useState(false);
+
   const [searchText, setSearchText] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const [sortConfig, setSortConfig] = useState({
     key: "competitionStartDate",
@@ -33,11 +28,6 @@ export default function CompetitionsBoardPage() {
 
   const [statusFilter, setStatusFilter] = useState("");
   const [fieldFilter, setFieldFilter] = useState("");
-
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editCompetition, setEditCompetition] = useState(null);
-  const [modalError, setModalError] = useState("");
-  const [saving, setSaving] = useState(false);
 
   const [toast, setToast] = useState({
     isOpen: false,
@@ -60,28 +50,35 @@ export default function CompetitionsBoardPage() {
         return;
       }
 
-      loadCompetitions("");
-      loadFields();
+      loadCompetitions({
+        search: "",
+        from: "",
+        to: "",
+      });
     },
     [currentRanchId],
   );
 
-  async function loadCompetitions(searchValue) {
+  async function loadCompetitions(custom) {
     if (!currentRanchId) {
       showToast("error", "לא נבחרה חווה פעילה");
       return;
     }
+
+    const effectiveSearch = custom?.search ?? searchText;
+    const effectiveDateFrom = custom?.from ?? dateFrom;
+    const effectiveDateTo = custom?.to ?? dateTo;
 
     try {
       setLoading(true);
 
       const response = await getCompetitionsByHostRanch({
         ranchId: currentRanchId,
-        searchText: searchValue || null,
+        searchText: effectiveSearch.trim() || null,
         status: null,
         fieldId: null,
-        dateFrom: null,
-        dateTo: null,
+        dateFrom: effectiveDateFrom || null,
+        dateTo: effectiveDateTo || null,
       });
 
       setCompetitions(Array.isArray(response.data) ? response.data : []);
@@ -91,17 +88,6 @@ export default function CompetitionsBoardPage() {
       showToast("error", error.response?.data || "שגיאה בטעינת התחרויות");
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function loadFields() {
-    try {
-      const response = await getAllFields();
-      setFields(Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-      console.error(error);
-      setFields([]);
-      showToast("error", error.response?.data || "שגיאה בטעינת הענפים");
     }
   }
 
@@ -131,18 +117,29 @@ export default function CompetitionsBoardPage() {
   }
 
   function handleSearch() {
-    loadCompetitions(searchText.trim());
+    loadCompetitions({
+      search: searchText,
+      from: dateFrom,
+      to: dateTo,
+    });
   }
 
   function handleResetSearch() {
     setSearchText("");
+    setDateFrom("");
+    setDateTo("");
     setStatusFilter("");
     setFieldFilter("");
     setSortConfig({
       key: "competitionStartDate",
       direction: "desc",
     });
-    loadCompetitions("");
+
+    loadCompetitions({
+      search: "",
+      from: "",
+      to: "",
+    });
   }
 
   function handleSort(columnKey) {
@@ -168,103 +165,48 @@ export default function CompetitionsBoardPage() {
     });
   }
 
-  function openCreateModal() {
-    setEditCompetition(null);
-    setModalError("");
-    setModalOpen(true);
-  }
-
-  async function openEditModal(item) {
-    if (!currentRanchId) {
-      return;
-    }
-
-    try {
-      setModalError("");
-
-      const response = await getCompetitionById(item.competitionId, currentRanchId);
-      setEditCompetition(response.data || null);
-      setModalOpen(true);
-    } catch (error) {
-      console.error(error);
-      showToast("error", error.response?.data || "שגיאה בטעינת פרטי התחרות");
-    }
-  }
-
-  function closeModal() {
-    setModalOpen(false);
-    setEditCompetition(null);
-    setModalError("");
-  }
-
-  async function handleSubmitCompetition(formData) {
-    if (!currentRanchId) {
-      setModalError("לא נבחרה חווה פעילה");
-      return;
-    }
-
-    try {
-      setSaving(true);
-      setModalError("");
-
-      if (editCompetition) {
-        await updateCompetition(editCompetition.competitionId, {
-          competitionId: editCompetition.competitionId,
-          hostRanchId: currentRanchId,
-          fieldId: formData.fieldId,
-          competitionName: formData.competitionName,
-          competitionStartDate: formData.competitionStartDate,
-          competitionEndDate: formData.competitionEndDate,
-          registrationOpenDate: formData.registrationOpenDate,
-          registrationEndDate: formData.registrationEndDate,
-          paidTimeRegistrationDate: formData.paidTimeRegistrationDate,
-          paidTimePublicationDate: formData.paidTimePublicationDate,
-          competitionStatus: formData.competitionStatus,
-          notes: formData.notes,
-        });
-
-        showToast("success", "התחרות עודכנה בהצלחה");
-      } else {
-        await createCompetition({
-          hostRanchId: currentRanchId,
-          fieldId: formData.fieldId,
-          competitionName: formData.competitionName,
-          competitionStartDate: formData.competitionStartDate,
-          competitionEndDate: formData.competitionEndDate,
-          registrationOpenDate: formData.registrationOpenDate,
-          registrationEndDate: formData.registrationEndDate,
-          paidTimeRegistrationDate: formData.paidTimeRegistrationDate,
-          paidTimePublicationDate: formData.paidTimePublicationDate,
-          competitionStatus: formData.competitionStatus,
-          notes: formData.notes,
-        });
-
-        showToast("success", "התחרות נפתחה בהצלחה");
-      }
-
-      closeModal();
-      await loadCompetitions(searchText.trim());
-    } catch (error) {
-      console.error(error);
-      setModalError(error.response?.data || "שגיאה בשמירת התחרות");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   function handleEnterCompetition(item) {
-    navigate(`/competitions/${item.competitionId}`);
+    navigate(`/competitions/${item.competitionId}/edit`);
   }
 
-  const statusOptions = useMemo(function () {
-    const uniqueStatuses = competitions
-      .map(function (item) {
-        return item.competitionStatus;
-      })
-      .filter(Boolean);
+  function handleEditCompetition(item) {
+    navigate(`/competitions/${item.competitionId}/edit`);
+  }
 
-    return Array.from(new Set(uniqueStatuses));
-  }, [competitions]);
+  function handleCreateCompetition() {
+    navigate("/competitions/create");
+  }
+
+  const statusOptions = useMemo(
+    function () {
+      const values = competitions
+        .map(function (item) {
+          return item.competitionStatus;
+        })
+        .filter(Boolean);
+
+      return Array.from(new Set(values));
+    },
+    [competitions],
+  );
+
+  const fieldOptions = useMemo(
+    function () {
+      const map = new Map();
+
+      competitions.forEach(function (item) {
+        if (item.fieldId && item.fieldName && !map.has(item.fieldId)) {
+          map.set(item.fieldId, {
+            fieldId: item.fieldId,
+            fieldName: item.fieldName,
+          });
+        }
+      });
+
+      return Array.from(map.values());
+    },
+    [competitions],
+  );
 
   const filteredAndSortedCompetitions = useMemo(
     function () {
@@ -332,7 +274,7 @@ export default function CompetitionsBoardPage() {
 
             <button
               type="button"
-              onClick={openCreateModal}
+              onClick={handleCreateCompetition}
               className="rounded-xl bg-[#8B6352] px-5 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-[#7A5547]"
             >
               + פתיחת תחרות חדשה
@@ -345,6 +287,10 @@ export default function CompetitionsBoardPage() {
               onChange={setSearchText}
               onSearch={handleSearch}
               onReset={handleResetSearch}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              onDateFromChange={setDateFrom}
+              onDateToChange={setDateTo}
             />
           </div>
         </div>
@@ -354,29 +300,19 @@ export default function CompetitionsBoardPage() {
             competitions={filteredAndSortedCompetitions}
             loading={loading}
             onEnter={handleEnterCompetition}
-            onEdit={openEditModal}
+            onEdit={handleEditCompetition}
             onSort={handleSort}
             sortKey={sortConfig.key}
             sortDirection={sortConfig.direction}
             statusOptions={statusOptions}
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
-            fieldOptions={fields}
+            fieldOptions={fieldOptions}
             fieldFilter={fieldFilter}
             onFieldFilterChange={setFieldFilter}
           />
         </div>
       </div>
-
-      <CompetitionModal
-        isOpen={modalOpen}
-        onClose={closeModal}
-        onSubmit={handleSubmitCompetition}
-        initialValue={editCompetition}
-        fields={fields}
-        error={modalError}
-        saving={saving}
-      />
 
       <ToastMessage
         isOpen={toast.isOpen}

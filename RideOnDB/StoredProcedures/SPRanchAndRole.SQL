@@ -4,7 +4,7 @@ GO
 
 GO
 
-CREATE PROCEDURE usp_InsertRanch
+CREATE OR ALTER PROCEDURE usp_InsertRanch
     @RanchName NVARCHAR(100),
     @ContactEmail NVARCHAR(254) = NULL,
     @ContactPhone VARCHAR(20) = NULL,
@@ -27,7 +27,7 @@ END
 GO
 
 
-CREATE PROCEDURE usp_InsertNewRanchRequest
+CREATE OR ALTER PROCEDURE usp_InsertNewRanchRequest
     @RanchId INT,
     @SubmittedBySystemUserId INT
 AS
@@ -41,7 +41,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_UpdateNewRanchRequestStatus
+CREATE OR ALTER PROCEDURE usp_UpdateNewRanchRequestStatus
     @RequestId INT,
     @ResolvedBySuperUserId INT,
     @NewStatus NVARCHAR(20) -- 'Approved' / 'Rejected'
@@ -77,7 +77,7 @@ END
 GO
 
 
-CREATE PROCEDURE usp_UpdateRanch
+CREATE OR ALTER PROCEDURE usp_UpdateRanch
     @RanchId INT,
     @RanchName NVARCHAR(100),
     @ContactEmail NVARCHAR(254) = NULL,
@@ -107,7 +107,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_GetAllRanchesNames
+CREATE OR ALTER PROCEDURE usp_GetAllRanchesNames
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -121,7 +121,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_GetRanchById
+CREATE OR ALTER PROCEDURE usp_GetRanchById
     @RanchId INT
 AS
 BEGIN
@@ -140,7 +140,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_GetAllRanchesByUserId
+CREATE OR ALTER PROCEDURE usp_GetAllRanchesByUserId
     @UserId INT
 AS
 BEGIN

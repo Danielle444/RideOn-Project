@@ -1,5 +1,5 @@
 --Ranch Admin and secrotery Requests
-CREATE PROCEDURE usp_GetPendingRoleRequests
+CREATE OR ALTER PROCEDURE usp_GetPendingRoleRequests
     @RoleId TINYINT
 AS
 BEGIN
@@ -27,7 +27,7 @@ GO
 
 --new ranch requests
 
-CREATE PROCEDURE usp_GetPendingNewRanchRequests
+CREATE OR ALTER PROCEDURE usp_GetPendingNewRanchRequests
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -49,7 +49,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_UpdateNewRanchRequestStatus
+CREATE OR ALTER PROCEDURE usp_UpdateNewRanchRequestStatus
     @RequestId INT,
     @ResolvedBySuperUserId INT,
     @NewStatus NVARCHAR(20) -- 'Approved' או 'Rejected'

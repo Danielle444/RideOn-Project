@@ -231,7 +231,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_GetAllFines
+CREATE OR ALTER PROCEDURE usp_GetAllFines
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -246,7 +246,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_InsertFine
+CREATE OR ALTER PROCEDURE usp_InsertFine
     @FineName NVARCHAR(100),
     @FineDescription NVARCHAR(255) = NULL,
     @FineAmount DECIMAL(10,2)
@@ -261,7 +261,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_UpdateFine
+CREATE OR ALTER PROCEDURE usp_UpdateFine
     @FineId INT,
     @FineName NVARCHAR(100),
     @FineDescription NVARCHAR(255) = NULL,
@@ -279,7 +279,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_DeleteFine
+CREATE OR ALTER PROCEDURE usp_DeleteFine
     @FineId INT
 AS
 BEGIN

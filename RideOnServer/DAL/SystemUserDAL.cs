@@ -1,7 +1,7 @@
 using Microsoft.Data.SqlClient;
 using System.Data;
 using RideOnServer.BL;
-using RideOnServer.BL.DTOs;
+using RideOnServer.BL.DTOs.Auth;
 
 namespace RideOnServer.DAL
 {

@@ -4,7 +4,7 @@ GO
    1) VALIDATIONS (Pre-Registration Checks)
    ========================================================= */
    
-CREATE PROCEDURE usp_CheckNationalIdExists
+CREATE OR ALTER PROCEDURE usp_CheckNationalIdExists
     @NationalId VARCHAR(9)
 AS
 BEGIN
@@ -28,7 +28,7 @@ GO
    2) PERSON-RANCH-ROLE ASSIGNMENT
    ========================================================= */
 
-CREATE PROCEDURE usp_AssignPersonRoleAtRanch
+CREATE OR ALTER PROCEDURE usp_AssignPersonRoleAtRanch
     @PersonId INT,
     @RanchId INT,
     @RoleId TINYINT,
@@ -105,7 +105,7 @@ END
 GO
 
 
-CREATE PROCEDURE usp_UpdatePersonRoleStatus
+CREATE OR ALTER PROCEDURE usp_UpdatePersonRoleStatus
     @PersonId INT,
     @RanchId INT,
     @RoleId TINYINT,
@@ -156,7 +156,7 @@ GO
    ========================================================= */
 
 
-CREATE PROCEDURE usp_SetMustChangePassword
+CREATE OR ALTER PROCEDURE usp_SetMustChangePassword
     @SystemUserId INT,
     @MustChangePassword BIT
 AS
@@ -172,7 +172,7 @@ GO
    4) USER STATUS MANAGEMENT
    ========================================================= */
 
-   CREATE PROCEDURE usp_ToggleSystemUserStatus
+   CREATE OR ALTER PROCEDURE usp_ToggleSystemUserStatus
     @SystemUserId INT,
     @IsActive BIT
 AS
@@ -190,7 +190,7 @@ GO
    5) USER DATA MANAGEMENT
    ========================================================= */
 
-   CREATE PROCEDURE usp_GetPersonRanchesAndRoles
+   CREATE OR ALTER PROCEDURE usp_GetPersonRanchesAndRoles
     @PersonId INT
 AS
 BEGIN
@@ -211,7 +211,7 @@ END
 GO
 
 
-   CREATE PROCEDURE usp_UpdatePerson
+   CREATE OR ALTER PROCEDURE usp_UpdatePerson
     @PersonId INT,
     @FirstName NVARCHAR(50),
     @LastName NVARCHAR(50),
@@ -234,7 +234,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_SearchPersons
+CREATE OR ALTER PROCEDURE usp_SearchPersons
     @SearchText NVARCHAR(100) = NULL, -- יכול להכיל חלק משם פרטי או משפחה
     @IsActive BIT = NULL
     -- TODO: Add @RanchId INT = NULL, @RoleId TINYINT = NULL when needed
@@ -269,7 +269,7 @@ GO
    6) FEDERATION MEMBERS
    ========================================================= */
 
-   CREATE PROCEDURE usp_InsertOrUpgradeFederationMember
+   CREATE OR ALTER PROCEDURE usp_InsertOrUpgradeFederationMember
     -- Person parameters (Optional if PersonId is provided)
     @PersonId INT = NULL, 
     @NationalId VARCHAR(9) = NULL,
@@ -318,7 +318,7 @@ END
 GO
 
 
-CREATE PROCEDURE usp_GetAllFederationMembers
+CREATE OR ALTER PROCEDURE usp_GetAllFederationMembers
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -342,7 +342,7 @@ GO
    7) ADMIN MANAGED USERS
    ========================================================= */
 
-   CREATE PROCEDURE usp_AddManagedPerson
+   CREATE OR ALTER PROCEDURE usp_AddManagedPerson
     @SystemUserId INT,
     @PersonId INT,
     @ApprovalStatus NVARCHAR(20) = 'Pending'
@@ -357,7 +357,7 @@ END
 GO
 
 
-CREATE PROCEDURE usp_GetManagedPersons
+CREATE OR ALTER PROCEDURE usp_GetManagedPersons
     @SystemUserId INT
 AS
 BEGIN
@@ -382,7 +382,7 @@ GO
    8) LEGACY
    ========================================================= */
 
-CREATE PROCEDURE usp_InsertPerson
+CREATE OR ALTER PROCEDURE usp_InsertPerson
     @NationalId VARCHAR(9),
     @FirstName NVARCHAR(50),
     @LastName NVARCHAR(50),

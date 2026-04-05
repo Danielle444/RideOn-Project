@@ -1,4 +1,4 @@
-CREATE PROCEDURE usp_GetAllProductCategories
+CREATE OR ALTER PROCEDURE usp_GetAllProductCategories
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -6,7 +6,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_GetProductsByCategory
+CREATE OR ALTER PROCEDURE usp_GetProductsByCategory
     @CategoryId TINYINT = NULL
 AS
 BEGIN
@@ -24,7 +24,7 @@ GO
 
 -- Prices
 
-CREATE PROCEDURE usp_SetProductPriceForRanch
+CREATE OR ALTER PROCEDURE usp_SetProductPriceForRanch
     @ProductId SMALLINT,
     @RanchId INT,
     @NewPrice DECIMAL(10,2)
@@ -54,7 +54,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_GetPriceHistoryForProduct
+CREATE OR ALTER PROCEDURE usp_GetPriceHistoryForProduct
     @ProductId SMALLINT,
     @RanchId INT
 AS
@@ -73,7 +73,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_GetActivePricesByCategory
+CREATE OR ALTER PROCEDURE usp_GetActivePricesByCategory
     @CategoryId TINYINT,
     @RanchId INT
 AS
@@ -95,7 +95,7 @@ GO
 
 
 --SP to get prices for secrotery view
-CREATE PROCEDURE usp_GetProductPricingGrid
+CREATE OR ALTER PROCEDURE usp_GetProductPricingGrid
     @RanchId INT,
     @CategoryId TINYINT
 AS

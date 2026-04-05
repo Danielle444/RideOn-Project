@@ -1,9 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
-using RideOnServer.BL.DTOs;
 using System.Security.Claims;
 using System.Collections.Generic;
+using RideOnServer.BL.DTOs.Auth;
+using RideOnServer.BL.DTOs.Auth.SuperUser;
 
 namespace RideOnServer.Controllers
 {

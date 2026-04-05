@@ -1,4 +1,5 @@
-﻿using RideOnServer.BL.DTOs;
+﻿using RideOnServer.BL.DTOs.Auth;
+using RideOnServer.BL.DTOs.Auth.SuperUser;
 using RideOnServer.DAL;
 
 namespace RideOnServer.BL

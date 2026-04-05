@@ -1,4 +1,4 @@
-CREATE PROCEDURE usp_GetArenasByRanchId
+CREATE OR ALTER PROCEDURE usp_GetArenasByRanchId
     @RanchId INT
 AS
 BEGIN
@@ -16,7 +16,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_InsertArena
+CREATE OR ALTER PROCEDURE usp_InsertArena
     @RanchId INT,
     @ArenaName NVARCHAR(100),
     @ArenaLength SMALLINT = NULL,
@@ -40,7 +40,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_UpdateArena
+CREATE OR ALTER PROCEDURE usp_UpdateArena
     @RanchId INT,
     @ArenaId TINYINT,
     @ArenaName NVARCHAR(100),
