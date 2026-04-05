@@ -6,6 +6,7 @@ import PublicRoute from "../routes/PublicRoute";
 import ChangePasswordPage from "../pages/shared/ChangePasswordPage";
 import SelectRanchPage from "../pages/secretary/SelectRanchPage";
 import CompetitionsBoardPage from "../pages/secretary/CompetitionsBoardPage";
+import CompetitionFormPage from "../pages/secretary/CompetitionFormPage";
 import UserRequestsPage from "../pages/superuser/UserRequestsPage";
 import SuperUsersManagementPage from "../pages/superuser/SuperUsersManagementPage";
 import FieldsManagementPage from "../pages/superuser/FieldsManagementPage";
@@ -67,6 +68,22 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <CompetitionsBoardPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/competitions/create",
+    element: (
+      <ProtectedRoute>
+        <CompetitionFormPage mode="create" />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/competitions/:competitionId/edit",
+    element: (
+      <ProtectedRoute>
+        <CompetitionFormPage mode="edit" />
       </ProtectedRoute>
     ),
   },

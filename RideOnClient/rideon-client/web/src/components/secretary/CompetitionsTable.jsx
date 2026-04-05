@@ -1,4 +1,11 @@
-import { ArrowUpDown, ChevronDown, Pencil, ArrowLeft } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  ArrowUpDown,
+  Filter,
+  Pencil,
+  X,
+} from "lucide-react";
 import DataTableShell from "../common/table/DataTableShell";
 import DataTableEmptyState from "../common/table/DataTableEmptyState";
 import DataTableLoadingState from "../common/table/DataTableLoadingState";
@@ -49,7 +56,7 @@ function getStatusClass(status) {
   return "bg-[#F3ECE8] text-[#6D4C41]";
 }
 
-function SortHeader(props) {
+function HeaderSortButton(props) {
   const isActive = props.sortKey === props.columnKey;
 
   return (
@@ -58,16 +65,122 @@ function SortHeader(props) {
       onClick={function () {
         props.onSort(props.columnKey);
       }}
-      className="inline-flex items-center gap-2 font-bold text-[#4E342E] transition-opacity hover:opacity-80"
+      className="inline-flex items-center gap-1 font-bold text-[#4E342E] transition-opacity hover:opacity-80"
     >
       <span>{props.label}</span>
       <ArrowUpDown size={14} />
       {isActive ? (
-        <span className="text-xs text-[#8B6352]">
+        <span className="text-[10px] text-[#8B6352]">
           {props.sortDirection === "asc" ? "▲" : "▼"}
         </span>
       ) : null}
     </button>
+  );
+}
+
+function HeaderFilterMenu(props) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(function () {
+    function handleClickOutside(event) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return function () {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const hasValue = props.value !== "" && props.value !== null && props.value !== undefined;
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        type="button"
+        onClick={function () {
+          setOpen(!open);
+        }}
+        className={
+          "inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors " +
+          (hasValue
+            ? "border-[#8B6352] bg-[#F3ECE8] text-[#8B6352]"
+            : "border-[#D7CCC8] bg-white text-[#7A655C] hover:bg-[#F8F5F2]")
+        }
+        title={props.title}
+      >
+        <Filter size={13} />
+      </button>
+
+      {open ? (
+        <div className="absolute left-0 top-9 z-20 min-w-[160px] rounded-xl border border-[#E6DCD5] bg-white p-3 shadow-lg">
+          <div className="mb-2 text-xs font-semibold text-[#6D4C41]">
+            {props.title}
+          </div>
+
+          <select
+            value={props.value}
+            onChange={function (e) {
+              props.onChange(e.target.value);
+              setOpen(false);
+            }}
+            className="h-9 w-full rounded-lg border border-[#D7CCC8] bg-white px-2 text-sm text-[#3E2723] focus:outline-none focus:ring-1 focus:ring-[#D2B7A7]"
+          >
+            <option value="">הכל</option>
+            {props.options.map(function (opt) {
+              const value = opt.value ?? opt;
+              const label = opt.label ?? opt;
+
+              return (
+                <option key={String(value)} value={value}>
+                  {label}
+                </option>
+              );
+            })}
+          </select>
+
+          {hasValue ? (
+            <button
+              type="button"
+              onClick={function () {
+                props.onChange("");
+                setOpen(false);
+              }}
+              className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[#8B6352] hover:opacity-80"
+            >
+              <X size={12} />
+              ניקוי סינון
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function HeaderCell(props) {
+  return (
+    <div className="flex items-center justify-start gap-2">
+      <HeaderSortButton
+        label={props.label}
+        columnKey={props.columnKey}
+        sortKey={props.sortKey}
+        sortDirection={props.sortDirection}
+        onSort={props.onSort}
+      />
+
+      {props.filter ? (
+        <HeaderFilterMenu
+          title={props.filterTitle}
+          value={props.filterValue}
+          onChange={props.onFilterChange}
+          options={props.filterOptions}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -78,9 +191,9 @@ export default function CompetitionsTable(props) {
     <div className="overflow-hidden rounded-[24px] border border-[#E8DDD7] bg-white">
       <DataTableShell widthMode="full" tableClassName="text-right w-full">
         <thead className="bg-[#FAF7F5]">
-          <tr className="border-b border-[#E8DDD6] text-sm text-[#6A5248] align-top">
+          <tr className="border-b border-[#E8DDD6] text-sm text-[#6A5248] align-middle">
             <th className="px-5 py-4 min-w-[260px]">
-              <SortHeader
+              <HeaderCell
                 label="שם תחרות"
                 columnKey="competitionName"
                 sortKey={props.sortKey}
@@ -89,43 +202,28 @@ export default function CompetitionsTable(props) {
               />
             </th>
 
-            <th className="px-5 py-4 min-w-[170px]">
-              <div className="flex flex-col gap-3">
-                <SortHeader
-                  label="ענף"
-                  columnKey="fieldName"
-                  sortKey={props.sortKey}
-                  sortDirection={props.sortDirection}
-                  onSort={props.onSort}
-                />
-
-                <div className="relative">
-                  <select
-                    value={props.fieldFilter}
-                    onChange={function (e) {
-                      props.onFieldFilterChange(e.target.value);
-                    }}
-                    className="h-9 w-full rounded-lg border border-[#D7CCC8] bg-white px-3 text-sm text-[#3E2723] focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-                  >
-                    <option value="">הכל</option>
-                    {props.fieldOptions.map(function (field) {
-                      return (
-                        <option key={field.fieldId} value={field.fieldId}>
-                          {field.fieldName}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <ChevronDown
-                    size={14}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8B6352]"
-                  />
-                </div>
-              </div>
+            <th className="px-5 py-4 min-w-[180px]">
+              <HeaderCell
+                label="ענף"
+                columnKey="fieldName"
+                sortKey={props.sortKey}
+                sortDirection={props.sortDirection}
+                onSort={props.onSort}
+                filter={true}
+                filterTitle="סינון לפי ענף"
+                filterValue={props.fieldFilter}
+                onFilterChange={props.onFieldFilterChange}
+                filterOptions={props.fieldOptions.map(function (field) {
+                  return {
+                    value: field.fieldId,
+                    label: field.fieldName,
+                  };
+                })}
+              />
             </th>
 
             <th className="px-5 py-4 min-w-[220px]">
-              <SortHeader
+              <HeaderCell
                 label="תאריכי תחרות"
                 columnKey="competitionStartDate"
                 sortKey={props.sortKey}
@@ -134,39 +232,19 @@ export default function CompetitionsTable(props) {
               />
             </th>
 
-            <th className="px-5 py-4 min-w-[170px]">
-              <div className="flex flex-col gap-3">
-                <SortHeader
-                  label="סטטוס"
-                  columnKey="competitionStatus"
-                  sortKey={props.sortKey}
-                  sortDirection={props.sortDirection}
-                  onSort={props.onSort}
-                />
-
-                <div className="relative">
-                  <select
-                    value={props.statusFilter}
-                    onChange={function (e) {
-                      props.onStatusFilterChange(e.target.value);
-                    }}
-                    className="h-9 w-full rounded-lg border border-[#D7CCC8] bg-white px-3 text-sm text-[#3E2723] focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-                  >
-                    <option value="">הכל</option>
-                    {props.statusOptions.map(function (status) {
-                      return (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <ChevronDown
-                    size={14}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8B6352]"
-                  />
-                </div>
-              </div>
+            <th className="px-5 py-4 min-w-[180px]">
+              <HeaderCell
+                label="סטטוס"
+                columnKey="competitionStatus"
+                sortKey={props.sortKey}
+                sortDirection={props.sortDirection}
+                onSort={props.onSort}
+                filter={true}
+                filterTitle="סינון לפי סטטוס"
+                filterValue={props.statusFilter}
+                onFilterChange={props.onStatusFilterChange}
+                filterOptions={props.statusOptions}
+              />
             </th>
 
             <th className="px-5 py-4 text-center min-w-[160px] font-bold text-[#4E342E]">

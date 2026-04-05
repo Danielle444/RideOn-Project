@@ -1,4 +1,4 @@
-﻿using RideOnServer.BL.DTOs;
+﻿using RideOnServer.BL.DTOs.Auth;
 
 namespace RideOnServer.BL
 {

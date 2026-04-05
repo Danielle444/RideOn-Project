@@ -1,6 +1,6 @@
 ﻿using Microsoft.Data.SqlClient;
 using RideOnServer.BL;
-using RideOnServer.BL.DTOs;
+using RideOnServer.BL.DTOs.Competition;
 
 namespace RideOnServer.DAL
 {
@@ -24,7 +24,7 @@ namespace RideOnServer.DAL
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("SP_GetCompetitionsByHostRanch", connection, paramDic))
+                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetCompetitionsByHostRanch", connection, paramDic))
                     using (SqlDataReader reader = command.ExecuteReader())
                     {
                         List<Competition> list = new List<Competition>();
@@ -57,7 +57,7 @@ namespace RideOnServer.DAL
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("SP_GetCompetitionById", connection, paramDic))
+                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetCompetitionById", connection, paramDic))
                     using (SqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
@@ -99,7 +99,7 @@ namespace RideOnServer.DAL
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("SP_InsertCompetition", connection, paramDic))
+                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_InsertCompetition", connection, paramDic))
                     {
                         object result = command.ExecuteScalar()!;
                         return Convert.ToInt32(result);
@@ -135,7 +135,7 @@ namespace RideOnServer.DAL
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("SP_UpdateCompetition", connection, paramDic))
+                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateCompetition", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }

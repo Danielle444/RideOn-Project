@@ -1,5 +1,5 @@
 ﻿using Microsoft.IdentityModel.Tokens;
-using RideOnServer.BL.DTOs;
+using RideOnServer.BL.DTOs.Auth;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;

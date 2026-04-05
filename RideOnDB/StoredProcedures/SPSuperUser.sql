@@ -31,7 +31,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_GetSuperUserById
+CREATE OR ALTER PROCEDURE usp_GetSuperUserById
     @SuperUserId INT
 AS
 BEGIN
@@ -49,7 +49,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_GetSuperUserForLogin
+CREATE OR ALTER PROCEDURE usp_GetSuperUserForLogin
     @Email NVARCHAR(100)
 AS
 BEGIN
@@ -67,7 +67,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_UpdateSuperUserLastLogin
+CREATE OR ALTER PROCEDURE usp_UpdateSuperUserLastLogin
     @SuperUserId INT
 AS
 BEGIN
@@ -79,7 +79,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_UpdateSuperUserPassword
+CREATE OR ALTER PROCEDURE usp_UpdateSuperUserPassword
     @SuperUserId INT,
     @NewPasswordHash NVARCHAR(255),
     @NewPasswordSalt NVARCHAR(255)
@@ -97,7 +97,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE usp_CheckSuperUserEmailExists
+CREATE OR ALTER PROCEDURE usp_CheckSuperUserEmailExists
     @Email NVARCHAR(100)
 AS
 BEGIN

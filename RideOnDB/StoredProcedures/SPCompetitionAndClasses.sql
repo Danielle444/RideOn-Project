@@ -1,4 +1,4 @@
-CREATE PROCEDURE SP_GetRecentAndUpcomingCompetitions
+CREATE OR ALTER PROCEDURE usp_GetRecentAndUpcomingCompetitions
     @Status NVARCHAR(20) = NULL -- פרמטר חדש אופציונלי
 AS
 BEGIN
@@ -22,30 +22,126 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_GetCompetitionsByHostRanch
-    @RanchId INT
+CREATE OR ALTER PROCEDURE usp_GetCompetitionsByHostRanch
+    @RanchId INT,
+    @SearchText NVARCHAR(100) = NULL,
+    @Status NVARCHAR(20) = NULL,
+    @FieldId TINYINT = NULL,
+    @DateFrom DATE = NULL,
+    @DateTo DATE = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
-    
+
     SELECT 
         C.CompetitionId,
+        C.HostRanchId,
+        C.FieldId,
+        C.CreatedBySystemUserId,
         C.CompetitionName,
         C.CompetitionStartDate,
         C.CompetitionEndDate,
         C.RegistrationOpenDate,
         C.RegistrationEndDate,
+        C.PaidTimeRegistrationDate,
+        C.PaidTimePublicationDate,
         C.CompetitionStatus,
+        C.Notes,
+        C.StallMapUrl,
         F.FieldName
     FROM Competition C
-    INNER JOIN Field F ON C.FieldId = F.FieldId
+    INNER JOIN Field F
+        ON C.FieldId = F.FieldId
     WHERE C.HostRanchId = @RanchId
-    ORDER BY C.CompetitionStartDate DESC; -- בדרך כלל חוות רוצות לראות את החדש ביותר קודם
+      AND (
+            @SearchText IS NULL
+            OR LTRIM(RTRIM(@SearchText)) = ''
+            OR C.CompetitionName LIKE N'%' + @SearchText + N'%'
+          )
+      AND (
+            @Status IS NULL
+            OR LTRIM(RTRIM(@Status)) = ''
+            OR C.CompetitionStatus = @Status
+          )
+      AND (
+            @FieldId IS NULL
+            OR C.FieldId = @FieldId
+          )
+      AND (
+            @DateFrom IS NULL
+            OR C.CompetitionStartDate >= @DateFrom
+          )
+      AND (
+            @DateTo IS NULL
+            OR C.CompetitionEndDate <= @DateTo
+          )
+    ORDER BY C.CompetitionStartDate DESC;
+END
+GO
+
+CREATE OR ALTER PROCEDURE usp_GetCompetitionById
+    @CompetitionId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        C.CompetitionId,
+        C.HostRanchId,
+        C.FieldId,
+        C.CreatedBySystemUserId,
+        C.CompetitionName,
+        C.CompetitionStartDate,
+        C.CompetitionEndDate,
+        C.RegistrationOpenDate,
+        C.RegistrationEndDate,
+        C.PaidTimeRegistrationDate,
+        C.PaidTimePublicationDate,
+        C.CompetitionStatus,
+        C.Notes,
+        C.StallMapUrl,
+        F.FieldName
+    FROM Competition C
+    INNER JOIN Field F
+        ON C.FieldId = F.FieldId
+    WHERE C.CompetitionId = @CompetitionId;
+END
+GO
+
+CREATE OR ALTER PROCEDURE usp_UpdateCompetition
+    @CompetitionId INT,
+    @FieldId TINYINT,
+    @CompetitionName NVARCHAR(100),
+    @CompetitionStartDate DATE,
+    @CompetitionEndDate DATE,
+    @RegistrationOpenDate DATE = NULL,
+    @RegistrationEndDate DATE = NULL,
+    @PaidTimeRegistrationDate DATE = NULL,
+    @PaidTimePublicationDate DATE = NULL,
+    @CompetitionStatus NVARCHAR(20) = NULL,
+    @Notes NVARCHAR(500) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE Competition
+    SET
+        FieldId = @FieldId,
+        CompetitionName = @CompetitionName,
+        CompetitionStartDate = @CompetitionStartDate,
+        CompetitionEndDate = @CompetitionEndDate,
+        RegistrationOpenDate = @RegistrationOpenDate,
+        RegistrationEndDate = @RegistrationEndDate,
+        PaidTimeRegistrationDate = @PaidTimeRegistrationDate,
+        PaidTimePublicationDate = @PaidTimePublicationDate,
+        CompetitionStatus = @CompetitionStatus,
+        Notes = @Notes
+    WHERE CompetitionId = @CompetitionId;
 END
 GO
 
 
-CREATE PROCEDURE SP_InsertCompetition
+CREATE OR ALTER PROCEDURE usp_InsertCompetition
     @HostRanchId INT,
     @FieldId TINYINT,
     @CreatedBySystemUserId INT,
@@ -100,7 +196,7 @@ GO
 
 --Get old competitions to duplicate classes
 
-CREATE PROCEDURE SP_GetClassesFromLatestCompetition
+CREATE OR ALTER PROCEDURE usp_GetClassesFromLatestCompetition
     @FieldId TINYINT
 AS
 BEGIN
@@ -136,7 +232,7 @@ END
 GO
 
 
-CREATE PROCEDURE SP_GetCompetitionsByFieldLastTwoYears
+CREATE OR ALTER PROCEDURE usp_GetCompetitionsByFieldLastTwoYears
     @FieldId TINYINT
 AS
 BEGIN
@@ -154,7 +250,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_GetClassesByCompetitionId
+CREATE OR ALTER PROCEDURE usp_GetClassesByCompetitionId
     @CompetitionId INT
 AS
 BEGIN
@@ -180,7 +276,7 @@ GO
 
 -- CRUD class in competition
 
-CREATE PROCEDURE SP_InsertClassInCompetition
+CREATE OR ALTER PROCEDURE usp_InsertClassInCompetition
     @CompetitionId INT,
     @ClassTypeId SMALLINT,
     @ArenaRanchId INT,
@@ -211,7 +307,7 @@ END
 GO
 
 
-CREATE PROCEDURE SP_UpdateClassInCompetition
+CREATE OR ALTER PROCEDURE usp_UpdateClassInCompetition
     @ClassInCompId INT,
     @ClassTypeId SMALLINT,
     @ArenaRanchId INT,
@@ -241,7 +337,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_DeleteClassInCompetition
+CREATE OR ALTER PROCEDURE usp_DeleteClassInCompetition
     @ClassInCompId INT
 AS
 BEGIN
@@ -273,7 +369,7 @@ END
 GO
 
 --ClassType
-CREATE PROCEDURE usp_GetAllClassTypes
+CREATE OR ALTER PROCEDURE usp_GetAllClassTypes
     @FieldId TINYINT = NULL
 AS
 BEGIN
@@ -295,7 +391,7 @@ GO
 
 --Prizes
     
-CREATE PROCEDURE usp_GetAllPrizeTypes
+CREATE OR ALTER PROCEDURE usp_GetAllPrizeTypes
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -311,7 +407,7 @@ GO
 
 --judges
 
-CREATE PROCEDURE SP_GetJudgesByClassId
+CREATE OR ALTER PROCEDURE usp_GetJudgesByClassId
     @ClassInCompId INT
 AS
 BEGIN
@@ -331,7 +427,7 @@ END
 GO
 
 
-CREATE PROCEDURE SP_GetJudgesByCompetitionId
+CREATE OR ALTER PROCEDURE usp_GetJudgesByCompetitionId
     @CompetitionId INT
 AS
 BEGIN

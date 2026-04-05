@@ -1,4 +1,4 @@
-CREATE PROCEDURE SP_GetAllPaidTimeBaseSlots
+CREATE OR ALTER PROCEDURE usp_GetAllPaidTimeBaseSlots
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -11,7 +11,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_InsertPaidTimeSlotInComp
+CREATE OR ALTER PROCEDURE usp_InsertPaidTimeSlotInComp
     @CompetitionId INT,
     @PaidTimeSlotId INT,
     @ArenaRanchId INT,
@@ -38,7 +38,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_UpdatePaidTimeSlotInComp
+CREATE OR ALTER PROCEDURE usp_UpdatePaidTimeSlotInComp
     @CompSlotId INT,
     @PaidTimeSlotId INT,
     @ArenaRanchId INT,
@@ -66,7 +66,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_GetPaidTimeSlotsByCompId
+CREATE OR ALTER PROCEDURE usp_GetPaidTimeSlotsByCompId
     @CompetitionId INT
 AS
 BEGIN
@@ -89,7 +89,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_DeletePaidTimeSlotInComp
+CREATE OR ALTER PROCEDURE usp_DeletePaidTimeSlotInComp
     @CompSlotId INT,
     @ForceDelete BIT = 0 
 AS
@@ -126,7 +126,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_GetCompetitionsWithPaidTimeLastTwoYears
+CREATE OR ALTER PROCEDURE usp_GetCompetitionsWithPaidTimeLastTwoYears
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -149,7 +149,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE SP_GetPaidTimeSlotsFromLatestCompetition
+CREATE OR ALTER PROCEDURE usp_GetPaidTimeSlotsFromLatestCompetition
 AS
 BEGIN
     SET NOCOUNT ON;
