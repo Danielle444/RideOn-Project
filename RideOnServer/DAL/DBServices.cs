@@ -1,11 +1,11 @@
-﻿using Microsoft.Data.SqlClient;
+using Npgsql;
 using Microsoft.Extensions.Configuration;
 
 namespace RideOnServer.DAL
 {
     public class DBServices
     {
-        protected SqlConnection Connect(string conStr)
+        protected NpgsqlConnection Connect(string conStr)
         {
             IConfigurationRoot configuration = new ConfigurationBuilder()
                 .AddJsonFile("appsettings.json")
@@ -13,15 +13,15 @@ namespace RideOnServer.DAL
 
             string cStr = configuration.GetConnectionString(conStr)!;
 
-            return new SqlConnection(cStr);
+            return new NpgsqlConnection(cStr);
         }
 
-        protected SqlCommand CreateCommandWithStoredProcedure(
+        protected NpgsqlCommand CreateCommandWithStoredProcedure(
             string spName,
-            SqlConnection con,
+            NpgsqlConnection con,
             Dictionary<string, object>? paramDic)
         {
-            SqlCommand cmd = new SqlCommand
+            NpgsqlCommand cmd = new NpgsqlCommand
             {
                 Connection = con,
                 CommandText = spName,

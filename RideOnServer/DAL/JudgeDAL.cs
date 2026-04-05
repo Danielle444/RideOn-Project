@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Npgsql;
 using RideOnServer.BL;
 
 namespace RideOnServer.DAL
@@ -14,12 +14,12 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetAllJudges", connection, paramDic))
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetAllJudges", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
                     {
                         List<Judge> list = new List<Judge>();
 
@@ -69,11 +69,11 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_InsertJudge", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_InsertJudge", connection, paramDic))
                     {
                         object result = command.ExecuteScalar()!;
                         return Convert.ToInt32(result);
@@ -108,11 +108,11 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateJudge", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateJudge", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
@@ -133,11 +133,11 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_DeleteJudge", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_DeleteJudge", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }

@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using System.Data;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.Auth;
@@ -16,12 +16,12 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetSystemUserForLogin", connection, paramDic))
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetSystemUserForLogin", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -58,12 +58,12 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetApprovedPersonRanchesAndRoles", connection, paramDic))
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetApprovedPersonRanchesAndRoles", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
                     {
                         List<ApprovedRoleRanch> approvedRolesAndRanches = new List<ApprovedRoleRanch>();
 
@@ -97,11 +97,11 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_CheckNationalIdExists", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_CheckNationalIdExists", connection, paramDic))
                     {
                         object result = command.ExecuteScalar()!;
                         return Convert.ToInt32(result) == 1;
@@ -123,11 +123,11 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_CheckUsernameExists", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_CheckUsernameExists", connection, paramDic))
                     {
                         object result = command.ExecuteScalar()!;
                         return Convert.ToInt32(result) == 1;
@@ -152,11 +152,11 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_AssignPersonRoleAtRanch", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_AssignPersonRoleAtRanch", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
@@ -180,11 +180,11 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdatePersonRoleStatus", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdatePersonRoleStatus", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
@@ -207,11 +207,11 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateSystemUserPassword", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateSystemUserPassword", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
@@ -233,11 +233,11 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_SetMustChangePassword", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_SetMustChangePassword", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
@@ -253,11 +253,11 @@ namespace RideOnServer.DAL
         {
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = new SqlCommand("usp_RegisterSystemUserWithRoles", connection))
+                    using (NpgsqlCommand command = new NpgsqlCommand("usp_RegisterSystemUserWithRoles", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
 

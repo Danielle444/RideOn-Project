@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Npgsql;
 using RideOnServer.BL;
 
 namespace RideOnServer.DAL
@@ -14,12 +14,12 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetClassesByCompetitionId", connection, paramDic))
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetClassesByCompetitionId", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
                     {
                         List<ClassInCompetition> list = new List<ClassInCompetition>();
 
@@ -67,11 +67,11 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_InsertClassInCompetition", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_InsertClassInCompetition", connection, paramDic))
                     {
                         object result = command.ExecuteScalar()!;
                         return Convert.ToInt32(result);
@@ -102,11 +102,11 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateClassInCompetition", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateClassInCompetition", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
@@ -127,11 +127,11 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_DeleteClassInCompetition", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_DeleteClassInCompetition", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }

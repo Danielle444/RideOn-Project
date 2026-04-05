@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Npgsql;
 using RideOnServer.BL;
 
 namespace RideOnServer.DAL
@@ -9,12 +9,12 @@ namespace RideOnServer.DAL
         {
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetAllPrizeTypes", connection, null))
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetAllPrizeTypes", connection, null))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
                     {
                         List<PrizeType> list = new List<PrizeType>();
 
@@ -50,11 +50,11 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_InsertPrizeType", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_InsertPrizeType", connection, paramDic))
                     {
                         object result = command.ExecuteScalar()!;
                         return Convert.ToInt32(result);
@@ -78,11 +78,11 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdatePrizeType", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdatePrizeType", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
@@ -103,11 +103,11 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_DeletePrizeType", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_DeletePrizeType", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
