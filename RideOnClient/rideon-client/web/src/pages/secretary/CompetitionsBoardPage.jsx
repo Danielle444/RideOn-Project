@@ -1,44 +1,125 @@
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useUser } from "../../context/UserContext";
-import { useActiveRole } from "../../context/ActiveRoleContext";
 import AppLayout from "../../components/layout/AppLayout";
 import secretaryGeneralMenu from "../../components/secretary/secretaryGeneralMenu";
+import CompetitionsSearchBar from "../../components/secretary/CompetitionsSearchBar";
+import CompetitionsTable from "../../components/secretary/CompetitionsTable";
+import CompetitionModal from "../../components/secretary/CompetitionModal";
+import ToastMessage from "../../components/common/ToastMessage";
+import { useUser } from "../../context/UserContext";
+import { useActiveRole } from "../../context/ActiveRoleContext";
+import {
+  getCompetitionsByHostRanch,
+  getCompetitionById,
+  createCompetition,
+  updateCompetition,
+} from "../../services/competitionService";
+import { getAllFields } from "../../services/superUserService";
 
 export default function CompetitionsBoardPage() {
   const navigate = useNavigate();
   const { user } = useUser();
   const { activeRole } = useActiveRole();
 
-  const competitions = [
-    {
-      name: "ריינינג 1+2 2026",
-      field: "ריינינג",
-      host: "חוות דאבל קיי",
-      dates: "15/03/2026 - 17/03/2026",
-      status: "כעת",
+  const [competitions, setCompetitions] = useState([]);
+  const [fields, setFields] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchText, setSearchText] = useState("");
+
+  const [sortConfig, setSortConfig] = useState({
+    key: "competitionStartDate",
+    direction: "desc",
+  });
+
+  const [statusFilter, setStatusFilter] = useState("");
+  const [fieldFilter, setFieldFilter] = useState("");
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editCompetition, setEditCompetition] = useState(null);
+  const [modalError, setModalError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const [toast, setToast] = useState({
+    isOpen: false,
+    type: "success",
+    message: "",
+  });
+
+  const userName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
+  const subtitle =
+    [activeRole?.roleName, activeRole?.ranchName].filter(Boolean).join(" · ") ||
+    "לא נבחר תפקיד וחווה";
+
+  const currentRanchId = useMemo(function () {
+    return activeRole?.ranchId || null;
+  }, [activeRole]);
+
+  useEffect(
+    function () {
+      if (!currentRanchId) {
+        return;
+      }
+
+      loadCompetitions("");
+      loadFields();
     },
-    {
-      name: "גביע האביב",
-      field: "דרסז'",
-      host: "חוות סוסים גליל",
-      dates: "22/04/2026 - 23/04/2026",
-      status: "טיוטה",
-    },
-    {
-      name: "תחרות חורף 2025",
-      field: "קפיצות",
-      host: "מרכז רכיבה בניה",
-      dates: "10/12/2025 - 12/12/2025",
-      status: "הסתיימה",
-    },
-    {
-      name: "אליפות הנוער",
-      field: "אקסטרים",
-      host: "מועדון רכיבה השרון",
-      dates: "05/05/2026 - 07/05/2026",
-      status: "פתוחה",
-    },
-  ];
+    [currentRanchId],
+  );
+
+  async function loadCompetitions(searchValue) {
+    if (!currentRanchId) {
+      showToast("error", "לא נבחרה חווה פעילה");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const response = await getCompetitionsByHostRanch({
+        ranchId: currentRanchId,
+        searchText: searchValue || null,
+        status: null,
+        fieldId: null,
+        dateFrom: null,
+        dateTo: null,
+      });
+
+      setCompetitions(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error(error);
+      setCompetitions([]);
+      showToast("error", error.response?.data || "שגיאה בטעינת התחרויות");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadFields() {
+    try {
+      const response = await getAllFields();
+      setFields(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error(error);
+      setFields([]);
+      showToast("error", error.response?.data || "שגיאה בטעינת הענפים");
+    }
+  }
+
+  function showToast(type, message) {
+    setToast({
+      isOpen: true,
+      type: type,
+      message: message,
+    });
+  }
+
+  function closeToast() {
+    setToast({
+      isOpen: false,
+      type: "success",
+      message: "",
+    });
+  }
 
   function handleGeneralNavigate(itemKey) {
     if (itemKey === "competitions-board") {
@@ -46,29 +127,195 @@ export default function CompetitionsBoardPage() {
       return;
     }
 
-    alert("המסך יתחבר כאן בהמשך");
+    showToast("info", "המסך יתחבר בהמשך");
   }
 
-  function getStatusClass(status) {
-    if (status === "כעת") {
-      return "bg-green-100 text-green-700";
-    }
-
-    if (status === "טיוטה") {
-      return "bg-red-100 text-red-700";
-    }
-
-    if (status === "הסתיימה") {
-      return "bg-gray-100 text-gray-700";
-    }
-
-    return "bg-blue-100 text-blue-700";
+  function handleSearch() {
+    loadCompetitions(searchText.trim());
   }
 
-  const userName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
-  const subtitle =
-    [activeRole?.roleName, activeRole?.ranchName].filter(Boolean).join(" · ") ||
-    "לא נבחר תפקיד וחווה";
+  function handleResetSearch() {
+    setSearchText("");
+    setStatusFilter("");
+    setFieldFilter("");
+    setSortConfig({
+      key: "competitionStartDate",
+      direction: "desc",
+    });
+    loadCompetitions("");
+  }
+
+  function handleSort(columnKey) {
+    setSortConfig(function (prev) {
+      if (prev.key !== columnKey) {
+        return {
+          key: columnKey,
+          direction: "asc",
+        };
+      }
+
+      if (prev.direction === "asc") {
+        return {
+          key: columnKey,
+          direction: "desc",
+        };
+      }
+
+      return {
+        key: "competitionStartDate",
+        direction: "desc",
+      };
+    });
+  }
+
+  function openCreateModal() {
+    setEditCompetition(null);
+    setModalError("");
+    setModalOpen(true);
+  }
+
+  async function openEditModal(item) {
+    if (!currentRanchId) {
+      return;
+    }
+
+    try {
+      setModalError("");
+
+      const response = await getCompetitionById(item.competitionId, currentRanchId);
+      setEditCompetition(response.data || null);
+      setModalOpen(true);
+    } catch (error) {
+      console.error(error);
+      showToast("error", error.response?.data || "שגיאה בטעינת פרטי התחרות");
+    }
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setEditCompetition(null);
+    setModalError("");
+  }
+
+  async function handleSubmitCompetition(formData) {
+    if (!currentRanchId) {
+      setModalError("לא נבחרה חווה פעילה");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setModalError("");
+
+      if (editCompetition) {
+        await updateCompetition(editCompetition.competitionId, {
+          competitionId: editCompetition.competitionId,
+          hostRanchId: currentRanchId,
+          fieldId: formData.fieldId,
+          competitionName: formData.competitionName,
+          competitionStartDate: formData.competitionStartDate,
+          competitionEndDate: formData.competitionEndDate,
+          registrationOpenDate: formData.registrationOpenDate,
+          registrationEndDate: formData.registrationEndDate,
+          paidTimeRegistrationDate: formData.paidTimeRegistrationDate,
+          paidTimePublicationDate: formData.paidTimePublicationDate,
+          competitionStatus: formData.competitionStatus,
+          notes: formData.notes,
+        });
+
+        showToast("success", "התחרות עודכנה בהצלחה");
+      } else {
+        await createCompetition({
+          hostRanchId: currentRanchId,
+          fieldId: formData.fieldId,
+          competitionName: formData.competitionName,
+          competitionStartDate: formData.competitionStartDate,
+          competitionEndDate: formData.competitionEndDate,
+          registrationOpenDate: formData.registrationOpenDate,
+          registrationEndDate: formData.registrationEndDate,
+          paidTimeRegistrationDate: formData.paidTimeRegistrationDate,
+          paidTimePublicationDate: formData.paidTimePublicationDate,
+          competitionStatus: formData.competitionStatus,
+          notes: formData.notes,
+        });
+
+        showToast("success", "התחרות נפתחה בהצלחה");
+      }
+
+      closeModal();
+      await loadCompetitions(searchText.trim());
+    } catch (error) {
+      console.error(error);
+      setModalError(error.response?.data || "שגיאה בשמירת התחרות");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleEnterCompetition(item) {
+    navigate(`/competitions/${item.competitionId}`);
+  }
+
+  const statusOptions = useMemo(function () {
+    const uniqueStatuses = competitions
+      .map(function (item) {
+        return item.competitionStatus;
+      })
+      .filter(Boolean);
+
+    return Array.from(new Set(uniqueStatuses));
+  }, [competitions]);
+
+  const filteredAndSortedCompetitions = useMemo(
+    function () {
+      let result = Array.isArray(competitions) ? [...competitions] : [];
+
+      if (statusFilter) {
+        result = result.filter(function (item) {
+          return item.competitionStatus === statusFilter;
+        });
+      }
+
+      if (fieldFilter) {
+        result = result.filter(function (item) {
+          return String(item.fieldId) === String(fieldFilter);
+        });
+      }
+
+      result.sort(function (a, b) {
+        const key = sortConfig.key;
+        const direction = sortConfig.direction === "asc" ? 1 : -1;
+
+        let aValue = a[key];
+        let bValue = b[key];
+
+        if (key === "competitionStartDate") {
+          aValue = aValue ? new Date(aValue).getTime() : 0;
+          bValue = bValue ? new Date(bValue).getTime() : 0;
+        } else {
+          aValue = (aValue || "").toString().toLowerCase();
+          bValue = (bValue || "").toString().toLowerCase();
+        }
+
+        if (aValue < bValue) {
+          return -1 * direction;
+        }
+
+        if (aValue > bValue) {
+          return 1 * direction;
+        }
+
+        return 0;
+      });
+
+      return result;
+    },
+    [competitions, statusFilter, fieldFilter, sortConfig],
+  );
+
+  if (!activeRole) {
+    return null;
+  }
 
   return (
     <AppLayout
@@ -78,96 +325,65 @@ export default function CompetitionsBoardPage() {
       activeItemKey="competitions-board"
       onNavigate={handleGeneralNavigate}
     >
-      <div className="bg-white rounded-[28px] border border-[#E2D6CF] shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-8 py-6 border-b border-[#EFE5E0]">
-          <h1 className="text-[2.2rem] font-bold text-[#3E2723]">
-            לוח תחרויות
-          </h1>
+      <div className="rounded-[28px] border border-[#E6DCD5] bg-white shadow-sm overflow-hidden">
+        <div className="border-b border-[#EFE5DF] px-8 py-7">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <h1 className="text-[2rem] font-bold text-[#3F312B]">לוח תחרויות</h1>
 
-          <button
-            type="button"
-            onClick={function () {
-              alert("פתיחת תחרות חדשה תתחבר כאן בהמשך");
-            }}
-            className="bg-[#8B6352] hover:bg-[#774E3E] text-white text-[1.35rem] font-semibold px-8 py-4 rounded-2xl transition-all shadow-sm"
-          >
-            + פתיחת תחרות חדשה
-          </button>
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="rounded-xl bg-[#8B6352] px-5 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-[#7A5547]"
+            >
+              + פתיחת תחרות חדשה
+            </button>
+          </div>
+
+          <div className="mt-6">
+            <CompetitionsSearchBar
+              value={searchText}
+              onChange={setSearchText}
+              onSearch={handleSearch}
+              onReset={handleResetSearch}
+            />
+          </div>
         </div>
 
-        <div className="px-8 py-7">
-          <div className="rounded-[24px] border border-[#E4D8D1] bg-[#FDFBFA] p-6 mb-8">
-            <div className="flex items-center justify-start gap-4 flex-wrap text-[#5D4037] text-lg font-semibold">
-              <span>סינון:</span>
-
-              <select className="rounded-xl border border-[#D7CCC8] px-4 py-2 bg-white text-[#3E2723]">
-                <option>הכל</option>
-              </select>
-              <span>סטטוס</span>
-
-              <select className="rounded-xl border border-[#D7CCC8] px-4 py-2 bg-white text-[#3E2723]">
-                <option>הכל</option>
-              </select>
-              <span>טווח תאריכים</span>
-
-              <select className="rounded-xl border border-[#D7CCC8] px-4 py-2 bg-white text-[#3E2723]">
-                <option>הכל</option>
-              </select>
-              <span>ענף</span>
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <div className="w-full max-w-[420px]">
-                <input
-                  type="text"
-                  placeholder="חיפוש לפי שם תחרות או חווה..."
-                  className="w-full rounded-xl border border-[#D7CCC8] px-5 py-4 text-right text-[#3E2723] placeholder-[#BCAAA4] focus:outline-none focus:border-[#8B6352]"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="overflow-hidden rounded-2xl border border-[#E8DDD7]">
-            <div className="grid grid-cols-[1.2fr_0.8fr_1.1fr_1.1fr_0.8fr_1fr] bg-[#F3ECE8] px-6 py-5 text-[#4E342E] text-[1.2rem] font-bold">
-              <div className="text-right">שם תחרות</div>
-              <div className="text-right">ענף</div>
-              <div className="text-right">חווה מארחת</div>
-              <div className="text-right">תאריכי תחרות</div>
-              <div className="text-right">סטטוס</div>
-              <div className="text-right">פעולות</div>
-            </div>
-
-            {competitions.map(function (item, index) {
-              return (
-                <div
-                  key={index}
-                  className="grid grid-cols-[1.2fr_0.8fr_1.1fr_1.1fr_0.8fr_1fr] px-6 py-6 border-t border-[#EFE5E0] items-center text-[#3E2723] text-[1.1rem]"
-                >
-                  <div className="text-right">{item.name}</div>
-                  <div className="text-right">{item.field}</div>
-                  <div className="text-right">{item.host}</div>
-                  <div className="text-right">{item.dates}</div>
-
-                  <div className="text-right">
-                    <span
-                      className={
-                        "inline-flex rounded-full px-4 py-2 text-sm font-semibold " +
-                        getStatusClass(item.status)
-                      }
-                    >
-                      {item.status}
-                    </span>
-                  </div>
-
-                  <div className="text-right text-[#8B6352] font-semibold">
-                    כניסה | עריכה
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+        <div className="px-6 py-6">
+          <CompetitionsTable
+            competitions={filteredAndSortedCompetitions}
+            loading={loading}
+            onEnter={handleEnterCompetition}
+            onEdit={openEditModal}
+            onSort={handleSort}
+            sortKey={sortConfig.key}
+            sortDirection={sortConfig.direction}
+            statusOptions={statusOptions}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            fieldOptions={fields}
+            fieldFilter={fieldFilter}
+            onFieldFilterChange={setFieldFilter}
+          />
         </div>
       </div>
+
+      <CompetitionModal
+        isOpen={modalOpen}
+        onClose={closeModal}
+        onSubmit={handleSubmitCompetition}
+        initialValue={editCompetition}
+        fields={fields}
+        error={modalError}
+        saving={saving}
+      />
+
+      <ToastMessage
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+      />
     </AppLayout>
   );
 }
