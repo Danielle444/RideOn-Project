@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
-function toInputDateTimeLocal(value) {
+function toInputDate(value) {
   if (!value) {
     return "";
+  }
+
+  if (typeof value === "string" && value.includes("T")) {
+    return value.split("T")[0];
   }
 
   var date = new Date(value);
@@ -15,10 +19,28 @@ function toInputDateTimeLocal(value) {
   var year = date.getFullYear();
   var month = String(date.getMonth() + 1).padStart(2, "0");
   var day = String(date.getDate()).padStart(2, "0");
-  var hours = String(date.getHours()).padStart(2, "0");
-  var minutes = String(date.getMinutes()).padStart(2, "0");
 
-  return year + "-" + month + "-" + day + "T" + hours + ":" + minutes;
+  return year + "-" + month + "-" + day;
+}
+
+function normalizeTimeForInput(value) {
+  if (!value) {
+    return "";
+  }
+
+  return String(value).slice(0, 5);
+}
+
+function normalizeTimeForServer(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (value.length === 5) {
+    return value + ":00";
+  }
+
+  return value;
 }
 
 export default function ClassInCompetitionModal(props) {
@@ -27,7 +49,7 @@ export default function ClassInCompetitionModal(props) {
   var [formData, setFormData] = useState({
     classTypeId: "",
     arenaId: "",
-    classDateTime: "",
+    classDate: "",
     startTime: "",
     orderInDay: "",
     organizerCost: "",
@@ -45,7 +67,7 @@ export default function ClassInCompetitionModal(props) {
         setFormData({
           classTypeId: "",
           arenaId: "",
-          classDateTime: "",
+          classDate: props.defaultDate || "",
           startTime: "",
           orderInDay: "",
           organizerCost: "",
@@ -60,10 +82,8 @@ export default function ClassInCompetitionModal(props) {
           ? String(props.initialValue.classTypeId)
           : "",
         arenaId: props.initialValue.arenaId ? String(props.initialValue.arenaId) : "",
-        classDateTime: toInputDateTimeLocal(props.initialValue.classDateTime),
-        startTime: props.initialValue.startTime
-          ? String(props.initialValue.startTime).slice(0, 5)
-          : "",
+        classDate: toInputDate(props.initialValue.classDateTime),
+        startTime: normalizeTimeForInput(props.initialValue.startTime),
         orderInDay:
           props.initialValue.orderInDay !== null &&
           props.initialValue.orderInDay !== undefined
@@ -82,7 +102,7 @@ export default function ClassInCompetitionModal(props) {
         classNotes: props.initialValue.classNotes || "",
       });
     },
-    [props.isOpen, props.initialValue],
+    [props.isOpen, props.initialValue, props.defaultDate],
   );
 
   if (!props.isOpen) {
@@ -104,8 +124,8 @@ export default function ClassInCompetitionModal(props) {
     props.onSubmit({
       classTypeId: formData.classTypeId ? Number(formData.classTypeId) : "",
       arenaId: formData.arenaId ? Number(formData.arenaId) : "",
-      classDateTime: formData.classDateTime || null,
-      startTime: formData.startTime || null,
+      classDateTime: formData.classDate ? formData.classDate + "T12:00:00" : null,
+      startTime: normalizeTimeForServer(formData.startTime),
       orderInDay: formData.orderInDay ? Number(formData.orderInDay) : null,
       organizerCost: formData.organizerCost ? Number(formData.organizerCost) : null,
       federationCost: formData.federationCost ? Number(formData.federationCost) : null,
@@ -180,13 +200,13 @@ export default function ClassInCompetitionModal(props) {
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
-                תאריך ושעה
+                תאריך
               </label>
               <input
-                type="datetime-local"
-                value={formData.classDateTime}
+                type="date"
+                value={formData.classDate}
                 onChange={function (e) {
-                  handleChange("classDateTime", e.target.value);
+                  handleChange("classDate", e.target.value);
                 }}
                 className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right"
               />
@@ -269,7 +289,7 @@ export default function ClassInCompetitionModal(props) {
           </div>
 
           {props.error ? (
-            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 text-right">
+            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
               {props.error}
             </div>
           ) : null}

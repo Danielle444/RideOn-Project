@@ -17,8 +17,9 @@ namespace RideOnServer.BL
         public TimeSpan? StartTime { get; set; }
         public byte? OrderInDay { get; set; }
 
-        // UI helper
+        // UI helpers
         public string? ClassName { get; set; }
+        public string? ArenaName { get; set; }
 
         internal static List<ClassInCompetition> GetClassesByCompetitionId(int competitionId)
         {
