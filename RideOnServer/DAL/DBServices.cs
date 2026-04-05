@@ -1,5 +1,5 @@
-using Npgsql;
 using Microsoft.Extensions.Configuration;
+using Npgsql;
 
 namespace RideOnServer.DAL
 {
@@ -8,10 +8,20 @@ namespace RideOnServer.DAL
         protected NpgsqlConnection Connect(string conStr)
         {
             IConfigurationRoot configuration = new ConfigurationBuilder()
-                .AddJsonFile("appsettings.json")
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: true)
+                .AddEnvironmentVariables()
                 .Build();
 
             string cStr = configuration.GetConnectionString(conStr)!;
+
+            var builder = new Npgsql.NpgsqlConnectionStringBuilder(cStr);
+
+            Console.WriteLine("=== DB HOST === " + builder.Host);
+            Console.WriteLine("=== DB PORT === " + builder.Port);
+            Console.WriteLine("=== DB USER === " + builder.Username);
+            Console.WriteLine("=== DB DATABASE === " + builder.Database);
 
             return new NpgsqlConnection(cStr);
         }

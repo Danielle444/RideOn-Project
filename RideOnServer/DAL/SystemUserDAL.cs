@@ -3,6 +3,7 @@ using System.Data;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.Auth;
 
+
 namespace RideOnServer.DAL
 {
     public class SystemUserDAL : DBServices
@@ -43,7 +44,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -82,7 +83,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -108,7 +109,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -134,7 +135,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -162,7 +163,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -190,7 +191,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -217,7 +218,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -243,7 +244,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -257,40 +258,58 @@ namespace RideOnServer.DAL
                 {
                     connection.Open();
 
-                    using (NpgsqlCommand command = new NpgsqlCommand("usp_RegisterSystemUserWithRoles", connection))
+                    using (NpgsqlTransaction transaction = connection.BeginTransaction())
                     {
-                        command.CommandType = CommandType.StoredProcedure;
-
-                        command.Parameters.AddWithValue("@NationalId", request.NationalId);
-                        command.Parameters.AddWithValue("@FirstName", request.FirstName);
-                        command.Parameters.AddWithValue("@LastName", request.LastName);
-                        command.Parameters.AddWithValue("@Gender", (object?)request.Gender ?? DBNull.Value);
-                        command.Parameters.AddWithValue("@DateOfBirth", (object?)request.DateOfBirth ?? DBNull.Value);
-                        command.Parameters.AddWithValue("@CellPhone", request.CellPhone);
-                        command.Parameters.AddWithValue("@Email", request.Email);
-                        command.Parameters.AddWithValue("@Username", request.Username);
-                        command.Parameters.AddWithValue("@PasswordHash", passwordHash);
-                        command.Parameters.AddWithValue("@PasswordSalt", passwordSalt);
-
-                        DataTable ranchRolesTable = new DataTable();
-                        ranchRolesTable.Columns.Add("RanchId", typeof(int));
-                        ranchRolesTable.Columns.Add("RoleId", typeof(byte));
-
-                        foreach (RegisterRanchRoleRequest pair in request.RanchRoles)
+                        try
                         {
-                            ranchRolesTable.Rows.Add(pair.RanchId, pair.RoleId);
+                            int personId;
+
+                            using (NpgsqlCommand command = new NpgsqlCommand("usp_RegisterSystemUser", connection, transaction))
+                            {
+                                command.CommandType = CommandType.StoredProcedure;
+
+                                command.Parameters.AddWithValue("@NationalId", request.NationalId);
+                                command.Parameters.AddWithValue("@FirstName", request.FirstName);
+                                command.Parameters.AddWithValue("@LastName", request.LastName);
+                                command.Parameters.AddWithValue("@Gender", (object?)request.Gender ?? DBNull.Value);
+                                command.Parameters.AddWithValue("@DateOfBirth", (object?)request.DateOfBirth ?? DBNull.Value);
+                                command.Parameters.AddWithValue("@CellPhone", request.CellPhone);
+                                command.Parameters.AddWithValue("@Email", request.Email);
+                                command.Parameters.AddWithValue("@Username", request.Username);
+                                command.Parameters.AddWithValue("@PasswordHash", passwordHash);
+                                command.Parameters.AddWithValue("@PasswordSalt", passwordSalt);
+
+                                object result = command.ExecuteScalar()!;
+                                personId = Convert.ToInt32(result);
+                            }
+
+                            foreach (RegisterRanchRoleRequest pair in request.RanchRoles)
+                            {
+                                using (NpgsqlCommand roleCommand = new NpgsqlCommand("usp_AssignPersonRoleAtRanch", connection, transaction))
+                                {
+                                    roleCommand.CommandType = CommandType.StoredProcedure;
+
+                                    roleCommand.Parameters.AddWithValue("@PersonId", personId);
+                                    roleCommand.Parameters.AddWithValue("@RanchId", pair.RanchId);
+                                    roleCommand.Parameters.AddWithValue("@RoleId", pair.RoleId);
+                                    roleCommand.Parameters.AddWithValue("@RoleStatus", "Pending");
+
+                                    roleCommand.ExecuteNonQuery();
+                                }
+                            }
+
+                            transaction.Commit();
+                            return personId;
                         }
-
-                        SqlParameter ranchRolesParam = command.Parameters.AddWithValue("@RanchRoles", ranchRolesTable);
-                        ranchRolesParam.SqlDbType = SqlDbType.Structured;
-                        ranchRolesParam.TypeName = "RegisterRanchRoleTableType";
-
-                        object result = command.ExecuteScalar()!;
-                        return Convert.ToInt32(result);
+                        catch
+                        {
+                            transaction.Rollback();
+                            throw;
+                        }
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }

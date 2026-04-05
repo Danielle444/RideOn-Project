@@ -34,7 +34,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception(ex.Message);
             }
@@ -61,7 +61,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception(ex.Message);
             }
@@ -88,7 +88,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception(ex.Message);
             }
@@ -113,7 +113,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception(ex.Message);
             }
