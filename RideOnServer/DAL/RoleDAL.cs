@@ -1,6 +1,7 @@
 using Npgsql;
 using RideOnServer.BL;
-
+using Microsoft.Extensions.Configuration;
+ 
 namespace RideOnServer.DAL
 {
     public class RoleDAL : DBServices
@@ -31,7 +32,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
