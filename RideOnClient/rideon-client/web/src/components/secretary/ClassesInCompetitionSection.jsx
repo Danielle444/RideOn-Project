@@ -1,25 +1,17 @@
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 
-function formatTime(value) {
-  if (!value) {
+function formatMoney(value) {
+  if (value === null || value === undefined || value === "") {
     return "-";
   }
 
-  return String(value).slice(0, 5);
+  return "₪" + value;
 }
 
-function formatDateTime(value) {
-  if (!value) {
-    return "-";
-  }
-
-  var date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-
-  return date.toLocaleString("he-IL");
+function getTotalCost(item) {
+  var organizer = Number(item.organizerCost || 0);
+  var federation = Number(item.federationCost || 0);
+  return organizer + federation;
 }
 
 export default function ClassesInCompetitionSection(props) {
@@ -31,81 +23,87 @@ export default function ClassesInCompetitionSection(props) {
     );
   }
 
+  if (props.loading) {
+    return (
+      <div className="rounded-[24px] border border-[#E8DDD7] bg-white px-6 py-10 text-right text-[#6D4C41]">
+        טוען מקצים...
+      </div>
+    );
+  }
+
+  if (props.items.length === 0) {
+    return (
+      <div className="rounded-[24px] border border-[#E8DDD7] bg-white px-6 py-16 text-center">
+        <div className="mb-4 text-[3rem] text-[#D7CCC8]">☰</div>
+        <div className="text-[1.8rem] font-bold text-[#6D4C41]">אין מקצים ליום זה</div>
+        <div className="mt-2 text-[1.1rem] text-[#8A6F64]">
+          לחצי על "הוספת מקצה" כדי להתחיל
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-5 text-right">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="text-[#6D4C41]">
-          מקצים שנשמרו לתחרות: <span className="font-bold">{props.items.length}</span>
-        </div>
-
-        <button
-          type="button"
-          onClick={props.onAdd}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#8B6352] px-5 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-[#7A5547]"
-        >
-          <Plus size={18} />
-          הוספת מקצה
-        </button>
+    <div className="overflow-hidden rounded-[24px] border border-[#E8DDD7] bg-white">
+      <div className="grid grid-cols-[0.6fr_1.8fr_1fr_1fr_1fr_1fr_0.9fr] gap-3 bg-[#FAF7F5] px-6 py-4 text-center text-sm font-bold text-[#4E342E]">
+        <div>מס׳</div>
+        <div>שם מקצה</div>
+        <div>מגרש</div>
+        <div>עלות מארגן</div>
+        <div>עלות התאחדות</div>
+        <div>סה״כ מחיר</div>
+        <div>פעולות</div>
       </div>
 
-      <div className="overflow-hidden rounded-[24px] border border-[#E8DDD7] bg-white">
-        <div className="grid grid-cols-[1.5fr_1fr_1fr_0.8fr_0.9fr_0.9fr] bg-[#FAF7F5] px-5 py-4 text-sm font-bold text-[#4E342E]">
-          <div>שם מקצה</div>
-          <div>שעת התחלה</div>
-          <div>תאריך ושעה</div>
-          <div>סדר</div>
-          <div>עלות מארגן</div>
-          <div className="text-center">פעולות</div>
-        </div>
+      {props.items.map(function (item, index) {
+        return (
+          <div
+            key={item.classInCompId}
+            className={
+              "grid grid-cols-[0.6fr_1.8fr_1fr_1fr_1fr_1fr_0.9fr] items-center gap-3 border-t border-[#F1E8E3] px-6 py-5 text-center text-[#3F312B] " +
+              (index % 2 === 0 ? "bg-white" : "bg-[#FFFEFD]")
+            }
+          >
+            <div className="font-semibold">
+              {item.orderInDay ?? index + 1}
+            </div>
 
-        {props.loading ? (
-          <div className="px-5 py-8 text-right text-[#6D4C41]">טוען מקצים...</div>
-        ) : props.items.length === 0 ? (
-          <div className="px-5 py-8 text-right text-[#6D4C41]">לא נוספו עדיין מקצים</div>
-        ) : (
-          props.items.map(function (item, index) {
-            return (
-              <div
-                key={item.classInCompId}
-                className={
-                  "grid grid-cols-[1.5fr_1fr_1fr_0.8fr_0.9fr_0.9fr] items-center border-t border-[#F1E8E3] px-5 py-5 text-[#3F312B] " +
-                  (index % 2 === 0 ? "bg-white" : "bg-[#FFFEFD]")
-                }
+            <div className="font-semibold">{item.className || "-"}</div>
+
+            <div>{item.arenaName || "-"}</div>
+
+            <div>{formatMoney(item.organizerCost)}</div>
+
+            <div>{formatMoney(item.federationCost)}</div>
+
+            <div>{formatMoney(getTotalCost(item))}</div>
+
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={function () {
+                  props.onDelete(item);
+                }}
+                className="text-red-600 transition-colors hover:text-red-700"
+                title="מחיקה"
               >
-                <div className="font-semibold">{item.className || "-"}</div>
-                <div>{formatTime(item.startTime)}</div>
-                <div>{formatDateTime(item.classDateTime)}</div>
-                <div>{item.orderInDay ?? "-"}</div>
-                <div>{item.organizerCost ?? "-"}</div>
+                <Trash2 size={18} />
+              </button>
 
-                <div className="flex items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={function () {
-                      props.onEdit(item);
-                    }}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#D7CCC8] bg-white text-[#5D4037] transition-colors hover:bg-[#F8F5F2]"
-                    title="עריכה"
-                  >
-                    <Pencil size={17} />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={function () {
-                      props.onDelete(item);
-                    }}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 bg-white text-red-600 transition-colors hover:bg-red-50"
-                    title="מחיקה"
-                  >
-                    <Trash2 size={17} />
-                  </button>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
+              <button
+                type="button"
+                onClick={function () {
+                  props.onEdit(item);
+                }}
+                className="text-[#7B5A4E] transition-colors hover:text-[#5D4037]"
+                title="עריכה"
+              >
+                <Pencil size={18} />
+              </button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -20,7 +20,7 @@ export default function AppLayout(props) {
   }
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#F5F1EE]">
+    <div dir="rtl" className="h-screen overflow-hidden bg-[#F5F1EE]">
       <TopBar
         onLogout={handleLogout}
         onNotificationsClick={handleNotificationsClick}
@@ -30,7 +30,7 @@ export default function AppLayout(props) {
         onNotificationItemClick={props.onNotificationItemClick}
       />
 
-      <div className="min-h-[calc(100vh-48px)] flex">
+      <div className="flex h-[calc(100vh-48px)] overflow-hidden">
         <Sidebar
           userName={props.userName}
           subtitle={props.subtitle}
@@ -39,7 +39,7 @@ export default function AppLayout(props) {
           onNavigate={props.onNavigate}
         />
 
-        <main className="flex-1 p-6">{props.children}</main>
+        <main className="flex-1 overflow-y-auto p-6">{props.children}</main>
       </div>
     </div>
   );
