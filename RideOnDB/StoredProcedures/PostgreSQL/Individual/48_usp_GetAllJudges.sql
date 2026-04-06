@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetAllJudges(
-    "FieldId" SMALLINT DEFAULT NULL
+    p_FieldId SMALLINT DEFAULT NULL
 )
 RETURNS TABLE(
     "JudgeId"          INTEGER,
@@ -27,8 +27,8 @@ BEGIN
             WHERE jf2.judgeid = j.judgeid
         )
     FROM judge j
-    WHERE ("FieldId" IS NULL OR EXISTS (
-        SELECT 1 FROM judgefield jf WHERE jf.judgeid = j.judgeid AND jf.fieldid = "FieldId"
+    WHERE (p_FieldId IS NULL OR EXISTS (
+        SELECT 1 FROM judgefield jf WHERE jf.judgeid = j.judgeid AND jf.fieldid = p_FieldId
     ))
     ORDER BY j.firstnamehebrew ASC;
 END;

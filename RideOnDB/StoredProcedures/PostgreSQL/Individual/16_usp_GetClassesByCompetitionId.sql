@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetClassesByCompetitionId(
-    "CompetitionId" INTEGER
+    p_CompetitionId INTEGER
 )
 RETURNS TABLE(
     "ClassInCompId"  INTEGER,
@@ -8,7 +8,7 @@ RETURNS TABLE(
     "ArenaRanchId"   INTEGER,
     "ArenaId"        SMALLINT,
     "ArenaName"      TEXT,
-    "ClassDateTime"  TIMESTAMP,
+    "ClassDateTime"  TIMESTAMPTZ,
     "OrganizerCost"  NUMERIC(10,2),
     "FederationCost" NUMERIC(10,2),
     "StartTime"      TIME,
@@ -34,7 +34,7 @@ BEGIN
     FROM classincompetition cic
     INNER JOIN classtype ct ON cic.classtypeid  = ct.classtypeid
     INNER JOIN arena     a  ON cic.arenaranchid = a.ranchid AND cic.arenaid = a.arenaid
-    WHERE cic.competitionid = "CompetitionId"
+    WHERE cic.competitionid = p_CompetitionId
     ORDER BY cic.classdatetime ASC, cic.orderinday ASC, cic.classincompid ASC;
 END;
 $$;

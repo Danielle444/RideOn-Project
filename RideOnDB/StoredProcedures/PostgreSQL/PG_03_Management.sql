@@ -9,13 +9,14 @@
 -- ============================================================
 
 -- Insert new ranch
+DROP FUNCTION IF EXISTS usp_InsertRanch(TEXT, TEXT, TEXT, TEXT, DOUBLE PRECISION, DOUBLE PRECISION) CASCADE;
 CREATE OR REPLACE FUNCTION usp_InsertRanch(
-    "RanchName"    TEXT,
-    "ContactEmail" TEXT    DEFAULT NULL,
-    "ContactPhone" TEXT    DEFAULT NULL,
-    "WebsiteUrl"   TEXT    DEFAULT NULL,
-    "Lat"          DOUBLE PRECISION DEFAULT NULL,
-    "Long"         DOUBLE PRECISION DEFAULT NULL
+    ranchname_param    TEXT,
+    contactemail_param TEXT    DEFAULT NULL,
+    contactphone_param TEXT    DEFAULT NULL,
+    websiteurl_param   TEXT    DEFAULT NULL,
+    lat_param          DOUBLE PRECISION DEFAULT NULL,
+    long_param         DOUBLE PRECISION DEFAULT NULL
 )
 RETURNS TABLE("NewRanchId" INTEGER)
 LANGUAGE plpgsql AS $$
@@ -23,12 +24,12 @@ DECLARE
     v_new_id  INTEGER;
     v_geog    geography := NULL;
 BEGIN
-    IF "Lat" IS NOT NULL AND "Long" IS NOT NULL THEN
-        v_geog := ST_SetSRID(ST_MakePoint("Long", "Lat"), 4326)::geography;
+    IF lat_param IS NOT NULL AND long_param IS NOT NULL THEN
+        v_geog := ST_SetSRID(ST_MakePoint(long_param, lat_param), 4326)::geography;
     END IF;
 
     INSERT INTO ranch (ranchname, contactemail, contactphone, websiteurl, location, ranchstatus)
-    VALUES ("RanchName", "ContactEmail", "ContactPhone", "WebsiteUrl", v_geog, 'Pending')
+    VALUES (ranchname_param, contactemail_param, contactphone_param, websiteurl_param, v_geog, 'Pending')
     RETURNING ranchid INTO v_new_id;
 
     RETURN QUERY SELECT v_new_id AS "NewRanchId";
@@ -37,9 +38,10 @@ $$;
 
 
 -- Insert new ranch request
+DROP FUNCTION IF EXISTS usp_InsertNewRanchRequest(INTEGER, INTEGER) CASCADE;
 CREATE OR REPLACE FUNCTION usp_InsertNewRanchRequest(
-    "RanchId"                 INTEGER,
-    "SubmittedBySystemUserId" INTEGER
+    ranchid_param                 INTEGER,
+    submittedbysystemuserid_param INTEGER
 )
 RETURNS TABLE("NewRequestId" INTEGER)
 LANGUAGE plpgsql AS $$
@@ -47,7 +49,7 @@ DECLARE
     v_new_id INTEGER;
 BEGIN
     INSERT INTO newranchrequest (ranchid, submittedbysystemuserid)
-    VALUES ("RanchId", "SubmittedBySystemUserId")
+    VALUES (ranchid_param, submittedbysystemuserid_param)
     RETURNING requestid INTO v_new_id;
 
     RETURN QUERY SELECT v_new_id AS "NewRequestId";
@@ -56,69 +58,72 @@ $$;
 
 
 -- Update ranch request status (and update ranch status accordingly)
+DROP FUNCTION IF EXISTS usp_UpdateNewRanchRequestStatus(INTEGER, INTEGER, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_UpdateNewRanchRequestStatus(
-    "RequestId"            INTEGER,
-    "ResolvedBySuperUserId" INTEGER,
-    "NewStatus"            TEXT
+    requestid_param            INTEGER,
+    resolvedbysuperuserid_param INTEGER,
+    newstatus_param            TEXT
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
     UPDATE newranchrequest SET
-        requeststatus         = "NewStatus",
-        resolvedbysuperuserid = "ResolvedBySuperUserId",
+        requeststatus         = newstatus_param,
+        resolvedbysuperuserid = resolvedbysuperuserid_param,
         resolveddate          = NOW()
-    WHERE requestid = "RequestId";
+    WHERE requestid = requestid_param;
 
     UPDATE ranch r SET
-        ranchstatus = "NewStatus"
+        ranchstatus = newstatus_param
     FROM newranchrequest nrr
     WHERE r.ranchid = nrr.ranchid
-      AND nrr.requestid = "RequestId";
+      AND nrr.requestid = requestid_param;
 END;
 $$;
 
 
 -- Update ranch details
+DROP FUNCTION IF EXISTS usp_UpdateRanch(INTEGER, TEXT, TEXT, TEXT, TEXT, DOUBLE PRECISION, DOUBLE PRECISION) CASCADE;
 CREATE OR REPLACE FUNCTION usp_UpdateRanch(
-    "RanchId"    INTEGER,
-    "RanchName"  TEXT,
-    "ContactEmail" TEXT DEFAULT NULL,
-    "ContactPhone" TEXT DEFAULT NULL,
-    "WebsiteUrl"   TEXT DEFAULT NULL,
-    "Latitude"     DOUBLE PRECISION DEFAULT NULL,
-    "Longitude"    DOUBLE PRECISION DEFAULT NULL
+    ranchid_param    INTEGER,
+    ranchname_param  TEXT,
+    contactemail_param TEXT DEFAULT NULL,
+    contactphone_param TEXT DEFAULT NULL,
+    websiteurl_param   TEXT DEFAULT NULL,
+    latitude_param     DOUBLE PRECISION DEFAULT NULL,
+    longitude_param    DOUBLE PRECISION DEFAULT NULL
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 DECLARE
     v_geog geography := NULL;
 BEGIN
-    IF "Latitude" IS NOT NULL AND "Longitude" IS NOT NULL THEN
-        v_geog := ST_SetSRID(ST_MakePoint("Longitude", "Latitude"), 4326)::geography;
+    IF latitude_param IS NOT NULL AND longitude_param IS NOT NULL THEN
+        v_geog := ST_SetSRID(ST_MakePoint(longitude_param, latitude_param), 4326)::geography;
     END IF;
 
     UPDATE ranch SET
-        ranchname    = "RanchName",
-        contactemail = "ContactEmail",
-        contactphone = "ContactPhone",
-        websiteurl   = "WebsiteUrl",
+        ranchname    = ranchname_param,
+        contactemail = contactemail_param,
+        contactphone = contactphone_param,
+        websiteurl   = websiteurl_param,
         location     = v_geog
-    WHERE ranchid = "RanchId";
+    WHERE ranchid = ranchid_param;
 END;
 $$;
 
 
 -- Get ranch by ID
+DROP FUNCTION IF EXISTS usp_GetRanchById(INTEGER) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetRanchById(
-    "RanchId" INTEGER
+    ranchid_param INTEGER
 )
 RETURNS TABLE(
     "RanchId"      INTEGER,
-    "RanchName"    TEXT,
-    "ContactEmail" TEXT,
-    "ContactPhone" TEXT,
-    "WebsiteUrl"   TEXT,
+    "RanchName"    VARCHAR,
+    "ContactEmail" VARCHAR,
+    "ContactPhone" VARCHAR,
+    "WebsiteUrl"   VARCHAR,
     "Latitude"     DOUBLE PRECISION,
     "Longitude"    DOUBLE PRECISION
 )
@@ -134,21 +139,22 @@ BEGIN
         ST_Y(r.location::geometry),
         ST_X(r.location::geometry)
     FROM ranch r
-    WHERE r.ranchid = "RanchId";
+    WHERE r.ranchid = ranchid_param;
 END;
 $$;
 
 
 -- Get all ranches for a user
+DROP FUNCTION IF EXISTS usp_GetAllRanchesByUserId(INTEGER) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetAllRanchesByUserId(
-    "UserId" INTEGER
+    userid_param INTEGER
 )
 RETURNS TABLE(
     "RanchId"      INTEGER,
-    "RanchName"    TEXT,
-    "ContactEmail" TEXT,
-    "ContactPhone" TEXT,
-    "WebsiteUrl"   TEXT,
+    "RanchName"    VARCHAR,
+    "ContactEmail" VARCHAR,
+    "ContactPhone" VARCHAR,
+    "WebsiteUrl"   VARCHAR,
     "Latitude"     DOUBLE PRECISION,
     "Longitude"    DOUBLE PRECISION
 )
@@ -165,7 +171,7 @@ BEGIN
         ST_X(r.location::geometry)
     FROM ranch r
     INNER JOIN personranch pr ON r.ranchid = pr.ranchid
-    WHERE pr.personid   = "UserId"
+    WHERE pr.personid   = userid_param
       AND r.ranchstatus = 'Approved';
 END;
 $$;
@@ -176,11 +182,12 @@ $$;
 -- ============================================================
 
 -- Insert super user
+DROP FUNCTION IF EXISTS usp_InsertSuperUser(TEXT, TEXT, TEXT, BOOLEAN) CASCADE;
 CREATE OR REPLACE FUNCTION usp_InsertSuperUser(
-    "Email"              TEXT,
-    "PasswordHash"       TEXT,
-    "PasswordSalt"       TEXT,
-    "MustChangePassword" BOOLEAN DEFAULT TRUE
+    email_param              TEXT,
+    passwordhash_param       TEXT,
+    passwordsalt_param       TEXT,
+    mustchangepassword_param BOOLEAN DEFAULT TRUE
 )
 RETURNS TABLE("NewSuperUserId" INTEGER)
 LANGUAGE plpgsql AS $$
@@ -188,7 +195,7 @@ DECLARE
     v_new_id INTEGER;
 BEGIN
     INSERT INTO superuser (email, passwordhash, passwordsalt, mustchangepassword)
-    VALUES ("Email", "PasswordHash", "PasswordSalt", "MustChangePassword")
+    VALUES (email_param, passwordhash_param, passwordsalt_param, mustchangepassword_param)
     RETURNING superuserid INTO v_new_id;
 
     RETURN QUERY SELECT v_new_id AS "NewSuperUserId";
@@ -197,10 +204,11 @@ $$;
 
 
 -- Get all super users
+DROP FUNCTION IF EXISTS usp_GetAllSuperUsers() CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetAllSuperUsers()
 RETURNS TABLE(
     "SuperUserId"        INTEGER,
-    "Email"              TEXT,
+    "Email"              VARCHAR,
     "IsActive"           BOOLEAN,
     "MustChangePassword" BOOLEAN,
     "CreatedDate"        TIMESTAMP,
@@ -218,14 +226,15 @@ $$;
 
 
 -- Get super user by ID
+DROP FUNCTION IF EXISTS usp_GetSuperUserById(INTEGER) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetSuperUserById(
-    "SuperUserId" INTEGER
+    superuserid_param INTEGER
 )
 RETURNS TABLE(
     "SuperUserId"        INTEGER,
-    "Email"              TEXT,
-    "PasswordHash"       TEXT,
-    "PasswordSalt"       TEXT,
+    "Email"              VARCHAR,
+    "PasswordHash"       VARCHAR,
+    "PasswordSalt"       VARCHAR,
     "IsActive"           BOOLEAN,
     "MustChangePassword" BOOLEAN
 )
@@ -235,20 +244,21 @@ BEGIN
     SELECT su.superuserid, su.email, su.passwordhash, su.passwordsalt,
            su.isactive, su.mustchangepassword
     FROM superuser su
-    WHERE su.superuserid = "SuperUserId";
+    WHERE su.superuserid = superuserid_param;
 END;
 $$;
 
 
 -- Get super user for login
+DROP FUNCTION IF EXISTS usp_GetSuperUserForLogin(TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetSuperUserForLogin(
-    "Email" TEXT
+    email_param TEXT
 )
 RETURNS TABLE(
     "SuperUserId"        INTEGER,
-    "Email"              TEXT,
-    "PasswordHash"       TEXT,
-    "PasswordSalt"       TEXT,
+    "Email"              VARCHAR,
+    "PasswordHash"       VARCHAR,
+    "PasswordSalt"       VARCHAR,
     "IsActive"           BOOLEAN,
     "MustChangePassword" BOOLEAN
 )
@@ -258,79 +268,83 @@ BEGIN
     SELECT su.superuserid, su.email, su.passwordhash, su.passwordsalt,
            su.isactive, su.mustchangepassword
     FROM superuser su
-    WHERE su.email = "Email";
+    WHERE su.email = email_param;
 END;
 $$;
 
 
 -- Update super user last login timestamp
+DROP FUNCTION IF EXISTS usp_UpdateSuperUserLastLogin(INTEGER) CASCADE;
 CREATE OR REPLACE FUNCTION usp_UpdateSuperUserLastLogin(
-    "SuperUserId" INTEGER
+    superuserid_param INTEGER
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
     UPDATE superuser SET lastlogindate = NOW()
-    WHERE superuserid = "SuperUserId";
+    WHERE superuserid = superuserid_param;
 END;
 $$;
 
 
 -- Update super user password
+DROP FUNCTION IF EXISTS usp_UpdateSuperUserPassword(INTEGER, TEXT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_UpdateSuperUserPassword(
-    "SuperUserId"    INTEGER,
-    "NewPasswordHash" TEXT,
-    "NewPasswordSalt" TEXT
+    superuserid_param    INTEGER,
+    newpasswordhash_param TEXT,
+    newpasswordsalt_param TEXT
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
     UPDATE superuser SET
-        passwordhash       = "NewPasswordHash",
-        passwordsalt       = "NewPasswordSalt",
+        passwordhash       = newpasswordhash_param,
+        passwordsalt       = newpasswordsalt_param,
         mustchangepassword = FALSE
-    WHERE superuserid = "SuperUserId"
+    WHERE superuserid = superuserid_param
       AND isactive    = TRUE;
 END;
 $$;
 
 
 -- Check if super user email exists
+DROP FUNCTION IF EXISTS usp_CheckSuperUserEmailExists(TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_CheckSuperUserEmailExists(
-    "Email" TEXT
+    email_param TEXT
 )
 RETURNS TABLE("ExistsFlag" INTEGER)
 LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
     SELECT CASE WHEN EXISTS (
-        SELECT 1 FROM superuser su WHERE su.email = "Email"
+        SELECT 1 FROM superuser su WHERE su.email = email_param
     ) THEN 1 ELSE 0 END AS "ExistsFlag";
 END;
 $$;
 
 
 -- Get role requests (super user view)
+DROP FUNCTION IF EXISTS usp_GetRoleRequests(SMALLINT, TEXT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetRoleRequests(
-    "RoleId"     SMALLINT,
-    "RoleStatus" TEXT DEFAULT NULL,
-    "SearchText" TEXT DEFAULT NULL
+    roleid_param     SMALLINT,
+    rolestatus_param TEXT DEFAULT NULL,
+    searchtext_param TEXT DEFAULT NULL
 )
 RETURNS TABLE(
     "PersonId"   INTEGER,
     "RanchId"    INTEGER,
     "RoleId"     SMALLINT,
-    "FullName"   TEXT,
-    "NationalId" TEXT,
-    "Email"      TEXT,
-    "CellPhone"  TEXT,
-    "RanchName"  TEXT,
-    "RoleName"   TEXT,
-    "RoleStatus" TEXT
+    "FullName"   VARCHAR,
+    "NationalId" VARCHAR,
+    "Email"      VARCHAR,
+    "CellPhone"  VARCHAR,
+    "RanchName"  VARCHAR,
+    "RoleName"   VARCHAR,
+    "RoleStatus" VARCHAR
 )
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF "RoleStatus" IS NOT NULL AND "RoleStatus" NOT IN ('Pending', 'Approved', 'Rejected') THEN
+    IF rolestatus_param IS NOT NULL AND rolestatus_param NOT IN ('Pending', 'Approved', 'Rejected') THEN
         RAISE EXCEPTION 'Invalid RoleStatus. Allowed: Pending, Approved, Rejected.';
     END IF;
 
@@ -350,15 +364,15 @@ BEGIN
     INNER JOIN person p ON prr.personid = p.personid
     INNER JOIN ranch  r ON prr.ranchid  = r.ranchid
     INNER JOIN role  rl ON prr.roleid   = rl.roleid
-    WHERE prr.roleid = "RoleId"
-      AND ("RoleStatus" IS NULL OR prr.rolestatus = "RoleStatus")
+    WHERE prr.roleid = roleid_param
+      AND (rolestatus_param IS NULL OR prr.rolestatus = rolestatus_param)
       AND (
-            "SearchText" IS NULL OR TRIM("SearchText") = ''
-            OR (p.firstname || ' ' || p.lastname) ILIKE '%' || "SearchText" || '%'
-            OR p.nationalid ILIKE '%' || "SearchText" || '%'
-            OR COALESCE(p.email, '') ILIKE '%' || "SearchText" || '%'
-            OR COALESCE(p.cellphone, '') ILIKE '%' || "SearchText" || '%'
-            OR r.ranchname ILIKE '%' || "SearchText" || '%'
+            searchtext_param IS NULL OR TRIM(searchtext_param) = ''
+            OR (p.firstname || ' ' || p.lastname) ILIKE '%' || searchtext_param || '%'
+            OR p.nationalid ILIKE '%' || searchtext_param || '%'
+            OR COALESCE(p.email, '') ILIKE '%' || searchtext_param || '%'
+            OR COALESCE(p.cellphone, '') ILIKE '%' || searchtext_param || '%'
+            OR r.ranchname ILIKE '%' || searchtext_param || '%'
           )
     ORDER BY
         CASE prr.rolestatus
@@ -373,29 +387,30 @@ $$;
 
 
 -- Get new ranch requests (super user view)
+DROP FUNCTION IF EXISTS usp_GetNewRanchRequests(TEXT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetNewRanchRequests(
-    "RequestStatus" TEXT DEFAULT NULL,
-    "SearchText"    TEXT DEFAULT NULL
+    requeststatus_param TEXT DEFAULT NULL,
+    searchtext_param    TEXT DEFAULT NULL
 )
 RETURNS TABLE(
     "RequestId"               INTEGER,
     "RanchId"                 INTEGER,
     "SubmittedBySystemUserId" INTEGER,
     "RequestDate"             TIMESTAMP,
-    "RanchName"               TEXT,
+    "RanchName"               VARCHAR,
     "PersonId"                INTEGER,
-    "FullName"                TEXT,
-    "NationalId"              TEXT,
-    "Email"                   TEXT,
-    "CellPhone"               TEXT,
-    "RequestStatus"           TEXT,
+    "FullName"                VARCHAR,
+    "NationalId"              VARCHAR,
+    "Email"                   VARCHAR,
+    "CellPhone"               VARCHAR,
+    "RequestStatus"           VARCHAR,
     "ResolvedBySuperUserId"   INTEGER,
-    "ResolvedBySuperUserEmail" TEXT,
+    "ResolvedBySuperUserEmail" VARCHAR,
     "ResolvedDate"            TIMESTAMP
 )
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF "RequestStatus" IS NOT NULL AND "RequestStatus" NOT IN ('Pending', 'Approved', 'Rejected') THEN
+    IF requeststatus_param IS NOT NULL AND requeststatus_param NOT IN ('Pending', 'Approved', 'Rejected') THEN
         RAISE EXCEPTION 'Invalid RequestStatus. Allowed: Pending, Approved, Rejected.';
     END IF;
 
@@ -420,14 +435,14 @@ BEGIN
     INNER JOIN systemuser sysu ON nrr.submittedbysystemuserid = sysu.systemuserid
     INNER JOIN person     p    ON sysu.systemuserid = p.personid
     LEFT  JOIN superuser  su   ON nrr.resolvedbysuperuserid = su.superuserid
-    WHERE ("RequestStatus" IS NULL OR nrr.requeststatus = "RequestStatus")
+    WHERE (requeststatus_param IS NULL OR nrr.requeststatus = requeststatus_param)
       AND (
-            "SearchText" IS NULL OR TRIM("SearchText") = ''
-            OR r.ranchname ILIKE '%' || "SearchText" || '%'
-            OR (p.firstname || ' ' || p.lastname) ILIKE '%' || "SearchText" || '%'
-            OR p.nationalid ILIKE '%' || "SearchText" || '%'
-            OR COALESCE(p.email, '') ILIKE '%' || "SearchText" || '%'
-            OR COALESCE(p.cellphone, '') ILIKE '%' || "SearchText" || '%'
+            searchtext_param IS NULL OR TRIM(searchtext_param) = ''
+            OR r.ranchname ILIKE '%' || searchtext_param || '%'
+            OR (p.firstname || ' ' || p.lastname) ILIKE '%' || searchtext_param || '%'
+            OR p.nationalid ILIKE '%' || searchtext_param || '%'
+            OR COALESCE(p.email, '') ILIKE '%' || searchtext_param || '%'
+            OR COALESCE(p.cellphone, '') ILIKE '%' || searchtext_param || '%'
           )
     ORDER BY
         CASE nrr.requeststatus
@@ -442,19 +457,20 @@ $$;
 
 
 -- Get pending role requests (ranch admin/secretary view)
+DROP FUNCTION IF EXISTS usp_GetPendingRoleRequests(SMALLINT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetPendingRoleRequests(
-    "RoleId" SMALLINT
+    roleid_param SMALLINT
 )
 RETURNS TABLE(
     "PersonId"   INTEGER,
     "RanchId"    INTEGER,
     "RoleId"     SMALLINT,
-    "FullName"   TEXT,
-    "IdNumber"   TEXT,
-    "Email"      TEXT,
-    "PhoneNumber" TEXT,
-    "RanchName"  TEXT,
-    "RoleStatus" TEXT
+    "FullName"   VARCHAR,
+    "IdNumber"   VARCHAR,
+    "Email"      VARCHAR,
+    "PhoneNumber" VARCHAR,
+    "RanchName"  VARCHAR,
+    "RoleStatus" VARCHAR
 )
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -473,22 +489,23 @@ BEGIN
     INNER JOIN person p ON prr.personid = p.personid
     INNER JOIN ranch  r ON prr.ranchid  = r.ranchid
     WHERE prr.rolestatus = 'Pending'
-      AND prr.roleid     = "RoleId"
+      AND prr.roleid     = roleid_param
     ORDER BY p.firstname;
 END;
 $$;
 
 
 -- Get pending new ranch requests (ranch admin view)
+DROP FUNCTION IF EXISTS usp_GetPendingNewRanchRequests() CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetPendingNewRanchRequests()
 RETURNS TABLE(
     "RequestId"     INTEGER,
     "RequestDate"   TIMESTAMP,
-    "RanchName"     TEXT,
-    "FullName"      TEXT,
-    "NationalId"    TEXT,
-    "Email"         TEXT,
-    "RequestStatus" TEXT
+    "RanchName"     VARCHAR,
+    "FullName"      VARCHAR,
+    "NationalId"    VARCHAR,
+    "Email"         VARCHAR,
+    "RequestStatus" VARCHAR
 )
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -515,8 +532,9 @@ $$;
 -- ============================================================
 
 -- Get all fields
+DROP FUNCTION IF EXISTS usp_GetAllFields() CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetAllFields()
-RETURNS TABLE("FieldId" SMALLINT, "FieldName" TEXT)
+RETURNS TABLE("FieldId" SMALLINT, "FieldName" VARCHAR)
 LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
@@ -526,15 +544,16 @@ $$;
 
 
 -- Insert field
+DROP FUNCTION IF EXISTS usp_InsertField(TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_InsertField(
-    "FieldName" TEXT
+    fieldname_param TEXT
 )
 RETURNS TABLE("NewFieldId" SMALLINT)
 LANGUAGE plpgsql AS $$
 DECLARE
     v_new_id SMALLINT;
 BEGIN
-    INSERT INTO field (fieldname) VALUES ("FieldName")
+    INSERT INTO field (fieldname) VALUES (fieldname_param)
     RETURNING fieldid INTO v_new_id;
 
     RETURN QUERY SELECT v_new_id AS "NewFieldId";
@@ -543,36 +562,38 @@ $$;
 
 
 -- Update field
+DROP FUNCTION IF EXISTS usp_UpdateField(SMALLINT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_UpdateField(
-    "FieldId"   SMALLINT,
-    "FieldName" TEXT
+    fieldid_param   SMALLINT,
+    fieldname_param TEXT
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
-    UPDATE field SET fieldname = "FieldName" WHERE fieldid = "FieldId";
+    UPDATE field SET fieldname = fieldname_param WHERE fieldid = fieldid_param;
 END;
 $$;
 
 
 -- Delete field (with validation)
+DROP FUNCTION IF EXISTS usp_DeleteField(SMALLINT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_DeleteField(
-    "FieldId" SMALLINT
+    fieldid_param SMALLINT
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM competition c WHERE c.fieldid = "FieldId") THEN
+    IF EXISTS (SELECT 1 FROM competition c WHERE c.fieldid = fieldid_param) THEN
         RAISE EXCEPTION 'Cannot delete field: There are competitions associated with this field.';
     END IF;
-    IF EXISTS (SELECT 1 FROM classtype ct WHERE ct.fieldid = "FieldId") THEN
+    IF EXISTS (SELECT 1 FROM classtype ct WHERE ct.fieldid = fieldid_param) THEN
         RAISE EXCEPTION 'Cannot delete field: There are class types associated with this field.';
     END IF;
-    IF EXISTS (SELECT 1 FROM judgefield jf WHERE jf.fieldid = "FieldId") THEN
+    IF EXISTS (SELECT 1 FROM judgefield jf WHERE jf.fieldid = fieldid_param) THEN
         RAISE EXCEPTION 'Cannot delete field: There are judges qualified for this field.';
     END IF;
 
-    DELETE FROM field WHERE fieldid = "FieldId";
+    DELETE FROM field WHERE fieldid = fieldid_param;
 END;
 $$;
 
@@ -582,11 +603,12 @@ $$;
 -- ============================================================
 
 -- Insert class type
+DROP FUNCTION IF EXISTS usp_InsertClassType(SMALLINT, TEXT, TEXT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_InsertClassType(
-    "FieldId"                  SMALLINT,
-    "ClassName"                TEXT,
-    "JudgingSheetFormat"       TEXT,
-    "QualificationDescription" TEXT DEFAULT NULL
+    fieldid_param                  SMALLINT,
+    classname_param                TEXT,
+    judgingsheetformat_param       TEXT,
+    qualificationdescription_param TEXT DEFAULT NULL
 )
 RETURNS TABLE("NewClassTypeId" SMALLINT)
 LANGUAGE plpgsql AS $$
@@ -594,7 +616,7 @@ DECLARE
     v_new_id SMALLINT;
 BEGIN
     INSERT INTO classtype (fieldid, classname, judgingsheetformat, qualificationdescription)
-    VALUES ("FieldId", "ClassName", "JudgingSheetFormat", "QualificationDescription")
+    VALUES (fieldid_param, classname_param, judgingsheetformat_param, qualificationdescription_param)
     RETURNING classtypeid INTO v_new_id;
 
     RETURN QUERY SELECT v_new_id AS "NewClassTypeId";
@@ -603,37 +625,39 @@ $$;
 
 
 -- Update class type
+DROP FUNCTION IF EXISTS usp_UpdateClassType(SMALLINT, SMALLINT, TEXT, TEXT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_UpdateClassType(
-    "ClassTypeId"              SMALLINT,
-    "FieldId"                  SMALLINT,
-    "ClassName"                TEXT,
-    "JudgingSheetFormat"       TEXT,
-    "QualificationDescription" TEXT DEFAULT NULL
+    classtypeid_param              SMALLINT,
+    fieldid_param                  SMALLINT,
+    classname_param                TEXT,
+    judgingsheetformat_param       TEXT,
+    qualificationdescription_param TEXT DEFAULT NULL
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
     UPDATE classtype SET
-        fieldid                  = "FieldId",
-        classname                = "ClassName",
-        judgingsheetformat       = "JudgingSheetFormat",
-        qualificationdescription = "QualificationDescription"
-    WHERE classtypeid = "ClassTypeId";
+        fieldid                  = fieldid_param,
+        classname                = classname_param,
+        judgingsheetformat       = judgingsheetformat_param,
+        qualificationdescription = qualificationdescription_param
+    WHERE classtypeid = classtypeid_param;
 END;
 $$;
 
 
 -- Delete class type (with validation)
+DROP FUNCTION IF EXISTS usp_DeleteClassType(SMALLINT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_DeleteClassType(
-    "ClassTypeId" SMALLINT
+    classtypeid_param SMALLINT
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM classincompetition cic WHERE cic.classtypeid = "ClassTypeId") THEN
+    IF EXISTS (SELECT 1 FROM classincompetition cic WHERE cic.classtypeid = classtypeid_param) THEN
         RAISE EXCEPTION 'Cannot delete class type: It is already used in existing or historical competitions.';
     END IF;
-    DELETE FROM classtype WHERE classtypeid = "ClassTypeId";
+    DELETE FROM classtype WHERE classtypeid = classtypeid_param;
 END;
 $$;
 
@@ -643,17 +667,18 @@ $$;
 -- ============================================================
 
 -- Get all judges (optionally filtered by field)
+DROP FUNCTION IF EXISTS usp_GetAllJudges(SMALLINT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetAllJudges(
-    "FieldId" SMALLINT DEFAULT NULL
+    fieldid_param SMALLINT DEFAULT NULL
 )
 RETURNS TABLE(
     "JudgeId"          INTEGER,
-    "FirstNameHebrew"  TEXT,
-    "LastNameHebrew"   TEXT,
-    "FirstNameEnglish" TEXT,
-    "LastNameEnglish"  TEXT,
-    "Country"          TEXT,
-    "QualifiedFields"  TEXT
+    "FirstNameHebrew"  VARCHAR,
+    "LastNameHebrew"   VARCHAR,
+    "FirstNameEnglish" VARCHAR,
+    "LastNameEnglish"  VARCHAR,
+    "Country"          VARCHAR,
+    "QualifiedFields"  VARCHAR
 )
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -672,8 +697,8 @@ BEGIN
             WHERE jf2.judgeid = j.judgeid
         )
     FROM judge j
-    WHERE ("FieldId" IS NULL OR EXISTS (
-        SELECT 1 FROM judgefield jf WHERE jf.judgeid = j.judgeid AND jf.fieldid = "FieldId"
+    WHERE (fieldid_param IS NULL OR EXISTS (
+        SELECT 1 FROM judgefield jf WHERE jf.judgeid = j.judgeid AND jf.fieldid = fieldid_param
     ))
     ORDER BY j.firstnamehebrew ASC;
 END;
@@ -681,12 +706,13 @@ $$;
 
 
 -- Insert judge (basic, without field assignment)
+DROP FUNCTION IF EXISTS usp_InsertJudge(TEXT, TEXT, TEXT, TEXT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_InsertJudge(
-    "FirstNameHebrew"  TEXT,
-    "LastNameHebrew"   TEXT,
-    "FirstNameEnglish" TEXT,
-    "LastNameEnglish"  TEXT,
-    "Country"          TEXT
+    firstnamehebrew_param  TEXT,
+    lastnamehebrew_param   TEXT,
+    firstnameenglish_param TEXT,
+    lastnameenglish_param  TEXT,
+    country_param          TEXT
 )
 RETURNS TABLE("NewJudgeId" INTEGER)
 LANGUAGE plpgsql AS $$
@@ -694,7 +720,7 @@ DECLARE
     v_new_id INTEGER;
 BEGIN
     INSERT INTO judge (firstnamehebrew, lastnamehebrew, firstnameenglish, lastnameenglish, country)
-    VALUES ("FirstNameHebrew", "LastNameHebrew", "FirstNameEnglish", "LastNameEnglish", "Country")
+    VALUES (firstnamehebrew_param, lastnamehebrew_param, firstnameenglish_param, lastnameenglish_param, country_param)
     RETURNING judgeid INTO v_new_id;
 
     RETURN QUERY SELECT v_new_id AS "NewJudgeId";
@@ -703,30 +729,31 @@ $$;
 
 
 -- Insert judge with field assignments (CSV of field IDs)
+DROP FUNCTION IF EXISTS usp_InsertJudgeWithFields(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_InsertJudgeWithFields(
-    "FirstNameHebrew"  TEXT,
-    "LastNameHebrew"   TEXT,
-    "FirstNameEnglish" TEXT,
-    "LastNameEnglish"  TEXT,
-    "Country"          TEXT,
-    "FieldIdsCsv"      TEXT
+    firstnamehebrew_param  TEXT,
+    lastnamehebrew_param   TEXT,
+    firstnameenglish_param TEXT,
+    lastnameenglish_param  TEXT,
+    country_param          TEXT,
+    fieldidscsv_param      TEXT
 )
 RETURNS TABLE("NewJudgeId" INTEGER)
 LANGUAGE plpgsql AS $$
 DECLARE
     v_new_id INTEGER;
 BEGIN
-    IF "FieldIdsCsv" IS NULL OR TRIM("FieldIdsCsv") = '' THEN
+    IF fieldidscsv_param IS NULL OR TRIM(fieldidscsv_param) = '' THEN
         RAISE EXCEPTION 'Cannot create judge: At least one field must be provided.';
     END IF;
 
     INSERT INTO judge (firstnamehebrew, lastnamehebrew, firstnameenglish, lastnameenglish, country)
-    VALUES ("FirstNameHebrew", "LastNameHebrew", "FirstNameEnglish", "LastNameEnglish", "Country")
+    VALUES (firstnamehebrew_param, lastnamehebrew_param, firstnameenglish_param, lastnameenglish_param, country_param)
     RETURNING judgeid INTO v_new_id;
 
     INSERT INTO judgefield (judgeid, fieldid)
     SELECT v_new_id, CAST(TRIM(val) AS SMALLINT)
-    FROM unnest(string_to_array("FieldIdsCsv", ',')) AS val;
+    FROM unnest(string_to_array(fieldidscsv_param, ',')) AS val;
 
     RETURN QUERY SELECT v_new_id AS "NewJudgeId";
 END;
@@ -734,82 +761,86 @@ $$;
 
 
 -- Update judge and reassign fields (CSV of field IDs)
+DROP FUNCTION IF EXISTS usp_UpdateJudge(INTEGER, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_UpdateJudge(
-    "JudgeId"          INTEGER,
-    "FirstNameHebrew"  TEXT,
-    "LastNameHebrew"   TEXT,
-    "FirstNameEnglish" TEXT,
-    "LastNameEnglish"  TEXT,
-    "Country"          TEXT,
-    "FieldIdsCsv"      TEXT
+    judgeid_param          INTEGER,
+    firstnamehebrew_param  TEXT,
+    lastnamehebrew_param   TEXT,
+    firstnameenglish_param TEXT,
+    lastnameenglish_param  TEXT,
+    country_param          TEXT,
+    fieldidscsv_param      TEXT
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF "FieldIdsCsv" IS NULL OR TRIM("FieldIdsCsv") = '' THEN
+    IF fieldidscsv_param IS NULL OR TRIM(fieldidscsv_param) = '' THEN
         RAISE EXCEPTION 'Cannot update judge: At least one field must be provided.';
     END IF;
 
     UPDATE judge SET
-        firstnamehebrew  = "FirstNameHebrew",
-        lastnamehebrew   = "LastNameHebrew",
-        firstnameenglish = "FirstNameEnglish",
-        lastnameenglish  = "LastNameEnglish",
-        country          = "Country"
-    WHERE judgeid = "JudgeId";
+        firstnamehebrew  = firstnamehebrew_param,
+        lastnamehebrew   = lastnamehebrew_param,
+        firstnameenglish = firstnameenglish_param,
+        lastnameenglish  = lastnameenglish_param,
+        country          = country_param
+    WHERE judgeid = judgeid_param;
 
-    DELETE FROM judgefield WHERE judgeid = "JudgeId";
+    DELETE FROM judgefield WHERE judgeid = judgeid_param;
 
     INSERT INTO judgefield (judgeid, fieldid)
-    SELECT "JudgeId", CAST(TRIM(val) AS SMALLINT)
-    FROM unnest(string_to_array("FieldIdsCsv", ',')) AS val;
+    SELECT judgeid_param, CAST(TRIM(val) AS SMALLINT)
+    FROM unnest(string_to_array(fieldidscsv_param, ',')) AS val;
 END;
 $$;
 
 
 -- Delete judge (with validation)
+DROP FUNCTION IF EXISTS usp_DeleteJudge(INTEGER) CASCADE;
 CREATE OR REPLACE FUNCTION usp_DeleteJudge(
-    "JudgeId" INTEGER
+    judgeid_param INTEGER
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM classjudge cj WHERE cj.judgeid = "JudgeId") THEN
+    IF EXISTS (SELECT 1 FROM classjudge cj WHERE cj.judgeid = judgeid_param) THEN
         RAISE EXCEPTION 'Cannot delete judge: Judge is assigned to specific classes.';
     END IF;
 
-    DELETE FROM judgefield WHERE judgeid = "JudgeId";
-    DELETE FROM judge WHERE judgeid = "JudgeId";
+    DELETE FROM judgefield WHERE judgeid = judgeid_param;
+    DELETE FROM judge WHERE judgeid = judgeid_param;
 END;
 $$;
 
 
 -- Add judge to a field
+DROP FUNCTION IF EXISTS usp_AddJudgeToField(INTEGER, SMALLINT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_AddJudgeToField(
-    "JudgeId" INTEGER,
-    "FieldId" SMALLINT
+    judgeid_param INTEGER,
+    fieldid_param SMALLINT
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM judgefield jf WHERE jf.judgeid = "JudgeId" AND jf.fieldid = "FieldId") THEN
+    IF EXISTS (SELECT 1 FROM judgefield jf WHERE jf.judgeid = judgeid_param AND jf.fieldid = fieldid_param) THEN
         RAISE EXCEPTION 'Cannot add field: Judge is already assigned to this field.';
     END IF;
 
-    INSERT INTO judgefield (judgeid, fieldid) VALUES ("JudgeId", "FieldId");
+    INSERT INTO judgefield (judgeid, fieldid) VALUES (judgeid_param, fieldid_param);
 END;
 $$;
 
 
 -- Remove judge from a field
+DROP FUNCTION IF EXISTS usp_RemoveJudgeFromField(INTEGER, SMALLINT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_RemoveJudgeFromField(
-    "JudgeId" INTEGER,
-    "FieldId" SMALLINT
+    judgeid_param INTEGER,
+    fieldid_param SMALLINT
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
-    DELETE FROM judgefield WHERE judgeid = "JudgeId" AND fieldid = "FieldId";
+    DELETE FROM judgefield WHERE judgeid = judgeid_param AND fieldid = fieldid_param;
 END;
 $$;
 
@@ -819,9 +850,10 @@ $$;
 -- ============================================================
 
 -- Insert prize type
+DROP FUNCTION IF EXISTS usp_InsertPrizeType(TEXT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_InsertPrizeType(
-    "PrizeTypeName"   TEXT,
-    "PrizeDescription" TEXT DEFAULT NULL
+    prizetypename_param   TEXT,
+    prizedescription_param TEXT DEFAULT NULL
 )
 RETURNS TABLE("NewPrizeTypeId" SMALLINT)
 LANGUAGE plpgsql AS $$
@@ -829,7 +861,7 @@ DECLARE
     v_new_id SMALLINT;
 BEGIN
     INSERT INTO prizetype (prizetypename, prizedescription)
-    VALUES ("PrizeTypeName", "PrizeDescription")
+    VALUES (prizetypename_param, prizedescription_param)
     RETURNING prizetypeid INTO v_new_id;
 
     RETURN QUERY SELECT v_new_id AS "NewPrizeTypeId";
@@ -838,33 +870,35 @@ $$;
 
 
 -- Update prize type
+DROP FUNCTION IF EXISTS usp_UpdatePrizeType(SMALLINT, TEXT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_UpdatePrizeType(
-    "PrizeTypeId"     SMALLINT,
-    "PrizeTypeName"   TEXT,
-    "PrizeDescription" TEXT DEFAULT NULL
+    prizetypeid_param     SMALLINT,
+    prizetypename_param   TEXT,
+    prizedescription_param TEXT DEFAULT NULL
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
     UPDATE prizetype SET
-        prizetypename   = "PrizeTypeName",
-        prizedescription = "PrizeDescription"
-    WHERE prizetypeid = "PrizeTypeId";
+        prizetypename   = prizetypename_param,
+        prizedescription = prizedescription_param
+    WHERE prizetypeid = prizetypeid_param;
 END;
 $$;
 
 
 -- Delete prize type (with validation)
+DROP FUNCTION IF EXISTS usp_DeletePrizeType(SMALLINT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_DeletePrizeType(
-    "PrizeTypeId" SMALLINT
+    prizetypeid_param SMALLINT
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM classprize cp WHERE cp.prizetypeid = "PrizeTypeId") THEN
+    IF EXISTS (SELECT 1 FROM classprize cp WHERE cp.prizetypeid = prizetypeid_param) THEN
         RAISE EXCEPTION 'Cannot delete prize type: It is already associated with existing or historical classes.';
     END IF;
-    DELETE FROM prizetype WHERE prizetypeid = "PrizeTypeId";
+    DELETE FROM prizetype WHERE prizetypeid = prizetypeid_param;
 END;
 $$;
 
@@ -874,11 +908,12 @@ $$;
 -- ============================================================
 
 -- Get all fines
+DROP FUNCTION IF EXISTS usp_GetAllFines() CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetAllFines()
 RETURNS TABLE(
     "FineId"          INTEGER,
-    "FineName"        TEXT,
-    "FineDescription" TEXT,
+    "FineName"        VARCHAR,
+    "FineDescription" VARCHAR,
     "FineAmount"      NUMERIC(10,2)
 )
 LANGUAGE plpgsql AS $$
@@ -891,10 +926,11 @@ $$;
 
 
 -- Insert fine
+DROP FUNCTION IF EXISTS usp_InsertFine(TEXT, NUMERIC, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_InsertFine(
-    "FineName"        TEXT,
-    "FineDescription" TEXT DEFAULT NULL,
-    "FineAmount"      NUMERIC(10,2)
+    finename_param        TEXT,
+    fineamount_param      NUMERIC(10,2),
+    finedescription_param TEXT DEFAULT NULL
 )
 RETURNS TABLE("NewFineId" INTEGER)
 LANGUAGE plpgsql AS $$
@@ -902,7 +938,7 @@ DECLARE
     v_new_id INTEGER;
 BEGIN
     INSERT INTO fine (finename, finedescription, fineamount)
-    VALUES ("FineName", "FineDescription", "FineAmount")
+    VALUES (finename_param, finedescription_param, fineamount_param)
     RETURNING fineid INTO v_new_id;
 
     RETURN QUERY SELECT v_new_id AS "NewFineId";
@@ -911,32 +947,34 @@ $$;
 
 
 -- Update fine
+DROP FUNCTION IF EXISTS usp_UpdateFine(INTEGER, TEXT, NUMERIC, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_UpdateFine(
-    "FineId"          INTEGER,
-    "FineName"        TEXT,
-    "FineDescription" TEXT DEFAULT NULL,
-    "FineAmount"      NUMERIC(10,2)
+    fineid_param          INTEGER,
+    finename_param        TEXT,
+    fineamount_param      NUMERIC(10,2),
+    finedescription_param TEXT DEFAULT NULL
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
     UPDATE fine SET
-        finename        = "FineName",
-        finedescription = "FineDescription",
-        fineamount      = "FineAmount"
-    WHERE fineid = "FineId";
+        finename        = finename_param,
+        finedescription = finedescription_param,
+        fineamount      = fineamount_param
+    WHERE fineid = fineid_param;
 END;
 $$;
 
 
 -- Delete fine
+DROP FUNCTION IF EXISTS usp_DeleteFine(INTEGER) CASCADE;
 CREATE OR REPLACE FUNCTION usp_DeleteFine(
-    "FineId" INTEGER
+    fineid_param INTEGER
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
-    DELETE FROM fine WHERE fineid = "FineId";
+    DELETE FROM fine WHERE fineid = fineid_param;
 END;
 $$;
 
@@ -946,304 +984,114 @@ $$;
 -- ============================================================
 
 -- Check if national ID exists
+DROP FUNCTION IF EXISTS usp_CheckNationalIdExists(TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_CheckNationalIdExists(
-    "NationalId" TEXT
+    nationalid_param TEXT
 )
 RETURNS TABLE("ExistsFlag" INTEGER)
 LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
     SELECT CASE WHEN EXISTS (
-        SELECT 1 FROM person p WHERE p.nationalid = "NationalId"
+        SELECT 1 FROM person p WHERE p.nationalid = nationalid_param
     ) THEN 1 ELSE 0 END AS "ExistsFlag";
 END;
 $$;
 
 
 -- Assign person role at ranch
+DROP FUNCTION IF EXISTS usp_AssignPersonRoleAtRanch(INTEGER, INTEGER, SMALLINT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_AssignPersonRoleAtRanch(
-    "PersonId"   INTEGER,
-    "RanchId"    INTEGER,
-    "RoleId"     SMALLINT,
-    "RoleStatus" TEXT DEFAULT 'Pending'
+    personid_param   INTEGER,
+    ranchid_param    INTEGER,
+    roleid_param     SMALLINT,
+    rolestatus_param TEXT DEFAULT 'Pending'
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF "RoleStatus" NOT IN ('Pending', 'Approved', 'Rejected') THEN
+    IF rolestatus_param NOT IN ('Pending', 'Approved', 'Rejected') THEN
         RAISE EXCEPTION 'Invalid RoleStatus';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM person p WHERE p.personid = "PersonId") THEN
+    IF NOT EXISTS (SELECT 1 FROM person p WHERE p.personid = personid_param) THEN
         RAISE EXCEPTION 'Person does not exist';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM ranch r WHERE r.ranchid = "RanchId") THEN
+    IF NOT EXISTS (SELECT 1 FROM ranch r WHERE r.ranchid = ranchid_param) THEN
         RAISE EXCEPTION 'Ranch does not exist';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM role r WHERE r.roleid = "RoleId") THEN
+    IF NOT EXISTS (SELECT 1 FROM role r WHERE r.roleid = roleid_param) THEN
         RAISE EXCEPTION 'Role does not exist';
     END IF;
 
-    INSERT INTO personranch (personid, ranchid) VALUES ("PersonId", "RanchId")
+    INSERT INTO personranch (personid, ranchid) VALUES (personid_param, ranchid_param)
     ON CONFLICT DO NOTHING;
 
     IF NOT EXISTS (
         SELECT 1 FROM personranchrole prr
-        WHERE prr.personid = "PersonId" AND prr.ranchid = "RanchId" AND prr.roleid = "RoleId"
+        WHERE prr.personid = personid_param AND prr.ranchid = ranchid_param AND prr.roleid = roleid_param
     ) THEN
         INSERT INTO personranchrole (personid, ranchid, roleid, rolestatus)
-        VALUES ("PersonId", "RanchId", "RoleId", "RoleStatus");
+        VALUES (personid_param, ranchid_param, roleid_param, rolestatus_param);
     ELSE
-        UPDATE personranchrole SET rolestatus = "RoleStatus"
-        WHERE personid = "PersonId" AND ranchid = "RanchId" AND roleid = "RoleId";
+        UPDATE personranchrole SET rolestatus = rolestatus_param
+        WHERE personid = personid_param AND ranchid = ranchid_param AND roleid = roleid_param;
     END IF;
 END;
 $$;
 
 
 -- Update person role status
+DROP FUNCTION IF EXISTS usp_UpdatePersonRoleStatus(INTEGER, INTEGER, SMALLINT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_UpdatePersonRoleStatus(
-    "PersonId"   INTEGER,
-    "RanchId"    INTEGER,
-    "RoleId"     SMALLINT,
-    "RoleStatus" TEXT
+    personid_param   INTEGER,
+    ranchid_param    INTEGER,
+    roleid_param     SMALLINT,
+    rolestatus_param TEXT
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF "RoleStatus" NOT IN ('Pending', 'Approved', 'Rejected') THEN
+    IF rolestatus_param NOT IN ('Pending', 'Approved', 'Rejected') THEN
         RAISE EXCEPTION 'Invalid RoleStatus';
     END IF;
     IF NOT EXISTS (
         SELECT 1 FROM personranchrole prr
-        WHERE prr.personid = "PersonId" AND prr.ranchid = "RanchId" AND prr.roleid = "RoleId"
+        WHERE prr.personid = personid_param AND prr.ranchid = ranchid_param AND prr.roleid = roleid_param
     ) THEN
         RAISE EXCEPTION 'PersonRanchRole does not exist';
     END IF;
 
-    UPDATE personranchrole SET rolestatus = "RoleStatus"
-    WHERE personid = "PersonId" AND ranchid = "RanchId" AND roleid = "RoleId";
+    UPDATE personranchrole SET rolestatus = rolestatus_param
+    WHERE personid = personid_param AND ranchid = ranchid_param AND roleid = roleid_param;
 END;
 $$;
 
 
 -- Set must change password flag
+DROP FUNCTION IF EXISTS usp_SetMustChangePassword(INTEGER, BOOLEAN) CASCADE;
 CREATE OR REPLACE FUNCTION usp_SetMustChangePassword(
-    "SystemUserId"       INTEGER,
-    "MustChangePassword" BOOLEAN
+    systemuserid_param       INTEGER,
+    mustchangepassword_param BOOLEAN
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
-    UPDATE systemuser SET mustchangepassword = "MustChangePassword"
-    WHERE systemuserid = "SystemUserId";
+    UPDATE systemuser SET mustchangepassword = mustchangepassword_param
+    WHERE systemuserid = systemuserid_param;
 END;
 $$;
 
 
 -- Toggle system user active status
+DROP FUNCTION IF EXISTS usp_ToggleSystemUserStatus(INTEGER, BOOLEAN) CASCADE;
 CREATE OR REPLACE FUNCTION usp_ToggleSystemUserStatus(
-    "SystemUserId" INTEGER,
-    "IsActive"     BOOLEAN
+    systemuserid_param INTEGER,
+    isactive_param     BOOLEAN
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
-    UPDATE systemuser SET isactive = "IsActive"
-    WHERE systemuserid = "SystemUserId";
-END;
-$$;
-
-
--- Get all ranches and roles for a person
-CREATE OR REPLACE FUNCTION usp_GetPersonRanchesAndRoles(
-    "PersonId" INTEGER
-)
-RETURNS TABLE(
-    "RanchId"    INTEGER,
-    "RanchName"  TEXT,
-    "RoleId"     SMALLINT,
-    "RoleName"   TEXT,
-    "RoleStatus" TEXT
-)
-LANGUAGE plpgsql AS $$
-BEGIN
-    RETURN QUERY
-    SELECT prr.ranchid, r.ranchname, prr.roleid, rl.rolename, prr.rolestatus
-    FROM personranchrole prr
-    INNER JOIN ranch r  ON prr.ranchid = r.ranchid
-    INNER JOIN role  rl ON prr.roleid  = rl.roleid
-    WHERE prr.personid = "PersonId";
-END;
-$$;
-
-
--- Update person details
-CREATE OR REPLACE FUNCTION usp_UpdatePerson(
-    "PersonId"  INTEGER,
-    "FirstName" TEXT,
-    "LastName"  TEXT,
-    "Gender"    TEXT,
-    "CellPhone" TEXT,
-    "Email"     TEXT
-)
-RETURNS VOID
-LANGUAGE plpgsql AS $$
-BEGIN
-    UPDATE person SET
-        firstname = "FirstName",
-        lastname  = "LastName",
-        gender    = "Gender",
-        cellphone = "CellPhone",
-        email     = "Email"
-    WHERE personid = "PersonId";
-END;
-$$;
-
-
--- Search persons
-CREATE OR REPLACE FUNCTION usp_SearchPersons(
-    "SearchText" TEXT    DEFAULT NULL,
-    "IsActive"   BOOLEAN DEFAULT NULL
-)
-RETURNS TABLE(
-    "PersonId"   INTEGER,
-    "NationalId" TEXT,
-    "FirstName"  TEXT,
-    "LastName"   TEXT,
-    "Email"      TEXT,
-    "CellPhone"  TEXT,
-    "Username"   TEXT,
-    "IsActive"   BOOLEAN
-)
-LANGUAGE plpgsql AS $$
-BEGIN
-    RETURN QUERY
-    SELECT
-        p.personid, p.nationalid, p.firstname, p.lastname, p.email, p.cellphone,
-        su.username, su.isactive
-    FROM person p
-    INNER JOIN systemuser su ON p.personid = su.systemuserid
-    WHERE ("SearchText" IS NULL OR
-           p.firstname ILIKE '%' || "SearchText" || '%' OR
-           p.lastname  ILIKE '%' || "SearchText" || '%')
-      AND ("IsActive" IS NULL OR su.isactive = "IsActive");
-END;
-$$;
-
-
--- Insert or upgrade federation member
-CREATE OR REPLACE FUNCTION usp_InsertOrUpgradeFederationMember(
-    "PersonId"             INTEGER     DEFAULT NULL,
-    "NationalId"           TEXT        DEFAULT NULL,
-    "FirstName"            TEXT        DEFAULT NULL,
-    "LastName"             TEXT        DEFAULT NULL,
-    "Gender"               TEXT        DEFAULT NULL,
-    "DateOfBirth"          DATE        DEFAULT NULL,
-    "CellPhone"            TEXT        DEFAULT NULL,
-    "Email"                TEXT        DEFAULT NULL,
-    "HasValidMembership"   BOOLEAN,
-    "MedicalCheckValidUntil" DATE,
-    "CertificationLevel"   TEXT
-)
-RETURNS TABLE("FederationMemberId" INTEGER)
-LANGUAGE plpgsql AS $$
-DECLARE
-    v_person_id INTEGER := "PersonId";
-BEGIN
-    IF v_person_id IS NULL THEN
-        INSERT INTO person (nationalid, firstname, lastname, gender, dateofbirth, cellphone, email)
-        VALUES ("NationalId", "FirstName", "LastName", "Gender", "DateOfBirth", "CellPhone", "Email")
-        RETURNING personid INTO v_person_id;
-    END IF;
-
-    INSERT INTO federationmember (federationmemberid, hasvalidmembership, medicalcheckvaliduntil, certificationlevel)
-    VALUES (v_person_id, "HasValidMembership", "MedicalCheckValidUntil", "CertificationLevel");
-
-    RETURN QUERY SELECT v_person_id AS "FederationMemberId";
-END;
-$$;
-
-
--- Get all federation members
-CREATE OR REPLACE FUNCTION usp_GetAllFederationMembers()
-RETURNS TABLE(
-    "FederationMemberId"     INTEGER,
-    "NationalId"             TEXT,
-    "FirstName"              TEXT,
-    "LastName"               TEXT,
-    "HasValidMembership"     BOOLEAN,
-    "MedicalCheckValidUntil" DATE,
-    "CertificationLevel"     TEXT
-)
-LANGUAGE plpgsql AS $$
-BEGIN
-    RETURN QUERY
-    SELECT
-        fm.federationmemberid, p.nationalid, p.firstname, p.lastname,
-        fm.hasvalidmembership, fm.medicalcheckvaliduntil, fm.certificationlevel
-    FROM federationmember fm
-    INNER JOIN person p ON fm.federationmemberid = p.personid;
-END;
-$$;
-
-
--- Add managed person
-CREATE OR REPLACE FUNCTION usp_AddManagedPerson(
-    "SystemUserId"   INTEGER,
-    "PersonId"       INTEGER,
-    "ApprovalStatus" TEXT DEFAULT 'Pending'
-)
-RETURNS VOID
-LANGUAGE plpgsql AS $$
-BEGIN
-    INSERT INTO personmanagedbysystemuser (systemuserid, personid, requestdate, approvalstatus)
-    VALUES ("SystemUserId", "PersonId", NOW(), "ApprovalStatus");
-END;
-$$;
-
-
--- Get managed persons for a system user
-CREATE OR REPLACE FUNCTION usp_GetManagedPersons(
-    "SystemUserId" INTEGER
-)
-RETURNS TABLE(
-    "PersonId"       INTEGER,
-    "FirstName"      TEXT,
-    "LastName"       TEXT,
-    "NationalId"     TEXT,
-    "RequestDate"    TIMESTAMP,
-    "ApprovalStatus" TEXT
-)
-LANGUAGE plpgsql AS $$
-BEGIN
-    RETURN QUERY
-    SELECT m.personid, p.firstname, p.lastname, p.nationalid, m.requestdate, m.approvalstatus
-    FROM personmanagedbysystemuser m
-    INNER JOIN person p ON m.personid = p.personid
-    WHERE m.systemuserid = "SystemUserId";
-END;
-$$;
-
-
--- Insert person (legacy)
-CREATE OR REPLACE FUNCTION usp_InsertPerson(
-    "NationalId"  TEXT,
-    "FirstName"   TEXT,
-    "LastName"    TEXT,
-    "Gender"      TEXT,
-    "DateOfBirth" DATE,
-    "CellPhone"   TEXT,
-    "Email"       TEXT
-)
-RETURNS TABLE("NewPersonId" INTEGER)
-LANGUAGE plpgsql AS $$
-DECLARE
-    v_new_id INTEGER;
-BEGIN
-    INSERT INTO person (nationalid, firstname, lastname, gender, dateofbirth, cellphone, email)
-    VALUES ("NationalId", "FirstName", "LastName", "Gender", "DateOfBirth", "CellPhone", "Email")
-    RETURNING personid INTO v_new_id;
-
-    RETURN QUERY SELECT v_new_id AS "NewPersonId";
+    UPDATE systemuser SET isactive = isactive_param
+    WHERE systemuserid = systemuserid_param;
 END;
 $$;

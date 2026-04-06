@@ -1,14 +1,14 @@
 CREATE OR REPLACE FUNCTION usp_InsertClassInCompetition(
-    "CompetitionId"  INTEGER,
-    "ClassTypeId"    SMALLINT,
-    "ArenaRanchId"   INTEGER,
-    "ArenaId"        SMALLINT,
-    "ClassDateTime"  TIMESTAMP  DEFAULT NULL,
-    "StartTime"      TIME       DEFAULT NULL,
-    "OrderInDay"     SMALLINT   DEFAULT NULL,
-    "OrganizerCost"  NUMERIC(10,2) DEFAULT NULL,
-    "FederationCost" NUMERIC(10,2) DEFAULT NULL,
-    "ClassNotes"     TEXT       DEFAULT NULL
+    p_CompetitionId  INTEGER,
+    p_ClassTypeId    SMALLINT,
+    p_ArenaRanchId   INTEGER,
+    p_ArenaId        SMALLINT,
+    p_ClassDateTime  TIMESTAMPTZ DEFAULT NULL,
+    p_StartTime      TIME       DEFAULT NULL,
+    p_OrderInDay     SMALLINT   DEFAULT NULL,
+    p_OrganizerCost  NUMERIC(10,2) DEFAULT NULL,
+    p_FederationCost NUMERIC(10,2) DEFAULT NULL,
+    p_ClassNotes     TEXT       DEFAULT NULL
 )
 RETURNS TABLE("NewClassInCompId" INTEGER)
 LANGUAGE plpgsql AS $$
@@ -21,9 +21,9 @@ BEGIN
         organizercost, federationcost, classnotes
     )
     VALUES (
-        "CompetitionId", "ClassTypeId", "ArenaRanchId", "ArenaId",
-        "ClassDateTime", "StartTime", "OrderInDay",
-        "OrganizerCost", "FederationCost", "ClassNotes"
+        p_CompetitionId, p_ClassTypeId, p_ArenaRanchId, p_ArenaId,
+        p_ClassDateTime, p_StartTime, p_OrderInDay,
+        p_OrganizerCost, p_FederationCost, p_ClassNotes
     )
     RETURNING classincompid INTO v_new_id;
 

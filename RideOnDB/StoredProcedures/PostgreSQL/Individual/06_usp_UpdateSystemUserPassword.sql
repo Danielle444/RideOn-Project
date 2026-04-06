@@ -1,17 +1,17 @@
 CREATE OR REPLACE FUNCTION usp_UpdateSystemUserPassword(
-    "SystemUserId"   INTEGER,
-    "NewPasswordHash" TEXT,
-    "NewPasswordSalt" TEXT
+    p_SystemUserId   INTEGER,
+    p_NewPasswordHash TEXT,
+    p_NewPasswordSalt TEXT
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
     UPDATE systemuser
     SET
-        passwordhash       = "NewPasswordHash",
-        passwordsalt       = "NewPasswordSalt",
+        passwordhash       = p_NewPasswordHash,
+        passwordsalt       = p_NewPasswordSalt,
         mustchangepassword = FALSE
-    WHERE systemuserid = "SystemUserId"
+    WHERE systemuserid = p_SystemUserId
       AND isactive     = TRUE;
 END;
 $$;

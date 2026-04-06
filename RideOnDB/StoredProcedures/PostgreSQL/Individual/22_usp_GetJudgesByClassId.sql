@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetJudgesByClassId(
-    "ClassInCompId" INTEGER
+    p_ClassInCompId INTEGER
 )
 RETURNS TABLE(
     "JudgeId"          INTEGER,
@@ -21,6 +21,6 @@ BEGIN
         j.country
     FROM judge j
     INNER JOIN classjudge cj ON j.judgeid = cj.judgeid
-    WHERE cj.classincompid = "ClassInCompId";
+    WHERE cj.classincompid = p_ClassInCompId;
 END;
 $$;

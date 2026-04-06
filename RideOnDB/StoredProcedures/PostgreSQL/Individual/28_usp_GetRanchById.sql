@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetRanchById(
-    RanchId INTEGER
+    p_RanchId INTEGER
 )
 RETURNS TABLE(
     "RanchId"      INTEGER,
@@ -7,8 +7,7 @@ RETURNS TABLE(
     "ContactEmail" TEXT,
     "ContactPhone" TEXT,
     "WebsiteUrl"   TEXT,
-    "Latitude"     DOUBLE PRECISION,
-    "Longitude"    DOUBLE PRECISION
+    "Location"     TEXT
 )
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -19,9 +18,8 @@ BEGIN
         r.contactemail,
         r.contactphone,
         r.websiteurl,
-        ST_Y(r.location::geometry),
-        ST_X(r.location::geometry)
+        r.location
     FROM ranch r
-    WHERE r.ranchid = RanchId;
+    WHERE r.ranchid = p_RanchId;
 END;
 $$;

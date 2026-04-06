@@ -1,12 +1,12 @@
 CREATE OR REPLACE FUNCTION usp_GetNewRanchRequests(
-    RequestStatus TEXT DEFAULT NULL,
-    "SearchText"  TEXT DEFAULT NULL
+    p_RequestStatus TEXT DEFAULT NULL,
+    p_SearchText    TEXT DEFAULT NULL
 )
 RETURNS TABLE(
     "RequestId"               INTEGER,
     "RanchId"                 INTEGER,
     "SubmittedBySystemUserId" INTEGER,
-    "RequestDate"             TIMESTAMP,
+    "RequestDate"             TIMESTAMPTZ,
     "RanchName"               TEXT,
     "PersonId"                INTEGER,
     "FullName"                TEXT,
@@ -16,11 +16,11 @@ RETURNS TABLE(
     "RequestStatus"           TEXT,
     "ResolvedBySuperUserId"   INTEGER,
     "ResolvedBySuperUserEmail" TEXT,
-    "ResolvedDate"            TIMESTAMP
+    "ResolvedDate"            TIMESTAMPTZ
 )
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF RequestStatus IS NOT NULL AND RequestStatus NOT IN ('Pending', 'Approved', 'Rejected') THEN
+    IF p_RequestStatus IS NOT NULL AND p_RequestStatus NOT IN ('Pending', 'Approved', 'Rejected') THEN
         RAISE EXCEPTION 'Invalid RequestStatus. Allowed: Pending, Approved, Rejected.';
     END IF;
 
@@ -45,14 +45,14 @@ BEGIN
     INNER JOIN systemuser sysu ON nrr.submittedbysystemuserid = sysu.systemuserid
     INNER JOIN person     p    ON sysu.systemuserid = p.personid
     LEFT  JOIN superuser  su   ON nrr.resolvedbysuperuserid = su.superuserid
-    WHERE (RequestStatus IS NULL OR nrr.requeststatus = RequestStatus)
+    WHERE (p_RequestStatus IS NULL OR nrr.requeststatus = p_RequestStatus)
       AND (
-            "SearchText" IS NULL OR TRIM("SearchText") = ''
-            OR r.ranchname ILIKE '%' || "SearchText" || '%'
-            OR (p.firstname || ' ' || p.lastname) ILIKE '%' || "SearchText" || '%'
-            OR p.nationalid ILIKE '%' || "SearchText" || '%'
-            OR COALESCE(p.email, '') ILIKE '%' || "SearchText" || '%'
-            OR COALESCE(p.cellphone, '') ILIKE '%' || "SearchText" || '%'
+            p_SearchText IS NULL OR TRIM(p_SearchText) = ''
+            OR r.ranchname ILIKE '%' || p_SearchText || '%'
+            OR (p.firstname || ' ' || p.lastname) ILIKE '%' || p_SearchText || '%'
+            OR p.nationalid ILIKE '%' || p_SearchText || '%'
+            OR COALESCE(p.email, '') ILIKE '%' || p_SearchText || '%'
+            OR COALESCE(p.cellphone, '') ILIKE '%' || p_SearchText || '%'
           )
     ORDER BY
         CASE nrr.requeststatus

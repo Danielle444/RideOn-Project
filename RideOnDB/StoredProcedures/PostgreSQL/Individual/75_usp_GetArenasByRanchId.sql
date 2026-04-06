@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetArenasByRanchId(
-    "RanchId" INTEGER
+    p_RanchId INTEGER
 )
 RETURNS TABLE(
     "ArenaId"     SMALLINT,
@@ -13,7 +13,7 @@ BEGIN
     RETURN QUERY
     SELECT a.arenaid, a.arenaname, a.arenalength, a.arenawidth, a.iscovered
     FROM arena a
-    WHERE a.ranchid = "RanchId"
+    WHERE a.ranchid = p_RanchId
     ORDER BY a.arenaname;
 END;
 $$;

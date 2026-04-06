@@ -1,5 +1,6 @@
+DROP FUNCTION IF EXISTS usp_GetPersonByNationalIdForRegistration CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetPersonByNationalIdForRegistration(
-    NationalId TEXT
+    p_NationalId TEXT
 )
 RETURNS TABLE(
     "PersonId"      INTEGER,
@@ -27,6 +28,6 @@ BEGIN
         (su.systemuserid IS NOT NULL)
     FROM person p
     LEFT JOIN systemuser su ON p.personid = su.systemuserid
-    WHERE p.nationalid = $1;
+    WHERE p.nationalid = p_NationalId;
 END;
 $$;

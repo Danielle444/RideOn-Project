@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetSuperUserById(
-    SuperUserId INTEGER
+    p_SuperUserId INTEGER
 )
 RETURNS TABLE(
     "SuperUserId"        INTEGER,
@@ -15,6 +15,6 @@ BEGIN
     SELECT su.superuserid, su.email, su.passwordhash, su.passwordsalt,
            su.isactive, su.mustchangepassword
     FROM superuser su
-    WHERE su.superuserid = SuperUserId;
+    WHERE su.superuserid = p_SuperUserId;
 END;
 $$;

@@ -1,27 +1,20 @@
 CREATE OR REPLACE FUNCTION usp_UpdateRanch(
-    "RanchId"    INTEGER,
-    "RanchName"  TEXT,
-    "ContactEmail" TEXT DEFAULT NULL,
-    "ContactPhone" TEXT DEFAULT NULL,
-    "WebsiteUrl"   TEXT DEFAULT NULL,
-    "Latitude"     DOUBLE PRECISION DEFAULT NULL,
-    "Longitude"    DOUBLE PRECISION DEFAULT NULL
+    p_RanchId      INTEGER,
+    p_RanchName    TEXT,
+    p_ContactEmail TEXT DEFAULT NULL,
+    p_ContactPhone TEXT DEFAULT NULL,
+    p_WebsiteUrl   TEXT DEFAULT NULL,
+    p_Location     TEXT DEFAULT NULL
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
-DECLARE
-    v_geog geography := NULL;
 BEGIN
-    IF "Latitude" IS NOT NULL AND "Longitude" IS NOT NULL THEN
-        v_geog := ST_SetSRID(ST_MakePoint("Longitude", "Latitude"), 4326)::geography;
-    END IF;
-
     UPDATE ranch SET
-        ranchname    = "RanchName",
-        contactemail = "ContactEmail",
-        contactphone = "ContactPhone",
-        websiteurl   = "WebsiteUrl",
-        location     = v_geog
-    WHERE ranchid = "RanchId";
+        ranchname    = p_RanchName,
+        contactemail = p_ContactEmail,
+        contactphone = p_ContactPhone,
+        websiteurl   = p_WebsiteUrl,
+        location     = p_Location
+    WHERE ranchid = p_RanchId;
 END;
 $$;

@@ -9,12 +9,13 @@
 -- ============================================================
 
 -- Get arenas by ranch ID
+DROP FUNCTION IF EXISTS usp_GetArenasByRanchId(INTEGER) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetArenasByRanchId(
-    "RanchId" INTEGER
+    ranchid_param INTEGER
 )
 RETURNS TABLE(
     "ArenaId"     SMALLINT,
-    "ArenaName"   TEXT,
+    "ArenaName"   VARCHAR,
     "ArenaLength" SMALLINT,
     "ArenaWidth"  SMALLINT,
     "IsCovered"   BOOLEAN
@@ -24,19 +25,20 @@ BEGIN
     RETURN QUERY
     SELECT a.arenaid, a.arenaname, a.arenalength, a.arenawidth, a.iscovered
     FROM arena a
-    WHERE a.ranchid = "RanchId"
+    WHERE a.ranchid = ranchid_param
     ORDER BY a.arenaname;
 END;
 $$;
 
 
 -- Insert arena (auto-calculates the next ArenaId for the ranch)
+DROP FUNCTION IF EXISTS usp_InsertArena(INTEGER, TEXT, SMALLINT, SMALLINT, BOOLEAN) CASCADE;
 CREATE OR REPLACE FUNCTION usp_InsertArena(
-    "RanchId"     INTEGER,
-    "ArenaName"   TEXT,
-    "ArenaLength" SMALLINT DEFAULT NULL,
-    "ArenaWidth"  SMALLINT DEFAULT NULL,
-    "IsCovered"   BOOLEAN  DEFAULT NULL
+    ranchid_param     INTEGER,
+    arenaname_param   TEXT,
+    arenalength_param SMALLINT DEFAULT NULL,
+    arenawidth_param  SMALLINT DEFAULT NULL,
+    iscovered_param   BOOLEAN  DEFAULT NULL
 )
 RETURNS TABLE("NewArenaId" SMALLINT)
 LANGUAGE plpgsql AS $$
@@ -44,10 +46,10 @@ DECLARE
     v_new_arena_id SMALLINT;
 BEGIN
     SELECT COALESCE(MAX(a.arenaid), 0) + 1 INTO v_new_arena_id
-    FROM arena a WHERE a.ranchid = "RanchId";
+    FROM arena a WHERE a.ranchid = ranchid_param;
 
     INSERT INTO arena (ranchid, arenaid, arenaname, arenalength, arenawidth, iscovered)
-    VALUES ("RanchId", v_new_arena_id, "ArenaName", "ArenaLength", "ArenaWidth", "IsCovered");
+    VALUES (ranchid_param, v_new_arena_id, arenaname_param, arenalength_param, arenawidth_param, iscovered_param);
 
     RETURN QUERY SELECT v_new_arena_id AS "NewArenaId";
 END;
@@ -55,23 +57,24 @@ $$;
 
 
 -- Update arena
+DROP FUNCTION IF EXISTS usp_UpdateArena(INTEGER, SMALLINT, TEXT, SMALLINT, SMALLINT, BOOLEAN) CASCADE;
 CREATE OR REPLACE FUNCTION usp_UpdateArena(
-    "RanchId"     INTEGER,
-    "ArenaId"     SMALLINT,
-    "ArenaName"   TEXT,
-    "ArenaLength" SMALLINT DEFAULT NULL,
-    "ArenaWidth"  SMALLINT DEFAULT NULL,
-    "IsCovered"   BOOLEAN  DEFAULT NULL
+    ranchid_param     INTEGER,
+    arenaid_param     SMALLINT,
+    arenaname_param   TEXT,
+    arenalength_param SMALLINT DEFAULT NULL,
+    arenawidth_param  SMALLINT DEFAULT NULL,
+    iscovered_param   BOOLEAN  DEFAULT NULL
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
     UPDATE arena SET
-        arenaname   = "ArenaName",
-        arenalength = "ArenaLength",
-        arenawidth  = "ArenaWidth",
-        iscovered   = "IsCovered"
-    WHERE ranchid = "RanchId" AND arenaid = "ArenaId";
+        arenaname   = arenaname_param,
+        arenalength = arenalength_param,
+        arenawidth  = arenawidth_param,
+        iscovered   = iscovered_param
+    WHERE ranchid = ranchid_param AND arenaid = arenaid_param;
 END;
 $$;
 
@@ -81,11 +84,12 @@ $$;
 -- ============================================================
 
 -- Create a compound with stalls (bulk)
+DROP FUNCTION IF EXISTS usp_CreateCompoundWithStalls(INTEGER, TEXT, SMALLINT, SMALLINT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_CreateCompoundWithStalls(
-    "RanchId"       INTEGER,
-    "CompoundName"  TEXT,
-    "NumberOfStalls" SMALLINT,
-    "StallType"     SMALLINT
+    ranchid_param       INTEGER,
+    compoundname_param  TEXT,
+    numberofstalls_param SMALLINT,
+    stalltype_param     SMALLINT
 )
 RETURNS TABLE("NewCompoundId" SMALLINT)
 LANGUAGE plpgsql AS $$
@@ -94,14 +98,14 @@ DECLARE
     i             SMALLINT;
 BEGIN
     SELECT COALESCE(MAX(sc.compoundid), 0) + 1 INTO v_compound_id
-    FROM stallcompound sc WHERE sc.ranchid = "RanchId";
+    FROM stallcompound sc WHERE sc.ranchid = ranchid_param;
 
     INSERT INTO stallcompound (ranchid, compoundid, compoundname)
-    VALUES ("RanchId", v_compound_id, "CompoundName");
+    VALUES (ranchid_param, v_compound_id, compoundname_param);
 
-    FOR i IN 1.."NumberOfStalls" LOOP
+    FOR i IN 1..numberofstalls_param LOOP
         INSERT INTO stall (ranchid, compoundid, stallid, stallnumber, stalltype)
-        VALUES ("RanchId", v_compound_id, i, CAST(i AS TEXT), "StallType");
+        VALUES (ranchid_param, v_compound_id, i, CAST(i AS TEXT), stalltype_param);
     END LOOP;
 
     RETURN QUERY SELECT v_compound_id AS "NewCompoundId";
@@ -110,51 +114,54 @@ $$;
 
 
 -- Get compounds by ranch ID
+DROP FUNCTION IF EXISTS usp_GetCompoundsByRanchId(INTEGER) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetCompoundsByRanchId(
-    "RanchId" INTEGER
+    ranchid_param INTEGER
 )
-RETURNS TABLE("CompoundId" SMALLINT, "CompoundName" TEXT)
+RETURNS TABLE("CompoundId" SMALLINT, "CompoundName" VARCHAR)
 LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
     SELECT sc.compoundid, sc.compoundname
     FROM stallcompound sc
-    WHERE sc.ranchid = "RanchId";
+    WHERE sc.ranchid = ranchid_param;
 END;
 $$;
 
 
 -- Get stalls by compound ID
+DROP FUNCTION IF EXISTS usp_GetStallsByCompoundId(INTEGER, SMALLINT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetStallsByCompoundId(
-    "RanchId"    INTEGER,
-    "CompoundId" SMALLINT
+    ranchid_param    INTEGER,
+    compoundid_param SMALLINT
 )
 RETURNS TABLE(
     "StallId"     SMALLINT,
-    "StallNumber" TEXT,
+    "StallNumber" VARCHAR,
     "StallType"   SMALLINT,
-    "StallNotes"  TEXT
+    "StallNotes"  VARCHAR
 )
 LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
     SELECT s.stallid, s.stallnumber, s.stalltype, s.stallnotes
     FROM stall s
-    WHERE s.ranchid    = "RanchId"
-      AND s.compoundid = "CompoundId";
+    WHERE s.ranchid    = ranchid_param
+      AND s.compoundid = compoundid_param;
 END;
 $$;
 
 
 -- Get total stall count for a ranch
+DROP FUNCTION IF EXISTS usp_GetTotalStallsCountByRanchId(INTEGER) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetTotalStallsCountByRanchId(
-    "RanchId" INTEGER
+    ranchid_param INTEGER
 )
 RETURNS TABLE("TotalStalls" BIGINT)
 LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
-    SELECT COUNT(*) FROM stall s WHERE s.ranchid = "RanchId";
+    SELECT COUNT(*) FROM stall s WHERE s.ranchid = ranchid_param;
 END;
 $$;
 
@@ -164,8 +171,9 @@ $$;
 -- ============================================================
 
 -- Get all product categories
+DROP FUNCTION IF EXISTS usp_GetAllProductCategories() CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetAllProductCategories()
-RETURNS TABLE("CategoryId" SMALLINT, "CategoryName" TEXT)
+RETURNS TABLE("CategoryId" SMALLINT, "CategoryName" VARCHAR)
 LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
@@ -175,46 +183,49 @@ $$;
 
 
 -- Get products by category (or all if no category given)
+DROP FUNCTION IF EXISTS usp_GetProductsByCategory(SMALLINT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetProductsByCategory(
-    "CategoryId" SMALLINT DEFAULT NULL
+    categoryid_param SMALLINT DEFAULT NULL
 )
 RETURNS TABLE(
     "ProductId"   SMALLINT,
     "CategoryId"  SMALLINT,
-    "ProductName" TEXT
+    "ProductName" VARCHAR
 )
 LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
     SELECT p.productid, p.categoryid, p.productname
     FROM product p
-    WHERE ("CategoryId" IS NULL OR p.categoryid = "CategoryId");
+    WHERE (categoryid_param IS NULL OR p.categoryid = categoryid_param);
 END;
 $$;
 
 
 -- Set product price for ranch (deactivates old price, inserts new one)
+DROP FUNCTION IF EXISTS usp_SetProductPriceForRanch(SMALLINT, INTEGER, NUMERIC) CASCADE;
 CREATE OR REPLACE FUNCTION usp_SetProductPriceForRanch(
-    "ProductId" SMALLINT,
-    "RanchId"   INTEGER,
-    "NewPrice"  NUMERIC(10,2)
+    productid_param SMALLINT,
+    ranchid_param   INTEGER,
+    newprice_param  NUMERIC(10,2)
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
     UPDATE pricecatalog SET isactive = FALSE
-    WHERE productid = "ProductId" AND ranchid = "RanchId" AND isactive = TRUE;
+    WHERE productid = productid_param AND ranchid = ranchid_param AND isactive = TRUE;
 
     INSERT INTO pricecatalog (productid, ranchid, creationdate, itemprice, isactive)
-    VALUES ("ProductId", "RanchId", NOW(), "NewPrice", TRUE);
+    VALUES (productid_param, ranchid_param, NOW(), newprice_param, TRUE);
 END;
 $$;
 
 
 -- Get price history for a product at a ranch
+DROP FUNCTION IF EXISTS usp_GetPriceHistoryForProduct(SMALLINT, INTEGER) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetPriceHistoryForProduct(
-    "ProductId" SMALLINT,
-    "RanchId"   INTEGER
+    productid_param SMALLINT,
+    ranchid_param   INTEGER
 )
 RETURNS TABLE(
     "CatalogItemId" INTEGER,
@@ -227,20 +238,21 @@ BEGIN
     RETURN QUERY
     SELECT pc.catalogitemid, pc.creationdate, pc.itemprice, pc.isactive
     FROM pricecatalog pc
-    WHERE pc.productid = "ProductId" AND pc.ranchid = "RanchId"
+    WHERE pc.productid = productid_param AND pc.ranchid = ranchid_param
     ORDER BY pc.creationdate DESC;
 END;
 $$;
 
 
 -- Get active prices by category for a ranch
+DROP FUNCTION IF EXISTS usp_GetActivePricesByCategory(SMALLINT, INTEGER) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetActivePricesByCategory(
-    "CategoryId" SMALLINT,
-    "RanchId"    INTEGER
+    categoryid_param SMALLINT,
+    ranchid_param    INTEGER
 )
 RETURNS TABLE(
     "ProductId"     SMALLINT,
-    "ProductName"   TEXT,
+    "ProductName"   VARCHAR,
     "CatalogItemId" INTEGER,
     "ItemPrice"     NUMERIC(10,2)
 )
@@ -250,21 +262,22 @@ BEGIN
     SELECT p.productid, p.productname, pc.catalogitemid, pc.itemprice
     FROM product p
     INNER JOIN pricecatalog pc ON p.productid = pc.productid
-    WHERE p.categoryid  = "CategoryId"
-      AND pc.ranchid    = "RanchId"
+    WHERE p.categoryid  = categoryid_param
+      AND pc.ranchid    = ranchid_param
       AND pc.isactive   = TRUE;
 END;
 $$;
 
 
 -- Get product pricing grid (including products with no price set)
+DROP FUNCTION IF EXISTS usp_GetProductPricingGrid(INTEGER, SMALLINT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetProductPricingGrid(
-    "RanchId"    INTEGER,
-    "CategoryId" SMALLINT
+    ranchid_param    INTEGER,
+    categoryid_param SMALLINT
 )
 RETURNS TABLE(
     "ProductId"     SMALLINT,
-    "ProductName"   TEXT,
+    "ProductName"   VARCHAR,
     "CatalogItemId" INTEGER,
     "ItemPrice"     NUMERIC(10,2),
     "CreationDate"  TIMESTAMP
@@ -281,9 +294,9 @@ BEGIN
     FROM product p
     LEFT JOIN pricecatalog pc
         ON p.productid  = pc.productid
-        AND pc.ranchid  = "RanchId"
+        AND pc.ranchid  = ranchid_param
         AND pc.isactive = TRUE
-    WHERE p.categoryid = "CategoryId"
+    WHERE p.categoryid = categoryid_param
     ORDER BY p.productname;
 END;
 $$;
@@ -294,11 +307,12 @@ $$;
 -- ============================================================
 
 -- Get all base paid time slot definitions
+DROP FUNCTION IF EXISTS usp_GetAllPaidTimeBaseSlots() CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetAllPaidTimeBaseSlots()
 RETURNS TABLE(
     "PaidTimeSlotId" INTEGER,
-    "DayOfWeek"      TEXT,
-    "TimeOfDay"      TEXT
+    "DayOfWeek"      VARCHAR,
+    "TimeOfDay"      VARCHAR
 )
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -309,16 +323,17 @@ $$;
 
 
 -- Insert paid time slot in competition
+DROP FUNCTION IF EXISTS usp_InsertPaidTimeSlotInComp(INTEGER, INTEGER, INTEGER, SMALLINT, DATE, TIME, TIME, TEXT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_InsertPaidTimeSlotInComp(
-    "CompetitionId"   INTEGER,
-    "PaidTimeSlotId"  INTEGER,
-    "ArenaRanchId"    INTEGER,
-    "ArenaId"         SMALLINT,
-    "SlotDate"        DATE,
-    "StartTime"       TIME,
-    "EndTime"         TIME,
-    "SlotStatus"      TEXT DEFAULT NULL,
-    "SlotNotes"       TEXT DEFAULT NULL
+    competitionid_param   INTEGER,
+    paidtimeslotid_param  INTEGER,
+    arenaranchid_param    INTEGER,
+    arenaid_param         SMALLINT,
+    slotdate_param        DATE,
+    starttime_param       TIME,
+    endtime_param         TIME,
+    slotstatus_param      TEXT DEFAULT NULL,
+    slotnotes_param       TEXT DEFAULT NULL
 )
 RETURNS TABLE("NewCompSlotId" INTEGER)
 LANGUAGE plpgsql AS $$
@@ -330,8 +345,8 @@ BEGIN
         slotdate, starttime, endtime, slotstatus, slotnotes
     )
     VALUES (
-        "CompetitionId", "PaidTimeSlotId", "ArenaRanchId", "ArenaId",
-        "SlotDate", "StartTime", "EndTime", "SlotStatus", "SlotNotes"
+        competitionid_param, paidtimeslotid_param, arenaranchid_param, arenaid_param,
+        slotdate_param, starttime_param, endtime_param, slotstatus_param, slotnotes_param
     )
     RETURNING compslotid INTO v_new_id;
 
@@ -341,47 +356,49 @@ $$;
 
 
 -- Update paid time slot in competition
+DROP FUNCTION IF EXISTS usp_UpdatePaidTimeSlotInComp(INTEGER, INTEGER, INTEGER, SMALLINT, DATE, TIME, TIME, TEXT, TEXT) CASCADE;
 CREATE OR REPLACE FUNCTION usp_UpdatePaidTimeSlotInComp(
-    "CompSlotId"     INTEGER,
-    "PaidTimeSlotId" INTEGER,
-    "ArenaRanchId"   INTEGER,
-    "ArenaId"        SMALLINT,
-    "SlotDate"       DATE,
-    "StartTime"      TIME,
-    "EndTime"        TIME,
-    "SlotStatus"     TEXT DEFAULT NULL,
-    "SlotNotes"      TEXT DEFAULT NULL
+    compslotid_param     INTEGER,
+    paidtimeslotid_param INTEGER,
+    arenaranchid_param   INTEGER,
+    arenaid_param        SMALLINT,
+    slotdate_param       DATE,
+    starttime_param      TIME,
+    endtime_param        TIME,
+    slotstatus_param     TEXT DEFAULT NULL,
+    slotnotes_param      TEXT DEFAULT NULL
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
     UPDATE paidtimeslotincompetition SET
-        paidtimeslotid = "PaidTimeSlotId",
-        arenaranchid   = "ArenaRanchId",
-        arenaid        = "ArenaId",
-        slotdate       = "SlotDate",
-        starttime      = "StartTime",
-        endtime        = "EndTime",
-        slotstatus     = "SlotStatus",
-        slotnotes      = "SlotNotes"
-    WHERE compslotid = "CompSlotId";
+        paidtimeslotid = paidtimeslotid_param,
+        arenaranchid   = arenaranchid_param,
+        arenaid        = arenaid_param,
+        slotdate       = slotdate_param,
+        starttime      = starttime_param,
+        endtime        = endtime_param,
+        slotstatus     = slotstatus_param,
+        slotnotes      = slotnotes_param
+    WHERE compslotid = compslotid_param;
 END;
 $$;
 
 
 -- Get paid time slots by competition ID
+DROP FUNCTION IF EXISTS usp_GetPaidTimeSlotsByCompId(INTEGER) CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetPaidTimeSlotsByCompId(
-    "CompetitionId" INTEGER
+    competitionid_param INTEGER
 )
 RETURNS TABLE(
     "CompSlotId"   INTEGER,
     "SlotDate"     DATE,
-    "TimeOfDay"    TEXT,
+    "TimeOfDay"    VARCHAR,
     "StartTime"    TIME,
     "EndTime"      TIME,
     "ArenaRanchId" INTEGER,
     "ArenaId"      SMALLINT,
-    "ArenaName"    TEXT
+    "ArenaName"    VARCHAR
 )
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -398,16 +415,17 @@ BEGIN
     FROM paidtimeslotincompetition ptc
     INNER JOIN paidtimeslot pt ON ptc.paidtimeslotid = pt.paidtimeslotid
     INNER JOIN arena        a  ON ptc.arenaranchid   = a.ranchid AND ptc.arenaid = a.arenaid
-    WHERE ptc.competitionid = "CompetitionId"
+    WHERE ptc.competitionid = competitionid_param
     ORDER BY ptc.slotdate ASC, ptc.starttime ASC;
 END;
 $$;
 
 
 -- Delete paid time slot in competition (with validation)
+DROP FUNCTION IF EXISTS usp_DeletePaidTimeSlotInComp(INTEGER, BOOLEAN) CASCADE;
 CREATE OR REPLACE FUNCTION usp_DeletePaidTimeSlotInComp(
-    "CompSlotId"  INTEGER,
-    "ForceDelete" BOOLEAN DEFAULT FALSE
+    compslotid_param  INTEGER,
+    forcedelete_param BOOLEAN DEFAULT FALSE
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
@@ -415,7 +433,7 @@ BEGIN
     -- Hard block: active assignments exist
     IF EXISTS (
         SELECT 1 FROM paidtimerequest ptr
-        WHERE ptr.assignedcompslotid = "CompSlotId"
+        WHERE ptr.assignedcompslotid = compslotid_param
           AND COALESCE(ptr.status, '') <> 'Cancelled'
     ) THEN
         RAISE EXCEPTION 'Cannot delete: Participants are actively ASSIGNED to this slot.';
@@ -424,24 +442,25 @@ BEGIN
     -- Warning: active requests exist (user must confirm)
     IF EXISTS (
         SELECT 1 FROM paidtimerequest ptr
-        WHERE ptr.requestedcompslotid = "CompSlotId"
+        WHERE ptr.requestedcompslotid = compslotid_param
           AND COALESCE(ptr.status, '') <> 'Cancelled'
     ) THEN
-        IF "ForceDelete" = FALSE THEN
+        IF forcedelete_param = FALSE THEN
             RAISE EXCEPTION 'Warning: There are active REQUESTS for this slot. User confirmation required.';
         END IF;
     END IF;
 
-    DELETE FROM paidtimeslotincompetition WHERE compslotid = "CompSlotId";
+    DELETE FROM paidtimeslotincompetition WHERE compslotid = compslotid_param;
 END;
 $$;
 
 
 -- Get competitions with paid time in the last two years
+DROP FUNCTION IF EXISTS usp_GetCompetitionsWithPaidTimeLastTwoYears() CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetCompetitionsWithPaidTimeLastTwoYears()
 RETURNS TABLE(
     "CompetitionId"         INTEGER,
-    "CompetitionName"       TEXT,
+    "CompetitionName"       VARCHAR,
     "CompetitionStartDate"  DATE
 )
 LANGUAGE plpgsql AS $$
@@ -462,16 +481,17 @@ $$;
 
 
 -- Get paid time slots from the latest competition that had paid time
+DROP FUNCTION IF EXISTS usp_GetPaidTimeSlotsFromLatestCompetition() CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetPaidTimeSlotsFromLatestCompetition()
 RETURNS TABLE(
     "CompSlotId"     INTEGER,
     "PaidTimeSlotId" INTEGER,
-    "TimeOfDay"      TEXT,
+    "TimeOfDay"      VARCHAR,
     "ArenaRanchId"   INTEGER,
     "ArenaId"        SMALLINT,
     "StartTime"      TIME,
     "EndTime"        TIME,
-    "SlotNotes"      TEXT
+    "SlotNotes"      VARCHAR
 )
 LANGUAGE plpgsql AS $$
 DECLARE

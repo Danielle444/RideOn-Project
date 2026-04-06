@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetJudgesByCompetitionId(
-    "CompetitionId" INTEGER
+    p_CompetitionId INTEGER
 )
 RETURNS TABLE(
     "JudgeId"          INTEGER,
@@ -22,6 +22,6 @@ BEGIN
     FROM judge j
     INNER JOIN classjudge       cj  ON j.judgeid       = cj.judgeid
     INNER JOIN classincompetition cic ON cj.classincompid = cic.classincompid
-    WHERE cic.competitionid = "CompetitionId";
+    WHERE cic.competitionid = p_CompetitionId;
 END;
 $$;

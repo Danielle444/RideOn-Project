@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetCompetitionById(
-    CompetitionId INTEGER
+    p_CompetitionId INTEGER
 )
 RETURNS TABLE(
     "CompetitionId"             INTEGER,
@@ -39,6 +39,6 @@ BEGIN
         f.fieldname
     FROM competition c
     INNER JOIN field f ON c.fieldid = f.fieldid
-    WHERE c.competitionid = CompetitionId;
+    WHERE c.competitionid = p_CompetitionId;
 END;
 $$;

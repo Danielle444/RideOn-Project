@@ -1,9 +1,9 @@
 CREATE OR REPLACE FUNCTION usp_InsertJudge(
-    "FirstNameHebrew"  TEXT,
-    "LastNameHebrew"   TEXT,
-    "FirstNameEnglish" TEXT,
-    "LastNameEnglish"  TEXT,
-    "Country"          TEXT
+    p_FirstNameHebrew  TEXT,
+    p_LastNameHebrew   TEXT,
+    p_FirstNameEnglish TEXT,
+    p_LastNameEnglish  TEXT,
+    p_Country          TEXT
 )
 RETURNS TABLE("NewJudgeId" INTEGER)
 LANGUAGE plpgsql AS $$
@@ -11,7 +11,7 @@ DECLARE
     v_new_id INTEGER;
 BEGIN
     INSERT INTO judge (firstnamehebrew, lastnamehebrew, firstnameenglish, lastnameenglish, country)
-    VALUES ("FirstNameHebrew", "LastNameHebrew", "FirstNameEnglish", "LastNameEnglish", "Country")
+    VALUES (p_FirstNameHebrew, p_LastNameHebrew, p_FirstNameEnglish, p_LastNameEnglish, p_Country)
     RETURNING judgeid INTO v_new_id;
 
     RETURN QUERY SELECT v_new_id AS "NewJudgeId";
