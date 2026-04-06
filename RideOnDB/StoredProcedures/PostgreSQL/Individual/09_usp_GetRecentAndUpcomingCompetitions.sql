@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetRecentAndUpcomingCompetitions(
-    "Status" TEXT DEFAULT NULL
+    p_Status TEXT DEFAULT NULL
 )
 RETURNS TABLE(
     "CompetitionId"             INTEGER,
@@ -45,7 +45,7 @@ BEGIN
     INNER JOIN field f ON c.fieldid = f.fieldid
     WHERE c.competitionstartdate >= v_six_ago
       AND c.competitionstartdate <= v_one_year
-      AND ("Status" IS NULL OR c.competitionstatus = "Status")
+      AND (p_Status IS NULL OR c.competitionstatus = p_Status)
     ORDER BY c.competitionstartdate ASC;
 END;
 $$;

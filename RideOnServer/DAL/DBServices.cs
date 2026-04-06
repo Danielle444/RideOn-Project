@@ -31,20 +31,33 @@ namespace RideOnServer.DAL
             NpgsqlConnection con,
             Dictionary<string, object>? paramDic)
         {
-            NpgsqlCommand cmd = new NpgsqlCommand
-            {
-                Connection = con,
-                CommandText = spName,
-                CommandTimeout = 10,
-                CommandType = System.Data.CommandType.StoredProcedure
-            };
+            var paramList = new List<string>();
+            var values = new List<object>();
 
             if (paramDic != null)
             {
+                int i = 1;
                 foreach (var param in paramDic)
                 {
-                    cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                    paramList.Add($"${i}");
+                    values.Add(param.Value ?? DBNull.Value);
+                    i++;
                 }
+            }
+
+            string sql = $"SELECT * FROM {spName}({string.Join(", ", paramList)})";
+
+            NpgsqlCommand cmd = new NpgsqlCommand
+            {
+                Connection = con,
+                CommandText = sql,
+                CommandTimeout = 10,
+                CommandType = System.Data.CommandType.Text
+            };
+
+            foreach (var val in values)
+            {
+                cmd.Parameters.AddWithValue(val);
             }
 
             return cmd;

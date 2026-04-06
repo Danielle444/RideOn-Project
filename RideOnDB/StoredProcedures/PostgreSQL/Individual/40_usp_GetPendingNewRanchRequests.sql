@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION usp_GetPendingNewRanchRequests()
 RETURNS TABLE(
     "RequestId"     INTEGER,
-    "RequestDate"   TIMESTAMP,
+    "RequestDate"   TIMESTAMPTZ,
     "RanchName"     TEXT,
     "FullName"      TEXT,
     "NationalId"    TEXT,

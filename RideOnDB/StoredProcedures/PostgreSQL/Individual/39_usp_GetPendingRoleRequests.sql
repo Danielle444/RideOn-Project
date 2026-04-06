@@ -1,16 +1,16 @@
 CREATE OR REPLACE FUNCTION usp_GetPendingRoleRequests(
-    RoleId SMALLINT
+    p_RoleId SMALLINT
 )
 RETURNS TABLE(
-    "PersonId"   INTEGER,
-    "RanchId"    INTEGER,
-    "RoleId"     SMALLINT,
-    "FullName"   TEXT,
-    "IdNumber"   TEXT,
-    "Email"      TEXT,
+    "PersonId"    INTEGER,
+    "RanchId"     INTEGER,
+    "RoleId"      SMALLINT,
+    "FullName"    TEXT,
+    "IdNumber"    TEXT,
+    "Email"       TEXT,
     "PhoneNumber" TEXT,
-    "RanchName"  TEXT,
-    "RoleStatus" TEXT
+    "RanchName"   TEXT,
+    "RoleStatus"  TEXT
 )
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -29,7 +29,7 @@ BEGIN
     INNER JOIN person p ON prr.personid = p.personid
     INNER JOIN ranch  r ON prr.ranchid  = r.ranchid
     WHERE prr.rolestatus = 'Pending'
-      AND prr.roleid     = RoleId
+      AND prr.roleid     = p_RoleId
     ORDER BY p.firstname;
 END;
 $$;

@@ -1,6 +1,6 @@
 CREATE OR REPLACE FUNCTION usp_SearchPersons(
-    "SearchText" TEXT    DEFAULT NULL,
-    IsActive     BOOLEAN DEFAULT NULL
+    p_SearchText TEXT    DEFAULT NULL,
+    p_IsActive   BOOLEAN DEFAULT NULL
 )
 RETURNS TABLE(
     "PersonId"   INTEGER,
@@ -20,9 +20,9 @@ BEGIN
         su.username, su.isactive
     FROM person p
     INNER JOIN systemuser su ON p.personid = su.systemuserid
-    WHERE ("SearchText" IS NULL OR
-           p.firstname ILIKE '%' || "SearchText" || '%' OR
-           p.lastname  ILIKE '%' || "SearchText" || '%')
-      AND (IsActive IS NULL OR su.isactive = IsActive);
+    WHERE (p_SearchText IS NULL OR
+           p.firstname ILIKE '%' || p_SearchText || '%' OR
+           p.lastname  ILIKE '%' || p_SearchText || '%')
+      AND (p_IsActive IS NULL OR su.isactive = p_IsActive);
 END;
 $$;

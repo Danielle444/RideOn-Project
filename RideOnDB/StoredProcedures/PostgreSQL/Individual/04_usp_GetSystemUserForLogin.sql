@@ -1,16 +1,16 @@
 CREATE OR REPLACE FUNCTION usp_GetSystemUserForLogin(
-    "Username" TEXT
+    p_Username TEXT
 )
 RETURNS TABLE(
-    "SystemUserId"      INTEGER,
-    "Username"          TEXT,
-    "PasswordHash"      TEXT,
-    "PasswordSalt"      TEXT,
-    "IsActive"          BOOLEAN,
+    "SystemUserId"       INTEGER,
+    "Username"           TEXT,
+    "PasswordHash"       TEXT,
+    "PasswordSalt"       TEXT,
+    "IsActive"           BOOLEAN,
     "MustChangePassword" BOOLEAN,
-    "CreatedDate"       TIMESTAMP,
-    "FirstName"         TEXT,
-    "LastName"          TEXT
+    "CreatedDate"        TIMESTAMPTZ,
+    "FirstName"          TEXT,
+    "LastName"           TEXT
 )
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -27,6 +27,6 @@ BEGIN
         p.lastname
     FROM systemuser su
     INNER JOIN person p ON su.systemuserid = p.personid
-    WHERE su.username = "Username";
+    WHERE su.username = p_Username;
 END;
 $$;

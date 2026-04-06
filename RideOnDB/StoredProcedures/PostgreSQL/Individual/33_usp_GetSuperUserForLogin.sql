@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetSuperUserForLogin(
-    Email TEXT
+    p_Email TEXT
 )
 RETURNS TABLE(
     "SuperUserId"        INTEGER,
@@ -15,6 +15,6 @@ BEGIN
     SELECT su.superuserid, su.email, su.passwordhash, su.passwordsalt,
            su.isactive, su.mustchangepassword
     FROM superuser su
-    WHERE su.email = Email;
+    WHERE su.email = p_Email;
 END;
 $$;

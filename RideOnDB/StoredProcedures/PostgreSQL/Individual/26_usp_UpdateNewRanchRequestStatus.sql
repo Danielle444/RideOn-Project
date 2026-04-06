@@ -1,21 +1,21 @@
 CREATE OR REPLACE FUNCTION usp_UpdateNewRanchRequestStatus(
-    "RequestId"            INTEGER,
-    "ResolvedBySuperUserId" INTEGER,
-    "NewStatus"            TEXT
+    p_RequestId            INTEGER,
+    p_ResolvedBySuperUserId INTEGER,
+    p_NewStatus            TEXT
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
     UPDATE newranchrequest SET
-        requeststatus         = "NewStatus",
-        resolvedbysuperuserid = "ResolvedBySuperUserId",
+        requeststatus         = p_NewStatus,
+        resolvedbysuperuserid = p_ResolvedBySuperUserId,
         resolveddate          = NOW()
-    WHERE requestid = "RequestId";
+    WHERE requestid = p_RequestId;
 
     UPDATE ranch r SET
-        ranchstatus = "NewStatus"
+        ranchstatus = p_NewStatus
     FROM newranchrequest nrr
     WHERE r.ranchid = nrr.ranchid
-      AND nrr.requestid = "RequestId";
+      AND nrr.requestid = p_RequestId;
 END;
 $$;

@@ -4,8 +4,8 @@ RETURNS TABLE(
     "Email"              TEXT,
     "IsActive"           BOOLEAN,
     "MustChangePassword" BOOLEAN,
-    "CreatedDate"        TIMESTAMP,
-    "LastLoginDate"      TIMESTAMP
+    "CreatedDate"        TIMESTAMPTZ,
+    "LastLoginDate"      TIMESTAMPTZ
 )
 LANGUAGE plpgsql AS $$
 BEGIN

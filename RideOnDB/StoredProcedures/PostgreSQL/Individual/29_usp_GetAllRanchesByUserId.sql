@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetAllRanchesByUserId(
-    "UserId" INTEGER
+    p_UserId INTEGER
 )
 RETURNS TABLE(
     "RanchId"      INTEGER,
@@ -7,8 +7,7 @@ RETURNS TABLE(
     "ContactEmail" TEXT,
     "ContactPhone" TEXT,
     "WebsiteUrl"   TEXT,
-    "Latitude"     DOUBLE PRECISION,
-    "Longitude"    DOUBLE PRECISION
+    "Location"     TEXT
 )
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -19,11 +18,10 @@ BEGIN
         r.contactemail,
         r.contactphone,
         r.websiteurl,
-        ST_Y(r.location::geometry),
-        ST_X(r.location::geometry)
+        r.location
     FROM ranch r
     INNER JOIN personranch pr ON r.ranchid = pr.ranchid
-    WHERE pr.personid   = "UserId"
+    WHERE pr.personid   = p_UserId
       AND r.ranchstatus = 'Approved';
 END;
 $$;

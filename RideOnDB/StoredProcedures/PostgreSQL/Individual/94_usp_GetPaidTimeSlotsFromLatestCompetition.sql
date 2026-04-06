@@ -1,13 +1,13 @@
 CREATE OR REPLACE FUNCTION usp_GetPaidTimeSlotsFromLatestCompetition()
 RETURNS TABLE(
-    "CompSlotId"     INTEGER,
-    "PaidTimeSlotId" INTEGER,
-    "TimeOfDay"      TEXT,
-    "ArenaRanchId"   INTEGER,
-    "ArenaId"        SMALLINT,
-    "StartTime"      TIME,
-    "EndTime"        TIME,
-    "SlotNotes"      TEXT
+    "PaidTimeSlotInCompId" INTEGER,
+    "PaidTimeSlotId"       INTEGER,
+    "TimeOfDay"            TEXT,
+    "ArenaRanchId"         INTEGER,
+    "ArenaId"              INTEGER,
+    "StartTime"            TIME,
+    "EndTime"              TIME,
+    "SlotNotes"            TEXT
 )
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -24,7 +24,7 @@ BEGIN
     IF v_latest_comp_id IS NOT NULL THEN
         RETURN QUERY
         SELECT
-            ptc.compslotid,
+            ptc.paidtimeslotincompid,
             ptc.paidtimeslotid,
             pt.timeofday,
             ptc.arenaranchid,

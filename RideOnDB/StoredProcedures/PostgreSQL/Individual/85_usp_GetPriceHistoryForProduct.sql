@@ -1,19 +1,19 @@
 CREATE OR REPLACE FUNCTION usp_GetPriceHistoryForProduct(
-    "ProductId" SMALLINT,
-    "RanchId"   INTEGER
+    p_ProductId SMALLINT,
+    p_RanchId   INTEGER
 )
 RETURNS TABLE(
-    "CatalogItemId" INTEGER,
-    "CreationDate"  TIMESTAMP,
-    "ItemPrice"     NUMERIC(10,2),
-    "IsActive"      BOOLEAN
+    "PriceCatalogId" INTEGER,
+    "CreationDate"   TIMESTAMPTZ,
+    "ItemPrice"      NUMERIC(10,2),
+    "IsActive"       BOOLEAN
 )
 LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
-    SELECT pc.catalogitemid, pc.creationdate, pc.itemprice, pc.isactive
+    SELECT pc.pricecatalogid, pc.creationdate, pc.itemprice, pc.isactive
     FROM pricecatalog pc
-    WHERE pc.productid = "ProductId" AND pc.ranchid = "RanchId"
+    WHERE pc.productid = p_ProductId AND pc.ranchid = p_RanchId
     ORDER BY pc.creationdate DESC;
 END;
 $$;

@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION usp_GetRoleRequests(
-    RoleId     SMALLINT,
-    RoleStatus TEXT DEFAULT NULL,
-    "SearchText" TEXT DEFAULT NULL
+    p_RoleId     SMALLINT,
+    p_RoleStatus TEXT DEFAULT NULL,
+    p_SearchText TEXT DEFAULT NULL
 )
 RETURNS TABLE(
     "PersonId"   INTEGER,
@@ -17,7 +17,7 @@ RETURNS TABLE(
 )
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF RoleStatus IS NOT NULL AND RoleStatus NOT IN ('Pending', 'Approved', 'Rejected') THEN
+    IF p_RoleStatus IS NOT NULL AND p_RoleStatus NOT IN ('Pending', 'Approved', 'Rejected') THEN
         RAISE EXCEPTION 'Invalid RoleStatus. Allowed: Pending, Approved, Rejected.';
     END IF;
 
@@ -37,15 +37,15 @@ BEGIN
     INNER JOIN person p ON prr.personid = p.personid
     INNER JOIN ranch  r ON prr.ranchid  = r.ranchid
     INNER JOIN role  rl ON prr.roleid   = rl.roleid
-    WHERE prr.roleid = RoleId
-      AND (RoleStatus IS NULL OR prr.rolestatus = RoleStatus)
+    WHERE prr.roleid = p_RoleId
+      AND (p_RoleStatus IS NULL OR prr.rolestatus = p_RoleStatus)
       AND (
-            "SearchText" IS NULL OR TRIM("SearchText") = ''
-            OR (p.firstname || ' ' || p.lastname) ILIKE '%' || "SearchText" || '%'
-            OR p.nationalid ILIKE '%' || "SearchText" || '%'
-            OR COALESCE(p.email, '') ILIKE '%' || "SearchText" || '%'
-            OR COALESCE(p.cellphone, '') ILIKE '%' || "SearchText" || '%'
-            OR r.ranchname ILIKE '%' || "SearchText" || '%'
+            p_SearchText IS NULL OR TRIM(p_SearchText) = ''
+            OR (p.firstname || ' ' || p.lastname) ILIKE '%' || p_SearchText || '%'
+            OR p.nationalid ILIKE '%' || p_SearchText || '%'
+            OR COALESCE(p.email, '') ILIKE '%' || p_SearchText || '%'
+            OR COALESCE(p.cellphone, '') ILIKE '%' || p_SearchText || '%'
+            OR r.ranchname ILIKE '%' || p_SearchText || '%'
           )
     ORDER BY
         CASE prr.rolestatus

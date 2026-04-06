@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetProductsByCategory(
-    CategoryId SMALLINT DEFAULT NULL
+    p_CategoryId SMALLINT DEFAULT NULL
 )
 RETURNS TABLE(
     "ProductId"   SMALLINT,
@@ -11,6 +11,6 @@ BEGIN
     RETURN QUERY
     SELECT p.productid, p.categoryid, p.productname
     FROM product p
-    WHERE (CategoryId IS NULL OR p.categoryid = CategoryId);
+    WHERE (p_CategoryId IS NULL OR p.categoryid = p_CategoryId);
 END;
 $$;

@@ -1,6 +1,6 @@
 CREATE OR REPLACE FUNCTION usp_GetStallsByCompoundId(
-    "RanchId"    INTEGER,
-    "CompoundId" SMALLINT
+    p_RanchId    INTEGER,
+    p_CompoundId SMALLINT
 )
 RETURNS TABLE(
     "StallId"     SMALLINT,
@@ -13,7 +13,7 @@ BEGIN
     RETURN QUERY
     SELECT s.stallid, s.stallnumber, s.stalltype, s.stallnotes
     FROM stall s
-    WHERE s.ranchid    = "RanchId"
-      AND s.compoundid = "CompoundId";
+    WHERE s.ranchid    = p_RanchId
+      AND s.compoundid = p_CompoundId;
 END;
 $$;

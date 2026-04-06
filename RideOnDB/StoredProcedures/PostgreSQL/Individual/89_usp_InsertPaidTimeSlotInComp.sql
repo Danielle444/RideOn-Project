@@ -1,15 +1,15 @@
 CREATE OR REPLACE FUNCTION usp_InsertPaidTimeSlotInComp(
-    "CompetitionId"   INTEGER,
-    "PaidTimeSlotId"  INTEGER,
-    "ArenaRanchId"    INTEGER,
-    "ArenaId"         SMALLINT,
-    "SlotDate"        DATE,
-    "StartTime"       TIME,
-    "EndTime"         TIME,
-    "SlotStatus"      TEXT DEFAULT NULL,
-    "SlotNotes"       TEXT DEFAULT NULL
+    p_CompetitionId  INTEGER,
+    p_PaidTimeSlotId INTEGER,
+    p_ArenaRanchId   INTEGER,
+    p_ArenaId        INTEGER,
+    p_SlotDate       DATE,
+    p_StartTime      TIME,
+    p_EndTime        TIME,
+    p_SlotStatus     TEXT DEFAULT NULL,
+    p_SlotNotes      TEXT DEFAULT NULL
 )
-RETURNS TABLE("NewCompSlotId" INTEGER)
+RETURNS TABLE("NewPaidTimeSlotInCompId" INTEGER)
 LANGUAGE plpgsql AS $$
 DECLARE
     v_new_id INTEGER;
@@ -19,11 +19,11 @@ BEGIN
         slotdate, starttime, endtime, slotstatus, slotnotes
     )
     VALUES (
-        "CompetitionId", "PaidTimeSlotId", "ArenaRanchId", "ArenaId",
-        "SlotDate", "StartTime", "EndTime", "SlotStatus", "SlotNotes"
+        p_CompetitionId, p_PaidTimeSlotId, p_ArenaRanchId, p_ArenaId,
+        p_SlotDate, p_StartTime, p_EndTime, p_SlotStatus, p_SlotNotes
     )
-    RETURNING compslotid INTO v_new_id;
+    RETURNING paidtimeslotincompid INTO v_new_id;
 
-    RETURN QUERY SELECT v_new_id AS "NewCompSlotId";
+    RETURN QUERY SELECT v_new_id AS "NewPaidTimeSlotInCompId";
 END;
 $$;

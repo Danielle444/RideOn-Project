@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetApprovedPersonRanchesAndRoles(
-    "PersonId" INTEGER
+    p_PersonId INTEGER
 )
 RETURNS TABLE(
     "RanchId"   INTEGER,
@@ -18,7 +18,7 @@ BEGIN
     FROM personranchrole prr
     INNER JOIN ranch r  ON prr.ranchid = r.ranchid
     INNER JOIN role  rl ON prr.roleid  = rl.roleid
-    WHERE prr.personid   = "PersonId"
+    WHERE prr.personid   = p_PersonId
       AND prr.rolestatus = 'Approved';
 END;
 $$;

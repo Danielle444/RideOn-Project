@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetPersonRanchesAndRoles(
-    "PersonId" INTEGER
+    p_PersonId INTEGER
 )
 RETURNS TABLE(
     "RanchId"    INTEGER,
@@ -15,6 +15,6 @@ BEGIN
     FROM personranchrole prr
     INNER JOIN ranch r  ON prr.ranchid = r.ranchid
     INNER JOIN role  rl ON prr.roleid  = rl.roleid
-    WHERE prr.personid = "PersonId";
+    WHERE prr.personid = p_PersonId;
 END;
 $$;

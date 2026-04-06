@@ -1,10 +1,10 @@
 CREATE OR REPLACE FUNCTION usp_RemoveJudgeFromField(
-    "JudgeId" INTEGER,
-    "FieldId" SMALLINT
+    p_JudgeId INTEGER,
+    p_FieldId SMALLINT
 )
 RETURNS VOID
 LANGUAGE plpgsql AS $$
 BEGIN
-    DELETE FROM judgefield WHERE judgeid = "JudgeId" AND fieldid = "FieldId";
+    DELETE FROM judgefield WHERE judgeid = p_JudgeId AND fieldid = p_FieldId;
 END;
 $$;

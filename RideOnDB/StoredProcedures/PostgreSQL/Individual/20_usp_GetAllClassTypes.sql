@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetAllClassTypes(
-    FieldId SMALLINT DEFAULT NULL
+    p_FieldId SMALLINT DEFAULT NULL
 )
 RETURNS TABLE(
     "ClassTypeId"              SMALLINT,
@@ -21,7 +21,7 @@ BEGIN
         ct.judgingsheetformat
     FROM classtype ct
     INNER JOIN field f ON ct.fieldid = f.fieldid
-    WHERE (FieldId IS NULL OR ct.fieldid = FieldId)
+    WHERE (p_FieldId IS NULL OR ct.fieldid = p_FieldId)
     ORDER BY f.fieldname ASC, ct.classname ASC;
 END;
 $$;

@@ -1,10 +1,10 @@
 CREATE OR REPLACE FUNCTION usp_GetCompetitionsByHostRanch(
-    "RanchId"    INTEGER,
-    "SearchText" TEXT    DEFAULT NULL,
-    "Status"     TEXT    DEFAULT NULL,
-    "FieldId"    SMALLINT DEFAULT NULL,
-    "DateFrom"   DATE    DEFAULT NULL,
-    "DateTo"     DATE    DEFAULT NULL
+    p_RanchId    INTEGER,
+    p_SearchText TEXT     DEFAULT NULL,
+    p_Status     TEXT     DEFAULT NULL,
+    p_FieldId    SMALLINT DEFAULT NULL,
+    p_DateFrom   DATE     DEFAULT NULL,
+    p_DateTo     DATE     DEFAULT NULL
 )
 RETURNS TABLE(
     "CompetitionId"             INTEGER,
@@ -44,12 +44,12 @@ BEGIN
         f.fieldname
     FROM competition c
     INNER JOIN field f ON c.fieldid = f.fieldid
-    WHERE c.hostranchid = "RanchId"
-      AND ("SearchText" IS NULL OR TRIM("SearchText") = '' OR c.competitionname ILIKE '%' || "SearchText" || '%')
-      AND ("Status"     IS NULL OR TRIM("Status")     = '' OR c.competitionstatus = "Status")
-      AND ("FieldId"    IS NULL OR c.fieldid = "FieldId")
-      AND ("DateFrom"   IS NULL OR c.competitionstartdate >= "DateFrom")
-      AND ("DateTo"     IS NULL OR c.competitionenddate   <= "DateTo")
+    WHERE c.hostranchid = p_RanchId
+      AND (p_SearchText IS NULL OR TRIM(p_SearchText) = '' OR c.competitionname ILIKE '%' || p_SearchText || '%')
+      AND (p_Status     IS NULL OR TRIM(p_Status)     = '' OR c.competitionstatus = p_Status)
+      AND (p_FieldId    IS NULL OR c.fieldid = p_FieldId)
+      AND (p_DateFrom   IS NULL OR c.competitionstartdate >= p_DateFrom)
+      AND (p_DateTo     IS NULL OR c.competitionenddate   <= p_DateTo)
     ORDER BY c.competitionstartdate DESC;
 END;
 $$;

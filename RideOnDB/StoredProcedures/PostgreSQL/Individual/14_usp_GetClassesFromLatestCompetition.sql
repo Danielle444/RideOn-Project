@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION usp_GetClassesFromLatestCompetition(
-    "FieldId" SMALLINT
+    p_FieldId SMALLINT
 )
 RETURNS TABLE(
     "ClassInCompId"         INTEGER,
@@ -17,7 +17,7 @@ DECLARE
 BEGIN
     SELECT c.competitionid INTO v_latest_comp_id
     FROM competition c
-    WHERE c.fieldid = "FieldId"
+    WHERE c.fieldid = p_FieldId
     ORDER BY c.competitionstartdate DESC
     LIMIT 1;
 
