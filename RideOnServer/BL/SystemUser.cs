@@ -150,7 +150,14 @@ namespace RideOnServer.BL
             return dal.CheckUsernameExists(username);
         }
 
+        internal static int CreatePendingRanchRequest(CreateRanchRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.RanchName))
+                throw new Exception("Ranch name is required");
 
+            SystemUserDAL dal = new SystemUserDAL();
+            return dal.CreatePendingRanchRequest(request);
+        }
 
 
     }

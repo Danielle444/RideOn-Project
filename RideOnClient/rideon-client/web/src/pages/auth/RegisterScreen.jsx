@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Info } from "lucide-react";
+import { Eye, EyeOff, Info, X } from "lucide-react";
 import logo from "../../../../shared/assets/logo.png";
 import Field from "../../components/common/Field";
 import CustomDropdown from "../../components/common/CustomDropdown";
 import {
   register,
+  createRanchRequest,
   getRanches,
   getRoles,
   checkUsername,
@@ -68,6 +69,16 @@ export default function RegisterScreen() {
   const [existingSystemUserFound, setExistingSystemUserFound] = useState(false);
   const [nationalIdChecked, setNationalIdChecked] = useState(false);
 
+  const [showRanchModal, setShowRanchModal] = useState(false);
+  const [creatingRanchRequest, setCreatingRanchRequest] = useState(false);
+  const [ranchModalError, setRanchModalError] = useState("");
+  const [newRanch, setNewRanch] = useState({
+    ranchName: "",
+    contactEmail: "",
+    contactPhone: "",
+    websiteUrl: "",
+  });
+
   useEffect(function () {
     Promise.all([getRoles(), getRanches()])
       .then(function ([rolesResponse, ranchesResponse]) {
@@ -108,6 +119,23 @@ export default function RegisterScreen() {
     };
   }
 
+  function setNewRanchField(fieldName) {
+    return function (e) {
+      var value = e.target.value;
+
+      setNewRanch(function (prevRanch) {
+        return {
+          ...prevRanch,
+          [fieldName]: value,
+        };
+      });
+
+      if (ranchModalError) {
+        setRanchModalError("");
+      }
+    };
+  }
+
   function resetPersonDetailsKeepNationalId() {
     setForm(function (prevForm) {
       return {
@@ -120,6 +148,28 @@ export default function RegisterScreen() {
         email: "",
       };
     });
+  }
+
+  function openCreateRanchModal() {
+    setRanchModalError("");
+    setNewRanch(function () {
+      return {
+        ranchName: "",
+        contactEmail: form.email || "",
+        contactPhone: form.cellPhone || "",
+        websiteUrl: "",
+      };
+    });
+    setShowRanchModal(true);
+  }
+
+  function closeCreateRanchModal() {
+    if (creatingRanchRequest) {
+      return;
+    }
+
+    setShowRanchModal(false);
+    setRanchModalError("");
   }
 
   async function handleNationalIdBlur() {
@@ -262,6 +312,89 @@ export default function RegisterScreen() {
 
     setError("");
     setActiveSection(3);
+  }
+
+  async function handleCreateRanchRequest() {
+    setRanchModalError("");
+    setError("");
+    setSuccess("");
+
+    if (!newRanch.ranchName.trim()) {
+      setRanchModalError("יש להזין שם חווה");
+      return;
+    }
+
+    if (!form.firstName.trim()) {
+      setRanchModalError("יש למלא שם פרטי לפני יצירת בקשת חווה");
+      return;
+    }
+
+    if (!form.lastName.trim()) {
+      setRanchModalError("יש למלא שם משפחה לפני יצירת בקשת חווה");
+      return;
+    }
+
+    if (!form.nationalId.trim()) {
+      setRanchModalError("יש למלא תעודת זהות לפני יצירת בקשת חווה");
+      return;
+    }
+
+    if (!form.cellPhone.trim()) {
+      setRanchModalError("יש למלא טלפון נייד לפני יצירת בקשת חווה");
+      return;
+    }
+
+    try {
+      setCreatingRanchRequest(true);
+
+      await createRanchRequest({
+        ranchName: newRanch.ranchName.trim(),
+        contactEmail: newRanch.contactEmail.trim() || null,
+        contactPhone: newRanch.contactPhone.trim() || null,
+        websiteUrl: newRanch.websiteUrl.trim() || null,
+        latitude: null,
+        longitude: null,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        nationalId: form.nationalId.trim(),
+        email: form.email.trim() || null,
+        cellPhone: form.cellPhone.trim(),
+      });
+
+      const ranchesResponse = await getRanches();
+      const refreshedRanches = Array.isArray(ranchesResponse.data)
+        ? ranchesResponse.data
+        : [];
+
+      setRanches(refreshedRanches);
+
+      var createdRanch = refreshedRanches.find(function (item) {
+        return item.ranchName === newRanch.ranchName.trim();
+      });
+
+      if (createdRanch) {
+        setRanchRolePairs(function (prevPairs) {
+          return prevPairs.map(function (pair, index) {
+            if (index === 0 && !pair.ranchId) {
+              return {
+                ...pair,
+                ranchId: String(createdRanch.ranchId),
+              };
+            }
+
+            return pair;
+          });
+        });
+      }
+
+      setShowRanchModal(false);
+      setSuccess("בקשת חווה נשלחה בהצלחה. החווה תופיע לאחר אישור מנהל.");
+    } catch (err) {
+      var message = getApiErrorMessage(err, "שגיאה ביצירת בקשת חווה");
+      setRanchModalError(message);
+    } finally {
+      setCreatingRanchRequest(false);
+    }
   }
 
   async function handleSubmit(e) {
@@ -701,34 +834,44 @@ export default function RegisterScreen() {
                           <Field
                             label={`חווה ${ranchRolePairs.length > 1 ? idx + 1 : ""}`}
                           >
-                            <CustomDropdown
-                              value={pair.ranchId}
-                              onChange={function (e) {
-                                setRanchRolePairs(function (prevPairs) {
-                                  return prevPairs.map(function (item, index) {
-                                    if (index === idx) {
-                                      return {
-                                        ...item,
-                                        ranchId: e.target.value,
-                                      };
-                                    }
-                                    return item;
+                            <div>
+                              <CustomDropdown
+                                value={pair.ranchId}
+                                onChange={function (e) {
+                                  setRanchRolePairs(function (prevPairs) {
+                                    return prevPairs.map(function (item, index) {
+                                      if (index === idx) {
+                                        return {
+                                          ...item,
+                                          ranchId: e.target.value,
+                                        };
+                                      }
+                                      return item;
+                                    });
                                   });
-                                });
-                              }}
-                              options={ranches}
-                              placeholder="בחר חווה"
-                              disabled={false}
-                              openDropdownKey={openDropdownKey}
-                              setOpenDropdownKey={setOpenDropdownKey}
-                              dropdownKey={"ranch-" + idx}
-                              getOptionLabel={function (option) {
-                                return option.ranchName;
-                              }}
-                              getOptionValue={function (option) {
-                                return option.ranchId;
-                              }}
-                            />
+                                }}
+                                options={ranches}
+                                placeholder="בחר חווה"
+                                disabled={false}
+                                openDropdownKey={openDropdownKey}
+                                setOpenDropdownKey={setOpenDropdownKey}
+                                dropdownKey={"ranch-" + idx}
+                                getOptionLabel={function (option) {
+                                  return option.ranchName;
+                                }}
+                                getOptionValue={function (option) {
+                                  return option.ranchId;
+                                }}
+                              />
+
+                              <button
+                                type="button"
+                                onClick={openCreateRanchModal}
+                                className="mt-2 text-xs text-[#795548] hover:text-[#4E342E] hover:underline transition-colors"
+                              >
+                                לא מצאתי את החווה שלי
+                              </button>
+                            </div>
                           </Field>
 
                           <Field
@@ -846,6 +989,103 @@ export default function RegisterScreen() {
           </div>
         </form>
       </div>
+
+      {showRanchModal && (
+        <div className="fixed inset-0 z-50 bg-black/35 flex items-center justify-center px-4">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-[#E8D5C9] overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#F1E6DF]">
+              <button
+                type="button"
+                onClick={closeCreateRanchModal}
+                className="text-[#8D6E63] hover:text-[#5D4037] transition-colors"
+              >
+                <X size={18} />
+              </button>
+
+              <h3 className="text-lg font-bold text-[#3F312B]">
+                בקשה להוספת חווה
+              </h3>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-[#795548] text-right leading-6">
+                לא מצאת את החווה שלך? אפשר לשלוח בקשה להוספת חווה חדשה. הבקשה
+                תועבר לאישור מנהל המערכת.
+              </p>
+
+              <Field label="שם החווה" required>
+                <input
+                  type="text"
+                  value={newRanch.ranchName}
+                  onChange={setNewRanchField("ranchName")}
+                  placeholder="הזיני שם חווה"
+                  className={inputCls}
+                />
+              </Field>
+
+              <Field label="אימייל חווה">
+                <input
+                  type="email"
+                  value={newRanch.contactEmail}
+                  onChange={setNewRanchField("contactEmail")}
+                  placeholder="example@email.com"
+                  className={inputCls}
+                />
+              </Field>
+
+              <Field label="טלפון חווה">
+                <input
+                  type="tel"
+                  value={newRanch.contactPhone}
+                  onChange={setNewRanchField("contactPhone")}
+                  placeholder="050-0000000"
+                  className={inputCls}
+                />
+              </Field>
+
+              <Field label="אתר חווה">
+                <input
+                  type="text"
+                  value={newRanch.websiteUrl}
+                  onChange={setNewRanchField("websiteUrl")}
+                  placeholder="https://example.com"
+                  className={inputCls}
+                />
+              </Field>
+
+              {ranchModalError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm text-right">
+                  {ranchModalError}
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleCreateRanchRequest}
+                  disabled={creatingRanchRequest}
+                  className="flex-1 py-3 rounded-xl text-white font-bold text-sm shadow-md hover:shadow-lg active:scale-[0.98] transition-all disabled:opacity-60"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #795548 0%, #4E342E 100%)",
+                  }}
+                >
+                  {creatingRanchRequest ? "שולח בקשה..." : "שלח בקשת חווה"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={closeCreateRanchModal}
+                  disabled={creatingRanchRequest}
+                  className="sm:w-36 py-3 rounded-xl border-2 border-[#D7CCC8] text-[#795548] font-semibold hover:bg-[#F5EBE4] transition-all disabled:opacity-60"
+                >
+                  ביטול
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <p className="text-xs text-[#BCAAA4] mt-6">RideOn System &copy; 2026</p>
     </div>

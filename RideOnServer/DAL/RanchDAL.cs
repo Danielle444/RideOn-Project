@@ -31,7 +31,39 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public List<Ranch> GetRanchesForRegistration()
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetRanchesForRegistration", connection, null))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<Ranch> ranches = new List<Ranch>();
+
+                        while (reader.Read())
+                        {
+                            ranches.Add(new Ranch
+                            {
+                                RanchId = Convert.ToInt32(reader["RanchId"]),
+                                RanchName = reader["RanchName"].ToString()!
+                            });
+                        }
+
+                        return ranches;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }

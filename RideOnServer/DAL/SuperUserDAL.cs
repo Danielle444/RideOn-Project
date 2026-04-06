@@ -9,38 +9,39 @@ namespace RideOnServer.DAL
     {
         public SuperUser? GetSuperUserForLogin(string email)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
-            {
-                { "@Email", email }
-            };
-
             try
             {
                 using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetSuperUserForLogin", connection, paramDic))
-                    using (NpgsqlDataReader reader = command.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            return new SuperUser
-                            {
-                                SuperUserId = Convert.ToInt32(reader["SuperUserId"]),
-                                Email = reader["Email"].ToString() ?? string.Empty,
-                                PasswordHash = reader["PasswordHash"].ToString() ?? string.Empty,
-                                PasswordSalt = reader["PasswordSalt"].ToString() ?? string.Empty,
-                                IsActive = Convert.ToBoolean(reader["IsActive"]),
-                                MustChangePassword = Convert.ToBoolean(reader["MustChangePassword"])
-                            };
-                        }
+                    string query = "SELECT * FROM usp_getsuperuserforlogin(@p_email)";
 
-                        return null;
+                    using (NpgsqlCommand command = new NpgsqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@p_email", email);
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                return new SuperUser
+                                {
+                                    SuperUserId = Convert.ToInt32(reader["SuperUserId"]),
+                                    Email = reader["Email"].ToString() ?? string.Empty,
+                                    PasswordHash = reader["PasswordHash"].ToString() ?? string.Empty,
+                                    PasswordSalt = reader["PasswordSalt"].ToString() ?? string.Empty,
+                                    IsActive = Convert.ToBoolean(reader["IsActive"]),
+                                    MustChangePassword = Convert.ToBoolean(reader["MustChangePassword"])
+                                };
+                            }
+
+                            return null;
+                        }
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -383,6 +384,35 @@ namespace RideOnServer.DAL
                 }
             }
             catch (NpgsqlException  ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public string GetRanchStatusById(int ranchId)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    string query = "SELECT ranchstatus FROM ranch WHERE ranchid = @RanchId";
+
+                    using (NpgsqlCommand command = new NpgsqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@RanchId", ranchId);
+
+                        object? result = command.ExecuteScalar();
+
+                        if (result == null || result == DBNull.Value)
+                            throw new Exception("Ranch not found");
+
+                        return result.ToString() ?? string.Empty;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }

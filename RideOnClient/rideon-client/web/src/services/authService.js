@@ -20,8 +20,12 @@ function register(data) {
   return axios.post(`${API}/SystemUsers/register`, data);
 }
 
+function createRanchRequest(data) {
+  return axios.post(`${API}/SystemUsers/ranch-request`, data);
+}
+
 function getRanches() {
-  return axios.get(`${API}/Ranches`);
+  return axios.get(`${API}/Ranches/for-registration`);
 }
 
 function getRoles() {
@@ -38,7 +42,8 @@ function changePassword(username, currentPassword, newPassword) {
 
 function changeSuperUserPassword(currentPassword, newPassword) {
   const token =
-    localStorage.getItem("rideon_token") || sessionStorage.getItem("rideon_token");
+    localStorage.getItem("rideon_token") ||
+    sessionStorage.getItem("rideon_token");
 
   return axios.put(
     `${API}/SuperUsers/change-password`,
@@ -50,7 +55,7 @@ function changeSuperUserPassword(currentPassword, newPassword) {
       headers: {
         Authorization: `Bearer ${token}`,
       },
-    }
+    },
   );
 }
 
@@ -70,6 +75,7 @@ export {
   login,
   loginSuperUser,
   register,
+  createRanchRequest,
   getRanches,
   getRoles,
   changePassword,

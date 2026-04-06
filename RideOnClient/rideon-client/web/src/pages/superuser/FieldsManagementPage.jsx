@@ -67,9 +67,7 @@ export default function FieldsManagementPage() {
       }
 
       return fields.filter(function (item) {
-        return (
-          (item.fieldName || "").toLowerCase().includes(s)
-        );
+        return (item.fieldName || "").toLowerCase().includes(s);
       });
     },
     [fields, search],
@@ -146,7 +144,14 @@ export default function FieldsManagementPage() {
       await loadFields();
     } catch (err) {
       console.error(err);
-      setError(err.response?.data || "שגיאה בשמירת הענף");
+
+      const errorMessage =
+        err.response?.data?.title ||
+        err.response?.data?.message ||
+        (typeof err.response?.data === "string" ? err.response.data : null) ||
+        "שגיאה בשמירת הענף";
+
+      setError(errorMessage);
     }
   }
 
@@ -181,7 +186,9 @@ export default function FieldsManagementPage() {
       <div className="rounded-[26px] border border-[#E6DCD5] bg-white shadow-sm overflow-hidden">
         <div className="px-8 pt-8 pb-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <h1 className="text-[2rem] font-bold text-[#3F312B]">ניהול ענפים</h1>
+            <h1 className="text-[2rem] font-bold text-[#3F312B]">
+              ניהול ענפים
+            </h1>
 
             <button
               type="button"
@@ -216,7 +223,9 @@ export default function FieldsManagementPage() {
         isOpen={modalOpen}
         onClose={closeModal}
         onSubmit={handleSubmit}
-        initialValue={editItem}
+        initialValue={editItem?.fieldName || ""}
+        initialItem={editItem}
+        isEdit={!!editItem}
         error={error}
       />
 
