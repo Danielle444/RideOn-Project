@@ -14,7 +14,11 @@ export default function FieldModal(props) {
 
   function handleSubmit(e) {
     e.preventDefault();
-    props.onSubmit(name.trim());
+
+    props.onSubmit({
+      fieldId: props.initialItem?.fieldId || 0,
+      fieldName: name.trim(),
+    });
   }
 
   return (

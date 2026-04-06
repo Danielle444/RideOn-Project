@@ -20,5 +20,19 @@ namespace RideOnServer.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [HttpGet("for-registration")]
+        public IActionResult GetRanchesForRegistration()
+        {
+            try
+            {
+                List<Ranch> ranches = Ranch.GetRanchesForRegistration();
+                return Ok(ranches);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

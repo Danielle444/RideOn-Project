@@ -2,7 +2,7 @@ using Npgsql;
 using System.Data;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.Auth;
-
+using NpgsqlTypes;
 
 namespace RideOnServer.DAL
 {
@@ -258,48 +258,113 @@ namespace RideOnServer.DAL
                 {
                     connection.Open();
 
+                    int[] ranchIds = request.RanchRoles
+                        .Select(pair => pair.RanchId)
+                        .ToArray();
+
+                    short[] roleIds = request.RanchRoles
+                        .Select(pair => (short)pair.RoleId)
+                        .ToArray();
+
+                    string sql = @"
+                SELECT * FROM usp_RegisterSystemUserWithRoles(
+                    @NationalId,
+                    @FirstName,
+                    @LastName,
+                    @Username,
+                    @PasswordHash,
+                    @PasswordSalt,
+                    @RanchIds,
+                    @RoleIds,
+                    @Gender,
+                    @DateOfBirth,
+                    @CellPhone,
+                    @Email
+                )";
+
+                    using (NpgsqlCommand command = new NpgsqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@NationalId", request.NationalId);
+                        command.Parameters.AddWithValue("@FirstName", request.FirstName);
+                        command.Parameters.AddWithValue("@LastName", request.LastName);
+                        command.Parameters.AddWithValue("@Username", request.Username);
+                        command.Parameters.AddWithValue("@PasswordHash", passwordHash);
+                        command.Parameters.AddWithValue("@PasswordSalt", passwordSalt);
+                        command.Parameters.AddWithValue("@RanchIds", ranchIds);
+                        command.Parameters.AddWithValue("@RoleIds", roleIds);
+
+                        command.Parameters.AddWithValue("@Gender",
+                            string.IsNullOrWhiteSpace(request.Gender) ? DBNull.Value : request.Gender);
+
+                        var dateParam = command.Parameters.Add("@DateOfBirth", NpgsqlTypes.NpgsqlDbType.Date);
+                        dateParam.Value = request.DateOfBirth.HasValue
+                            ? request.DateOfBirth.Value.Date
+                            : DBNull.Value;
+
+                        command.Parameters.AddWithValue("@CellPhone", request.CellPhone);
+
+                        command.Parameters.AddWithValue("@Email",
+                            string.IsNullOrWhiteSpace(request.Email) ? DBNull.Value : request.Email);
+
+                        object result = command.ExecuteScalar()!;
+                        return Convert.ToInt32(result);
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+
+        public int CreatePendingRanchRequest(CreateRanchRequest request)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
                     using (NpgsqlTransaction transaction = connection.BeginTransaction())
                     {
                         try
                         {
-                            int personId;
+                            int newRanchId;
+                            int newRequestId;
 
-                            using (NpgsqlCommand command = new NpgsqlCommand("usp_RegisterSystemUser", connection, transaction))
+                            Dictionary<string, object> ranchParamDic = new Dictionary<string, object>
+                    {
+                        { "@RanchName", request.RanchName },
+                        { "@ContactEmail", (object?)request.ContactEmail ?? DBNull.Value },
+                        { "@ContactPhone", (object?)request.ContactPhone ?? DBNull.Value },
+                        { "@WebsiteUrl", (object?)request.WebsiteUrl ?? DBNull.Value },
+                        { "@Lat", (object?)request.Latitude ?? DBNull.Value },
+                        { "@Long", (object?)request.Longitude ?? DBNull.Value }
+                    };
+
+                            using (NpgsqlCommand ranchCommand = CreateCommandWithStoredProcedure("usp_InsertRanch", connection, ranchParamDic))
                             {
-                                command.CommandType = CommandType.StoredProcedure;
-
-                                command.Parameters.AddWithValue("@NationalId", request.NationalId);
-                                command.Parameters.AddWithValue("@FirstName", request.FirstName);
-                                command.Parameters.AddWithValue("@LastName", request.LastName);
-                                command.Parameters.AddWithValue("@Gender", (object?)request.Gender ?? DBNull.Value);
-                                command.Parameters.AddWithValue("@DateOfBirth", (object?)request.DateOfBirth ?? DBNull.Value);
-                                command.Parameters.AddWithValue("@CellPhone", request.CellPhone);
-                                command.Parameters.AddWithValue("@Email", request.Email);
-                                command.Parameters.AddWithValue("@Username", request.Username);
-                                command.Parameters.AddWithValue("@PasswordHash", passwordHash);
-                                command.Parameters.AddWithValue("@PasswordSalt", passwordSalt);
-
-                                object result = command.ExecuteScalar()!;
-                                personId = Convert.ToInt32(result);
+                                ranchCommand.Transaction = transaction;
+                                object ranchResult = ranchCommand.ExecuteScalar()!;
+                                newRanchId = Convert.ToInt32(ranchResult);
                             }
 
-                            foreach (RegisterRanchRoleRequest pair in request.RanchRoles)
+                            Dictionary<string, object> requestParamDic = new Dictionary<string, object>
+                    {
+                        { "@RanchId", newRanchId },
+                        { "@SubmittedBySystemUserId", DBNull.Value }
+                    };
+
+                            using (NpgsqlCommand requestCommand = CreateCommandWithStoredProcedure("usp_InsertNewRanchRequest", connection, requestParamDic))
                             {
-                                using (NpgsqlCommand roleCommand = new NpgsqlCommand("usp_AssignPersonRoleAtRanch", connection, transaction))
-                                {
-                                    roleCommand.CommandType = CommandType.StoredProcedure;
-
-                                    roleCommand.Parameters.AddWithValue("@PersonId", personId);
-                                    roleCommand.Parameters.AddWithValue("@RanchId", pair.RanchId);
-                                    roleCommand.Parameters.AddWithValue("@RoleId", pair.RoleId);
-                                    roleCommand.Parameters.AddWithValue("@RoleStatus", "Pending");
-
-                                    roleCommand.ExecuteNonQuery();
-                                }
+                                requestCommand.Transaction = transaction;
+                                object requestResult = requestCommand.ExecuteScalar()!;
+                                newRequestId = Convert.ToInt32(requestResult);
                             }
 
                             transaction.Commit();
-                            return personId;
+                            return newRequestId;
                         }
                         catch
                         {
@@ -314,6 +379,7 @@ namespace RideOnServer.DAL
                 throw new Exception($"Database error: {ex.Message}");
             }
         }
+
 
 
     }

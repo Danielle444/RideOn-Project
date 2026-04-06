@@ -125,8 +125,19 @@ namespace RideOnServer.BL
                 throw new Exception("Invalid role status. Only Approved or Rejected are allowed.");
             }
 
-            SuperUserDAL dal = new SuperUserDAL();
-            dal.UpdateRoleRequestStatus(personId, ranchId, roleId, roleStatus);
+            if (roleStatus == "Approved")
+            {
+                SuperUserDAL dal = new SuperUserDAL();
+                string ranchStatus = dal.GetRanchStatusById(ranchId);
+
+                if (ranchStatus != "Approved")
+                {
+                    throw new Exception("Cannot approve role request before ranch is approved.");
+                }
+            }
+
+            SuperUserDAL finalDal = new SuperUserDAL();
+            finalDal.UpdateRoleRequestStatus(personId, ranchId, roleId, roleStatus);
         }
 
         internal static void UpdateNewRanchRequestStatus(int requestId, int resolvedBySuperUserId, string newStatus)

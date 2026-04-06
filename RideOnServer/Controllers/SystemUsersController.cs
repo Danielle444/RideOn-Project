@@ -149,7 +149,24 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("ranch-request")]
+        public IActionResult CreateRanchRequest([FromBody] CreateRanchRequest request)
+        {
+            try
+            {
+                int requestId = SystemUser.CreatePendingRanchRequest(request);
 
+                return Ok(new
+                {
+                    RequestId = requestId,
+                    Message = "Ranch request created successfully"
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
 
 
 

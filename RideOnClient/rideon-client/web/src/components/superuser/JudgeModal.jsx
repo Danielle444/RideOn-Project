@@ -176,7 +176,6 @@ export default function JudgeModal(props) {
                 value={form.country}
                 onChange={(e) => updateField("country", e.target.value)}
                 className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-                required
               />
             </div>
 

@@ -21,5 +21,11 @@ namespace RideOnServer.BL
             RanchDAL dal = new RanchDAL();
             return dal.GetAllRanchesNames();
         }
+
+        internal static List<Ranch> GetRanchesForRegistration()
+        {
+            RanchDAL dal = new RanchDAL();
+            return dal.GetRanchesForRegistration();
+        }
     }
 }

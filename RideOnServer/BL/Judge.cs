@@ -80,9 +80,6 @@ namespace RideOnServer.BL
             if (string.IsNullOrWhiteSpace(lastNameHebrew))
                 throw new Exception("Hebrew last name is required");
 
-            if (string.IsNullOrWhiteSpace(country))
-                throw new Exception("Country is required");
-
             if (string.IsNullOrWhiteSpace(fieldIdsCsv))
                 throw new Exception("At least one field must be selected");
         }
