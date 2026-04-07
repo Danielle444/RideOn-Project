@@ -87,7 +87,8 @@ export default function ChangePasswordScreen(props) {
         {
           text: "אישור",
           onPress: function () {
-            props.navigation.replace("MobileEntryGate");
+            setTimeout(() => {
+            props.navigation.replace("MobileEntryGate");}, 0);
           },
         },
       ]);

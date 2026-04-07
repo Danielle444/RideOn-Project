@@ -30,7 +30,7 @@ export default function MobileEntryGateScreen(props) {
 
       handleNavigation();
     },
-    [isFocused, isUserHydrated, user, activeRole, didNavigate]
+    [isFocused, isUserHydrated, user, activeRole, didNavigate],
   );
 
   async function handleNavigation() {
@@ -42,7 +42,10 @@ export default function MobileEntryGateScreen(props) {
 
     if (user.mustChangePassword) {
       setDidNavigate(true);
-      props.navigation.replace("ChangePassword");
+      props.navigation.reset({
+        index: 0,
+        routes: [{ name: "ChangePassword" }],
+      });
       return;
     }
 
@@ -51,7 +54,10 @@ export default function MobileEntryGateScreen(props) {
 
       if (screenName) {
         setDidNavigate(true);
-        props.navigation.replace(screenName);
+        props.navigation.reset({
+          index: 0,
+          routes: [{ name: screenName }],
+        });
         return;
       }
     }
@@ -66,12 +72,17 @@ export default function MobileEntryGateScreen(props) {
       await setActiveRoleAndPersist(autoSelection.result.activeRole);
 
       setDidNavigate(true);
-      props.navigation.replace(autoSelection.result.destination);
+      props.navigation.reset({
+        index: 0,
+        routes: [{ name: autoSelection.result.destination }],
+      });
       return;
     }
 
     setDidNavigate(true);
-    props.navigation.replace("SelectActiveRole");
+    setTimeout(function () {
+      props.navigation.replace("SelectActiveRole");
+    }, 0);
   }
 
   return (
