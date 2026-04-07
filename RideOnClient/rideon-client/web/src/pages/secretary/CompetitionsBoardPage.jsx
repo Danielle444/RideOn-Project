@@ -8,6 +8,7 @@ import ToastMessage from "../../components/common/ToastMessage";
 import { useUser } from "../../context/UserContext";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import { getCompetitionsByHostRanch } from "../../services/competitionService";
+import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function CompetitionsBoardPage() {
   const navigate = useNavigate();
@@ -40,9 +41,12 @@ export default function CompetitionsBoardPage() {
     [activeRole?.roleName, activeRole?.ranchName].filter(Boolean).join(" · ") ||
     "לא נבחר תפקיד וחווה";
 
-  const currentRanchId = useMemo(function () {
-    return activeRole?.ranchId || null;
-  }, [activeRole]);
+  const currentRanchId = useMemo(
+    function () {
+      return activeRole?.ranchId || null;
+    },
+    [activeRole],
+  );
 
   useEffect(
     function () {
@@ -85,7 +89,7 @@ export default function CompetitionsBoardPage() {
     } catch (error) {
       console.error(error);
       setCompetitions([]);
-      showToast("error", error.response?.data || "שגיאה בטעינת התחרויות");
+      showToast("error", getErrorMessage(error, "שגיאה בטעינת התחרויות"));
     } finally {
       setLoading(false);
     }
@@ -267,10 +271,12 @@ export default function CompetitionsBoardPage() {
       activeItemKey="competitions-board"
       onNavigate={handleGeneralNavigate}
     >
-      <div className="rounded-[28px] border border-[#E6DCD5] bg-white shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-[28px] border border-[#E6DCD5] bg-white shadow-sm">
         <div className="border-b border-[#EFE5DF] px-8 py-7">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <h1 className="text-[2rem] font-bold text-[#3F312B]">לוח תחרויות</h1>
+            <h1 className="text-[2rem] font-bold text-[#3F312B]">
+              לוח תחרויות
+            </h1>
 
             <button
               type="button"

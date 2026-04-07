@@ -2,27 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import CustomDropdown from "../common/CustomDropdown";
 import MultiSelectPicker from "../common/MultiSelectPicker";
-import { toInputDate } from "../../utils/competitionForm.utils";
-
-function normalizeTimeForInput(value) {
-  if (!value) {
-    return "";
-  }
-
-  return String(value).slice(0, 5);
-}
-
-function normalizeTimeForServer(value) {
-  if (!value) {
-    return null;
-  }
-
-  if (value.length === 5) {
-    return value + ":00";
-  }
-
-  return value;
-}
+import {
+  toInputDate,
+  normalizeTimeForInput,
+  normalizeTimeForServer,
+} from "../../utils/competitionForm.utils";
 
 export default function ClassInCompetitionModal(props) {
   var isEdit = !!props.initialValue;

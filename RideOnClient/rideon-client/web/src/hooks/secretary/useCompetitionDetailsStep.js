@@ -16,6 +16,7 @@ import {
   toInputDate,
   getErrorMessage,
   validateDetailsForm,
+  buildCompetitionBasePayload,
 } from "../../utils/competitionForm.utils";
 
 export default function useCompetitionDetailsStep(options) {
@@ -160,9 +161,6 @@ export default function useCompetitionDetailsStep(options) {
         ),
         notes: competition.notes || "",
       });
-
-      // בכוונה לא מאפסים כאן selectedCompetitionJudgeIds
-      // כי היא רשימה לוקאלית שנאתחל פעם אחת מתוך המקצים ב-useCompetitionFormPage
     } catch (error) {
       console.error(error);
       onShowToast("error", getErrorMessage(error, "שגיאה בטעינת פרטי התחרות"));
@@ -206,19 +204,12 @@ export default function useCompetitionDetailsStep(options) {
   }
 
   function buildCompetitionPayload(statusOverride) {
+    var basePayload = buildCompetitionBasePayload(detailsForm, currentRanchId);
+
     return {
+      ...basePayload,
       competitionId: competitionId,
-      hostRanchId: currentRanchId,
-      fieldId: Number(detailsForm.fieldId),
-      competitionName: detailsForm.competitionName.trim(),
-      competitionStartDate: detailsForm.competitionStartDate,
-      competitionEndDate: detailsForm.competitionEndDate,
-      registrationOpenDate: detailsForm.registrationOpenDate || null,
-      registrationEndDate: detailsForm.registrationEndDate || null,
-      paidTimeRegistrationDate: detailsForm.paidTimeRegistrationDate || null,
-      paidTimePublicationDate: detailsForm.paidTimePublicationDate || null,
       competitionStatus: statusOverride,
-      notes: detailsForm.notes.trim() || null,
     };
   }
 
@@ -265,18 +256,7 @@ export default function useCompetitionDetailsStep(options) {
         };
       }
 
-      var createPayload = {
-        hostRanchId: currentRanchId,
-        fieldId: Number(detailsForm.fieldId),
-        competitionName: detailsForm.competitionName.trim(),
-        competitionStartDate: detailsForm.competitionStartDate,
-        competitionEndDate: detailsForm.competitionEndDate,
-        registrationOpenDate: detailsForm.registrationOpenDate || null,
-        registrationEndDate: detailsForm.registrationEndDate || null,
-        paidTimeRegistrationDate: detailsForm.paidTimeRegistrationDate || null,
-        paidTimePublicationDate: detailsForm.paidTimePublicationDate || null,
-        notes: detailsForm.notes.trim() || null,
-      };
+      var createPayload = buildCompetitionBasePayload(detailsForm, currentRanchId);
 
       var response = await createCompetition(createPayload);
 

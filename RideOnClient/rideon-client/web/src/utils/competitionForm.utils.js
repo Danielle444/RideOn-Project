@@ -20,6 +20,71 @@ function toInputDate(value) {
   return year + "-" + month + "-" + day;
 }
 
+function toDateKey(value) {
+  if (!value) {
+    return "";
+  }
+
+  if (typeof value === "string" && value.includes("T")) {
+    return value.split("T")[0];
+  }
+
+  var date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  var year = date.getFullYear();
+  var month = String(date.getMonth() + 1).padStart(2, "0");
+  var day = String(date.getDate()).padStart(2, "0");
+
+  return year + "-" + month + "-" + day;
+}
+
+function formatTimeForDisplay(value) {
+  if (!value) {
+    return "";
+  }
+
+  return String(value).slice(0, 5);
+}
+
+function normalizeTimeForInput(value) {
+  if (!value) {
+    return "";
+  }
+
+  return String(value).slice(0, 5);
+}
+
+function normalizeTimeForServer(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (value.length === 5) {
+    return value + ":00";
+  }
+
+  return value;
+}
+
+function buildCompetitionBasePayload(detailsForm, currentRanchId) {
+  return {
+    hostRanchId: currentRanchId,
+    fieldId: Number(detailsForm.fieldId),
+    competitionName: detailsForm.competitionName.trim(),
+    competitionStartDate: detailsForm.competitionStartDate,
+    competitionEndDate: detailsForm.competitionEndDate,
+    registrationOpenDate: detailsForm.registrationOpenDate || null,
+    registrationEndDate: detailsForm.registrationEndDate || null,
+    paidTimeRegistrationDate: detailsForm.paidTimeRegistrationDate || null,
+    paidTimePublicationDate: detailsForm.paidTimePublicationDate || null,
+    notes: detailsForm.notes.trim() || null,
+  };
+}
+
 function getErrorMessage(error, fallbackMessage) {
   if (!error) {
     return fallbackMessage;
@@ -116,4 +181,13 @@ function validateDetailsForm(detailsForm) {
   return "";
 }
 
-export { toInputDate, getErrorMessage, validateDetailsForm };
+export {
+  toInputDate,
+  toDateKey,
+  formatTimeForDisplay,
+  normalizeTimeForInput,
+  normalizeTimeForServer,
+  buildCompetitionBasePayload,
+  getErrorMessage,
+  validateDetailsForm,
+};

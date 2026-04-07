@@ -4,6 +4,7 @@ import {
   getAllFields,
   getAllJudges,
 } from "../../services/superUserService";
+import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function useJudgeCreation(options) {
   var fieldId = options.fieldId;
@@ -27,7 +28,7 @@ export default function useJudgeCreation(options) {
       setJudgeFields(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error(error);
-      setJudgeModalError(error.response?.data || "שגיאה בטעינת ענפים");
+      setJudgeModalError(getErrorMessage(error, "שגיאה בטעינת ענפים"));
     }
   }
 
@@ -64,7 +65,7 @@ export default function useJudgeCreation(options) {
       setJudgeModalOpen(false);
     } catch (error) {
       console.error(error);
-      setJudgeModalError(error.response?.data || "שגיאה בשמירת השופט");
+      setJudgeModalError(getErrorMessage(error, "שגיאה בשמירת השופט"));
     }
   }
 
