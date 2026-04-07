@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import useCompetitionDetailsStep from "./useCompetitionDetailsStep";
 import useCompetitionClassesStep from "./useCompetitionClassesStep";
@@ -68,6 +68,7 @@ export default function useCompetitionFormPage(options) {
     activeStep: activeStep,
     detailsForm: details.detailsForm,
     onShowToast: showToast,
+    loadOnInit: isEdit,
   });
 
   var paidTime = useCompetitionPaidTimeStep({
@@ -78,6 +79,55 @@ export default function useCompetitionFormPage(options) {
     onShowToast: showToast,
   });
 
+  useEffect(
+    function () {
+      if (!isEdit) {
+        return;
+      }
+
+      if (!details.competitionId) {
+        return;
+      }
+
+      var currentSelected = Array.isArray(details.selectedCompetitionJudgeIds)
+        ? details.selectedCompetitionJudgeIds
+        : [];
+
+      if (currentSelected.length > 0) {
+        return;
+      }
+
+      var classesList = Array.isArray(classes.classesInCompetition)
+        ? classes.classesInCompetition
+        : [];
+
+      if (classesList.length === 0) {
+        return;
+      }
+
+      var judgeIdsFromClasses = classesList
+        .flatMap(function (item) {
+          return Array.isArray(item.judgeIds) ? item.judgeIds : [];
+        })
+        .filter(function (id, index, arr) {
+          return arr.indexOf(id) === index;
+        });
+
+      if (judgeIdsFromClasses.length === 0) {
+        return;
+      }
+
+      details.setSelectedCompetitionJudgeIds(judgeIdsFromClasses);
+    },
+    [
+      isEdit,
+      details.competitionId,
+      details.selectedCompetitionJudgeIds,
+      classes.classesInCompetition,
+      details.setSelectedCompetitionJudgeIds,
+    ],
+  );
+
   async function handleSaveDetails(intent) {
     var result = await details.saveDetails(
       intent,
@@ -85,6 +135,11 @@ export default function useCompetitionFormPage(options) {
     );
 
     if (!result.success) {
+      return;
+    }
+
+    if (intent === "draft") {
+      navigate("/competitions"); // ⬅️ לוח תחרויות
       return;
     }
 
@@ -122,10 +177,15 @@ export default function useCompetitionFormPage(options) {
     arenas: details.arenas,
     classTypes: details.classTypes,
     judges: details.judges,
+    prizeTypes: details.prizeTypes,
     paidTimeBaseSlots: details.paidTimeBaseSlots,
     competitionId: details.competitionId,
     currentStatus: details.currentStatus,
     detailsForm: details.detailsForm,
+    selectedCompetitionJudgeIds: details.selectedCompetitionJudgeIds,
+    setSelectedCompetitionJudgeIds: details.setSelectedCompetitionJudgeIds,
+    toggleCompetitionJudge: details.toggleCompetitionJudge,
+    setJudgesManually: details.setJudgesManually,
     handleDetailsChange: details.handleDetailsChange,
     handleSaveDetails: handleSaveDetails,
     classesInCompetition: classes.classesInCompetition,
@@ -134,6 +194,7 @@ export default function useCompetitionFormPage(options) {
     editClassItem: classes.editClassItem,
     classModalError: classes.classModalError,
     savingClass: classes.savingClass,
+    createClassDefaultDate: classes.createClassDefaultDate,
     openCreateClassModal: classes.openCreateClassModal,
     openEditClassModal: classes.openEditClassModal,
     closeClassModal: classes.closeClassModal,

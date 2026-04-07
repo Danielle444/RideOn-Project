@@ -19,5 +19,9 @@
         public decimal? FederationCost { get; set; }
 
         public string? ClassNotes { get; set; }
+
+        public List<int> JudgeIds { get; set; } = new List<int>();
+        public byte? PrizeTypeId { get; set; }
+        public decimal? PrizeAmount { get; set; }
     }
 }

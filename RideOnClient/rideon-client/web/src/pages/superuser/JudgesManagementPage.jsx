@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import SuperUserLayout from "../../components/superuser/SuperUserLayout";
 import JudgesTable from "../../components/superuser/JudgesTable";
-import JudgeModal from "../../components/superuser/JudgeModal";
+import JudgeModal from "../../components/common/JudgeModal";
 import ConfirmDialog from "../../components/superuser/ConfirmDialog";
 import ToastMessage from "../../components/common/ToastMessage";
 import {
@@ -11,6 +11,7 @@ import {
   deleteJudge,
   getAllFields,
 } from "../../services/superUserService";
+import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function JudgesManagementPage() {
   const [judges, setJudges] = useState([]);
@@ -41,10 +42,10 @@ export default function JudgesManagementPage() {
   async function loadFields() {
     try {
       const res = await getAllFields();
-      setFields(res.data || []);
+      setFields(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error(err);
-      showToast("error", err.response?.data || "שגיאה בטעינת ענפים");
+      showToast("error", getErrorMessage(err, "שגיאה בטעינת ענפים"));
     }
   }
 
@@ -52,10 +53,10 @@ export default function JudgesManagementPage() {
     try {
       setLoading(true);
       const res = await getAllJudges(selectedFieldId || null);
-      setJudges(res.data || []);
+      setJudges(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error(err);
-      showToast("error", err.response?.data || "שגיאה בטעינת שופטים");
+      showToast("error", getErrorMessage(err, "שגיאה בטעינת שופטים"));
       setJudges([]);
     } finally {
       setLoading(false);
@@ -66,9 +67,12 @@ export default function JudgesManagementPage() {
     loadFields();
   }, []);
 
-  useEffect(function () {
-    loadJudges();
-  }, [selectedFieldId]);
+  useEffect(
+    function () {
+      loadJudges();
+    },
+    [selectedFieldId],
+  );
 
   const filteredJudges = useMemo(
     function () {
@@ -100,8 +104,8 @@ export default function JudgesManagementPage() {
   function showToast(type, message) {
     setToast({
       isOpen: true,
-      type,
-      message,
+      type: type,
+      message: message,
     });
   }
 
@@ -156,7 +160,7 @@ export default function JudgesManagementPage() {
       await loadJudges();
     } catch (err) {
       console.error(err);
-      setError(err.response?.data || "שגיאה בשמירת השופט");
+      setError(getErrorMessage(err, "שגיאה בשמירת השופט"));
     }
   }
 
@@ -174,7 +178,7 @@ export default function JudgesManagementPage() {
         } catch (err) {
           console.error(err);
           closeConfirmDialog();
-          showToast("error", err.response?.data || "שגיאה במחיקת שופט");
+          showToast("error", getErrorMessage(err, "שגיאה במחיקת שופט"));
         }
       },
     });
@@ -182,15 +186,17 @@ export default function JudgesManagementPage() {
 
   return (
     <SuperUserLayout activeItemKey="judges">
-      <div className="rounded-[26px] border border-[#E6DCD5] bg-white shadow-sm overflow-hidden">
-        <div className="px-8 pt-8 pb-6">
+      <div className="overflow-hidden rounded-[26px] border border-[#E6DCD5] bg-white shadow-sm">
+        <div className="px-8 pb-6 pt-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <h1 className="text-[2rem] font-bold text-[#3F312B]">ניהול שופטים</h1>
+            <h1 className="text-[2rem] font-bold text-[#3F312B]">
+              ניהול שופטים
+            </h1>
 
             <button
               type="button"
               onClick={openCreate}
-              className="rounded-xl bg-[#8B6352] px-5 py-3 font-semibold text-white shadow-sm hover:bg-[#7A5547] transition-colors"
+              className="rounded-xl bg-[#8B6352] px-5 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-[#7A5547]"
             >
               + הוספת שופט
             </button>

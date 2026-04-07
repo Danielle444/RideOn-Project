@@ -8,6 +8,7 @@ import {
   getAllFields,
   getAllClassTypes,
   getAllJudges,
+  getAllPrizeTypes,
 } from "../../services/superUserService";
 import { getArenasByRanchId } from "../../services/arenaService";
 import { getAllPaidTimeBaseSlots } from "../../services/paidTimeSlotInCompetitionService";
@@ -15,6 +16,7 @@ import {
   toInputDate,
   getErrorMessage,
   validateDetailsForm,
+  buildCompetitionBasePayload,
 } from "../../utils/competitionForm.utils";
 
 export default function useCompetitionDetailsStep(options) {
@@ -31,7 +33,11 @@ export default function useCompetitionDetailsStep(options) {
   var [arenas, setArenas] = useState([]);
   var [classTypes, setClassTypes] = useState([]);
   var [judges, setJudges] = useState([]);
+  var [prizeTypes, setPrizeTypes] = useState([]);
   var [paidTimeBaseSlots, setPaidTimeBaseSlots] = useState([]);
+  var [selectedCompetitionJudgeIds, setSelectedCompetitionJudgeIds] = useState(
+    [],
+  );
 
   var [competitionId, setCompetitionId] = useState(
     isEdit ? competitionIdFromRoute : null,
@@ -86,17 +92,20 @@ export default function useCompetitionDetailsStep(options) {
         getAllFields(),
         getArenasByRanchId(currentRanchId),
         getAllPaidTimeBaseSlots(currentRanchId),
+        getAllPrizeTypes(),
       ]);
 
       var fieldsRes = results[0];
       var arenasRes = results[1];
       var paidTimeBaseSlotsRes = results[2];
+      var prizeTypesRes = results[3];
 
       setFields(Array.isArray(fieldsRes.data) ? fieldsRes.data : []);
       setArenas(Array.isArray(arenasRes.data) ? arenasRes.data : []);
       setPaidTimeBaseSlots(
         Array.isArray(paidTimeBaseSlotsRes.data) ? paidTimeBaseSlotsRes.data : [],
       );
+      setPrizeTypes(Array.isArray(prizeTypesRes.data) ? prizeTypesRes.data : []);
 
       if (isEdit && competitionIdFromRoute) {
         await loadExistingCompetition(competitionIdFromRoute, currentRanchId);
@@ -159,28 +168,48 @@ export default function useCompetitionDetailsStep(options) {
   }
 
   function handleDetailsChange(fieldName, value) {
+    var currentFieldId = String(detailsForm.fieldId || "");
+    var nextFieldId = fieldName === "fieldId" ? String(value || "") : currentFieldId;
+
     setDetailsForm(function (prev) {
       return {
         ...prev,
         [fieldName]: value,
       };
     });
+
+    if (fieldName === "fieldId" && currentFieldId !== nextFieldId) {
+      setSelectedCompetitionJudgeIds([]);
+    }
+  }
+
+  function toggleCompetitionJudge(judgeId) {
+    setSelectedCompetitionJudgeIds(function (prev) {
+      var exists = prev.some(function (id) {
+        return String(id) === String(judgeId);
+      });
+
+      if (exists) {
+        return prev.filter(function (id) {
+          return String(id) !== String(judgeId);
+        });
+      }
+
+      return [...prev, judgeId];
+    });
+  }
+
+  function setJudgesManually(newJudges) {
+    setJudges(Array.isArray(newJudges) ? newJudges : []);
   }
 
   function buildCompetitionPayload(statusOverride) {
+    var basePayload = buildCompetitionBasePayload(detailsForm, currentRanchId);
+
     return {
+      ...basePayload,
       competitionId: competitionId,
-      hostRanchId: currentRanchId,
-      fieldId: Number(detailsForm.fieldId),
-      competitionName: detailsForm.competitionName.trim(),
-      competitionStartDate: detailsForm.competitionStartDate,
-      competitionEndDate: detailsForm.competitionEndDate,
-      registrationOpenDate: detailsForm.registrationOpenDate || null,
-      registrationEndDate: detailsForm.registrationEndDate || null,
-      paidTimeRegistrationDate: detailsForm.paidTimeRegistrationDate || null,
-      paidTimePublicationDate: detailsForm.paidTimePublicationDate || null,
       competitionStatus: statusOverride,
-      notes: detailsForm.notes.trim() || null,
     };
   }
 
@@ -212,9 +241,11 @@ export default function useCompetitionDetailsStep(options) {
         await updateCompetition(competitionId, payload);
 
         if (intent === "publish") {
+          setCurrentStatus("עתידית");
           onShowToast("success", "התחרות פורסמה בהצלחה");
         } else {
-          onShowToast("success", "פרטי התחרות נשמרו בהצלחה");
+          setCurrentStatus("טיוטה");
+          onShowToast("success", "התחרות נשמרה כטיוטה");
         }
 
         await loadExistingCompetition(competitionId, currentRanchId);
@@ -225,18 +256,7 @@ export default function useCompetitionDetailsStep(options) {
         };
       }
 
-      var createPayload = {
-        hostRanchId: currentRanchId,
-        fieldId: Number(detailsForm.fieldId),
-        competitionName: detailsForm.competitionName.trim(),
-        competitionStartDate: detailsForm.competitionStartDate,
-        competitionEndDate: detailsForm.competitionEndDate,
-        registrationOpenDate: detailsForm.registrationOpenDate || null,
-        registrationEndDate: detailsForm.registrationEndDate || null,
-        paidTimeRegistrationDate: detailsForm.paidTimeRegistrationDate || null,
-        paidTimePublicationDate: detailsForm.paidTimePublicationDate || null,
-        notes: detailsForm.notes.trim() || null,
-      };
+      var createPayload = buildCompetitionBasePayload(detailsForm, currentRanchId);
 
       var response = await createCompetition(createPayload);
 
@@ -248,6 +268,7 @@ export default function useCompetitionDetailsStep(options) {
       }
 
       setCompetitionId(newCompetitionId);
+      setCurrentStatus("טיוטה");
       onShowToast("success", "טיוטת התחרות נוצרה בהצלחה");
 
       onNavigateToEdit(newCompetitionId);
@@ -272,13 +293,18 @@ export default function useCompetitionDetailsStep(options) {
     arenas,
     classTypes,
     judges,
+    prizeTypes,
     paidTimeBaseSlots,
     competitionId,
     currentStatus,
     detailsForm,
+    selectedCompetitionJudgeIds,
+    setSelectedCompetitionJudgeIds,
     setCompetitionId,
     setCurrentStatus,
     handleDetailsChange,
+    toggleCompetitionJudge,
+    setJudgesManually,
     loadExistingCompetition,
     saveDetails,
   };

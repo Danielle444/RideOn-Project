@@ -21,8 +21,14 @@ function register(data) {
   });
 }
 
-function getRanches() {
-  return axios.get(`${API}/Ranches`, {
+function getRanchesForRegistration() {
+  return axios.get(`${API}/Ranches/for-registration`, {
+    timeout: 8000,
+  });
+}
+
+function createRanchRequest(data) {
+  return axios.post(`${API}/SystemUsers/ranch-request`, data, {
     timeout: 8000,
   });
 }
@@ -64,7 +70,8 @@ function changePassword(username, currentPassword, newPassword) {
 export {
   login,
   register,
-  getRanches,
+  getRanchesForRegistration,
+  createRanchRequest,
   getRoles,
   checkUsername,
   getPersonByNationalIdForRegistration,

@@ -1,50 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
-
-function toInputDate(value) {
-  if (!value) {
-    return "";
-  }
-
-  if (typeof value === "string" && value.includes("T")) {
-    return value.split("T")[0];
-  }
-
-  var date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  var year = date.getFullYear();
-  var month = String(date.getMonth() + 1).padStart(2, "0");
-  var day = String(date.getDate()).padStart(2, "0");
-
-  return year + "-" + month + "-" + day;
-}
-
-function normalizeTimeForInput(value) {
-  if (!value) {
-    return "";
-  }
-
-  return String(value).slice(0, 5);
-}
-
-function normalizeTimeForServer(value) {
-  if (!value) {
-    return null;
-  }
-
-  if (value.length === 5) {
-    return value + ":00";
-  }
-
-  return value;
-}
+import CustomDropdown from "../common/CustomDropdown";
+import MultiSelectPicker from "../common/MultiSelectPicker";
+import {
+  toInputDate,
+  normalizeTimeForInput,
+  normalizeTimeForServer,
+} from "../../utils/competitionForm.utils";
 
 export default function ClassInCompetitionModal(props) {
   var isEdit = !!props.initialValue;
+
+  var classTypes = Array.isArray(props.classTypes) ? props.classTypes : [];
+  var arenas = Array.isArray(props.arenas) ? props.arenas : [];
+  var judges = Array.isArray(props.judges) ? props.judges : [];
+  var prizeTypes = Array.isArray(props.prizeTypes) ? props.prizeTypes : [];
+
+  var [openDropdownKey, setOpenDropdownKey] = useState("");
 
   var [formData, setFormData] = useState({
     classTypeId: "",
@@ -55,7 +27,29 @@ export default function ClassInCompetitionModal(props) {
     organizerCost: "",
     federationCost: "",
     classNotes: "",
+    judgeIds: [],
+    prizeTypeId: "",
+    prizeAmount: "",
   });
+
+  var availableJudges = useMemo(
+    function () {
+      var defaultJudgeIds = Array.isArray(props.defaultJudgeIds)
+        ? props.defaultJudgeIds
+        : [];
+
+      if (defaultJudgeIds.length === 0) {
+        return [];
+      }
+
+      return judges.filter(function (judge) {
+        return defaultJudgeIds.some(function (id) {
+          return String(id) === String(judge.judgeId);
+        });
+      });
+    },
+    [judges, props.defaultJudgeIds],
+  );
 
   useEffect(
     function () {
@@ -73,6 +67,14 @@ export default function ClassInCompetitionModal(props) {
           organizerCost: "",
           federationCost: "",
           classNotes: "",
+          judgeIds:
+            props.defaultJudgeIds && props.defaultJudgeIds.length > 0
+              ? props.defaultJudgeIds.length === 1
+                ? [props.defaultJudgeIds[0]]
+                : []
+              : [],
+          prizeTypeId: "",
+          prizeAmount: "",
         });
         return;
       }
@@ -81,7 +83,9 @@ export default function ClassInCompetitionModal(props) {
         classTypeId: props.initialValue.classTypeId
           ? String(props.initialValue.classTypeId)
           : "",
-        arenaId: props.initialValue.arenaId ? String(props.initialValue.arenaId) : "",
+        arenaId: props.initialValue.arenaId
+          ? String(props.initialValue.arenaId)
+          : "",
         classDate: toInputDate(props.initialValue.classDateTime),
         startTime: normalizeTimeForInput(props.initialValue.startTime),
         orderInDay:
@@ -100,9 +104,51 @@ export default function ClassInCompetitionModal(props) {
             ? String(props.initialValue.federationCost)
             : "",
         classNotes: props.initialValue.classNotes || "",
+        judgeIds: Array.isArray(props.initialValue.judgeIds)
+          ? props.initialValue.judgeIds
+          : [],
+        prizeTypeId:
+          props.initialValue.prizeTypeId !== null &&
+          props.initialValue.prizeTypeId !== undefined
+            ? String(props.initialValue.prizeTypeId)
+            : "",
+        prizeAmount:
+          props.initialValue.prizeAmount !== null &&
+          props.initialValue.prizeAmount !== undefined
+            ? String(props.initialValue.prizeAmount)
+            : "",
       });
     },
-    [props.isOpen, props.initialValue, props.defaultDate],
+    [
+      props.isOpen,
+      props.initialValue,
+      props.defaultDate,
+      props.defaultJudgeIds,
+    ],
+  );
+
+  useEffect(
+    function () {
+      if (!props.isOpen) {
+        return;
+      }
+
+      if (isEdit) {
+        return;
+      }
+
+      if (availableJudges.length === 1) {
+        var onlyJudgeId = availableJudges[0].judgeId;
+
+        setFormData(function (prev) {
+          return {
+            ...prev,
+            judgeIds: [onlyJudgeId],
+          };
+        });
+      }
+    },
+    [props.isOpen, isEdit, availableJudges],
   );
 
   if (!props.isOpen) {
@@ -118,24 +164,51 @@ export default function ClassInCompetitionModal(props) {
     });
   }
 
+  function toggleJudgeSelection(judgeId) {
+    setFormData(function (prev) {
+      var currentJudgeIds = Array.isArray(prev.judgeIds) ? prev.judgeIds : [];
+      var exists = currentJudgeIds.some(function (id) {
+        return String(id) === String(judgeId);
+      });
+
+      return {
+        ...prev,
+        judgeIds: exists
+          ? currentJudgeIds.filter(function (id) {
+              return String(id) !== String(judgeId);
+            })
+          : [...currentJudgeIds, judgeId],
+      };
+    });
+  }
+
   function handleSubmit(e) {
     e.preventDefault();
 
     props.onSubmit({
       classTypeId: formData.classTypeId ? Number(formData.classTypeId) : "",
       arenaId: formData.arenaId ? Number(formData.arenaId) : "",
-      classDateTime: formData.classDate ? formData.classDate + "T12:00:00" : null,
+      classDateTime: formData.classDate
+        ? formData.classDate + "T12:00:00"
+        : null,
       startTime: normalizeTimeForServer(formData.startTime),
       orderInDay: formData.orderInDay ? Number(formData.orderInDay) : null,
-      organizerCost: formData.organizerCost ? Number(formData.organizerCost) : null,
-      federationCost: formData.federationCost ? Number(formData.federationCost) : null,
+      organizerCost: formData.organizerCost
+        ? Number(formData.organizerCost)
+        : null,
+      federationCost: formData.federationCost
+        ? Number(formData.federationCost)
+        : null,
       classNotes: formData.classNotes.trim() || null,
+      judgeIds: formData.judgeIds,
+      prizeTypeId: formData.prizeTypeId ? Number(formData.prizeTypeId) : null,
+      prizeAmount: formData.prizeAmount ? Number(formData.prizeAmount) : null,
     });
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6">
-      <div className="w-full max-w-[900px] rounded-[28px] border border-[#E6DCD5] bg-white shadow-xl">
+      <div className="flex max-h-[90vh] w-full max-w-[980px] flex-col overflow-hidden rounded-[28px] border border-[#E6DCD5] bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-[#EFE5DF] px-7 py-5">
           <h2 className="text-[1.65rem] font-bold text-[#3F312B]">
             {isEdit ? "עריכת מקצה" : "הוספת מקצה"}
@@ -150,52 +223,54 @@ export default function ClassInCompetitionModal(props) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-7 py-6">
+        <form onSubmit={handleSubmit} className="overflow-y-auto px-7 py-6">
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 סוג מקצה
               </label>
-              <select
+
+              <CustomDropdown
+                dropdownKey="class-type"
+                openDropdownKey={openDropdownKey}
+                setOpenDropdownKey={setOpenDropdownKey}
+                options={classTypes}
                 value={formData.classTypeId}
+                placeholder="בחרי סוג מקצה"
+                getOptionValue={function (item) {
+                  return item.classTypeId;
+                }}
+                getOptionLabel={function (item) {
+                  return item.className;
+                }}
                 onChange={function (e) {
                   handleChange("classTypeId", e.target.value);
                 }}
-                className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right"
-                required
-              >
-                <option value="">בחרי סוג מקצה</option>
-                {props.classTypes.map(function (item) {
-                  return (
-                    <option key={item.classTypeId} value={item.classTypeId}>
-                      {item.className}
-                    </option>
-                  );
-                })}
-              </select>
+              />
             </div>
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 מגרש
               </label>
-              <select
+
+              <CustomDropdown
+                dropdownKey="class-arena"
+                openDropdownKey={openDropdownKey}
+                setOpenDropdownKey={setOpenDropdownKey}
+                options={arenas}
                 value={formData.arenaId}
+                placeholder="בחרי מגרש"
+                getOptionValue={function (item) {
+                  return item.arenaId;
+                }}
+                getOptionLabel={function (item) {
+                  return item.arenaName;
+                }}
                 onChange={function (e) {
                   handleChange("arenaId", e.target.value);
                 }}
-                className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right"
-                required
-              >
-                <option value="">בחרי מגרש</option>
-                {props.arenas.map(function (item) {
-                  return (
-                    <option key={item.arenaId} value={item.arenaId}>
-                      {item.arenaName}
-                    </option>
-                  );
-                })}
-              </select>
+              />
             </div>
 
             <div>
@@ -271,6 +346,98 @@ export default function ClassInCompetitionModal(props) {
                 }}
                 className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right"
               />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
+                סוג פרס
+              </label>
+
+              <CustomDropdown
+                dropdownKey="class-prize-type"
+                openDropdownKey={openDropdownKey}
+                setOpenDropdownKey={setOpenDropdownKey}
+                options={prizeTypes}
+                value={formData.prizeTypeId}
+                placeholder="בחרי סוג פרס"
+                getOptionValue={function (item) {
+                  return item.prizeTypeId;
+                }}
+                getOptionLabel={function (item) {
+                  return item.prizeTypeName;
+                }}
+                onChange={function (e) {
+                  handleChange("prizeTypeId", e.target.value);
+                }}
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
+                סכום פרס
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.prizeAmount}
+                onChange={function (e) {
+                  handleChange("prizeAmount", e.target.value);
+                }}
+                className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
+                שופטים למקצה
+              </label>
+
+              {availableJudges.length === 0 ? (
+                <div className="rounded-2xl border border-[#D7CCC8] bg-[#FFFCFA] px-4 py-4 text-right text-sm text-[#8B6A5A]">
+                  יש לבחור קודם שופטים כלליים בחלק העליון של הגדרת התחרות.
+                </div>
+              ) : (
+                <>
+                  <div className="mb-3 text-right text-sm text-[#8B6A5A]">
+                    ניתן לבחור רק מבין השופטים שהוגדרו קודם בתחרות.
+                  </div>
+
+                  <MultiSelectPicker
+                    options={availableJudges}
+                    selectedValues={formData.judgeIds}
+                    onToggleValue={toggleJudgeSelection}
+                    getOptionValue={function (judge) {
+                      return judge.judgeId;
+                    }}
+                    getOptionLabel={function (judge) {
+                      return [judge.firstNameHebrew, judge.lastNameHebrew]
+                        .filter(Boolean)
+                        .join(" ");
+                    }}
+                    getOptionSearchText={function (judge) {
+                      return [
+                        judge.firstNameHebrew,
+                        judge.lastNameHebrew,
+                        judge.firstNameEnglish,
+                        judge.lastNameEnglish,
+                        judge.country,
+                        judge.qualifiedFields,
+                      ]
+                        .filter(Boolean)
+                        .join(" ");
+                    }}
+                    renderOptionMeta={function (judge) {
+                      return [judge.country, judge.qualifiedFields]
+                        .filter(Boolean)
+                        .join(" • ");
+                    }}
+                    searchPlaceholder="חיפוש שופט לפי שם, מדינה או ענף"
+                    emptySelectionText="לא נבחרו שופטים"
+                    noResultsText="לא נמצאו שופטים להצגה"
+                  />
+                </>
+              )}
             </div>
 
             <div className="md:col-span-2">

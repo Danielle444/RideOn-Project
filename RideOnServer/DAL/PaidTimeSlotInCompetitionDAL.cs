@@ -29,13 +29,16 @@ namespace RideOnServer.DAL
                             {
                                 CompSlotId = Convert.ToInt32(reader["CompSlotId"]),
                                 CompetitionId = competitionId,
+                                PaidTimeSlotId = Convert.ToInt32(reader["PaidTimeSlotId"]),
                                 SlotDate = Convert.ToDateTime(reader["SlotDate"]),
                                 TimeOfDay = reader["TimeOfDay"] == DBNull.Value ? null : reader["TimeOfDay"].ToString(),
                                 StartTime = (TimeSpan)reader["StartTime"],
                                 EndTime = (TimeSpan)reader["EndTime"],
                                 ArenaRanchId = Convert.ToInt32(reader["ArenaRanchId"]),
                                 ArenaId = Convert.ToByte(reader["ArenaId"]),
-                                ArenaName = reader["ArenaName"] == DBNull.Value ? null : reader["ArenaName"].ToString()
+                                ArenaName = reader["ArenaName"] == DBNull.Value ? null : reader["ArenaName"].ToString(),
+                                SlotStatus = reader["SlotStatus"] == DBNull.Value ? null : reader["SlotStatus"].ToString(),
+                                SlotNotes = reader["SlotNotes"] == DBNull.Value ? null : reader["SlotNotes"].ToString()
                             });
                         }
 

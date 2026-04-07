@@ -752,6 +752,80 @@ logoutTextSecondary: {
   fontWeight: "600",
   fontSize: 17,
 },
+
+  ranchLinkButton: {
+    marginTop: 8,
+    alignSelf: "flex-end",
+  },
+
+  ranchLinkText: {
+    color: "#795548",
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "right",
+    textDecorationLine: "underline",
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 18,
+  },
+
+  modalCard: {
+    width: "100%",
+    maxWidth: 390,
+    maxHeight: "85%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#E8D5C9",
+    overflow: "hidden",
+  },
+
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1E6DF",
+    backgroundColor: "#FFFDFC",
+  },
+
+  modalCloseButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F8F3F0",
+  },
+
+  modalTitle: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#3F312B",
+    marginRight: 12,
+  },
+
+  modalContent: {
+    padding: 18,
+    paddingBottom: 24,
+  },
+
+  modalSubtitle: {
+    textAlign: "right",
+    fontSize: 13,
+    color: "#795548",
+    lineHeight: 20,
+    marginBottom: 14,
+  },
 });
 
 export default styles;

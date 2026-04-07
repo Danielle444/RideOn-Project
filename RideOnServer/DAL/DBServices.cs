@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Npgsql;
+using NpgsqlTypes;
+using System.Data;
 
 namespace RideOnServer.DAL
 {
@@ -16,7 +18,7 @@ namespace RideOnServer.DAL
 
             string cStr = configuration.GetConnectionString(conStr)!;
 
-            var builder = new Npgsql.NpgsqlConnectionStringBuilder(cStr);
+            var builder = new NpgsqlConnectionStringBuilder(cStr);
 
             Console.WriteLine("=== DB HOST === " + builder.Host);
             Console.WriteLine("=== DB PORT === " + builder.Port);
@@ -32,35 +34,145 @@ namespace RideOnServer.DAL
             Dictionary<string, object>? paramDic)
         {
             var paramList = new List<string>();
-            var values = new List<object>();
-
-            if (paramDic != null)
-            {
-                int i = 1;
-                foreach (var param in paramDic)
-                {
-                    paramList.Add($"${i}");
-                    values.Add(param.Value ?? DBNull.Value);
-                    i++;
-                }
-            }
-
-            string sql = $"SELECT * FROM {spName}({string.Join(", ", paramList)})";
 
             NpgsqlCommand cmd = new NpgsqlCommand
             {
                 Connection = con,
-                CommandText = sql,
+                CommandText = "",
                 CommandTimeout = 10,
-                CommandType = System.Data.CommandType.Text
+                CommandType = CommandType.Text
             };
 
-            foreach (var val in values)
+            if (paramDic != null)
             {
-                cmd.Parameters.AddWithValue(val);
+                int i = 1;
+
+                foreach (var param in paramDic)
+                {
+                    string parameterName = $"p{i}";
+                    paramList.Add($"@{parameterName}");
+
+                    AddParameterWithType(cmd, parameterName, param.Key, param.Value);
+                    i++;
+                }
             }
 
+            cmd.CommandText = $"SELECT * FROM {spName}({string.Join(", ", paramList)})";
             return cmd;
+        }
+
+        private void AddParameterWithType(
+    NpgsqlCommand cmd,
+    string parameterName,
+    string originalKey,
+    object? value)
+        {
+            string key = originalKey.TrimStart('@').ToLowerInvariant();
+
+            if (key == "classdatetime")
+            {
+                var param = cmd.Parameters.Add(parameterName, NpgsqlDbType.Timestamp);
+                param.Value = value == null || value == DBNull.Value
+                    ? DBNull.Value
+                    : ((DateTime)value);
+                return;
+            }
+
+            if (key == "competitionstartdate" ||
+                key == "competitionenddate" ||
+                key == "registrationopendate" ||
+                key == "registrationenddate" ||
+                key == "paidtimeregistrationdate" ||
+                key == "paidtimepublicationdate" ||
+                key == "slotdate")
+            {
+                var param = cmd.Parameters.Add(parameterName, NpgsqlDbType.Date);
+                param.Value = value == null || value == DBNull.Value
+                    ? DBNull.Value
+                    : ((DateTime)value).Date;
+                return;
+            }
+
+            if (key == "starttime" || key == "endtime")
+            {
+                var param = cmd.Parameters.Add(parameterName, NpgsqlDbType.Time);
+
+                if (value == null || value == DBNull.Value)
+                {
+                    param.Value = DBNull.Value;
+                }
+                else if (value is TimeSpan ts)
+                {
+                    param.Value = ts;
+                }
+                else if (value is DateTime dt)
+                {
+                    param.Value = dt.TimeOfDay;
+                }
+                else
+                {
+                    param.Value = value;
+                }
+
+                return;
+            }
+
+            if (key.Contains("notes") ||
+                key.Contains("name") ||
+                key.Contains("status") ||
+                key.Contains("text") ||
+                key.Contains("url"))
+            {
+                var param = cmd.Parameters.Add(parameterName, NpgsqlDbType.Text);
+                param.Value = value == null || value == DBNull.Value
+                    ? DBNull.Value
+                    : value;
+                return;
+            }
+
+            if (value == null || value == DBNull.Value)
+            {
+                cmd.Parameters.AddWithValue(parameterName, DBNull.Value);
+                return;
+            }
+
+            if (value is int intValue)
+            {
+                cmd.Parameters.Add(parameterName, NpgsqlDbType.Integer).Value = intValue;
+                return;
+            }
+
+            if (value is short shortValue)
+            {
+                cmd.Parameters.Add(parameterName, NpgsqlDbType.Smallint).Value = shortValue;
+                return;
+            }
+
+            if (value is byte byteValue)
+            {
+                cmd.Parameters.Add(parameterName, NpgsqlDbType.Smallint).Value = byteValue;
+                return;
+            }
+
+            if (value is decimal decimalValue)
+            {
+                cmd.Parameters.Add(parameterName, NpgsqlDbType.Numeric).Value = decimalValue;
+                return;
+            }
+
+            if (value is bool boolValue)
+            {
+                cmd.Parameters.Add(parameterName, NpgsqlDbType.Boolean).Value = boolValue;
+                return;
+            }
+
+            if (value is string stringValue)
+            {
+                cmd.Parameters.Add(parameterName, NpgsqlDbType.Text).Value = stringValue;
+                return;
+            }
+
+            cmd.Parameters.AddWithValue(parameterName, value);
         }
     }
 }
