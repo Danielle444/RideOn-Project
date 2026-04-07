@@ -27,6 +27,22 @@ function normalizeTime(value) {
   return String(value).slice(0, 5);
 }
 
+function normalizeTimeForApi(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (/^\d{2}:\d{2}:\d{2}$/.test(value)) {
+    return value;
+  }
+
+  if (/^\d{2}:\d{2}$/.test(value)) {
+    return value + ":00";
+  }
+
+  return value;
+}
+
 export default function PaidTimeSlotInCompetitionModal(props) {
   var isEdit = !!props.initialValue;
 
@@ -63,7 +79,9 @@ export default function PaidTimeSlotInCompetitionModal(props) {
         paidTimeSlotId: props.initialValue.paidTimeSlotId
           ? String(props.initialValue.paidTimeSlotId)
           : "",
-        arenaId: props.initialValue.arenaId ? String(props.initialValue.arenaId) : "",
+        arenaId: props.initialValue.arenaId
+          ? String(props.initialValue.arenaId)
+          : "",
         slotDate: toInputDate(props.initialValue.slotDate),
         startTime: normalizeTime(props.initialValue.startTime),
         endTime: normalizeTime(props.initialValue.endTime),
@@ -91,11 +109,13 @@ export default function PaidTimeSlotInCompetitionModal(props) {
     e.preventDefault();
 
     props.onSubmit({
-      paidTimeSlotId: formData.paidTimeSlotId ? Number(formData.paidTimeSlotId) : "",
+      paidTimeSlotId: formData.paidTimeSlotId
+        ? Number(formData.paidTimeSlotId)
+        : "",
       arenaId: formData.arenaId ? Number(formData.arenaId) : "",
       slotDate: formData.slotDate || null,
-      startTime: formData.startTime || null,
-      endTime: formData.endTime || null,
+      startTime: normalizeTimeForApi(formData.startTime),
+      endTime: normalizeTimeForApi(formData.endTime),
       slotStatus: formData.slotStatus.trim() || null,
       slotNotes: formData.slotNotes.trim() || null,
     });
@@ -122,7 +142,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
-                בסיס פייד־טיים
+                סלוט פייד־טיים
               </label>
               <select
                 value={formData.paidTimeSlotId}
@@ -132,10 +152,13 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                 className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right"
                 required
               >
-                <option value="">בחרי בסיס פייד־טיים</option>
+                <option value="">בחרי סלוט פייד־טיים</option>
                 {props.baseSlots.map(function (item) {
                   return (
-                    <option key={item.paidTimeSlotId} value={item.paidTimeSlotId}>
+                    <option
+                      key={item.paidTimeSlotId}
+                      value={item.paidTimeSlotId}
+                    >
                       {item.dayOfWeek} - {item.timeOfDay}
                     </option>
                   );

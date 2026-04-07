@@ -64,19 +64,19 @@ export default function CompetitionFormPage(props) {
           competitionId={page.competitionId}
           currentStatus={page.currentStatus}
           detailsForm={page.detailsForm}
-          fields={page.fields}
+          fields={page.fields || []}
+          judges={page.judges || []}
+          selectedCompetitionJudgeIds={page.selectedCompetitionJudgeIds || []}
+          onToggleCompetitionJudge={page.toggleCompetitionJudge}
+          onJudgesReloaded={page.setJudgesManually}
           onChange={page.handleDetailsChange}
+          savingDetails={page.savingDetails}
           onSaveDraft={function () {
             page.handleSaveDetails("draft");
           }}
           onSaveAndContinue={function () {
             page.handleSaveDetails("continue");
           }}
-          onPublish={function () {
-            page.handleSaveDetails("publish");
-          }}
-          savingDetails={page.savingDetails}
-          canPublishCompetition={page.canPublishCompetition}
         />
 
         <CompetitionClassesStep
@@ -141,8 +141,12 @@ export default function CompetitionFormPage(props) {
         onSubmit={page.handleSubmitClass}
         initialValue={page.editClassItem}
         defaultDate={page.createClassDefaultDate}
-        classTypes={page.classTypes}
-        arenas={page.arenas}
+        defaultJudgeIds={page.selectedCompetitionJudgeIds || []}
+        classTypes={page.classTypes || []}
+        judges={page.judges || []}
+        prizeTypes={page.prizeTypes || []}
+        arenas={page.arenas || []}
+        fieldId={page.detailsForm.fieldId}
         error={page.classModalError}
         saving={page.savingClass}
       />

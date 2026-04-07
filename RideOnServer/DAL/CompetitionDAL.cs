@@ -83,14 +83,14 @@ namespace RideOnServer.DAL
                 { "@FieldId", competition.FieldId },
                 { "@CreatedBySystemUserId", competition.CreatedBySystemUserId },
                 { "@CompetitionName", competition.CompetitionName },
-                { "@CompetitionStartDate", competition.CompetitionStartDate },
-                { "@CompetitionEndDate", competition.CompetitionEndDate },
-                { "@RegistrationOpenDate", competition.RegistrationOpenDate },
-                { "@RegistrationEndDate", competition.RegistrationEndDate },
-                { "@PaidTimeRegistrationDate", competition.PaidTimeRegistrationDate },
-                { "@PaidTimePublicationDate", competition.PaidTimePublicationDate },
-                { "@CompetitionStatus", competition.CompetitionStatus },
-                { "@Notes", competition.Notes }
+                { "@CompetitionStartDate", competition.CompetitionStartDate.Date },
+                { "@CompetitionEndDate", competition.CompetitionEndDate.Date },
+                { "@RegistrationOpenDate", competition.RegistrationOpenDate?.Date ?? (object)DBNull.Value },
+                { "@RegistrationEndDate", competition.RegistrationEndDate?.Date ?? (object)DBNull.Value },
+                { "@PaidTimeRegistrationDate", competition.PaidTimeRegistrationDate?.Date ?? (object)DBNull.Value },
+                { "@PaidTimePublicationDate", competition.PaidTimePublicationDate?.Date ?? (object)DBNull.Value },
+                { "@CompetitionStatus", competition.CompetitionStatus ?? (object)DBNull.Value },
+                { "@Notes", competition.Notes ?? (object)DBNull.Value }
             };
 
             try
@@ -119,14 +119,14 @@ namespace RideOnServer.DAL
                 { "@CompetitionId", competition.CompetitionId },
                 { "@FieldId", competition.FieldId },
                 { "@CompetitionName", competition.CompetitionName },
-                { "@CompetitionStartDate", competition.CompetitionStartDate },
-                { "@CompetitionEndDate", competition.CompetitionEndDate },
-                { "@RegistrationOpenDate", competition.RegistrationOpenDate },
-                { "@RegistrationEndDate", competition.RegistrationEndDate },
-                { "@PaidTimeRegistrationDate", competition.PaidTimeRegistrationDate },
-                { "@PaidTimePublicationDate", competition.PaidTimePublicationDate },
-                { "@CompetitionStatus", competition.CompetitionStatus },
-                { "@Notes", competition.Notes }
+                { "@CompetitionStartDate", competition.CompetitionStartDate.Date },
+                { "@CompetitionEndDate", competition.CompetitionEndDate.Date },
+                { "@RegistrationOpenDate", competition.RegistrationOpenDate?.Date ?? (object)DBNull.Value },
+                { "@RegistrationEndDate", competition.RegistrationEndDate?.Date ?? (object)DBNull.Value },
+                { "@PaidTimeRegistrationDate", competition.PaidTimeRegistrationDate?.Date ?? (object)DBNull.Value },
+                { "@PaidTimePublicationDate", competition.PaidTimePublicationDate?.Date ?? (object)DBNull.Value },
+                { "@CompetitionStatus", competition.CompetitionStatus ?? (object)DBNull.Value },
+                { "@Notes", competition.Notes ?? (object)DBNull.Value }
             };
 
             try

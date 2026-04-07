@@ -17,9 +17,15 @@ namespace RideOnServer.BL
         public TimeSpan? StartTime { get; set; }
         public byte? OrderInDay { get; set; }
 
+        public List<int> JudgeIds { get; set; } = new List<int>();
+        public byte? PrizeTypeId { get; set; }
+        public string? PrizeTypeName { get; set; }
+        public decimal? PrizeAmount { get; set; }
+
         // UI helpers
         public string? ClassName { get; set; }
         public string? ArenaName { get; set; }
+        public string? JudgesDisplay { get; set; }
 
         internal static List<ClassInCompetition> GetClassesByCompetitionId(int competitionId)
         {
@@ -40,7 +46,10 @@ namespace RideOnServer.BL
                 request.ArenaRanchId,
                 request.ArenaId,
                 request.OrganizerCost,
-                request.FederationCost
+                request.FederationCost,
+                request.JudgeIds,
+                request.PrizeTypeId,
+                request.PrizeAmount
             );
 
             ClassInCompetition item = new ClassInCompetition
@@ -49,12 +58,15 @@ namespace RideOnServer.BL
                 ClassTypeId = request.ClassTypeId,
                 ArenaRanchId = request.ArenaRanchId,
                 ArenaId = request.ArenaId,
-                ClassDateTime = request.ClassDateTime,
+                ClassDateTime = request.ClassDateTime?.Date,
                 StartTime = request.StartTime,
                 OrderInDay = request.OrderInDay,
                 OrganizerCost = request.OrganizerCost,
                 FederationCost = request.FederationCost,
-                ClassNotes = string.IsNullOrWhiteSpace(request.ClassNotes) ? null : request.ClassNotes.Trim()
+                ClassNotes = string.IsNullOrWhiteSpace(request.ClassNotes) ? null : request.ClassNotes.Trim(),
+                JudgeIds = request.JudgeIds?.Distinct().ToList() ?? new List<int>(),
+                PrizeTypeId = request.PrizeTypeId,
+                PrizeAmount = request.PrizeAmount
             };
 
             ClassInCompetitionDAL dal = new ClassInCompetitionDAL();
@@ -74,7 +86,10 @@ namespace RideOnServer.BL
                 request.ArenaRanchId,
                 request.ArenaId,
                 request.OrganizerCost,
-                request.FederationCost
+                request.FederationCost,
+                request.JudgeIds,
+                request.PrizeTypeId,
+                request.PrizeAmount
             );
 
             ClassInCompetition item = new ClassInCompetition
@@ -84,12 +99,15 @@ namespace RideOnServer.BL
                 ClassTypeId = request.ClassTypeId,
                 ArenaRanchId = request.ArenaRanchId,
                 ArenaId = request.ArenaId,
-                ClassDateTime = request.ClassDateTime,
+                ClassDateTime = request.ClassDateTime?.Date,
                 StartTime = request.StartTime,
                 OrderInDay = request.OrderInDay,
                 OrganizerCost = request.OrganizerCost,
                 FederationCost = request.FederationCost,
-                ClassNotes = string.IsNullOrWhiteSpace(request.ClassNotes) ? null : request.ClassNotes.Trim()
+                ClassNotes = string.IsNullOrWhiteSpace(request.ClassNotes) ? null : request.ClassNotes.Trim(),
+                JudgeIds = request.JudgeIds?.Distinct().ToList() ?? new List<int>(),
+                PrizeTypeId = request.PrizeTypeId,
+                PrizeAmount = request.PrizeAmount
             };
 
             ClassInCompetitionDAL dal = new ClassInCompetitionDAL();
@@ -113,7 +131,10 @@ namespace RideOnServer.BL
             int arenaRanchId,
             byte arenaId,
             decimal? organizerCost,
-            decimal? federationCost)
+            decimal? federationCost,
+            List<int>? judgeIds,
+            byte? prizeTypeId,
+            decimal? prizeAmount)
         {
             if (competitionId <= 0)
             {
@@ -143,6 +164,34 @@ namespace RideOnServer.BL
             if (federationCost.HasValue && federationCost.Value < 0)
             {
                 throw new Exception("FederationCost cannot be negative");
+            }
+
+            if (judgeIds == null || judgeIds.Count == 0)
+            {
+                throw new Exception("At least one judge must be selected for the class");
+            }
+
+            if (judgeIds.Any(id => id <= 0))
+            {
+                throw new Exception("JudgeIds contain invalid values");
+            }
+
+            bool hasPrizeType = prizeTypeId.HasValue;
+            bool hasPrizeAmount = prizeAmount.HasValue;
+
+            if (hasPrizeType && !hasPrizeAmount)
+            {
+                throw new Exception("Prize amount is required when prize type is selected");
+            }
+
+            if (!hasPrizeType && hasPrizeAmount)
+            {
+                throw new Exception("Prize type is required when prize amount is entered");
+            }
+
+            if (prizeAmount.HasValue && prizeAmount.Value < 0)
+            {
+                throw new Exception("Prize amount cannot be negative");
             }
         }
     }

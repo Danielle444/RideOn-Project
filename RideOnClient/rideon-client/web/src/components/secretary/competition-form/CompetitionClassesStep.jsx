@@ -66,6 +66,11 @@ function formatTime(value) {
 }
 
 export default function CompetitionClassesStep(props) {
+  var items = Array.isArray(props.items) ? props.items : [];
+  var classTypes = Array.isArray(props.classTypes) ? props.classTypes : [];
+  var judges = Array.isArray(props.judges) ? props.judges : [];
+  var arenas = Array.isArray(props.arenas) ? props.arenas : [];
+
   var competitionDays = useMemo(
     function () {
       return buildCompetitionDays(
@@ -100,15 +105,15 @@ export default function CompetitionClassesStep(props) {
 
   var itemsByDay = useMemo(
     function () {
-      return props.items.filter(function (item) {
+      return items.filter(function (item) {
         return getDateKey(item.classDateTime) === selectedDayKey;
       });
     },
-    [props.items, selectedDayKey],
+    [items, selectedDayKey],
   );
 
   function getDayTitle(day) {
-    var dayItems = props.items.filter(function (item) {
+    var dayItems = items.filter(function (item) {
       return getDateKey(item.classDateTime) === day.key;
     });
 
@@ -202,9 +207,9 @@ export default function CompetitionClassesStep(props) {
               competitionId={props.competitionId}
               items={itemsByDay}
               loading={props.loading}
-              classTypes={props.classTypes}
-              judges={props.judges}
-              arenas={props.arenas}
+              classTypes={classTypes}
+              judges={judges}
+              arenas={arenas}
               onAdd={function () {
                 props.onAdd(selectedDayKey);
               }}
@@ -226,7 +231,7 @@ export default function CompetitionClassesStep(props) {
                 onClick={props.onFinishStep}
                 className="rounded-xl border border-[#D7CCC8] px-5 py-3 font-semibold text-[#5D4037] transition-colors hover:bg-[#F8F5F2]"
               >
-                המשך לפייד־טיים
+                שמור והמשך לפייד־טיים
               </button>
             ) : null}
 

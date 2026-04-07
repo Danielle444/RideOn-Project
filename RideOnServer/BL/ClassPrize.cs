@@ -4,8 +4,10 @@
     {
         public int ClassInCompId { get; set; }
 
-        public int PrizeTypeId { get; set; }
+        public byte PrizeTypeId { get; set; }
 
-        public short? PrizeAmount { get; set; }
+        public decimal? PrizeAmount { get; set; }
+
+        public string? PrizeTypeName { get; set; }
     }
 }

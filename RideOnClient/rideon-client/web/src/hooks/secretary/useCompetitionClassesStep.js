@@ -13,6 +13,7 @@ export default function useCompetitionClassesStep(options) {
   var activeStep = options.activeStep;
   var detailsForm = options.detailsForm;
   var onShowToast = options.onShowToast;
+  var loadOnInit = !!options.loadOnInit;
 
   var [classesInCompetition, setClassesInCompetition] = useState([]);
   var [loadingClasses, setLoadingClasses] = useState(false);
@@ -32,13 +33,17 @@ export default function useCompetitionClassesStep(options) {
 
   useEffect(
     function () {
-      if (activeStep !== "classes" || !competitionId || !currentRanchId) {
+      if (!competitionId || !currentRanchId) {
+        return;
+      }
+
+      if (activeStep !== "classes" && !loadOnInit) {
         return;
       }
 
       loadClassesSectionData(competitionId, currentRanchId);
     },
-    [activeStep, competitionId, currentRanchId],
+    [activeStep, competitionId, currentRanchId, loadOnInit],
   );
 
   async function loadClassesSectionData(competitionIdValue, ranchId) {
@@ -96,38 +101,32 @@ export default function useCompetitionClassesStep(options) {
       setSavingClass(true);
       setClassModalError("");
 
+      var payload = {
+        competitionId: competitionId,
+        hostRanchId: currentRanchId,
+        classTypeId: formData.classTypeId,
+        arenaRanchId: currentRanchId,
+        arenaId: formData.arenaId,
+        classDateTime: formData.classDateTime,
+        startTime: formData.startTime,
+        orderInDay: formData.orderInDay,
+        organizerCost: formData.organizerCost,
+        federationCost: formData.federationCost,
+        classNotes: formData.classNotes,
+        judgeIds: Array.isArray(formData.judgeIds) ? formData.judgeIds : [],
+        prizeTypeId: formData.prizeTypeId,
+        prizeAmount: formData.prizeAmount,
+      };
+
       if (editClassItem) {
         await updateClassInCompetition(editClassItem.classInCompId, {
           classInCompId: editClassItem.classInCompId,
-          competitionId: competitionId,
-          hostRanchId: currentRanchId,
-          classTypeId: formData.classTypeId,
-          arenaRanchId: currentRanchId,
-          arenaId: formData.arenaId,
-          classDateTime: formData.classDateTime,
-          startTime: formData.startTime,
-          orderInDay: formData.orderInDay,
-          organizerCost: formData.organizerCost,
-          federationCost: formData.federationCost,
-          classNotes: formData.classNotes,
+          ...payload,
         });
 
         onShowToast("success", "המקצה עודכן בהצלחה");
       } else {
-        await createClassInCompetition({
-          competitionId: competitionId,
-          hostRanchId: currentRanchId,
-          classTypeId: formData.classTypeId,
-          arenaRanchId: currentRanchId,
-          arenaId: formData.arenaId,
-          classDateTime: formData.classDateTime,
-          startTime: formData.startTime,
-          orderInDay: formData.orderInDay,
-          organizerCost: formData.organizerCost,
-          federationCost: formData.federationCost,
-          classNotes: formData.classNotes,
-        });
-
+        await createClassInCompetition(payload);
         onShowToast("success", "המקצה נוסף בהצלחה");
       }
 

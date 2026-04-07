@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import SuperUserLayout from "../../components/superuser/SuperUserLayout";
 import JudgesTable from "../../components/superuser/JudgesTable";
-import JudgeModal from "../../components/superuser/JudgeModal";
+import JudgeModal from "../../components/common/JudgeModal";
 import ConfirmDialog from "../../components/superuser/ConfirmDialog";
 import ToastMessage from "../../components/common/ToastMessage";
 import {
