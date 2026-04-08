@@ -111,15 +111,6 @@ export default function CompetitionsBoardPage() {
     });
   }
 
-  function handleGeneralNavigate(itemKey) {
-    if (itemKey === "competitions-board") {
-      navigate("/competitions");
-      return;
-    }
-
-    showToast("info", "המסך יתחבר בהמשך");
-  }
-
   function handleSearch() {
     loadCompetitions({
       search: searchText,
@@ -269,7 +260,6 @@ export default function CompetitionsBoardPage() {
       subtitle={subtitle}
       menuItems={secretaryGeneralMenu}
       activeItemKey="competitions-board"
-      onNavigate={handleGeneralNavigate}
     >
       <div className="overflow-hidden rounded-[28px] border border-[#E6DCD5] bg-white shadow-sm">
         <div className="border-b border-[#EFE5DF] px-8 py-7">

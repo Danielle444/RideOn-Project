@@ -19,6 +19,23 @@ export default function AppLayout(props) {
     }
   }
 
+  function handleSidebarNavigate(itemKey) {
+    if (props.onNavigate) {
+      props.onNavigate(itemKey);
+      return;
+    }
+
+    const matchedItem = Array.isArray(props.menuItems)
+      ? props.menuItems.find(function (menuItem) {
+          return menuItem.key === itemKey;
+        })
+      : null;
+
+    if (matchedItem?.path) {
+      navigate(matchedItem.path);
+    }
+  }
+
   return (
     <div dir="rtl" className="h-screen overflow-hidden bg-[#F5F1EE]">
       <TopBar
@@ -36,7 +53,7 @@ export default function AppLayout(props) {
           subtitle={props.subtitle}
           items={props.menuItems}
           activeItemKey={props.activeItemKey}
-          onNavigate={props.onNavigate}
+          onNavigate={handleSidebarNavigate}
         />
 
         <main className="flex-1 overflow-y-auto p-6">{props.children}</main>

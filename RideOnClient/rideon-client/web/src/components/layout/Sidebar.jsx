@@ -2,8 +2,8 @@ import logo from "../../../../shared/assets/logo.png";
 
 export default function Sidebar(props) {
   return (
-    <aside className="w-[290px] border-l border-[#D9CDC6] bg-white flex flex-col">
-      <div className="pt-8 pb-6 px-6 border-b border-[#EEE3DD]">
+    <aside className="w-[290px] border-l border-[#D9CDC6] bg-white flex flex-col h-full overflow-hidden">
+      <div className="pt-8 pb-6 px-6 border-b border-[#EEE3DD] shrink-0">
         <div className="flex flex-col items-center">
           <img src={logo} alt="RideOn" className="h-28 object-contain mb-3" />
         </div>
@@ -19,7 +19,7 @@ export default function Sidebar(props) {
         </div>
       </div>
 
-      <nav className="flex-1 py-5">
+      <nav className="flex-1 overflow-y-auto py-5">
         {props.items.map(function (item) {
           const Icon = item.icon;
           const isActive = props.activeItemKey === item.key;

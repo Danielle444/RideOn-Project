@@ -1,11 +1,11 @@
-using Npgsql;
-using RideOnServer.BL;
+﻿using Npgsql;
+using RideOnServer.BL.DTOs.StallCompounds;
 
 namespace RideOnServer.DAL
 {
-    public class ArenaDAL : DBServices
+    public class StallCompoundDAL : DBServices
     {
-        public List<Arena> GetArenasByRanchId(int ranchId)
+        public List<StallCompoundSummary> GetCompoundsSummaryByRanchId(int ranchId)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
@@ -18,27 +18,21 @@ namespace RideOnServer.DAL
                 {
                     connection.Open();
 
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetArenasByRanchId", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetCompoundsSummaryByRanchId", connection, paramDic))
                     using (NpgsqlDataReader reader = command.ExecuteReader())
                     {
-                        List<Arena> list = new List<Arena>();
+                        List<StallCompoundSummary> list = new List<StallCompoundSummary>();
 
                         while (reader.Read())
                         {
-                            list.Add(new Arena
+                            list.Add(new StallCompoundSummary
                             {
                                 RanchId = ranchId,
-                                ArenaId = Convert.ToByte(reader["ArenaId"]),
-                                ArenaName = reader["ArenaName"].ToString() ?? string.Empty,
-                                ArenaLength = reader["ArenaLength"] == DBNull.Value
-                                    ? null
-                                    : Convert.ToInt16(reader["ArenaLength"]),
-                                ArenaWidth = reader["ArenaWidth"] == DBNull.Value
-                                    ? null
-                                    : Convert.ToInt16(reader["ArenaWidth"]),
-                                IsCovered = reader["IsCovered"] == DBNull.Value
-                                    ? null
-                                    : Convert.ToBoolean(reader["IsCovered"])
+                                CompoundId = Convert.ToInt16(reader["CompoundId"]),
+                                CompoundName = reader["CompoundName"].ToString() ?? string.Empty,
+                                StallTypeProductId = Convert.ToInt16(reader["StallTypeProductId"]),
+                                StallTypeName = reader["StallTypeName"].ToString() ?? string.Empty,
+                                StallCount = Convert.ToInt32(reader["StallCount"])
                             });
                         }
 
@@ -52,15 +46,14 @@ namespace RideOnServer.DAL
             }
         }
 
-        public int InsertArena(int ranchId, string arenaName, short? arenaLength, short? arenaWidth, bool? isCovered)
+        public int CreateCompoundWithStallsByPattern(int ranchId, string compoundName, short stallTypeProductId, string numberingPattern)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
                 { "@RanchId", ranchId },
-                { "@ArenaName", arenaName },
-                { "@ArenaLength", arenaLength ?? (object)DBNull.Value },
-                { "@ArenaWidth", arenaWidth ?? (object)DBNull.Value },
-                { "@IsCovered", isCovered ?? (object)DBNull.Value }
+                { "@CompoundName", compoundName },
+                { "@StallType", stallTypeProductId },
+                { "@NumberingPattern", numberingPattern }
             };
 
             try
@@ -69,7 +62,7 @@ namespace RideOnServer.DAL
                 {
                     connection.Open();
 
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_InsertArena", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_CreateCompoundWithStallsByPattern", connection, paramDic))
                     {
                         object result = command.ExecuteScalar()!;
                         return Convert.ToInt32(result);
@@ -82,16 +75,13 @@ namespace RideOnServer.DAL
             }
         }
 
-        public void UpdateArena(int ranchId, short arenaId, string arenaName, short? arenaLength, short? arenaWidth, bool? isCovered)
+        public void UpdateCompoundName(int ranchId, short compoundId, string compoundName)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
                 { "@RanchId", ranchId },
-                { "@ArenaId", arenaId },
-                { "@ArenaName", arenaName },
-                { "@ArenaLength", arenaLength ?? (object)DBNull.Value },
-                { "@ArenaWidth", arenaWidth ?? (object)DBNull.Value },
-                { "@IsCovered", isCovered ?? (object)DBNull.Value }
+                { "@CompoundId", compoundId },
+                { "@CompoundName", compoundName }
             };
 
             try
@@ -100,7 +90,7 @@ namespace RideOnServer.DAL
                 {
                     connection.Open();
 
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateArena", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateCompoundName", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
@@ -112,12 +102,12 @@ namespace RideOnServer.DAL
             }
         }
 
-        public void DeleteArena(int ranchId, short arenaId)
+        public void DeleteCompound(int ranchId, short compoundId)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
                 { "@RanchId", ranchId },
-                { "@ArenaId", arenaId }
+                { "@CompoundId", compoundId }
             };
 
             try
@@ -126,7 +116,7 @@ namespace RideOnServer.DAL
                 {
                     connection.Open();
 
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_DeleteArena", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_DeleteCompound", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
