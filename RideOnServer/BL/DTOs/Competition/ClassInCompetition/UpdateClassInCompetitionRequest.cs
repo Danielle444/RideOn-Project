@@ -23,5 +23,7 @@
         public List<int> JudgeIds { get; set; } = new List<int>();
         public byte? PrizeTypeId { get; set; }
         public decimal? PrizeAmount { get; set; }
+
+        public short? PatternNumber { get; set; }
     }
 }

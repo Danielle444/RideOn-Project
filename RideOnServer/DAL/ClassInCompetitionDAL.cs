@@ -44,6 +44,7 @@ namespace RideOnServer.DAL
                                 PrizeTypeId = reader["PrizeTypeId"] == DBNull.Value ? null : Convert.ToByte(reader["PrizeTypeId"]),
                                 PrizeTypeName = reader["PrizeTypeName"] == DBNull.Value ? null : reader["PrizeTypeName"].ToString(),
                                 PrizeAmount = reader["PrizeAmount"] == DBNull.Value ? null : Convert.ToDecimal(reader["PrizeAmount"]),
+                                PatternNumber = reader["PatternNumber"] == DBNull.Value ? null : Convert.ToInt16(reader["PatternNumber"]),
                                 JudgeIds = new List<int>()
                             });
                         }
@@ -100,6 +101,7 @@ namespace RideOnServer.DAL
 
                             ReplaceClassJudges(newClassInCompId, item.JudgeIds, connection, transaction);
                             SaveClassPrize(newClassInCompId, item.PrizeTypeId, item.PrizeAmount, connection, transaction);
+                            SaveReiningType(newClassInCompId, item.PatternNumber, connection, transaction);
 
                             transaction.Commit();
                             return newClassInCompId;
@@ -152,6 +154,7 @@ namespace RideOnServer.DAL
 
                             ReplaceClassJudges(item.ClassInCompId, item.JudgeIds, connection, transaction);
                             SaveClassPrize(item.ClassInCompId, item.PrizeTypeId, item.PrizeAmount, connection, transaction);
+                            SaveReiningType(item.ClassInCompId, item.PatternNumber, connection, transaction);
 
                             transaction.Commit();
                         }
@@ -186,6 +189,7 @@ namespace RideOnServer.DAL
                     {
                         try
                         {
+                            DeleteReiningTypeByClassId(classInCompId, connection, transaction);
                             DeleteClassJudgesByClassId(classInCompId, connection, transaction);
                             DeleteClassPrizeByClassId(classInCompId, connection, transaction);
 
@@ -230,25 +234,6 @@ namespace RideOnServer.DAL
             }
 
             return judgeIds;
-        }
-
-        private void LoadPrizeByClassId(ClassInCompetition item, NpgsqlConnection connection)
-        {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
-            {
-                { "@ClassInCompId", item.ClassInCompId }
-            };
-
-            using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetClassPrizeByClassId", connection, paramDic))
-            using (NpgsqlDataReader reader = command.ExecuteReader())
-            {
-                if (reader.Read())
-                {
-                    item.PrizeTypeId = reader["PrizeTypeId"] == DBNull.Value ? null : Convert.ToByte(reader["PrizeTypeId"]);
-                    item.PrizeTypeName = reader["PrizeTypeName"] == DBNull.Value ? null : reader["PrizeTypeName"].ToString();
-                    item.PrizeAmount = reader["PrizeAmount"] == DBNull.Value ? null : Convert.ToDecimal(reader["PrizeAmount"]);
-                }
-            }
         }
 
         private void ReplaceClassJudges(
@@ -303,6 +288,32 @@ namespace RideOnServer.DAL
             }
         }
 
+        private void SaveReiningType(
+            int classInCompId,
+            short? patternNumber,
+            NpgsqlConnection connection,
+            NpgsqlTransaction transaction)
+        {
+            DeleteReiningTypeByClassId(classInCompId, connection, transaction);
+
+            if (!patternNumber.HasValue)
+            {
+                return;
+            }
+
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@ReiningClassInCompId", classInCompId },
+                { "@PatternNumber", patternNumber.Value }
+            };
+
+            using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpsertReiningType", connection, paramDic))
+            {
+                command.Transaction = transaction;
+                command.ExecuteNonQuery();
+            }
+        }
+
         private void DeleteClassJudgesByClassId(
             int classInCompId,
             NpgsqlConnection connection,
@@ -331,6 +342,23 @@ namespace RideOnServer.DAL
             };
 
             using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_DeleteClassPrizeByClassId", connection, paramDic))
+            {
+                command.Transaction = transaction;
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private void DeleteReiningTypeByClassId(
+            int classInCompId,
+            NpgsqlConnection connection,
+            NpgsqlTransaction transaction)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@ClassInCompId", classInCompId }
+            };
+
+            using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_DeleteReiningTypeByClassId", connection, paramDic))
             {
                 command.Transaction = transaction;
                 command.ExecuteNonQuery();

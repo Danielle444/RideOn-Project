@@ -5,6 +5,7 @@ import {
   updateClassInCompetition,
   deleteClassInCompetition,
 } from "../../services/classInCompetitionService";
+import { getAllPatterns } from "../../services/superUserService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function useCompetitionClassesStep(options) {
@@ -17,6 +18,7 @@ export default function useCompetitionClassesStep(options) {
 
   var [classesInCompetition, setClassesInCompetition] = useState([]);
   var [loadingClasses, setLoadingClasses] = useState(false);
+  var [patterns, setPatterns] = useState([]);
 
   var [classModalOpen, setClassModalOpen] = useState(false);
   var [editClassItem, setEditClassItem] = useState(null);
@@ -30,6 +32,10 @@ export default function useCompetitionClassesStep(options) {
     },
     [competitionId, classesInCompetition],
   );
+
+  useEffect(function () {
+    loadPatterns();
+  }, []);
 
   useEffect(
     function () {
@@ -45,6 +51,15 @@ export default function useCompetitionClassesStep(options) {
     },
     [activeStep, competitionId, currentRanchId, loadOnInit],
   );
+
+  async function loadPatterns() {
+    try {
+      var response = await getAllPatterns();
+      setPatterns(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error(error);
+    }
+  }
 
   async function loadClassesSectionData(competitionIdValue, ranchId) {
     try {
@@ -116,6 +131,7 @@ export default function useCompetitionClassesStep(options) {
         judgeIds: Array.isArray(formData.judgeIds) ? formData.judgeIds : [],
         prizeTypeId: formData.prizeTypeId,
         prizeAmount: formData.prizeAmount,
+        patternNumber: formData.patternNumber,
       };
 
       if (editClassItem) {
@@ -171,6 +187,7 @@ export default function useCompetitionClassesStep(options) {
   return {
     classesInCompetition,
     loadingClasses,
+    patterns,
     classModalOpen,
     editClassItem,
     classModalError,

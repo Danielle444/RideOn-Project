@@ -2,10 +2,11 @@
 {
     public class PatternManeuver
     {
-        public byte PatternNumber { get; set; }
+        public short PatternNumber { get; set; }
+        public short ManeuverId { get; set; }
+        public short ManeuverOrder { get; set; }
 
-        public byte ManeuverId { get; set; }
-
-        public byte Order { get; set; }
+        public string? ManeuverName { get; set; }
+        public string? ManeuverDescription { get; set; }
     }
 }

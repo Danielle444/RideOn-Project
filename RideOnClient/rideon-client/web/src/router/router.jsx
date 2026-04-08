@@ -12,6 +12,7 @@ import SuperUsersManagementPage from "../pages/superuser/SuperUsersManagementPag
 import FieldsManagementPage from "../pages/superuser/FieldsManagementPage";
 import ClassesManagementPage from "../pages/superuser/ClassesManagementPage";
 import JudgesManagementPage from "../pages/superuser/JudgesManagementPage";
+import ReiningPatternsManagementPage from "../pages/superuser/ReiningPatternsManagementPage";
 import PrizesManagementPage from "../pages/superuser/PrizesManagementPage";
 import FinesManagementPage from "../pages/superuser/FinesManagementPage";
 import NotificationsManagementPage from "../pages/superuser/NotificationsManagementPage";
@@ -128,6 +129,14 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute requireSuperUser={true}>
         <JudgesManagementPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/superuser/reining-patterns",
+    element: (
+      <ProtectedRoute requireSuperUser={true}>
+        <ReiningPatternsManagementPage />
       </ProtectedRoute>
     ),
   },

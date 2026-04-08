@@ -2,11 +2,10 @@
 {
     public class Maneuver
     {
-        public byte ManeuverId { get; set; }
+        public short ManeuverId { get; set; }
 
-        public string ManeuverName { get; set; }
+        public string ManeuverName { get; set; } = string.Empty;
 
-        public string ManeuverDescription { get; set; }
-
+        public string ManeuverDescription { get; set; } = string.Empty;
     }
 }

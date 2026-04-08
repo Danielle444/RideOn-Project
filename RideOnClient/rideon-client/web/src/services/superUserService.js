@@ -176,6 +176,57 @@ function deleteFine(id) {
   return axios.delete(`${API}/Fines/${id}`, getAuthHeaders());
 }
 
+// PATTERNS
+function getAllPatterns() {
+  return axios.get(`${API}/Patterns`, getAuthHeaders());
+}
+
+function getAllPatternsWithManeuvers() {
+  return axios.get(`${API}/Patterns/with-maneuvers`, getAuthHeaders());
+}
+
+function createPattern(data) {
+  return axios.post(`${API}/Patterns`, data, getAuthHeaders());
+}
+
+function updatePattern(data) {
+  return axios.put(`${API}/Patterns`, data, getAuthHeaders());
+}
+
+function deletePattern(patternNumber) {
+  return axios.delete(`${API}/Patterns/${patternNumber}`, getAuthHeaders());
+}
+
+// MANEUVERS
+function getAllManeuvers() {
+  return axios.get(`${API}/Maneuvers`, getAuthHeaders());
+}
+
+function createManeuver(data) {
+  return axios.post(`${API}/Maneuvers`, data, getAuthHeaders());
+}
+
+function updateManeuver(data) {
+  return axios.put(`${API}/Maneuvers`, data, getAuthHeaders());
+}
+
+function deleteManeuver(maneuverId) {
+  return axios.delete(`${API}/Maneuvers/${maneuverId}`, getAuthHeaders());
+}
+
+// PATTERN MANEUVERS
+function getPatternManeuvers(patternNumber) {
+  return axios.get(`${API}/PatternManeuvers/${patternNumber}`, getAuthHeaders());
+}
+
+function replacePatternManeuvers(patternNumber, items) {
+  return axios.put(
+    `${API}/PatternManeuvers/${patternNumber}`,
+    items,
+    getAuthHeaders(),
+  );
+}
+
 export {
   getRoleRequests,
   updateRoleRequestStatus,
@@ -204,4 +255,15 @@ export {
   createFine,
   updateFine,
   deleteFine,
+  getAllPatterns,
+  getAllPatternsWithManeuvers,
+  createPattern,
+  updatePattern,
+  deletePattern,
+  getAllManeuvers,
+  createManeuver,
+  updateManeuver,
+  deleteManeuver,
+  getPatternManeuvers,
+  replacePatternManeuvers,
 };
