@@ -1,13 +1,13 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
-using RideOnServer.BL.DTOs.Arenas;
+using RideOnServer.BL.DTOs.StallCompounds;
 
 namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ArenasController : ControllerBase
+    public class StallCompoundsController : ControllerBase
     {
         [Authorize]
         [HttpGet]
@@ -23,7 +23,7 @@ namespace RideOnServer.Controllers
                     RoleNames.HostSecretary
                 );
 
-                List<Arena> list = Arena.GetArenasByRanchId(ranchId);
+                var list = StallCompound.GetCompoundsSummaryByRanchId(ranchId);
                 return Ok(list);
             }
             catch (UnauthorizedAccessException ex)
@@ -38,7 +38,7 @@ namespace RideOnServer.Controllers
 
         [Authorize]
         [HttpPost]
-        public IActionResult Create([FromBody] UpsertArenaRequest request)
+        public IActionResult Create([FromBody] CreateCompoundWithStallsRequest request)
         {
             try
             {
@@ -50,7 +50,7 @@ namespace RideOnServer.Controllers
                     RoleNames.HostSecretary
                 );
 
-                int id = Arena.CreateArena(request);
+                int id = StallCompound.CreateCompoundWithStalls(request);
                 return Ok(id);
             }
             catch (UnauthorizedAccessException ex)
@@ -65,7 +65,7 @@ namespace RideOnServer.Controllers
 
         [Authorize]
         [HttpPut]
-        public IActionResult Update([FromBody] UpsertArenaRequest request)
+        public IActionResult UpdateName([FromQuery] int ranchId, [FromQuery] short compoundId, [FromQuery] string compoundName)
         {
             try
             {
@@ -73,11 +73,11 @@ namespace RideOnServer.Controllers
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
-                    request.RanchId,
+                    ranchId,
                     RoleNames.HostSecretary
                 );
 
-                Arena.UpdateArena(request);
+                StallCompound.UpdateCompoundName(ranchId, compoundId, compoundName);
                 return Ok();
             }
             catch (UnauthorizedAccessException ex)
@@ -92,7 +92,7 @@ namespace RideOnServer.Controllers
 
         [Authorize]
         [HttpDelete]
-        public IActionResult Delete([FromQuery] int ranchId, [FromQuery] short arenaId)
+        public IActionResult Delete([FromQuery] int ranchId, [FromQuery] short compoundId)
         {
             try
             {
@@ -104,7 +104,7 @@ namespace RideOnServer.Controllers
                     RoleNames.HostSecretary
                 );
 
-                Arena.DeleteArena(ranchId, arenaId);
+                StallCompound.DeleteCompound(ranchId, compoundId);
                 return Ok();
             }
             catch (UnauthorizedAccessException ex)

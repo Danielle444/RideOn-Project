@@ -1,4 +1,3 @@
-import { useNavigate } from "react-router-dom";
 import AppLayout from "../../components/layout/AppLayout";
 import ConfirmDialog from "../../components/superuser/ConfirmDialog";
 import ToastMessage from "../../components/common/ToastMessage";
@@ -8,44 +7,19 @@ import ServicePriceHistoryModal from "../../components/secretary/service-prices/
 import useServicePricesPage from "../../hooks/secretary/useServicePricesPage";
 import secretaryGeneralMenu from "../../components/secretary/secretaryGeneralMenu";
 import { getActiveRole, getUser } from "../../services/storageService";
+import { getSecretaryDisplayName } from "../../utils/secretaryDisplay.utils";
 
 export default function ServicePricesPage() {
-  const navigate = useNavigate();
   const page = useServicePricesPage();
 
   const activeRole = getActiveRole();
   const user = getUser();
 
-  const userName =
-    user?.fullName ||
-    user?.username ||
-    user?.userName ||
-    `${user?.firstName || ""} ${user?.lastName || ""}`.trim() ||
-    "משתמשת";
+  const userName = getSecretaryDisplayName(user);
 
   const subtitle = activeRole
     ? `${activeRole.roleName || ""} • ${activeRole.ranchName || ""}`
     : "מזכירת חווה מארחת";
-
-  function handleNavigate(itemKey) {
-    if (itemKey === "competitions-board") {
-      navigate("/competitions");
-      return;
-    }
-
-    if (itemKey === "service-prices") {
-      navigate("/service-prices");
-      return;
-    }
-
-    if (itemKey === "arenas-and-stalls") {
-      return;
-    }
-
-    if (itemKey === "profile-settings") {
-      return;
-    }
-  }
 
   return (
     <AppLayout
@@ -53,7 +27,6 @@ export default function ServicePricesPage() {
       subtitle={subtitle}
       menuItems={secretaryGeneralMenu}
       activeItemKey="service-prices"
-      onNavigate={handleNavigate}
       notificationCount={0}
       notificationsOpen={false}
       notificationItems={[]}
