@@ -1,4 +1,4 @@
-import { Pencil, Trash2, Plus, PauseCircle, Play } from "lucide-react";
+import { Pencil, Trash2, Plus, PauseCircle, Play, History } from "lucide-react";
 import DataTableShell from "../../common/table/DataTableShell";
 import DataTableEmptyState from "../../common/table/DataTableEmptyState";
 import DataTableLoadingState from "../../common/table/DataTableLoadingState";
@@ -59,7 +59,7 @@ export default function ServicePricesTable(props) {
               <th className="px-5 py-4 font-bold min-w-[120px] text-center">
                 סטטוס
               </th>
-              <th className="px-5 py-4 font-bold min-w-[260px] text-center">
+              <th className="px-5 py-4 font-bold min-w-[320px] text-center">
                 פעולות
               </th>
             </tr>
@@ -142,6 +142,16 @@ export default function ServicePricesTable(props) {
                             }}
                           />
                         )}
+
+                        <TableActionButton
+                          iconOnly={true}
+                          variant="neutral"
+                          title="היסטוריית מחירים"
+                          icon={<History size={17} />}
+                          onClick={function () {
+                            props.onHistory(item);
+                          }}
+                        />
 
                         <TableActionButton
                           iconOnly={true}

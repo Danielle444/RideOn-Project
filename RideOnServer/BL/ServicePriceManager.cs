@@ -117,5 +117,31 @@ namespace RideOnServer.BL
             dal.ActivateServiceProductPrice(productId, ranchId);
         }
 
+        internal static List<ServicePriceHistoryRow> GetPriceHistory(short productId, int ranchId)
+        {
+            if (productId <= 0)
+                throw new Exception("ProductId is required");
+
+            if (ranchId <= 0)
+                throw new Exception("RanchId is required");
+
+            ServicePriceDAL dal = new ServicePriceDAL();
+            return dal.GetPriceHistoryForProduct(productId, ranchId);
+        }
+
+        internal static void ActivateHistoryItem(int catalogItemId, int ranchId)
+        {
+            if (catalogItemId <= 0)
+                throw new Exception("CatalogItemId is required");
+
+            if (ranchId <= 0)
+                throw new Exception("RanchId is required");
+
+            ServicePriceDAL dal = new ServicePriceDAL();
+            dal.ActivateSpecificPriceHistoryItem(catalogItemId, ranchId);
+        }
+
+
+
     }
 }

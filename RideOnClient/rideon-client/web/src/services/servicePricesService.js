@@ -56,6 +56,26 @@ function activateServiceProduct(productId, ranchId) {
   );
 }
 
+function getServiceProductPriceHistory(productId, ranchId) {
+  return axios.get(`${API}/ServicePrices/products/${productId}/history`, {
+    params: {
+      ranchId,
+    },
+    ...getAuthHeaders(),
+  });
+}
+
+function activateServicePriceHistoryItem(catalogItemId, ranchId) {
+  return axios.put(
+    `${API}/ServicePrices/history/${catalogItemId}/activate`,
+    null,
+    {
+      params: { ranchId },
+      ...getAuthHeaders(),
+    },
+  );
+}
+
 export {
   getServicePricesDashboard,
   createServiceProduct,
@@ -63,4 +83,6 @@ export {
   deleteServiceProduct,
   deactivateServiceProduct,
   activateServiceProduct,
+  getServiceProductPriceHistory,
+  activateServicePriceHistoryItem,
 };

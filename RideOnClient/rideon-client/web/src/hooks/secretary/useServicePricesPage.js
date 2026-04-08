@@ -7,6 +7,8 @@ import {
   deleteServiceProduct,
   deactivateServiceProduct,
   activateServiceProduct,
+  getServiceProductPriceHistory,
+  activateServicePriceHistoryItem,
 } from "../../services/servicePricesService";
 
 export default function useServicePricesPage() {
@@ -19,6 +21,11 @@ export default function useServicePricesPage() {
   const [editItem, setEditItem] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [error, setError] = useState("");
+
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyItems, setHistoryItems] = useState([]);
+  const [historyProduct, setHistoryProduct] = useState(null);
 
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
@@ -131,6 +138,33 @@ export default function useServicePricesPage() {
     setError("");
   }
 
+  async function openHistory(item) {
+    try {
+      setHistoryOpen(true);
+      setHistoryProduct(item);
+      setHistoryItems([]);
+      setHistoryLoading(true);
+
+      const res = await getServiceProductPriceHistory(item.productId, ranchId);
+      setHistoryItems(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error(err);
+      showToast("error", err.response?.data || "שגיאה בטעינת היסטוריית המחירים");
+      setHistoryOpen(false);
+      setHistoryProduct(null);
+      setHistoryItems([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  function closeHistory() {
+    setHistoryOpen(false);
+    setHistoryLoading(false);
+    setHistoryItems([]);
+    setHistoryProduct(null);
+  }
+
   function closeConfirmDialog() {
     setConfirmDialog({
       isOpen: false,
@@ -172,6 +206,10 @@ export default function useServicePricesPage() {
 
       closeModal();
       await loadDashboard();
+
+      if (historyOpen && historyProduct?.productId === editItem?.productId) {
+        await openHistory(historyProduct);
+      }
     } catch (err) {
       console.error(err);
 
@@ -197,6 +235,10 @@ export default function useServicePricesPage() {
           closeConfirmDialog();
           showToast("success", "המוצר נמחק בהצלחה");
           await loadDashboard();
+
+          if (historyOpen && historyProduct?.productId === item.productId) {
+            closeHistory();
+          }
         } catch (err) {
           console.error(err);
           closeConfirmDialog();
@@ -217,6 +259,10 @@ export default function useServicePricesPage() {
           closeConfirmDialog();
           showToast("success", "המוצר הושבת בהצלחה");
           await loadDashboard();
+
+          if (historyOpen && historyProduct?.productId === item.productId) {
+            await openHistory(item);
+          }
         } catch (err) {
           console.error(err);
           closeConfirmDialog();
@@ -237,10 +283,38 @@ export default function useServicePricesPage() {
           closeConfirmDialog();
           showToast("success", "המוצר הופעל בהצלחה");
           await loadDashboard();
+
+          if (historyOpen && historyProduct?.productId === item.productId) {
+            await openHistory(item);
+          }
         } catch (err) {
           console.error(err);
           closeConfirmDialog();
           showToast("error", err.response?.data || "שגיאה בהפעלת המוצר");
+        }
+      },
+    });
+  }
+
+  function handleActivateHistoryItem(historyItem) {
+    setConfirmDialog({
+      isOpen: true,
+      title: "הפעלת מחיר מההיסטוריה",
+      message: "האם להפעיל את המחיר שנבחר כמחיר הפעיל של המוצר?",
+      onConfirm: async function () {
+        try {
+          await activateServicePriceHistoryItem(historyItem.catalogItemId, ranchId);
+          closeConfirmDialog();
+          showToast("success", "המחיר הופעל בהצלחה");
+          await loadDashboard();
+
+          if (historyProduct) {
+            await openHistory(historyProduct);
+          }
+        } catch (err) {
+          console.error(err);
+          closeConfirmDialog();
+          showToast("error", err.response?.data || "שגיאה בהפעלת המחיר");
         }
       },
     });
@@ -256,16 +330,23 @@ export default function useServicePricesPage() {
     editItem,
     selectedCategory,
     error,
+    historyOpen,
+    historyLoading,
+    historyItems,
+    historyProduct,
     confirmDialog,
     toast,
     openCreate,
     openEdit,
     closeModal,
+    openHistory,
+    closeHistory,
     closeConfirmDialog,
     closeToast,
     handleSubmit,
     handleDelete,
     handleDeactivate,
     handleActivate,
+    handleActivateHistoryItem,
   };
 }

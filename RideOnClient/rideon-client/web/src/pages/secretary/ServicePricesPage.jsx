@@ -4,6 +4,7 @@ import ConfirmDialog from "../../components/superuser/ConfirmDialog";
 import ToastMessage from "../../components/common/ToastMessage";
 import ServicePricesTable from "../../components/secretary/service-prices/ServicePricesTable";
 import ServiceProductModal from "../../components/secretary/service-prices/ServiceProductModal";
+import ServicePriceHistoryModal from "../../components/secretary/service-prices/ServicePriceHistoryModal";
 import useServicePricesPage from "../../hooks/secretary/useServicePricesPage";
 import secretaryGeneralMenu from "../../components/secretary/secretaryGeneralMenu";
 import { getActiveRole, getUser } from "../../services/storageService";
@@ -100,6 +101,7 @@ export default function ServicePricesPage() {
                   }}
                   onDeactivate={page.handleDeactivate}
                   onActivate={page.handleActivate}
+                  onHistory={page.openHistory}
                   onDelete={page.handleDelete}
                 />
               );
@@ -117,6 +119,15 @@ export default function ServicePricesPage() {
         error={page.error}
         categoryId={page.selectedCategory?.categoryId}
         categoryName={page.selectedCategory?.categoryName}
+      />
+
+      <ServicePriceHistoryModal
+        isOpen={page.historyOpen}
+        onClose={page.closeHistory}
+        historyItems={page.historyItems}
+        loading={page.historyLoading}
+        productName={page.historyProduct?.productName}
+        onActivateHistoryItem={page.handleActivateHistoryItem}
       />
 
       <ConfirmDialog

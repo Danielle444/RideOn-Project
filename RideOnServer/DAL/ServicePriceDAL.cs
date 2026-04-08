@@ -193,5 +193,80 @@ namespace RideOnServer.DAL
                 throw new Exception(ex.Message);
             }
         }
+
+        public List<ServicePriceHistoryRow> GetPriceHistoryForProduct(short productId, int ranchId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+    {
+        { "@ProductId", productId },
+        { "@RanchId", ranchId }
+    };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetPriceHistoryForProduct", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<ServicePriceHistoryRow> list = new List<ServicePriceHistoryRow>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(new ServicePriceHistoryRow
+                            {
+                                CatalogItemId = Convert.ToInt32(reader["CatalogItemId"]),
+                                CreationDate = reader["CreationDate"] == DBNull.Value
+                                    ? null
+                                    : Convert.ToDateTime(reader["CreationDate"]),
+                                ItemPrice = reader["ItemPrice"] == DBNull.Value
+                                    ? null
+                                    : Convert.ToDecimal(reader["ItemPrice"]),
+                                IsActive = reader["IsActive"] != DBNull.Value &&
+                                           Convert.ToBoolean(reader["IsActive"])
+                            });
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public void ActivateSpecificPriceHistoryItem(int catalogItemId, int ranchId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@PriceCatalogId", catalogItemId },
+                { "@RanchId", ranchId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_ActivateSpecificPriceHistoryItem", connection, paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+
+
+
     }
 }

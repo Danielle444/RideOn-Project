@@ -99,6 +99,37 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [Authorize]
+        [HttpGet("products/{id}/history")]
+        public IActionResult GetPriceHistory(short id, [FromQuery] int ranchId)
+        {
+            try
+            {
+                var list = ServicePriceManager.GetPriceHistory(id, ranchId);
+                return Ok(list);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize]
+        [HttpPut("history/{catalogItemId}/activate")]
+        public IActionResult ActivateHistoryItem(int catalogItemId, [FromQuery] int ranchId)
+        {
+            try
+            {
+                ServicePriceManager.ActivateHistoryItem(catalogItemId, ranchId);
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+
 
     }
 }
