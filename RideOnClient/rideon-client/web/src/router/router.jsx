@@ -16,6 +16,7 @@ import ReiningPatternsManagementPage from "../pages/superuser/ReiningPatternsMan
 import PrizesManagementPage from "../pages/superuser/PrizesManagementPage";
 import FinesManagementPage from "../pages/superuser/FinesManagementPage";
 import NotificationsManagementPage from "../pages/superuser/NotificationsManagementPage";
+import ServicePricesPage from "../pages/secretary/ServicePricesPage";
 
 const router = createBrowserRouter([
   {
@@ -85,6 +86,14 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <CompetitionFormPage mode="edit" />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/service-prices",
+    element: (
+      <ProtectedRoute>
+        <ServicePricesPage />
       </ProtectedRoute>
     ),
   },

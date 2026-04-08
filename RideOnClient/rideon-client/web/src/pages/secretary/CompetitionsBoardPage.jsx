@@ -112,13 +112,18 @@ export default function CompetitionsBoardPage() {
   }
 
   function handleGeneralNavigate(itemKey) {
-    if (itemKey === "competitions-board") {
-      navigate("/competitions");
-      return;
-    }
-
-    showToast("info", "המסך יתחבר בהמשך");
+  if (itemKey === "competitions-board") {
+    navigate("/competitions");
+    return;
   }
+
+  if (itemKey === "service-prices") {
+    navigate("/service-prices");
+    return;
+  }
+
+  showToast("info", "המסך יתחבר בהמשך");
+}
 
   function handleSearch() {
     loadCompetitions({
