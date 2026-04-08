@@ -7,6 +7,7 @@ import {
   Award,
   AlertTriangle,
   Bell,
+  Route,
 } from "lucide-react";
 
 const superUserMenu = [
@@ -15,6 +16,7 @@ const superUserMenu = [
   { key: "fields", label: "ענפים", icon: GitBranch },
   { key: "classes", label: "מקצים", icon: LayoutList },
   { key: "judges", label: "שופטים", icon: Gavel },
+  { key: "reining-patterns", label: "מסלולי ריינינג", icon: Route },
   { key: "prizes", label: "פרסים", icon: Award },
   { key: "fines", label: "קנסות", icon: AlertTriangle },
   { key: "notifications", label: "התראות", icon: Bell },

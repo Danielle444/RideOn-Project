@@ -9,6 +9,7 @@ import {
   getAllClassTypes,
   getAllJudges,
   getAllPrizeTypes,
+  getAllPatterns,
 } from "../../services/superUserService";
 import { getArenasByRanchId } from "../../services/arenaService";
 import { getAllPaidTimeBaseSlots } from "../../services/paidTimeSlotInCompetitionService";
@@ -34,6 +35,7 @@ export default function useCompetitionDetailsStep(options) {
   var [classTypes, setClassTypes] = useState([]);
   var [judges, setJudges] = useState([]);
   var [prizeTypes, setPrizeTypes] = useState([]);
+  var [patterns, setPatterns] = useState([]);
   var [paidTimeBaseSlots, setPaidTimeBaseSlots] = useState([]);
   var [selectedCompetitionJudgeIds, setSelectedCompetitionJudgeIds] = useState(
     [],
@@ -93,12 +95,14 @@ export default function useCompetitionDetailsStep(options) {
         getArenasByRanchId(currentRanchId),
         getAllPaidTimeBaseSlots(currentRanchId),
         getAllPrizeTypes(),
+        getAllPatterns(),
       ]);
 
       var fieldsRes = results[0];
       var arenasRes = results[1];
       var paidTimeBaseSlotsRes = results[2];
       var prizeTypesRes = results[3];
+      var patternsRes = results[4];
 
       setFields(Array.isArray(fieldsRes.data) ? fieldsRes.data : []);
       setArenas(Array.isArray(arenasRes.data) ? arenasRes.data : []);
@@ -106,6 +110,7 @@ export default function useCompetitionDetailsStep(options) {
         Array.isArray(paidTimeBaseSlotsRes.data) ? paidTimeBaseSlotsRes.data : [],
       );
       setPrizeTypes(Array.isArray(prizeTypesRes.data) ? prizeTypesRes.data : []);
+      setPatterns(Array.isArray(patternsRes.data) ? patternsRes.data : []);
 
       if (isEdit && competitionIdFromRoute) {
         await loadExistingCompetition(competitionIdFromRoute, currentRanchId);
@@ -294,6 +299,7 @@ export default function useCompetitionDetailsStep(options) {
     classTypes,
     judges,
     prizeTypes,
+    patterns,
     paidTimeBaseSlots,
     competitionId,
     currentStatus,

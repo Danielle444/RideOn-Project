@@ -22,7 +22,8 @@ namespace RideOnServer.BL
         public string? PrizeTypeName { get; set; }
         public decimal? PrizeAmount { get; set; }
 
-        // UI helpers
+        public short? PatternNumber { get; set; }
+
         public string? ClassName { get; set; }
         public string? ArenaName { get; set; }
         public string? JudgesDisplay { get; set; }
@@ -49,7 +50,8 @@ namespace RideOnServer.BL
                 request.FederationCost,
                 request.JudgeIds,
                 request.PrizeTypeId,
-                request.PrizeAmount
+                request.PrizeAmount,
+                request.PatternNumber
             );
 
             ClassInCompetition item = new ClassInCompetition
@@ -66,7 +68,8 @@ namespace RideOnServer.BL
                 ClassNotes = string.IsNullOrWhiteSpace(request.ClassNotes) ? null : request.ClassNotes.Trim(),
                 JudgeIds = request.JudgeIds?.Distinct().ToList() ?? new List<int>(),
                 PrizeTypeId = request.PrizeTypeId,
-                PrizeAmount = request.PrizeAmount
+                PrizeAmount = request.PrizeAmount,
+                PatternNumber = request.PatternNumber
             };
 
             ClassInCompetitionDAL dal = new ClassInCompetitionDAL();
@@ -89,7 +92,8 @@ namespace RideOnServer.BL
                 request.FederationCost,
                 request.JudgeIds,
                 request.PrizeTypeId,
-                request.PrizeAmount
+                request.PrizeAmount,
+                request.PatternNumber
             );
 
             ClassInCompetition item = new ClassInCompetition
@@ -107,7 +111,8 @@ namespace RideOnServer.BL
                 ClassNotes = string.IsNullOrWhiteSpace(request.ClassNotes) ? null : request.ClassNotes.Trim(),
                 JudgeIds = request.JudgeIds?.Distinct().ToList() ?? new List<int>(),
                 PrizeTypeId = request.PrizeTypeId,
-                PrizeAmount = request.PrizeAmount
+                PrizeAmount = request.PrizeAmount,
+                PatternNumber = request.PatternNumber
             };
 
             ClassInCompetitionDAL dal = new ClassInCompetitionDAL();
@@ -134,7 +139,8 @@ namespace RideOnServer.BL
             decimal? federationCost,
             List<int>? judgeIds,
             byte? prizeTypeId,
-            decimal? prizeAmount)
+            decimal? prizeAmount,
+            short? patternNumber)
         {
             if (competitionId <= 0)
             {
@@ -192,6 +198,11 @@ namespace RideOnServer.BL
             if (prizeAmount.HasValue && prizeAmount.Value < 0)
             {
                 throw new Exception("Prize amount cannot be negative");
+            }
+
+            if (patternNumber.HasValue && patternNumber.Value <= 0)
+            {
+                throw new Exception("PatternNumber is invalid");
             }
         }
     }

@@ -15,8 +15,20 @@ export default function ClassInCompetitionModal(props) {
   var arenas = Array.isArray(props.arenas) ? props.arenas : [];
   var judges = Array.isArray(props.judges) ? props.judges : [];
   var prizeTypes = Array.isArray(props.prizeTypes) ? props.prizeTypes : [];
+  var patterns = Array.isArray(props.patterns) ? props.patterns : [];
 
   var [openDropdownKey, setOpenDropdownKey] = useState("");
+  var [localError, setLocalError] = useState("");
+
+  var normalizedFieldName = String(props.fieldName || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+  var shouldShowPatternField =
+    !!props.isReiningField ||
+    normalizedFieldName.includes("ריינינג") ||
+    !!props.initialValue?.patternNumber;
 
   var [formData, setFormData] = useState({
     classTypeId: "",
@@ -30,6 +42,7 @@ export default function ClassInCompetitionModal(props) {
     judgeIds: [],
     prizeTypeId: "",
     prizeAmount: "",
+    patternNumber: "",
   });
 
   var availableJudges = useMemo(
@@ -57,6 +70,8 @@ export default function ClassInCompetitionModal(props) {
         return;
       }
 
+      setLocalError("");
+
       if (!props.initialValue) {
         setFormData({
           classTypeId: "",
@@ -75,6 +90,7 @@ export default function ClassInCompetitionModal(props) {
               : [],
           prizeTypeId: "",
           prizeAmount: "",
+          patternNumber: "",
         });
         return;
       }
@@ -117,6 +133,11 @@ export default function ClassInCompetitionModal(props) {
           props.initialValue.prizeAmount !== undefined
             ? String(props.initialValue.prizeAmount)
             : "",
+        patternNumber:
+          props.initialValue.patternNumber !== null &&
+          props.initialValue.patternNumber !== undefined
+            ? String(props.initialValue.patternNumber)
+            : "",
       });
     },
     [
@@ -156,6 +177,8 @@ export default function ClassInCompetitionModal(props) {
   }
 
   function handleChange(fieldName, value) {
+    setLocalError("");
+
     setFormData(function (prev) {
       return {
         ...prev,
@@ -165,6 +188,8 @@ export default function ClassInCompetitionModal(props) {
   }
 
   function toggleJudgeSelection(judgeId) {
+    setLocalError("");
+
     setFormData(function (prev) {
       var currentJudgeIds = Array.isArray(prev.judgeIds) ? prev.judgeIds : [];
       var exists = currentJudgeIds.some(function (id) {
@@ -185,6 +210,11 @@ export default function ClassInCompetitionModal(props) {
   function handleSubmit(e) {
     e.preventDefault();
 
+    if (shouldShowPatternField && !formData.patternNumber) {
+      setLocalError("בענף ריינינג חובה לבחור מסלול");
+      return;
+    }
+
     props.onSubmit({
       classTypeId: formData.classTypeId ? Number(formData.classTypeId) : "",
       arenaId: formData.arenaId ? Number(formData.arenaId) : "",
@@ -203,6 +233,11 @@ export default function ClassInCompetitionModal(props) {
       judgeIds: formData.judgeIds,
       prizeTypeId: formData.prizeTypeId ? Number(formData.prizeTypeId) : null,
       prizeAmount: formData.prizeAmount ? Number(formData.prizeAmount) : null,
+      patternNumber: shouldShowPatternField
+        ? formData.patternNumber
+          ? Number(formData.patternNumber)
+          : null
+        : null,
     });
   }
 
@@ -348,6 +383,32 @@ export default function ClassInCompetitionModal(props) {
               />
             </div>
 
+            {shouldShowPatternField ? (
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
+                  מסלול
+                </label>
+
+                <CustomDropdown
+                  dropdownKey="class-pattern"
+                  openDropdownKey={openDropdownKey}
+                  setOpenDropdownKey={setOpenDropdownKey}
+                  options={patterns}
+                  value={formData.patternNumber}
+                  placeholder="בחרי מסלול"
+                  getOptionValue={function (item) {
+                    return item.patternNumber;
+                  }}
+                  getOptionLabel={function (item) {
+                    return "מסלול " + item.patternNumber;
+                  }}
+                  onChange={function (e) {
+                    handleChange("patternNumber", e.target.value);
+                  }}
+                />
+              </div>
+            ) : null}
+
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 סוג פרס
@@ -455,7 +516,13 @@ export default function ClassInCompetitionModal(props) {
             </div>
           </div>
 
-          {props.error ? (
+          {localError ? (
+            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
+              {localError}
+            </div>
+          ) : null}
+
+          {!localError && props.error ? (
             <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
               {props.error}
             </div>

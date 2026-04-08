@@ -28,6 +28,13 @@ export default function CompetitionFormPage(props) {
     [activeRole?.roleName, activeRole?.ranchName].filter(Boolean).join(" · ") ||
     "לא נבחר תפקיד וחווה";
 
+  var selectedField = (page.fields || []).find(function (field) {
+    return String(field.fieldId) === String(page.detailsForm.fieldId);
+  });
+
+  var selectedFieldName = selectedField?.fieldName || "";
+  var isReiningField = String(selectedFieldName || "").trim() === "ריינינג";
+
   if (!activeRole) {
     return null;
   }
@@ -145,7 +152,10 @@ export default function CompetitionFormPage(props) {
         classTypes={page.classTypes || []}
         judges={page.judges || []}
         prizeTypes={page.prizeTypes || []}
+        patterns={page.patterns || []}
         arenas={page.arenas || []}
+        fieldName={selectedFieldName}
+        isReiningField={isReiningField}
         fieldId={page.detailsForm.fieldId}
         error={page.classModalError}
         saving={page.savingClass}

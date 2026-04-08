@@ -139,7 +139,7 @@ export default function useCompetitionFormPage(options) {
     }
 
     if (intent === "draft") {
-      navigate("/competitions"); // ⬅️ לוח תחרויות
+      navigate("/competitions");
       return;
     }
 
@@ -178,6 +178,10 @@ export default function useCompetitionFormPage(options) {
     classTypes: details.classTypes,
     judges: details.judges,
     prizeTypes: details.prizeTypes,
+    patterns:
+      Array.isArray(classes.patterns) && classes.patterns.length > 0
+        ? classes.patterns
+        : details.patterns,
     paidTimeBaseSlots: details.paidTimeBaseSlots,
     competitionId: details.competitionId,
     currentStatus: details.currentStatus,
