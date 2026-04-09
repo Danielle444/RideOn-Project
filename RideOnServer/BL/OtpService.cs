@@ -43,7 +43,7 @@ namespace RideOnServer.BL
         private static string GenerateOtp()
         {
             Random rng = new Random();
-            return rng.Next(100000, 999999).ToString();
+            return rng.Next(100000, 1000000).ToString();
         }
     }
 }
