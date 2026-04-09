@@ -77,6 +77,18 @@ namespace RideOnServer.BL
                 }
             }
 
+            OtpService otpService = new OtpService(
+                new ConfigurationBuilder()
+                    .SetBasePath(Directory.GetCurrentDirectory())
+                    .AddJsonFile("appsettings.json", optional: false)
+                    .AddJsonFile("appsettings.Development.json", optional: true)
+                    .AddEnvironmentVariables()
+                    .Build()
+            );
+
+            if (!otpService.VerifyOtp(request.Email, request.OtpCode))
+                throw new Exception("קוד האימות אינו תקף או פג תוקפו");
+
             PasswordPolicyValidator.ValidateOrThrow(request.Password);
 
             string passwordSalt = PasswordHelper.GenerateSalt();

@@ -168,7 +168,59 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("send-otp")]
+        public IActionResult SendOtp([FromBody] SendOtpRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.Email))
+                    return BadRequest("כתובת מייל נדרשת");
 
+                OtpService otpService = new OtpService(_configuration);
+                otpService.SendAndStoreOtp(request.Email);
+                return Ok(new { message = "קוד אימות נשלח למייל" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("forgot-password")]
+        public IActionResult ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.Email))
+                    return BadRequest("כתובת מייל נדרשת");
+
+                PasswordResetService service = new PasswordResetService(_configuration);
+                service.RequestReset(request.Email);
+                return Ok(new { message = "אם המייל קיים במערכת, ישלח אליך קישור לאיפוס" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("reset-password")]
+        public IActionResult ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.NewPassword))
+                    return BadRequest("פרטים חסרים");
+
+                PasswordResetService service = new PasswordResetService(_configuration);
+                service.ResetPassword(request.Token, request.NewPassword);
+                return Ok(new { message = "הסיסמה אופסה בהצלחה" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
 
 
     }
