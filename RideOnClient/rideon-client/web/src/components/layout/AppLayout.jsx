@@ -5,7 +5,8 @@ import Sidebar from "./Sidebar";
 
 export default function AppLayout(props) {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const authContext = useAuth();
+  const logout = authContext.logout;
 
   function handleLogout() {
     logout();
@@ -25,13 +26,13 @@ export default function AppLayout(props) {
       return;
     }
 
-    const matchedItem = Array.isArray(props.menuItems)
+    var matchedItem = Array.isArray(props.menuItems)
       ? props.menuItems.find(function (menuItem) {
           return menuItem.key === itemKey;
         })
       : null;
 
-    if (matchedItem?.path) {
+    if (matchedItem && matchedItem.path) {
       navigate(matchedItem.path);
     }
   }
@@ -51,6 +52,7 @@ export default function AppLayout(props) {
         <Sidebar
           userName={props.userName}
           subtitle={props.subtitle}
+          contextNote={props.contextNote}
           items={props.menuItems}
           activeItemKey={props.activeItemKey}
           onNavigate={handleSidebarNavigate}

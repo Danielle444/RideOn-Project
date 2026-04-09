@@ -7,6 +7,18 @@ import ChangePasswordPage from "../pages/shared/ChangePasswordPage";
 import SelectRanchPage from "../pages/secretary/SelectRanchPage";
 import CompetitionsBoardPage from "../pages/secretary/CompetitionsBoardPage";
 import CompetitionFormPage from "../pages/secretary/CompetitionFormPage";
+import CompetitionSummaryPage from "../pages/secretary/CompetitionSummaryPage";
+import CompetitionClassesPage from "../pages/secretary/CompetitionClassesPage";
+import CompetitionPaidTimePage from "../pages/secretary/CompetitionPaidTimePage";
+import CompetitionStallsPage from "../pages/secretary/CompetitionStallsPage";
+import CompetitionShavingsPage from "../pages/secretary/CompetitionShavingsPage";
+import CompetitionHealthCertificatesPage from "../pages/secretary/CompetitionHealthCertificatesPage";
+import CompetitionChangeTrackingPage from "../pages/secretary/CompetitionChangeTrackingPage";
+import CompetitionPaymentsPage from "../pages/secretary/CompetitionPaymentsPage";
+import ServicePricesPage from "../pages/secretary/ServicePricesPage";
+import ArenasAndStallsPage from "../pages/secretary/ArenasAndStallsPage";
+import WorkersManagementPage from "../pages/secretary/WorkersManagementPage";
+import ProfileSettingsPage from "../pages/secretary/ProfileSettingsPage";
 import UserRequestsPage from "../pages/superuser/UserRequestsPage";
 import SuperUsersManagementPage from "../pages/superuser/SuperUsersManagementPage";
 import FieldsManagementPage from "../pages/superuser/FieldsManagementPage";
@@ -16,8 +28,6 @@ import ReiningPatternsManagementPage from "../pages/superuser/ReiningPatternsMan
 import PrizesManagementPage from "../pages/superuser/PrizesManagementPage";
 import FinesManagementPage from "../pages/superuser/FinesManagementPage";
 import NotificationsManagementPage from "../pages/superuser/NotificationsManagementPage";
-import ServicePricesPage from "../pages/secretary/ServicePricesPage";
-import ArenasAndStallsPage from "../pages/secretary/ArenasAndStallsPage";
 
 const router = createBrowserRouter([
   {
@@ -83,6 +93,74 @@ const router = createBrowserRouter([
     ),
   },
   {
+    path: "/competitions/:competitionId",
+    element: <Navigate to="summary" replace />,
+  },
+  {
+    path: "/competitions/:competitionId/summary",
+    element: (
+      <ProtectedRoute>
+        <CompetitionSummaryPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/competitions/:competitionId/classes",
+    element: (
+      <ProtectedRoute>
+        <CompetitionClassesPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/competitions/:competitionId/paid-time",
+    element: (
+      <ProtectedRoute>
+        <CompetitionPaidTimePage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/competitions/:competitionId/stalls",
+    element: (
+      <ProtectedRoute>
+        <CompetitionStallsPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/competitions/:competitionId/shavings",
+    element: (
+      <ProtectedRoute>
+        <CompetitionShavingsPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/competitions/:competitionId/health-certificates",
+    element: (
+      <ProtectedRoute>
+        <CompetitionHealthCertificatesPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/competitions/:competitionId/change-tracking",
+    element: (
+      <ProtectedRoute>
+        <CompetitionChangeTrackingPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/competitions/:competitionId/payments",
+    element: (
+      <ProtectedRoute>
+        <CompetitionPaymentsPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: "/competitions/:competitionId/edit",
     element: (
       <ProtectedRoute>
@@ -103,6 +181,22 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <ArenasAndStallsPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/workers-management",
+    element: (
+      <ProtectedRoute>
+        <WorkersManagementPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/profile-settings",
+    element: (
+      <ProtectedRoute>
+        <ProfileSettingsPage />
       </ProtectedRoute>
     ),
   },

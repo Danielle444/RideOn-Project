@@ -8,12 +8,16 @@ import ToastMessage from "../../components/common/ToastMessage";
 import { useUser } from "../../context/UserContext";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import { getCompetitionsByHostRanch } from "../../services/competitionService";
+import { saveActiveCompetition } from "../../services/competitionSessionService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function CompetitionsBoardPage() {
   const navigate = useNavigate();
-  const { user } = useUser();
-  const { activeRole } = useActiveRole();
+  const userContext = useUser();
+  const activeRoleContext = useActiveRole();
+
+  const user = userContext.user;
+  const activeRole = activeRoleContext.activeRole;
 
   const [competitions, setCompetitions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -36,7 +40,7 @@ export default function CompetitionsBoardPage() {
     message: "",
   });
 
-  const userName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
+  const userName = ((user?.firstName || "") + " " + (user?.lastName || "")).trim();
   const subtitle =
     [activeRole?.roleName, activeRole?.ranchName].filter(Boolean).join(" · ") ||
     "לא נבחר תפקיד וחווה";
@@ -161,11 +165,16 @@ export default function CompetitionsBoardPage() {
   }
 
   function handleEnterCompetition(item) {
-    navigate(`/competitions/${item.competitionId}/edit`);
+    saveActiveCompetition({
+      competitionId: item.competitionId,
+      competitionName: item.competitionName || "",
+    });
+
+    navigate("/competitions/" + item.competitionId + "/summary");
   }
 
   function handleEditCompetition(item) {
-    navigate(`/competitions/${item.competitionId}/edit`);
+    navigate("/competitions/" + item.competitionId + "/edit");
   }
 
   function handleCreateCompetition() {
