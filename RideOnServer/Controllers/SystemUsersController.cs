@@ -60,6 +60,10 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                OtpService otpService = new OtpService(_configuration);
+                if (!otpService.VerifyOtp(registerRequest.Email, registerRequest.OtpCode))
+                    return BadRequest("קוד האימות אינו תקף או פג תוקפו");
+
                 RegisterResponse response = SystemUser.Register(registerRequest);
                 return Ok(response);
             }
@@ -175,6 +179,9 @@ namespace RideOnServer.Controllers
             {
                 if (string.IsNullOrWhiteSpace(request.Email))
                     return BadRequest("כתובת מייל נדרשת");
+
+                if (!request.Email.Contains("@") || !request.Email.Contains("."))
+                    return BadRequest("כתובת מייל אינה תקינה");
 
                 OtpService otpService = new OtpService(_configuration);
                 otpService.SendAndStoreOtp(request.Email);

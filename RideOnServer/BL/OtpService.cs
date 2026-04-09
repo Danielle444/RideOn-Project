@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using RideOnServer.DAL;
 
 namespace RideOnServer.BL
@@ -42,8 +43,7 @@ namespace RideOnServer.BL
 
         private static string GenerateOtp()
         {
-            Random rng = new Random();
-            return rng.Next(100000, 1000000).ToString();
+            return RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
         }
     }
 }
