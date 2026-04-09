@@ -1,4 +1,3 @@
-DROP FUNCTION IF EXISTS usp_MarkResetTokenAsUsed CASCADE;
 CREATE OR REPLACE FUNCTION usp_MarkResetTokenAsUsed(
     p_tokenid INTEGER
 )

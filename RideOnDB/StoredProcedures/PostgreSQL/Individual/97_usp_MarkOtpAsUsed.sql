@@ -1,4 +1,3 @@
-DROP FUNCTION IF EXISTS usp_MarkOtpAsUsed CASCADE;
 CREATE OR REPLACE FUNCTION usp_MarkOtpAsUsed(
     p_otpid INTEGER
 )

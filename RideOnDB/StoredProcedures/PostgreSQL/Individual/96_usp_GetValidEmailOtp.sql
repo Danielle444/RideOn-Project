@@ -1,4 +1,3 @@
-DROP FUNCTION IF EXISTS usp_GetValidEmailOtp CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetValidEmailOtp(
     p_email TEXT
 )

@@ -1,4 +1,3 @@
-DROP FUNCTION IF EXISTS usp_GetSystemUserByEmail CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetSystemUserByEmail(
     p_email TEXT
 )

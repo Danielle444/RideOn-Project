@@ -1,4 +1,3 @@
-DROP FUNCTION IF EXISTS usp_SavePasswordResetToken CASCADE;
 CREATE OR REPLACE FUNCTION usp_SavePasswordResetToken(
     p_systemuserid INTEGER,
     p_tokenhash    TEXT,

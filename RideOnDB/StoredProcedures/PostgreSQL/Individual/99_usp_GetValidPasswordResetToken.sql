@@ -1,4 +1,3 @@
-DROP FUNCTION IF EXISTS usp_GetValidPasswordResetToken CASCADE;
 CREATE OR REPLACE FUNCTION usp_GetValidPasswordResetToken(
     p_tokenhash TEXT
 )

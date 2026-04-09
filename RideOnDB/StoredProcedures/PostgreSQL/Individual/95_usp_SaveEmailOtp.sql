@@ -1,4 +1,3 @@
-DROP FUNCTION IF EXISTS usp_SaveEmailOtp CASCADE;
 CREATE OR REPLACE FUNCTION usp_SaveEmailOtp(
     p_email     TEXT,
     p_otphash   TEXT,
