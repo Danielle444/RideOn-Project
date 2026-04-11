@@ -1,4 +1,4 @@
-import AppLayout from "../../components/layout/AppLayout";
+import SecretaryLayout from "../../components/secretary/SecretaryLayout";
 import ConfirmDialog from "../../components/superuser/ConfirmDialog";
 import ToastMessage from "../../components/common/ToastMessage";
 import ServicePricesTable from "../../components/secretary/service-prices/ServicePricesTable";
@@ -22,7 +22,7 @@ export default function ServicePricesPage() {
     : "מזכירת חווה מארחת";
 
   return (
-    <AppLayout
+    <SecretaryLayout
       userName={userName}
       subtitle={subtitle}
       menuItems={secretaryGeneralMenu}
@@ -117,6 +117,6 @@ export default function ServicePricesPage() {
         message={page.toast.message}
         onClose={page.closeToast}
       />
-    </AppLayout>
+    </SecretaryLayout>
   );
 }

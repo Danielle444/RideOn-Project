@@ -8,6 +8,7 @@ import AdminProfileScreen from "../screens/roles/admin/screens/AdminProfileScree
 import PayerHomeScreen from "../screens/roles/payer/screens/PayerHomeScreen";
 import PayerCompetitionsBoardScreen from "../screens/roles/payer/screens/PayerCompetitionsBoardScreen";
 import WorkerShavingsOrdersScreen from "../screens/roles/worker/screens/WorkerShavingsOrdersScreen";
+import GuardedScreen from "./GuardedScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -42,17 +43,29 @@ export default function AppNavigator(props) {
 
       <Stack.Screen name="AdminHome">
         {function (screenProps) {
-          return <AdminHomeScreen {...screenProps} onLogout={props.onLogout} />;
+          return (
+            <GuardedScreen
+              navigation={screenProps.navigation}
+              allowedRoles={["אדמין חווה"]}
+            >
+              <AdminHomeScreen {...screenProps} onLogout={props.onLogout} />
+            </GuardedScreen>
+          );
         }}
       </Stack.Screen>
 
       <Stack.Screen name="AdminCompetitionsBoard">
         {function (screenProps) {
           return (
-            <AdminCompetitionsBoardScreen
-              {...screenProps}
-              onLogout={props.onLogout}
-            />
+            <GuardedScreen
+              navigation={screenProps.navigation}
+              allowedRoles={["אדמין חווה"]}
+            >
+              <AdminCompetitionsBoardScreen
+                {...screenProps}
+                onLogout={props.onLogout}
+              />
+            </GuardedScreen>
           );
         }}
       </Stack.Screen>
@@ -60,24 +73,44 @@ export default function AppNavigator(props) {
       <Stack.Screen name="AdminProfile">
         {function (screenProps) {
           return (
-            <AdminProfileScreen {...screenProps} onLogout={props.onLogout} />
+            <GuardedScreen
+              navigation={screenProps.navigation}
+              allowedRoles={["אדמין חווה"]}
+            >
+              <AdminProfileScreen
+                {...screenProps}
+                onLogout={props.onLogout}
+              />
+            </GuardedScreen>
           );
         }}
       </Stack.Screen>
 
       <Stack.Screen name="PayerHome">
         {function (screenProps) {
-          return <PayerHomeScreen {...screenProps} onLogout={props.onLogout} />;
+          return (
+            <GuardedScreen
+              navigation={screenProps.navigation}
+              allowedRoles={["משלם"]}
+            >
+              <PayerHomeScreen {...screenProps} onLogout={props.onLogout} />
+            </GuardedScreen>
+          );
         }}
       </Stack.Screen>
 
       <Stack.Screen name="PayerCompetitionsBoard">
         {function (screenProps) {
           return (
-            <PayerCompetitionsBoardScreen
-              {...screenProps}
-              onLogout={props.onLogout}
-            />
+            <GuardedScreen
+              navigation={screenProps.navigation}
+              allowedRoles={["משלם"]}
+            >
+              <PayerCompetitionsBoardScreen
+                {...screenProps}
+                onLogout={props.onLogout}
+              />
+            </GuardedScreen>
           );
         }}
       </Stack.Screen>
@@ -85,10 +118,15 @@ export default function AppNavigator(props) {
       <Stack.Screen name="WorkerShavingsOrders">
         {function (screenProps) {
           return (
-            <WorkerShavingsOrdersScreen
-              {...screenProps}
-              onLogout={props.onLogout}
-            />
+            <GuardedScreen
+              navigation={screenProps.navigation}
+              allowedRoles={["עובד חווה"]}
+            >
+              <WorkerShavingsOrdersScreen
+                {...screenProps}
+                onLogout={props.onLogout}
+              />
+            </GuardedScreen>
           );
         }}
       </Stack.Screen>

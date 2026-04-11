@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useUser } from "../../context/UserContext";
 import AppLayout from "../layout/AppLayout";
 import superUserMenu from "./superUserMenu";
@@ -17,9 +17,16 @@ export default function SuperUserLayout(props) {
   });
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
-  function handleNavigate(key) {
-    navigate("/superuser/" + key);
-  }
+  useEffect(
+    function () {
+      if (!user || user.userType !== "superUser") {
+        return;
+      }
+
+      loadPendingRequestsCount();
+    },
+    [user],
+  );
 
   async function loadPendingRequestsCount() {
     try {
@@ -43,39 +50,42 @@ export default function SuperUserLayout(props) {
     }
   }
 
-  useEffect(function () {
-    loadPendingRequestsCount();
-  }, []);
+  const notificationItems = useMemo(
+    function () {
+      const items = [];
 
-  const notificationItems = useMemo(function () {
-    const items = [];
+      if (pendingCounts.admin > 0) {
+        items.push({
+          key: "admin",
+          title: `${pendingCounts.admin} בקשות אדמין ממתינות`,
+          subtitle: "לחצי למעבר לבקשות אדמין",
+        });
+      }
 
-    if (pendingCounts.admin > 0) {
-      items.push({
-        key: "admin",
-        title: `${pendingCounts.admin} בקשות אדמין ממתינות`,
-        subtitle: "לחצי למעבר לבקשות אדמין",
-      });
-    }
+      if (pendingCounts.secretary > 0) {
+        items.push({
+          key: "secretary",
+          title: `${pendingCounts.secretary} בקשות מזכירה ממתינות`,
+          subtitle: "לחצי למעבר לבקשות מזכירה",
+        });
+      }
 
-    if (pendingCounts.secretary > 0) {
-      items.push({
-        key: "secretary",
-        title: `${pendingCounts.secretary} בקשות מזכירה ממתינות`,
-        subtitle: "לחצי למעבר לבקשות מזכירה",
-      });
-    }
+      if (pendingCounts.ranch > 0) {
+        items.push({
+          key: "ranch",
+          title: `${pendingCounts.ranch} בקשות חווה ממתינות`,
+          subtitle: "לחצי למעבר לבקשות חוות",
+        });
+      }
 
-    if (pendingCounts.ranch > 0) {
-      items.push({
-        key: "ranch",
-        title: `${pendingCounts.ranch} בקשות חווה ממתינות`,
-        subtitle: "לחצי למעבר לבקשות חוות",
-      });
-    }
+      return items;
+    },
+    [pendingCounts],
+  );
 
-    return items;
-  }, [pendingCounts]);
+  function handleNavigate(key) {
+    navigate("/superuser/" + key);
+  }
 
   function handleNotificationsClick() {
     setNotificationsOpen(function (prev) {
@@ -88,9 +98,17 @@ export default function SuperUserLayout(props) {
     navigate(`/superuser/requests?tab=${tabKey}`);
   }
 
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.userType !== "superUser") {
+    return <Navigate to="/select-ranch" replace />;
+  }
+
   return (
     <AppLayout
-      userName={user?.email || ""}
+      userName={user.email || ""}
       subtitle="מנהל מערכת"
       menuItems={superUserMenu}
       activeItemKey={props.activeItemKey}

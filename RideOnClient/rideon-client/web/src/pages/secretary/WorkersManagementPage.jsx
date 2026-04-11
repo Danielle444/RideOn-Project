@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Check, X, Pencil, Trash2 } from "lucide-react";
-import AppLayout from "../../components/layout/AppLayout";
+import SecretaryLayout from "../../components/secretary/SecretaryLayout";
 import secretaryGeneralMenu from "../../components/secretary/secretaryGeneralMenu";
 import ToastMessage from "../../components/common/ToastMessage";
+import ConfirmDialog from "../../components/superuser/ConfirmDialog";
 import { useUser } from "../../context/UserContext";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import { getSecretaryDisplayName } from "../../utils/secretaryDisplay.utils";
@@ -13,6 +13,9 @@ import {
   updateWorkerRoleStatus,
   removeWorkerAssignment,
 } from "../../services/workerService";
+import WorkersFiltersBar from "../../components/secretary/workers/WorkersFiltersBar";
+import WorkersTable from "../../components/secretary/workers/WorkersTable";
+import EditWorkerModal from "../../components/secretary/workers/EditWorkerModal";
 
 export default function WorkersManagementPage() {
   const userContext = useUser();
@@ -86,7 +89,7 @@ export default function WorkersManagementPage() {
     try {
       setLoading(true);
 
-      var response = await getWorkersByRanch({
+      const response = await getWorkersByRanch({
         ranchId: currentRanchId,
         status: statusFilter || null,
         search: search || null,
@@ -159,7 +162,7 @@ export default function WorkersManagementPage() {
   }
 
   async function handleApprove(item) {
-    var actionKey = getActionKey(item, "approve");
+    const actionKey = getActionKey(item, "approve");
 
     try {
       setActionLoadingKey(actionKey);
@@ -181,7 +184,7 @@ export default function WorkersManagementPage() {
   }
 
   async function handleReject(item) {
-    var actionKey = getActionKey(item, "reject");
+    const actionKey = getActionKey(item, "reject");
 
     try {
       setActionLoadingKey(actionKey);
@@ -229,7 +232,7 @@ export default function WorkersManagementPage() {
       "הסרת שיוך עובד",
       "האם את בטוחה שברצונך להסיר את השיוך של העובד מהחווה הפעילה? הפעולה לא תמחק את האדם מהמערכת.",
       async function () {
-        var actionKey = getActionKey(item, "remove");
+        const actionKey = getActionKey(item, "remove");
 
         try {
           closeConfirmDialog();
@@ -254,8 +257,8 @@ export default function WorkersManagementPage() {
 
   async function handleOpenEdit(item) {
     try {
-      var response = await getWorkerById(item.personId, item.ranchId);
-      var worker = response.data;
+      const response = await getWorkerById(item.personId, item.ranchId);
+      const worker = response.data;
 
       setEditingWorker(worker);
       setEditForm({
@@ -322,65 +325,19 @@ export default function WorkersManagementPage() {
     }
   }
 
-  function renderStatusPill(roleStatus) {
-    if (roleStatus === "Approved") {
-      return (
-        <span className="inline-flex rounded-full border border-[#CFE6D8] bg-[#F7FBF8] px-3 py-1 text-sm font-semibold text-[#2F6F4F]">
-          מאושר
-        </span>
-      );
-    }
-
-    if (roleStatus === "Pending") {
-      return (
-        <span className="inline-flex rounded-full border border-[#E9D8B5] bg-[#FFF9ED] px-3 py-1 text-sm font-semibold text-[#9A6A00]">
-          ממתין
-        </span>
-      );
-    }
-
-    if (roleStatus === "Rejected") {
-      return (
-        <span className="inline-flex rounded-full border border-[#E1D6D0] bg-[#FAF7F5] px-3 py-1 text-sm font-semibold text-[#8A7268]">
-          נדחה
-        </span>
-      );
-    }
-
-    return (
-      <span className="inline-flex rounded-full border border-[#E1D6D0] bg-[#FAF7F5] px-3 py-1 text-sm font-semibold text-[#8A7268]">
-        {roleStatus || "לא ידוע"}
-      </span>
-    );
-  }
-
-  function renderActionButton(config) {
-    return (
-      <button
-        type="button"
-        disabled={config.disabled}
-        onClick={config.onClick}
-        className={
-          "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors disabled:opacity-60 " +
-          config.className
-        }
-      >
-        {config.icon}
-        {config.label}
-      </button>
-    );
-  }
-
   if (!activeRole) {
     return null;
   }
 
   return (
-    <AppLayout
+    <SecretaryLayout
       userName={userName}
       subtitle={subtitle}
       menuItems={secretaryGeneralMenu}
       activeItemKey="workers-management"
+      notificationCount={0}
+      notificationsOpen={false}
+      notificationItems={[]}
     >
       <div className="rounded-[28px] border border-[#E6DCD5] bg-white shadow-sm overflow-hidden">
         <div className="px-8 pt-8 pb-6 border-b border-[#EFE5DF]">
@@ -388,373 +345,49 @@ export default function WorkersManagementPage() {
             ניהול עובדים
           </h1>
 
-          <div className="mt-8 flex flex-wrap items-center justify-start gap-3 rounded-2xl bg-[#FBF8F6] border border-[#ECE2DC] px-4 py-4">
-            <select
-              value={statusFilter}
-              onChange={function (e) {
-                setStatusFilter(e.target.value);
-              }}
-              className="h-11 min-w-[160px] rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-            >
-              <option value="">כל הסטטוסים</option>
-              <option value="Pending">ממתינים</option>
-              <option value="Approved">מאושרים</option>
-              <option value="Rejected">נדחו</option>
-            </select>
-
-            <div className="relative">
-              <input
-                type="text"
-                value={searchInput}
-                onChange={function (e) {
-                  setSearchInput(e.target.value);
-                }}
-                onKeyDown={function (e) {
-                  if (e.key === "Enter") {
-                    handleSearchClick();
-                  }
-                }}
-                placeholder="חיפוש לפי שם, ת״ז, אימייל, טלפון או שם משתמש"
-                className="w-[360px] h-11 rounded-xl border border-[#D8CBC3] bg-white pr-11 pl-4 text-[#3F312B] placeholder:text-[#A08D84] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-              />
-              <Search
-                size={17}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8E786E]"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSearchClick}
-              className="h-11 px-5 rounded-xl bg-[#8B6352] text-white font-semibold shadow-sm hover:bg-[#7A5547] transition-colors"
-            >
-              חפש
-            </button>
-
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="h-11 px-5 rounded-xl border border-[#D8CBC3] bg-white text-[#5D4037] font-semibold shadow-sm hover:bg-[#F8F5F2] transition-colors"
-            >
-              איפוס
-            </button>
-          </div>
+          <WorkersFiltersBar
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            searchInput={searchInput}
+            onSearchInputChange={setSearchInput}
+            onSearch={handleSearchClick}
+            onReset={handleResetFilters}
+          />
         </div>
 
         <div className="px-6 pb-4">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px] text-right">
-              <thead>
-                <tr className="bg-[#FAF7F5] border-b border-[#E8DDD6] text-[#6A5248] text-sm">
-                  <th className="px-5 py-4 font-bold">שם</th>
-                  <th className="px-5 py-4 font-bold">ת"ז</th>
-                  <th className="px-5 py-4 font-bold">אימייל</th>
-                  <th className="px-5 py-4 font-bold">טלפון</th>
-                  <th className="px-5 py-4 font-bold">שם משתמש</th>
-                  <th className="px-5 py-4 font-bold">סטטוס</th>
-                  <th className="px-5 py-4 font-bold text-center">פעולות</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="px-5 py-12 text-center text-[#8A7268]"
-                    >
-                      טוענת עובדים...
-                    </td>
-                  </tr>
-                ) : null}
-
-                {!loading && workers.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="px-5 py-12 text-center text-[#8A7268]"
-                    >
-                      לא נמצאו עובדים להצגה
-                    </td>
-                  </tr>
-                ) : null}
-
-                {!loading &&
-                  workers.map(function (item, index) {
-                    var currentStatus = item.roleStatus;
-                    var editLoading = actionLoadingKey === getActionKey(item, "edit");
-                    var approveLoading =
-                      actionLoadingKey === getActionKey(item, "approve");
-                    var rejectLoading =
-                      actionLoadingKey === getActionKey(item, "reject");
-                    var removeLoading =
-                      actionLoadingKey === getActionKey(item, "remove");
-
-                    return (
-                      <tr
-                        key={getWorkerRowKey(item)}
-                        className={
-                          "border-b border-[#F1E8E3] text-[#3F312B] transition-colors hover:bg-[#FCFAF8] " +
-                          (index % 2 === 0 ? "bg-white" : "bg-[#FFFEFD]")
-                        }
-                      >
-                        <td className="px-5 py-5 font-medium">{item.fullName}</td>
-                        <td className="px-5 py-5">{item.nationalId}</td>
-                        <td className="px-5 py-5">{item.email || "-"}</td>
-                        <td className="px-5 py-5">{item.cellPhone || "-"}</td>
-                        <td className="px-5 py-5">{item.username || "-"}</td>
-                        <td className="px-5 py-5">
-                          {renderStatusPill(currentStatus)}
-                        </td>
-                        <td className="px-5 py-5">
-                          <div className="flex items-center justify-center gap-2 flex-wrap">
-                            {renderActionButton({
-                              label: "עריכה",
-                              icon: <Pencil size={15} />,
-                              disabled: editLoading,
-                              onClick: function () {
-                                handleOpenEdit(item);
-                              },
-                              className:
-                                "border border-[#D8CBC3] bg-white text-[#5D4037] hover:bg-[#F8F5F2]",
-                            })}
-
-                            {currentStatus === "Pending"
-                              ? renderActionButton({
-                                  label: "אישור",
-                                  icon: <Check size={15} />,
-                                  disabled: approveLoading,
-                                  onClick: function () {
-                                    handleApprove(item);
-                                  },
-                                  className:
-                                    "bg-[#E8F3EC] text-[#2F6F4F] hover:bg-[#DCEEE3]",
-                                })
-                              : null}
-
-                            {currentStatus === "Pending"
-                              ? renderActionButton({
-                                  label: "דחייה",
-                                  icon: <X size={15} />,
-                                  disabled: rejectLoading,
-                                  onClick: function () {
-                                    handleReject(item);
-                                  },
-                                  className:
-                                    "bg-[#FBEAEA] text-[#A14A4A] hover:bg-[#F5DEDE]",
-                                })
-                              : null}
-
-                            {currentStatus === "Approved"
-                              ? renderActionButton({
-                                  label: "ביטול אישור",
-                                  icon: <X size={15} />,
-                                  disabled: rejectLoading,
-                                  onClick: function () {
-                                    handleUndoApprove(item);
-                                  },
-                                  className:
-                                    "bg-[#FBEAEA] text-[#A14A4A] hover:bg-[#F5DEDE]",
-                                })
-                              : null}
-
-                            {currentStatus === "Rejected"
-                              ? renderActionButton({
-                                  label: "אישור מחדש",
-                                  icon: <Check size={15} />,
-                                  disabled: approveLoading,
-                                  onClick: function () {
-                                    handleApproveRejected(item);
-                                  },
-                                  className:
-                                    "bg-[#E8F3EC] text-[#2F6F4F] hover:bg-[#DCEEE3]",
-                                })
-                              : null}
-
-                            {renderActionButton({
-                              label: "הסרת שיוך",
-                              icon: <Trash2 size={15} />,
-                              disabled: removeLoading,
-                              onClick: function () {
-                                handleRemoveAssignment(item);
-                              },
-                              className:
-                                "bg-[#F6F1EE] text-[#8B6352] hover:bg-[#EEE5E0]",
-                            })}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
+          <WorkersTable
+            workers={workers}
+            loading={loading}
+            actionLoadingKey={actionLoadingKey}
+            getActionKey={getActionKey}
+            onEdit={handleOpenEdit}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onUndoApprove={handleUndoApprove}
+            onApproveRejected={handleApproveRejected}
+            onRemoveAssignment={handleRemoveAssignment}
+          />
         </div>
       </div>
 
-      {editModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-          <div className="w-full max-w-[760px] rounded-[28px] border border-[#E6DCD5] bg-white shadow-xl overflow-hidden">
-            <div className="px-6 py-5 border-b border-[#EFE5DF] flex items-center justify-between gap-4">
-              <div className="text-right">
-                <h3 className="text-xl font-bold text-[#3F312B]">
-                  עריכת פרטי עובד
-                </h3>
-                <p className="mt-1 text-sm text-[#8A7268]">
-                  עדכון פרטי העובד המשויך לחווה הפעילה
-                </p>
-              </div>
+      <EditWorkerModal
+        isOpen={editModalOpen}
+        editingWorker={editingWorker}
+        editForm={editForm}
+        editSaving={editSaving}
+        onClose={closeEditModal}
+        onChangeField={handleEditFieldChange}
+        onSave={handleSaveEdit}
+      />
 
-              <button
-                type="button"
-                onClick={closeEditModal}
-                className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[#F8F5F2] text-[#7B5A4D]"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="rounded-2xl border border-[#E7DCD5] bg-white px-4 py-3">
-                  <label className="text-sm font-semibold text-[#7B5A4D]">
-                    שם פרטי
-                  </label>
-                  <input
-                    value={editForm.firstName}
-                    onChange={function (e) {
-                      handleEditFieldChange("firstName", e.target.value);
-                    }}
-                    className="mt-2 h-10 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-right text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-[#E7DCD5] bg-white px-4 py-3">
-                  <label className="text-sm font-semibold text-[#7B5A4D]">
-                    שם משפחה
-                  </label>
-                  <input
-                    value={editForm.lastName}
-                    onChange={function (e) {
-                      handleEditFieldChange("lastName", e.target.value);
-                    }}
-                    className="mt-2 h-10 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-right text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-[#E7DCD5] bg-white px-4 py-3">
-                  <label className="text-sm font-semibold text-[#7B5A4D]">
-                    טלפון
-                  </label>
-                  <input
-                    value={editForm.cellPhone}
-                    onChange={function (e) {
-                      handleEditFieldChange("cellPhone", e.target.value);
-                    }}
-                    className="mt-2 h-10 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-right text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-[#E7DCD5] bg-white px-4 py-3">
-                  <label className="text-sm font-semibold text-[#7B5A4D]">
-                    אימייל
-                  </label>
-                  <input
-                    value={editForm.email}
-                    onChange={function (e) {
-                      handleEditFieldChange("email", e.target.value);
-                    }}
-                    className="mt-2 h-10 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-right text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-[#E7DCD5] bg-white px-4 py-3">
-                  <label className="text-sm font-semibold text-[#7B5A4D]">
-                    מגדר
-                  </label>
-                  <input
-                    value={editForm.gender}
-                    onChange={function (e) {
-                      handleEditFieldChange("gender", e.target.value);
-                    }}
-                    className="mt-2 h-10 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-right text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-[#E7DCD5] bg-[#F8F5F2] px-4 py-3">
-                  <label className="text-sm font-semibold text-[#7B5A4D]">
-                    שם משתמש
-                  </label>
-                  <input
-                    value={editingWorker?.username || ""}
-                    disabled={true}
-                    className="mt-2 h-10 w-full rounded-xl border border-[#E1D6D0] bg-[#F3ECE8] px-4 text-right text-[#8A7268] shadow-sm cursor-not-allowed"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-wrap justify-start gap-3">
-                <button
-                  type="button"
-                  onClick={handleSaveEdit}
-                  disabled={editSaving}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-[#7B5A4D] px-5 py-2.5 text-white font-semibold shadow-sm hover:bg-[#6B4D42] disabled:opacity-60"
-                >
-                  {editSaving ? "שומרת..." : "שמירת שינויים"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={closeEditModal}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-[#D8CBC3] bg-white px-4 py-2.5 text-[#5D4037] font-semibold hover:bg-[#F8F5F2]"
-                >
-                  ביטול
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {confirmDialog.isOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-          <div className="w-full max-w-[520px] rounded-[28px] border border-[#E6DCD5] bg-white shadow-xl overflow-hidden">
-            <div className="px-6 py-5 border-b border-[#EFE5DF]">
-              <h3 className="text-xl font-bold text-[#3F312B] text-right">
-                {confirmDialog.title}
-              </h3>
-            </div>
-
-            <div className="px-6 py-6">
-              <p className="text-right text-[#6D4C41] leading-7">
-                {confirmDialog.message}
-              </p>
-
-              <div className="mt-6 flex flex-wrap justify-start gap-3">
-                <button
-                  type="button"
-                  onClick={function () {
-                    if (confirmDialog.onConfirm) {
-                      confirmDialog.onConfirm();
-                    }
-                  }}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-[#7B5A4D] px-5 py-2.5 text-white font-semibold shadow-sm hover:bg-[#6B4D42]"
-                >
-                  אישור
-                </button>
-
-                <button
-                  type="button"
-                  onClick={closeConfirmDialog}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-[#D8CBC3] bg-white px-4 py-2.5 text-[#5D4037] font-semibold hover:bg-[#F8F5F2]"
-                >
-                  ביטול
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onCancel={closeConfirmDialog}
+        onConfirm={confirmDialog.onConfirm}
+      />
 
       <ToastMessage
         isOpen={toast.isOpen}
@@ -762,6 +395,6 @@ export default function WorkersManagementPage() {
         message={toast.message}
         onClose={closeToast}
       />
-    </AppLayout>
+    </SecretaryLayout>
   );
 }

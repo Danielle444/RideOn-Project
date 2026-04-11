@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
+using RideOnServer.BL.DTOs.Auth;
 using RideOnServer.DAL;
 
 namespace RideOnServer.Controllers
@@ -15,8 +16,14 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 PatternDAL dal = new PatternDAL();
                 return Ok(dal.GetAllPatterns());
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -30,8 +37,32 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                if (UserAccessValidator.IsSuperUser(User))
+                {
+                    PatternDAL superUserDal = new PatternDAL();
+                    return Ok(superUserDal.GetAllPatternsWithManeuvers());
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                List<ApprovedRoleRanch> approvedRoles =
+                    SystemUser.GetApprovedPersonRanchesAndRoles(personId);
+
+                bool hasSecretaryRole = approvedRoles.Any(item =>
+                    !string.IsNullOrWhiteSpace(item.RoleName) &&
+                    item.RoleName.Trim().Equals(RoleNames.HostSecretary, StringComparison.OrdinalIgnoreCase));
+
+                if (!hasSecretaryRole)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לצפות בפטרנים");
+                }
+
                 PatternDAL dal = new PatternDAL();
                 return Ok(dal.GetAllPatternsWithManeuvers());
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -45,9 +76,15 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 PatternDAL dal = new PatternDAL();
                 dal.InsertPattern(pattern.PatternNumber);
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -61,9 +98,15 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 PatternDAL dal = new PatternDAL();
                 dal.UpdatePattern(request.OldPatternNumber, request.NewPatternNumber);
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -77,9 +120,15 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 PatternDAL dal = new PatternDAL();
                 dal.DeletePattern(patternNumber);
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {

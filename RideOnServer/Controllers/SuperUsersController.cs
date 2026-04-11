@@ -1,8 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
-using System.Security.Claims;
-using System.Collections.Generic;
 using RideOnServer.BL.DTOs.Auth;
 using RideOnServer.BL.DTOs.Auth.SuperUser;
 
@@ -56,12 +54,7 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                string? userType = User.Claims.FirstOrDefault(c => c.Type == "UserType")?.Value;
-
-                if (userType != "SuperUser")
-                {
-                    return Forbid("Only super users can create new super users");
-                }
+                UserAccessValidator.EnsureSuperUser(User);
 
                 int newSuperUserId = SuperUser.CreateSuperUser(request.Email, request.Password);
 
@@ -70,6 +63,10 @@ namespace RideOnServer.Controllers
                     SuperUserId = newSuperUserId,
                     Message = "Super user created successfully"
                 });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -83,25 +80,17 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                string? userType = User.Claims.FirstOrDefault(c => c.Type == "UserType")?.Value;
+                UserAccessValidator.EnsureSuperUser(User);
 
-                if (userType != "SuperUser")
-                {
-                    return Forbid("Only super users can change password here");
-                }
-
-                string? superUserIdClaim = User.Claims.FirstOrDefault(c => c.Type == "SuperUserId")?.Value;
-
-                if (string.IsNullOrWhiteSpace(superUserIdClaim))
-                {
-                    return Unauthorized("SuperUserId claim is missing");
-                }
-
-                int superUserId = int.Parse(superUserIdClaim);
+                int superUserId = UserAccessValidator.GetSuperUserIdFromClaims(User);
 
                 SuperUser.ChangePassword(superUserId, request.CurrentPassword, request.NewPassword);
 
                 return Ok("Password changed successfully");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -115,21 +104,9 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                string? userType = User.Claims.FirstOrDefault(c => c.Type == "UserType")?.Value;
+                UserAccessValidator.EnsureSuperUser(User);
 
-                if (userType != "SuperUser")
-                {
-                    return Forbid("Only super users can access this endpoint");
-                }
-
-                string? superUserIdClaim = User.Claims.FirstOrDefault(c => c.Type == "SuperUserId")?.Value;
-
-                if (string.IsNullOrWhiteSpace(superUserIdClaim))
-                {
-                    return Unauthorized("SuperUserId claim is missing");
-                }
-
-                int superUserId = int.Parse(superUserIdClaim);
+                int superUserId = UserAccessValidator.GetSuperUserIdFromClaims(User);
 
                 SuperUser? superUser = SuperUser.GetSuperUserById(superUserId);
 
@@ -146,6 +123,10 @@ namespace RideOnServer.Controllers
                     superUser.MustChangePassword
                 });
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
             catch (Exception ex)
             {
                 return BadRequest(ex.Message);
@@ -158,15 +139,14 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                string? userType = User.Claims.FirstOrDefault(c => c.Type == "UserType")?.Value;
-
-                if (userType != "SuperUser")
-                {
-                    return Forbid("Only super users can access this endpoint");
-                }
+                UserAccessValidator.EnsureSuperUser(User);
 
                 var list = SuperUser.GetRoleRequests(roleId, status, search);
                 return Ok(list);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -180,15 +160,14 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                string? userType = User.Claims.FirstOrDefault(c => c.Type == "UserType")?.Value;
-
-                if (userType != "SuperUser")
-                {
-                    return Forbid("Only super users can access this endpoint");
-                }
+                UserAccessValidator.EnsureSuperUser(User);
 
                 var list = SuperUser.GetNewRanchRequests(status, search);
                 return Ok(list);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -202,12 +181,7 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                string? userType = User.Claims.FirstOrDefault(c => c.Type == "UserType")?.Value;
-
-                if (userType != "SuperUser")
-                {
-                    return Forbid("Only super users can update role requests");
-                }
+                UserAccessValidator.EnsureSuperUser(User);
 
                 SuperUser.UpdateRoleRequestStatus(
                     request.PersonId,
@@ -217,6 +191,10 @@ namespace RideOnServer.Controllers
                 );
 
                 return Ok("Role request status updated successfully");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -230,21 +208,9 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                string? userType = User.Claims.FirstOrDefault(c => c.Type == "UserType")?.Value;
+                UserAccessValidator.EnsureSuperUser(User);
 
-                if (userType != "SuperUser")
-                {
-                    return Forbid("Only super users can update ranch requests");
-                }
-
-                string? superUserIdClaim = User.Claims.FirstOrDefault(c => c.Type == "SuperUserId")?.Value;
-
-                if (string.IsNullOrWhiteSpace(superUserIdClaim))
-                {
-                    return Unauthorized("SuperUserId claim is missing");
-                }
-
-                int superUserId = int.Parse(superUserIdClaim);
+                int superUserId = UserAccessValidator.GetSuperUserIdFromClaims(User);
 
                 if (request.ResolvedBySuperUserId != 0 && request.ResolvedBySuperUserId != superUserId)
                 {
@@ -259,6 +225,10 @@ namespace RideOnServer.Controllers
 
                 return Ok("New ranch request status updated successfully");
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
             catch (Exception ex)
             {
                 return BadRequest(ex.Message);
@@ -271,22 +241,19 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                string? userType = User.Claims.FirstOrDefault(c => c.Type == "UserType")?.Value;
-
-                if (userType != "SuperUser")
-                {
-                    return Forbid("Only super users can access this endpoint");
-                }
+                UserAccessValidator.EnsureSuperUser(User);
 
                 List<SuperUserListItem> list = SuperUser.GetAllSuperUsers();
                 return Ok(list);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
                 return BadRequest(ex.Message);
             }
         }
-
-
     }
 }

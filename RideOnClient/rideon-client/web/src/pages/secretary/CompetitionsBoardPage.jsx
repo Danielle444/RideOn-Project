@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import AppLayout from "../../components/layout/AppLayout";
+import SecretaryLayout from "../../components/secretary/SecretaryLayout";
 import secretaryGeneralMenu from "../../components/secretary/secretaryGeneralMenu";
 import CompetitionsSearchBar from "../../components/secretary/CompetitionsSearchBar";
 import CompetitionsTable from "../../components/secretary/CompetitionsTable";
@@ -41,6 +41,7 @@ export default function CompetitionsBoardPage() {
   });
 
   const userName = ((user?.firstName || "") + " " + (user?.lastName || "")).trim();
+
   const subtitle =
     [activeRole?.roleName, activeRole?.ranchName].filter(Boolean).join(" · ") ||
     "לא נבחר תפקיד וחווה";
@@ -144,23 +145,14 @@ export default function CompetitionsBoardPage() {
   function handleSort(columnKey) {
     setSortConfig(function (prev) {
       if (prev.key !== columnKey) {
-        return {
-          key: columnKey,
-          direction: "asc",
-        };
+        return { key: columnKey, direction: "asc" };
       }
 
       if (prev.direction === "asc") {
-        return {
-          key: columnKey,
-          direction: "desc",
-        };
+        return { key: columnKey, direction: "desc" };
       }
 
-      return {
-        key: "competitionStartDate",
-        direction: "desc",
-      };
+      return { key: "competitionStartDate", direction: "desc" };
     });
   }
 
@@ -243,14 +235,8 @@ export default function CompetitionsBoardPage() {
           bValue = (bValue || "").toString().toLowerCase();
         }
 
-        if (aValue < bValue) {
-          return -1 * direction;
-        }
-
-        if (aValue > bValue) {
-          return 1 * direction;
-        }
-
+        if (aValue < bValue) return -1 * direction;
+        if (aValue > bValue) return 1 * direction;
         return 0;
       });
 
@@ -264,11 +250,14 @@ export default function CompetitionsBoardPage() {
   }
 
   return (
-    <AppLayout
+    <SecretaryLayout
       userName={userName}
       subtitle={subtitle}
       menuItems={secretaryGeneralMenu}
       activeItemKey="competitions-board"
+      notificationCount={0}
+      notificationsOpen={false}
+      notificationItems={[]}
     >
       <div className="overflow-hidden rounded-[28px] border border-[#E6DCD5] bg-white shadow-sm">
         <div className="border-b border-[#EFE5DF] px-8 py-7">
@@ -325,6 +314,6 @@ export default function CompetitionsBoardPage() {
         message={toast.message}
         onClose={closeToast}
       />
-    </AppLayout>
+    </SecretaryLayout>
   );
 }

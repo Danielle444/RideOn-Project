@@ -19,6 +19,7 @@ namespace RideOnServer.BL
             return dal.GetSystemUserForLogin(username);
         }
 
+
         internal static SystemUser? Login(string username, string password)
         {
             SystemUser? systemUser = GetSystemUserForLogin(username);
@@ -169,7 +170,7 @@ namespace RideOnServer.BL
         {
             SystemUserDAL dal = new SystemUserDAL();
 
-            SystemUser? systemUser = GetSystemUserForLogin(request.Username);
+            SystemUser? systemUser = dal.GetSystemUserByPersonId(request.PersonId);
 
             if (systemUser == null)
             {
@@ -181,22 +182,18 @@ namespace RideOnServer.BL
                 throw new Exception("User is inactive");
             }
 
-            if (!PasswordHelper.VerifyPassword(request.CurrentPassword, systemUser.PasswordSalt, systemUser.PasswordHash))
+            if (!PasswordHelper.VerifyPassword(
+                request.CurrentPassword,
+                systemUser.PasswordSalt,
+                systemUser.PasswordHash))
             {
                 throw new Exception("Current password is incorrect");
             }
 
-            if (request.CurrentPassword == request.NewPassword)
-            {
-                throw new Exception("New password must be different from current password");
-            }
-
-            PasswordPolicyValidator.ValidateOrThrow(request.NewPassword);
-
             string newSalt = PasswordHelper.GenerateSalt();
             string newHash = PasswordHelper.HashPassword(request.NewPassword, newSalt);
 
-            dal.UpdateSystemUserPassword(systemUser.PersonId, newHash, newSalt);
+            dal.UpdateSystemUserPassword(request.PersonId, newHash, newSalt);
         }
 
         internal static void SetMustChangePassword(int systemUserId, bool mustChangePassword)
