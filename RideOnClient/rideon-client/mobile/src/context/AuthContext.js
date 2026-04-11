@@ -113,6 +113,11 @@ export function AuthProvider(props) {
 
       return { ok: true };
     } catch (err) {
+      if (err && err.isAuthError) {
+        await logout();
+        return { ok: false, message: "ההתחברות פגה, יש להתחבר מחדש" };
+      }
+
       return {
         ok: false,
         message: String(getApiErrorMessage(err, "שגיאה בהתחברות")),
@@ -141,6 +146,14 @@ export function AuthProvider(props) {
 
       return { ok: true };
     } catch (error) {
+      if (error && error.isAuthError) {
+        await logout();
+        return {
+          ok: false,
+          message: "ההתחברות פגה, יש להתחבר מחדש",
+        };
+      }
+
       return {
         ok: false,
         message: String(getApiErrorMessage(error, "שגיאה בהחלפת סיסמה")),
