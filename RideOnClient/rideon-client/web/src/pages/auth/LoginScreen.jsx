@@ -214,7 +214,7 @@ export default function LoginScreen() {
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
             <h3 className="mb-3 text-lg font-bold text-[#4E342E]">איפוס סיסמה</h3>
             <p className="mb-6 text-sm text-[#5D4037]">
-              לאיפוס הסיסמה ישלח קישור למייל הרשום שלך. להמשיך?
+              להמשך תהליך איפוס הסיסמה, תועבר למסך הבא. להמשיך?
             </p>
             <div className="flex gap-3 justify-end">
               <button

@@ -667,7 +667,7 @@ export default function RegisterScreen() {
                         <button
                           type="button"
                           onClick={handleSendOtp}
-                          disabled={otpLoading || !form.email}
+                          disabled={otpLoading || !form.email || emailLocked}
                           className="w-full rounded-xl border border-[#795548] py-2 text-sm text-[#795548] hover:bg-[#F5EDE8] disabled:opacity-50"
                         >
                           {otpLoading ? "שולח קוד..." : otpSent ? "שלח קוד חדש" : "שלח קוד אימות למייל"}
@@ -690,6 +690,7 @@ export default function RegisterScreen() {
                               className="w-full rounded-xl border border-[#D7CCC8] px-4 py-2 text-right focus:border-[#795548] focus:outline-none"
                               placeholder="הזן את הקוד שקיבלת במייל"
                               maxLength={6}
+                              autoComplete="one-time-code"
                             />
                           </div>
                         )}

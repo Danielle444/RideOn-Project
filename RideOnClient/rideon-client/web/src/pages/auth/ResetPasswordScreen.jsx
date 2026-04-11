@@ -30,11 +30,6 @@ export default function ResetPasswordScreen() {
       return;
     }
 
-    if (!token) {
-      setErrorMessage("קישור האיפוס אינו תקף");
-      return;
-    }
-
     setIsLoading(true);
 
     try {
@@ -56,6 +51,29 @@ export default function ResetPasswordScreen() {
         <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg text-center">
           <h2 className="mb-4 text-2xl font-bold text-[#4E342E]">הסיסמה אופסה בהצלחה</h2>
           <p className="text-[#5D4037]">מועבר למסך הכניסה...</p>
+          <span
+            onClick={function () { navigate("/login"); }}
+            className="cursor-pointer mt-4 block text-sm font-semibold text-[#795548] hover:underline"
+          >
+            לחץ כאן אם לא הועברת אוטומטית
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!token) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F5EDE8]" dir="rtl">
+        <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg text-center">
+          <h2 className="mb-4 text-2xl font-bold text-[#4E342E]">קישור לא תקף</h2>
+          <p className="text-[#5D4037] mb-6">קישור האיפוס חסר או אינו תקף. בקש קישור חדש.</p>
+          <span
+            onClick={function () { navigate("/forgot-password"); }}
+            className="cursor-pointer font-semibold text-[#795548] hover:underline text-sm"
+          >
+            לבקשת קישור חדש
+          </span>
         </div>
       </div>
     );
