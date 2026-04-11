@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.Profile;
 
@@ -36,13 +37,28 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [Authorize]
         [HttpGet("{ranchId}")]
         public IActionResult GetRanchById(int ranchId)
         {
             try
             {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary,
+                    RoleNames.RanchAdmin,
+                    RoleNames.RanchWorker
+                );
+
                 RanchProfile ranch = Ranch.GetRanchById(ranchId);
                 return Ok(ranch);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -50,6 +66,7 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [Authorize]
         [HttpPut("{ranchId}")]
         public IActionResult UpdateRanchProfile(int ranchId, [FromBody] UpdateRanchProfileRequest request)
         {
@@ -60,8 +77,21 @@ namespace RideOnServer.Controllers
 
             try
             {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary,
+                    RoleNames.RanchAdmin
+                );
+
                 Ranch.UpdateRanchProfile(request);
                 return Ok("Ranch profile updated successfully");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {

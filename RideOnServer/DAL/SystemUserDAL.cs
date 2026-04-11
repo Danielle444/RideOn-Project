@@ -49,6 +49,48 @@ namespace RideOnServer.DAL
             }
         }
 
+        public SystemUser? GetSystemUserByPersonId(int personId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@SystemUserId", personId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetSystemUserById", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return new SystemUser
+                            {
+                                PersonId = Convert.ToInt32(reader["SystemUserId"]),
+                                Username = reader["Username"].ToString()!,
+                                PasswordHash = reader["PasswordHash"].ToString()!,
+                                PasswordSalt = reader["PasswordSalt"].ToString()!,
+                                IsActive = Convert.ToBoolean(reader["IsActive"]),
+                                MustChangePassword = Convert.ToBoolean(reader["MustChangePassword"]),
+                                CreatedDate = Convert.ToDateTime(reader["CreatedDate"]),
+                                FirstName = reader["FirstName"].ToString()!,
+                                LastName = reader["LastName"].ToString()!
+                            };
+                        }
+
+                        return null;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
         public SystemUserProfile? GetSystemUserProfileById(int systemUserId)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>

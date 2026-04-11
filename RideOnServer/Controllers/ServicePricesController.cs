@@ -15,8 +15,22 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary,
+                    RoleNames.RanchAdmin,
+                    RoleNames.Payer
+                );
+
                 var list = ServicePriceManager.GetDashboard(ranchId);
                 return Ok(list);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -30,8 +44,20 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
                 int id = ServicePriceManager.CreateProduct(request);
                 return Ok(id);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -45,8 +71,20 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
                 ServicePriceManager.UpdateProduct(request);
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -56,12 +94,24 @@ namespace RideOnServer.Controllers
 
         [Authorize]
         [HttpDelete("products/{id}")]
-        public IActionResult DeleteProduct(short id)
+        public IActionResult DeleteProduct(short id, [FromQuery] int ranchId)
         {
             try
             {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
                 ServicePriceManager.DeleteProduct(id);
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -75,8 +125,20 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
                 ServicePriceManager.DeactivateProduct(id, ranchId);
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -90,8 +152,20 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
                 ServicePriceManager.ActivateProduct(id, ranchId);
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -105,8 +179,20 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
                 var list = ServicePriceManager.GetPriceHistory(id, ranchId);
                 return Ok(list);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -120,16 +206,25 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
                 ServicePriceManager.ActivateHistoryItem(catalogItemId, ranchId);
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
                 return BadRequest(ex.Message);
             }
         }
-
-
-
     }
 }

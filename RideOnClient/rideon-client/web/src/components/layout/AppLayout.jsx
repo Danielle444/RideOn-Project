@@ -16,7 +16,6 @@ export default function AppLayout(props) {
   function handleNotificationsClick() {
     if (props.onNotificationsClick) {
       props.onNotificationsClick();
-      return;
     }
   }
 

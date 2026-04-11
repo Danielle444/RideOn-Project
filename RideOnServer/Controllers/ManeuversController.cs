@@ -15,8 +15,14 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 ManeuverDAL dal = new ManeuverDAL();
                 return Ok(dal.GetAllManeuvers());
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -30,9 +36,15 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 ManeuverDAL dal = new ManeuverDAL();
                 short id = dal.InsertManeuver(maneuver.ManeuverName, maneuver.ManeuverDescription);
                 return Ok(id);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -46,9 +58,15 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 ManeuverDAL dal = new ManeuverDAL();
                 dal.UpdateManeuver(maneuver.ManeuverId, maneuver.ManeuverName, maneuver.ManeuverDescription);
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -62,9 +80,15 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 ManeuverDAL dal = new ManeuverDAL();
                 dal.DeleteManeuver(maneuverId);
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {

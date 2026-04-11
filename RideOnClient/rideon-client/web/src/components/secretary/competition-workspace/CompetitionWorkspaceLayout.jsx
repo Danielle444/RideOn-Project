@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import AppLayout from "../../layout/AppLayout";
+import SecretaryLayout from "../SecretaryLayout";
 import secretaryCompetitionMenu from "../secretaryCompetitionMenu";
 import { useUser } from "../../../context/UserContext";
 import { useActiveRole } from "../../../context/ActiveRoleContext";
@@ -109,13 +109,16 @@ export default function CompetitionWorkspaceLayout(props) {
   }
 
   return (
-    <AppLayout
+    <SecretaryLayout
       userName={userName}
       subtitle={subtitle}
       contextNote={activeCompetitionName}
       menuItems={secretaryCompetitionMenu}
       activeItemKey={props.activeItemKey}
       onNavigate={handleCompetitionMenuNavigate}
+      notificationCount={0}
+      notificationsOpen={false}
+      notificationItems={[]}
     >
       {typeof props.children === "function"
         ? props.children({
@@ -124,6 +127,6 @@ export default function CompetitionWorkspaceLayout(props) {
             setCurrentCompetition: updateCurrentCompetition,
           })
         : props.children}
-    </AppLayout>
+    </SecretaryLayout>
   );
 }

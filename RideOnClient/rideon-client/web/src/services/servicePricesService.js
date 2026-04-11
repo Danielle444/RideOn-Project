@@ -30,8 +30,11 @@ function updateServiceProduct(data) {
   return axios.put(`${API}/ServicePrices/products`, data, getAuthHeaders());
 }
 
-function deleteServiceProduct(id) {
-  return axios.delete(`${API}/ServicePrices/products/${id}`, getAuthHeaders());
+function deleteServiceProduct(id, ranchId) {
+  return axios.delete(`${API}/ServicePrices/products/${id}`, {
+    params: { ranchId },
+    ...getAuthHeaders(),
+  });
 }
 
 function deactivateServiceProduct(productId, ranchId) {

@@ -1,4 +1,4 @@
-import AppLayout from "../../components/layout/AppLayout";
+import SecretaryLayout from "../../components/secretary/SecretaryLayout";
 import secretaryGeneralMenu from "../../components/secretary/secretaryGeneralMenu";
 import ToastMessage from "../../components/common/ToastMessage";
 import CompetitionDetailsSection from "../../components/secretary/competition-form/CompetitionDetailsSection";
@@ -40,7 +40,7 @@ export default function CompetitionFormPage(props) {
   }
 
   return (
-    <AppLayout
+    <SecretaryLayout
       userName={userName}
       subtitle={subtitle}
       menuItems={secretaryGeneralMenu}
@@ -178,6 +178,6 @@ export default function CompetitionFormPage(props) {
         message={page.toast.message}
         onClose={page.closeToast}
       />
-    </AppLayout>
+    </SecretaryLayout>
   );
 }

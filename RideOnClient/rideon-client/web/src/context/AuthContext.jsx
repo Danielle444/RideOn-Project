@@ -164,7 +164,7 @@ export function AuthProvider({ children }) {
     try {
       const storedUser = getUser();
 
-      if (!storedUser || !storedUser.username) {
+      if (!storedUser || !storedUser.personId) {
         return {
           ok: false,
           message: "לא נמצאו פרטי משתמש. יש להתחבר מחדש.",
@@ -172,9 +172,9 @@ export function AuthProvider({ children }) {
       }
 
       await changePasswordRequest(
-        storedUser.username,
+        storedUser.personId,
         currentPassword,
-        newPassword
+        newPassword,
       );
 
       const updatedUser = {
@@ -202,7 +202,10 @@ export function AuthProvider({ children }) {
     }
   }
 
-  async function changeSuperUserPasswordAndRefresh(currentPassword, newPassword) {
+  async function changeSuperUserPasswordAndRefresh(
+    currentPassword,
+    newPassword,
+  ) {
     try {
       const storedUser = getUser();
 

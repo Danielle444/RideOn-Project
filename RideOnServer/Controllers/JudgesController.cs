@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
+using RideOnServer.BL.DTOs.Auth;
 using RideOnServer.BL.DTOs.Auth.SuperUser;
 
 namespace RideOnServer.Controllers
@@ -15,8 +16,32 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                if (UserAccessValidator.IsSuperUser(User))
+                {
+                    List<Judge> superUserList = Judge.GetAllJudges(fieldId);
+                    return Ok(superUserList);
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                List<ApprovedRoleRanch> approvedRoles =
+                    SystemUser.GetApprovedPersonRanchesAndRoles(personId);
+
+                bool hasSecretaryRole = approvedRoles.Any(item =>
+                    !string.IsNullOrWhiteSpace(item.RoleName) &&
+                    item.RoleName.Trim().Equals(RoleNames.HostSecretary, StringComparison.OrdinalIgnoreCase));
+
+                if (!hasSecretaryRole)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לצפות בשופטים");
+                }
+
                 List<Judge> list = Judge.GetAllJudges(fieldId);
                 return Ok(list);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -30,6 +55,23 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                if (!UserAccessValidator.IsSuperUser(User))
+                {
+                    int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                    List<ApprovedRoleRanch> approvedRoles =
+                        SystemUser.GetApprovedPersonRanchesAndRoles(personId);
+
+                    bool hasSecretaryRole = approvedRoles.Any(item =>
+                        !string.IsNullOrWhiteSpace(item.RoleName) &&
+                        item.RoleName.Trim().Equals(RoleNames.HostSecretary, StringComparison.OrdinalIgnoreCase));
+
+                    if (!hasSecretaryRole)
+                    {
+                        return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה ליצור שופט");
+                    }
+                }
+
                 int judgeId = Judge.CreateJudge(
                     request.FirstNameHebrew,
                     request.LastNameHebrew,
@@ -40,6 +82,10 @@ namespace RideOnServer.Controllers
                 );
 
                 return Ok(judgeId);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -53,6 +99,8 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 Judge.UpdateJudge(
                     request.JudgeId,
                     request.FirstNameHebrew,
@@ -64,6 +112,10 @@ namespace RideOnServer.Controllers
                 );
 
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -77,8 +129,14 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 Judge.DeleteJudge(id);
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {

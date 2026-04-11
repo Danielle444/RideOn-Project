@@ -15,8 +15,14 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 PatternManeuverDAL dal = new PatternManeuverDAL();
                 return Ok(dal.GetPatternManeuvers(patternNumber));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -30,9 +36,15 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 PatternManeuverDAL dal = new PatternManeuverDAL();
                 dal.ReplacePatternManeuvers(patternNumber, items ?? new List<PatternManeuver>());
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
