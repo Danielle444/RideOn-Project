@@ -1,8 +1,7 @@
 using Npgsql;
-using System.Data;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.Auth;
-using NpgsqlTypes;
+using RideOnServer.BL.DTOs.Profile;
 
 namespace RideOnServer.DAL
 {
@@ -44,7 +43,52 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public SystemUserProfile? GetSystemUserProfileById(int systemUserId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@SystemUserId", systemUserId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetSystemUserProfileById", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return new SystemUserProfile
+                            {
+                                PersonId = Convert.ToInt32(reader["PersonId"]),
+                                Username = reader["Username"].ToString()!,
+                                FirstName = reader["FirstName"].ToString()!,
+                                LastName = reader["LastName"].ToString()!,
+                                NationalId = reader["NationalId"].ToString()!,
+                                Gender = reader["Gender"] == DBNull.Value ? null : reader["Gender"].ToString(),
+                                DateOfBirth = reader["DateOfBirth"] == DBNull.Value ? null : Convert.ToDateTime(reader["DateOfBirth"]),
+                                CellPhone = reader["CellPhone"] == DBNull.Value ? null : reader["CellPhone"].ToString(),
+                                Email = reader["Email"] == DBNull.Value ? null : reader["Email"].ToString(),
+                                IsActive = Convert.ToBoolean(reader["IsActive"]),
+                                MustChangePassword = Convert.ToBoolean(reader["MustChangePassword"]),
+                                CreatedDate = Convert.ToDateTime(reader["CreatedDate"])
+                            };
+                        }
+
+                        return null;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -83,7 +127,77 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public List<UserProfileRole> GetPersonRanchesAndRoles(int personId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@PersonId", personId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetPersonRanchesAndRoles", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<UserProfileRole> profiles = new List<UserProfileRole>();
+
+                        while (reader.Read())
+                        {
+                            profiles.Add(new UserProfileRole
+                            {
+                                RanchId = Convert.ToInt32(reader["RanchId"]),
+                                RanchName = reader["RanchName"].ToString()!,
+                                RoleId = Convert.ToByte(reader["RoleId"]),
+                                RoleName = reader["RoleName"].ToString()!,
+                                RoleStatus = reader["RoleStatus"].ToString()!
+                            });
+                        }
+
+                        return profiles;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public void UpdateUserProfile(UpdateUserProfileRequest request)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@PersonId", request.PersonId },
+                { "@FirstName", request.FirstName },
+                { "@LastName", request.LastName },
+                { "@Gender", (object?)request.Gender ?? DBNull.Value },
+                { "@CellPhone", (object?)request.CellPhone ?? DBNull.Value },
+                { "@Email", (object?)request.Email ?? DBNull.Value }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdatePerson", connection, paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -109,7 +223,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -135,7 +249,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -163,7 +277,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -191,7 +305,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -218,7 +332,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -244,7 +358,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -317,7 +431,6 @@ namespace RideOnServer.DAL
             }
         }
 
-
         public int CreatePendingRanchRequest(CreateRanchRequest request)
         {
             try
@@ -334,14 +447,14 @@ namespace RideOnServer.DAL
                             int newRequestId;
 
                             Dictionary<string, object> ranchParamDic = new Dictionary<string, object>
-                    {
-                        { "@RanchName", request.RanchName },
-                        { "@ContactEmail", (object?)request.ContactEmail ?? DBNull.Value },
-                        { "@ContactPhone", (object?)request.ContactPhone ?? DBNull.Value },
-                        { "@WebsiteUrl", (object?)request.WebsiteUrl ?? DBNull.Value },
-                        { "@Lat", (object?)request.Latitude ?? DBNull.Value },
-                        { "@Long", (object?)request.Longitude ?? DBNull.Value }
-                    };
+                            {
+                                { "@RanchName", request.RanchName },
+                                { "@ContactEmail", (object?)request.ContactEmail ?? DBNull.Value },
+                                { "@ContactPhone", (object?)request.ContactPhone ?? DBNull.Value },
+                                { "@WebsiteUrl", (object?)request.WebsiteUrl ?? DBNull.Value },
+                                { "@Lat", (object?)request.Latitude ?? DBNull.Value },
+                                { "@Long", (object?)request.Longitude ?? DBNull.Value }
+                            };
 
                             using (NpgsqlCommand ranchCommand = CreateCommandWithStoredProcedure("usp_InsertRanch", connection, ranchParamDic))
                             {
@@ -351,10 +464,10 @@ namespace RideOnServer.DAL
                             }
 
                             Dictionary<string, object> requestParamDic = new Dictionary<string, object>
-                    {
-                        { "@RanchId", newRanchId },
-                        { "@SubmittedBySystemUserId", DBNull.Value }
-                    };
+                            {
+                                { "@RanchId", newRanchId },
+                                { "@SubmittedBySystemUserId", DBNull.Value }
+                            };
 
                             using (NpgsqlCommand requestCommand = CreateCommandWithStoredProcedure("usp_InsertNewRanchRequest", connection, requestParamDic))
                             {
@@ -379,8 +492,5 @@ namespace RideOnServer.DAL
                 throw new Exception($"Database error: {ex.Message}");
             }
         }
-
-
-
     }
 }

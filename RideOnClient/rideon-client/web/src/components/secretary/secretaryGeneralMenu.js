@@ -1,4 +1,10 @@
-import { Trophy, CalendarDays, TableProperties, Settings } from "lucide-react";
+import {
+  Trophy,
+  CalendarDays,
+  TableProperties,
+  Users,
+  Settings,
+} from "lucide-react";
 
 const secretaryGeneralMenu = [
   {
@@ -18,6 +24,12 @@ const secretaryGeneralMenu = [
     label: "מגרשים ותאים",
     icon: TableProperties,
     path: "/arenas-and-stalls",
+  },
+  {
+    key: "workers-management",
+    label: "ניהול עובדים",
+    icon: Users,
+    path: "/workers-management",
   },
   {
     key: "profile-settings",

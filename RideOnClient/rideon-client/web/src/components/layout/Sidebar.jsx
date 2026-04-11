@@ -16,13 +16,19 @@ export default function Sidebar(props) {
           <p className="mt-2 text-[1.02rem] font-medium text-[#8B6352] leading-7">
             {props.subtitle}
           </p>
+
+          {props.contextNote ? (
+            <p className="mt-1 text-[0.95rem] font-semibold text-[#A17664] leading-6">
+              {props.contextNote}
+            </p>
+          ) : null}
         </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto py-5">
         {props.items.map(function (item) {
-          const Icon = item.icon;
-          const isActive = props.activeItemKey === item.key;
+          var Icon = item.icon;
+          var isActive = props.activeItemKey === item.key;
 
           return (
             <button

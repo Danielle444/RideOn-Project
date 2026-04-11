@@ -1,9 +1,8 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.Auth;
 using RideOnServer.BL.DTOs.Auth.SuperUser;
-using RideOnServer.DAL;
+using RideOnServer.BL.DTOs.Profile;
 
 namespace RideOnServer.Controllers
 {
@@ -11,7 +10,6 @@ namespace RideOnServer.Controllers
     [ApiController]
     public class SystemUsersController : ControllerBase
     {
-
         private readonly IConfiguration _configuration;
 
         public SystemUsersController(IConfiguration configuration)
@@ -55,6 +53,34 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("profile-settings")]
+        public IActionResult GetProfileSettings([FromQuery] int personId, [FromQuery] int ranchId, [FromQuery] byte roleId)
+        {
+            try
+            {
+                ProfileSettingsResponse response = SystemUser.GetProfileSettings(personId, ranchId, roleId);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPut("profile")]
+        public IActionResult UpdateUserProfile([FromBody] UpdateUserProfileRequest request)
+        {
+            try
+            {
+                SystemUser.UpdateUserProfile(request);
+                return Ok("User profile updated successfully");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpPost("register")]
         public IActionResult Register([FromBody] RegisterRequest registerRequest)
         {
@@ -72,6 +98,7 @@ namespace RideOnServer.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
         [HttpPost("{personId}/roles")]
         public IActionResult AssignRoleToPerson(int personId, [FromBody] AssignRoleRequest request)
         {
