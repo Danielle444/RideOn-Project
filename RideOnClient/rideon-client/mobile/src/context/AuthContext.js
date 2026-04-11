@@ -64,11 +64,29 @@ export function AuthProvider(props) {
   async function loginAndInitialize(username, password) {
     try {
       await clearAuthStorage();
-      setUser(null);
-      setActiveRole(null);
-
+      
       const response = await loginRequest(username.trim(), password);
       const data = response.data;
+
+      // ❗ בדיקה לפני שמירה
+      if (
+        !data ||
+        !data.token ||
+        !data.personId ||
+        !data.approvedRolesAndRanches
+      ) {
+        return {
+          ok: false,
+          message: "נתוני התחברות לא תקינים",
+        };
+      }
+
+      if (data.approvedRolesAndRanches.length === 0) {
+        return {
+          ok: false,
+          message: "אין למשתמש תפקיד מאושר",
+        };
+      }
 
       const userData = {
         personId: data.personId,
@@ -80,47 +98,30 @@ export function AuthProvider(props) {
         approvedRolesAndRanches: data.approvedRolesAndRanches,
       };
 
-      if (
-        !data.approvedRolesAndRanches ||
-        data.approvedRolesAndRanches.length === 0
-      ) {
-        await clearAuthStorage();
-        setUser(null);
-        setActiveRole(null);
-
-        return {
-          ok: false,
-          message: "אין למשתמש תפקיד מאושר במערכת",
-        };
-      }
-
+      // ✅ רק עכשיו שומרים
       await saveToken(data.token);
       await saveUser(userData);
 
       setUser(userData);
+      setIsAuthenticated(true);
       setIsUserHydrated(true);
 
-      if (
-        data.approvedRolesAndRanches.length === 1 &&
-        isRoleSupportedOnMobile(data.approvedRolesAndRanches[0].roleName)
-      ) {
-        await setActiveRoleAndPersist(data.approvedRolesAndRanches[0]);
-      } else {
-        await clearActiveRole();
-      }
-
-      setIsAuthenticated(true);
-
-      return { ok: true };
+      return {
+        ok: true,
+        user: userData,
+      };
     } catch (err) {
       if (err && err.isAuthError) {
         await logout();
-        return { ok: false, message: "ההתחברות פגה, יש להתחבר מחדש" };
+        return {
+          ok: false,
+          message: "ההתחברות פגה, יש להתחבר מחדש",
+        };
       }
 
       return {
         ok: false,
-        message: String(getApiErrorMessage(err, "שגיאה בהתחברות")),
+        message: "שגיאה בהתחברות",
       };
     }
   }
