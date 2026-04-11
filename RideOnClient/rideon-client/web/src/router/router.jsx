@@ -18,6 +18,8 @@ import FinesManagementPage from "../pages/superuser/FinesManagementPage";
 import NotificationsManagementPage from "../pages/superuser/NotificationsManagementPage";
 import ServicePricesPage from "../pages/secretary/ServicePricesPage";
 import ArenasAndStallsPage from "../pages/secretary/ArenasAndStallsPage";
+import ForgotPasswordScreen from "../pages/auth/ForgotPasswordScreen";
+import ResetPasswordScreen from "../pages/auth/ResetPasswordScreen";
 
 const router = createBrowserRouter([
   {
@@ -44,9 +46,15 @@ const router = createBrowserRouter([
     path: "/forgot-password",
     element: (
       <PublicRoute>
-        <div dir="rtl" className="p-6">
-          מסך שכחתי סיסמה ייבנה בהמשך
-        </div>
+        <ForgotPasswordScreen />
+      </PublicRoute>
+    ),
+  },
+  {
+    path: "/reset-password",
+    element: (
+      <PublicRoute>
+        <ResetPasswordScreen />
       </PublicRoute>
     ),
   },

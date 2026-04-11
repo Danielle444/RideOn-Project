@@ -17,6 +17,7 @@ export default function LoginScreen() {
 
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPopup, setShowForgotPopup] = useState(false);
 
   function getSuperUserRoute(user) {
     if (user && user.mustChangePassword) {
@@ -155,7 +156,7 @@ export default function LoginScreen() {
               <button
                 type="button"
                 onClick={function () {
-                  navigate("/forgot-password");
+                  setShowForgotPopup(true);
                 }}
                 className="text-[#795548] hover:underline"
               >
@@ -207,6 +208,34 @@ export default function LoginScreen() {
           </span>
         </div>
       </div>
+
+      {showForgotPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" dir="rtl">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-3 text-lg font-bold text-[#4E342E]">איפוס סיסמה</h3>
+            <p className="mb-6 text-sm text-[#5D4037]">
+              לאיפוס הסיסמה ישלח קישור למייל הרשום שלך. להמשיך?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={function () { setShowForgotPopup(false); }}
+                className="rounded-xl border border-[#D7CCC8] px-4 py-2 text-sm text-[#5D4037] hover:bg-[#F5EDE8]"
+              >
+                ביטול
+              </button>
+              <button
+                onClick={function () {
+                  setShowForgotPopup(false);
+                  navigate("/forgot-password");
+                }}
+                className="rounded-xl bg-[#795548] px-4 py-2 text-sm text-white hover:bg-[#6D4C41]"
+              >
+                כן, שלח לי קישור
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
