@@ -84,6 +84,18 @@ function getPersonByNationalIdForRegistration(nationalId) {
   });
 }
 
+function sendOtp(email) {
+  return axios.post(`${API}/SystemUsers/send-otp`, { email });
+}
+
+function forgotPassword(email) {
+  return axios.post(`${API}/SystemUsers/forgot-password`, { email });
+}
+
+function resetPassword(token, newPassword) {
+  return axios.post(`${API}/SystemUsers/reset-password`, { token, newPassword });
+}
+
 export {
   login,
   loginSuperUser,
@@ -95,4 +107,7 @@ export {
   changeSuperUserPassword,
   checkUsername,
   getPersonByNationalIdForRegistration,
+  sendOtp,
+  forgotPassword,
+  resetPassword,
 };

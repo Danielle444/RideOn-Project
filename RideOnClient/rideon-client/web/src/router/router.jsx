@@ -31,6 +31,10 @@ import NotificationsManagementPage from "../pages/superuser/NotificationsManagem
 import UnauthorizedPage from "../pages/shared/UnauthorizedPage";
 
 const SECRETARY_ROLE = "מזכירת חווה מארחת";
+import ServicePricesPage from "../pages/secretary/ServicePricesPage";
+import ArenasAndStallsPage from "../pages/secretary/ArenasAndStallsPage";
+import ForgotPasswordScreen from "../pages/auth/ForgotPasswordScreen";
+import ResetPasswordScreen from "../pages/auth/ResetPasswordScreen";
 
 const router = createBrowserRouter([
   {
@@ -59,9 +63,15 @@ const router = createBrowserRouter([
     path: "/forgot-password",
     element: (
       <PublicRoute>
-        <div dir="rtl" className="p-6">
-          מסך שכחתי סיסמה ייבנה בהמשך
-        </div>
+        <ForgotPasswordScreen />
+      </PublicRoute>
+    ),
+  },
+  {
+    path: "/reset-password",
+    element: (
+      <PublicRoute>
+        <ResetPasswordScreen />
       </PublicRoute>
     ),
   },

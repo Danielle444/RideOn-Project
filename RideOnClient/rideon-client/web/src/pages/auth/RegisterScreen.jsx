@@ -11,6 +11,7 @@ import {
   getRoles,
   checkUsername,
   getPersonByNationalIdForRegistration,
+  sendOtp,
 } from "../../services/authService";
 
 import { getApiErrorMessage } from "../../../../shared/auth/utils/authApiErrors";
@@ -68,6 +69,12 @@ export default function RegisterScreen() {
   const [personLoadedFromSystem, setPersonLoadedFromSystem] = useState(false);
   const [existingSystemUserFound, setExistingSystemUserFound] = useState(false);
   const [nationalIdChecked, setNationalIdChecked] = useState(false);
+
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState("");
+  const [otpSuccess, setOtpSuccess] = useState("");
 
   const [showRanchModal, setShowRanchModal] = useState(false);
   const [creatingRanchRequest, setCreatingRanchRequest] = useState(false);
@@ -148,6 +155,28 @@ export default function RegisterScreen() {
         email: "",
       };
     });
+  }
+
+  async function handleSendOtp() {
+    setOtpError("");
+    setOtpSuccess("");
+
+    if (!form.email || !form.email.includes("@")) {
+      setOtpError("נא להזין כתובת מייל תקינה");
+      return;
+    }
+
+    setOtpLoading(true);
+
+    try {
+      await sendOtp(form.email.trim());
+      setOtpSent(true);
+      setOtpSuccess("קוד נשלח למייל שלך");
+    } catch {
+      setOtpError("שגיאה בשליחת קוד האימות. נסה שוב.");
+    } finally {
+      setOtpLoading(false);
+    }
   }
 
   function openCreateRanchModal() {
@@ -441,6 +470,7 @@ export default function RegisterScreen() {
         email: form.email,
         username: form.username,
         password: form.password,
+        otpCode: otpCode,
         ranchRoles: validPairs.map(function (pair) {
           return {
             ranchId: Number(pair.ranchId),
@@ -621,15 +651,51 @@ export default function RegisterScreen() {
                   </Field>
 
                   <Field label="אימייל" required>
-                    <input
-                      type="email"
-                      value={form.email}
-                      onChange={set("email")}
-                      onBlur={handleEmailBlur}
-                      placeholder="example@email.com"
-                      className={emailLocked ? readOnlyCls : inputCls}
-                      readOnly={emailLocked}
-                    />
+                    <div>
+                      <input
+                        type="email"
+                        value={form.email}
+                        onChange={set("email")}
+                        onBlur={handleEmailBlur}
+                        placeholder="example@email.com"
+                        className={emailLocked ? readOnlyCls : inputCls}
+                        readOnly={emailLocked}
+                      />
+
+                      {/* שלב OTP */}
+                      <div className="mt-3 space-y-2">
+                        <button
+                          type="button"
+                          onClick={handleSendOtp}
+                          disabled={otpLoading || !form.email || emailLocked}
+                          className="w-full rounded-xl border border-[#795548] py-2 text-sm text-[#795548] hover:bg-[#F5EDE8] disabled:opacity-50"
+                        >
+                          {otpLoading ? "שולח קוד..." : otpSent ? "שלח קוד חדש" : "שלח קוד אימות למייל"}
+                        </button>
+
+                        {otpSuccess && (
+                          <p className="text-sm text-green-600 text-right">{otpSuccess}</p>
+                        )}
+                        {otpError && (
+                          <p className="text-sm text-red-600 text-right">{otpError}</p>
+                        )}
+
+                        {otpSent && (
+                          <div>
+                            <label className="mb-1 block text-sm text-[#5D4037]">קוד אימות</label>
+                            <input
+                              type="text"
+                              value={otpCode}
+                              onChange={function (e) { setOtpCode(e.target.value); }}
+                              className="w-full rounded-xl border border-[#D7CCC8] px-4 py-2 text-right focus:border-[#795548] focus:outline-none"
+                              placeholder="הזן את הקוד שקיבלת במייל"
+                              maxLength={6}
+                              autoComplete="one-time-code"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </Field>
                 </div>
 
@@ -966,7 +1032,7 @@ export default function RegisterScreen() {
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="submit"
-                disabled={loading || existingSystemUserFound}
+                disabled={loading || existingSystemUserFound || !otpCode}
                 className="flex-1 py-3 rounded-xl text-white font-bold text-base shadow-md hover:shadow-lg active:scale-[0.98] transition-all disabled:opacity-60 cursor-pointer"
                 style={{
                   background:
