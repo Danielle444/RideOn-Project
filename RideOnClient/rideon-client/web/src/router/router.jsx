@@ -28,6 +28,7 @@ import ReiningPatternsManagementPage from "../pages/superuser/ReiningPatternsMan
 import PrizesManagementPage from "../pages/superuser/PrizesManagementPage";
 import FinesManagementPage from "../pages/superuser/FinesManagementPage";
 import NotificationsManagementPage from "../pages/superuser/NotificationsManagementPage";
+import UnauthorizedPage from "../pages/shared/UnauthorizedPage";
 
 const SECRETARY_ROLE = "מזכירת חווה מארחת";
 
@@ -287,6 +288,10 @@ const router = createBrowserRouter([
         <NotificationsManagementPage />
       </ProtectedRoute>
     ),
+  },
+  {
+    path: "/unauthorized",
+    element: <UnauthorizedPage />,
   },
 ]);
 
