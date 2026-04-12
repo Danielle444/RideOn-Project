@@ -90,6 +90,7 @@ export default function CompetitionDetailsSection(props) {
                 options={fields}
                 value={props.detailsForm.fieldId}
                 placeholder="בחרי ענף"
+                searchable={true}
                 getOptionValue={function (field) {
                   return field.fieldId;
                 }}

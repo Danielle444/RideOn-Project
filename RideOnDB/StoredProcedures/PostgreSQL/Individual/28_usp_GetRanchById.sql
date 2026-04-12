@@ -7,7 +7,9 @@ RETURNS TABLE(
     "ContactEmail" TEXT,
     "ContactPhone" TEXT,
     "WebsiteUrl"   TEXT,
-    "Location"     TEXT
+    "Location"     TEXT,
+    "Latitude"     DOUBLE PRECISION,
+    "Longitude"    DOUBLE PRECISION
 )
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -18,7 +20,9 @@ BEGIN
         r.contactemail,
         r.contactphone,
         r.websiteurl,
-        r.location
+        r.location,
+        r.latitude,
+        r.longitude
     FROM ranch r
     WHERE r.ranchid = p_RanchId;
 END;

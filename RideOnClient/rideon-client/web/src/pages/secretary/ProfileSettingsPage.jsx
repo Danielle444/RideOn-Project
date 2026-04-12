@@ -17,6 +17,7 @@ import {
 import AppLayout from "../../components/layout/AppLayout";
 import ToastMessage from "../../components/common/ToastMessage";
 import CustomDropdown from "../../components/common/CustomDropdown";
+import RanchLocationPicker from "../../components/common/RanchLocationPicker";
 import secretaryGeneralMenu from "../../components/secretary/secretaryGeneralMenu";
 import useProfileSettingsPage from "../../hooks/secretary/useProfileSettingsPage";
 import { getSecretaryDisplayName } from "../../utils/secretaryDisplay.utils";
@@ -304,39 +305,37 @@ export default function ProfileSettingsPage() {
               })
             : renderStaticField("אתר", page.data?.activeRanch?.websiteUrl)}
 
-          {page.isEditingRanch
-            ? renderInputField(
-                "Latitude",
-                page.ranchForm.latitude,
-                function (e) {
-                  page.setRanchField("latitude", e.target.value);
-                },
-                { textAlign: "left" },
-              )
-            : renderStaticField(
-                "Latitude",
-                page.data?.activeRanch?.latitude === null ||
-                  page.data?.activeRanch?.latitude === undefined
-                  ? ""
-                  : String(page.data.activeRanch.latitude),
-              )}
-
-          {page.isEditingRanch
-            ? renderInputField(
-                "Longitude",
-                page.ranchForm.longitude,
-                function (e) {
-                  page.setRanchField("longitude", e.target.value);
-                },
-                { textAlign: "left" },
-              )
-            : renderStaticField(
-                "Longitude",
-                page.data?.activeRanch?.longitude === null ||
-                  page.data?.activeRanch?.longitude === undefined
-                  ? ""
-                  : String(page.data.activeRanch.longitude),
-              )}
+          <div className="col-span-1 md:col-span-2">
+            {page.isEditingRanch ? (
+              <div className="rounded-2xl border border-[#E7DCD5] bg-white px-4 py-4">
+                <label className="block text-sm font-semibold text-[#7B5A4D] text-right mb-3">
+                  מיקום החווה
+                </label>
+                <RanchLocationPicker
+                  latitude={page.ranchForm.latitude}
+                  longitude={page.ranchForm.longitude}
+                  onChange={function (coords) {
+                    page.setRanchField("latitude", coords.latitude);
+                    page.setRanchField("longitude", coords.longitude);
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-[#E7DCD5] bg-white px-4 py-3">
+                <label className="block text-sm font-semibold text-[#7B5A4D] text-right mb-1">
+                  מיקום החווה
+                </label>
+                {page.data?.activeRanch?.latitude && page.data?.activeRanch?.longitude ? (
+                  <p className="text-sm text-[#5D4037] text-right">
+                    {Number(page.data.activeRanch.latitude).toFixed(6)},{" "}
+                    {Number(page.data.activeRanch.longitude).toFixed(6)}
+                  </p>
+                ) : (
+                  <p className="text-sm text-[#BCAAA4] text-right">לא הוגדר מיקום</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap justify-start gap-3">
@@ -595,6 +594,7 @@ export default function ProfileSettingsPage() {
                         page.setAddProfileField("ranchId", e.target.value);
                       }}
                       placeholder="בחרי חווה"
+                      searchable={true}
                       dropdownKey="add-profile-ranch"
                       openDropdownKey={page.openDropdownKey}
                       setOpenDropdownKey={page.setOpenDropdownKey}
@@ -621,6 +621,7 @@ export default function ProfileSettingsPage() {
                         page.setAddProfileField("roleId", e.target.value);
                       }}
                       placeholder="בחרי תפקיד"
+                      searchable={true}
                       dropdownKey="add-profile-role"
                       openDropdownKey={page.openDropdownKey}
                       setOpenDropdownKey={page.setOpenDropdownKey}

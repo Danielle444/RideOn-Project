@@ -160,6 +160,18 @@ namespace RideOnServer.DAL
                 return;
             }
 
+            if (value is double doubleValue)
+            {
+                cmd.Parameters.Add(parameterName, NpgsqlDbType.Double).Value = doubleValue;
+                return;
+            }
+
+            if (value is float floatValue)
+            {
+                cmd.Parameters.Add(parameterName, NpgsqlDbType.Real).Value = floatValue;
+                return;
+            }
+
             if (value is bool boolValue)
             {
                 cmd.Parameters.Add(parameterName, NpgsqlDbType.Boolean).Value = boolValue;

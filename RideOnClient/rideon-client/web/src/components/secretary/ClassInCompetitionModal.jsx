@@ -272,6 +272,7 @@ export default function ClassInCompetitionModal(props) {
                 options={classTypes}
                 value={formData.classTypeId}
                 placeholder="בחרי סוג מקצה"
+                searchable={true}
                 getOptionValue={function (item) {
                   return item.classTypeId;
                 }}
@@ -296,6 +297,7 @@ export default function ClassInCompetitionModal(props) {
                 options={arenas}
                 value={formData.arenaId}
                 placeholder="בחרי מגרש"
+                searchable={true}
                 getOptionValue={function (item) {
                   return item.arenaId;
                 }}
@@ -396,6 +398,7 @@ export default function ClassInCompetitionModal(props) {
                   options={patterns}
                   value={formData.patternNumber}
                   placeholder="בחרי מסלול"
+                  searchable={true}
                   getOptionValue={function (item) {
                     return item.patternNumber;
                   }}
@@ -421,6 +424,7 @@ export default function ClassInCompetitionModal(props) {
                 options={prizeTypes}
                 value={formData.prizeTypeId}
                 placeholder="בחרי סוג פרס"
+                searchable={true}
                 getOptionValue={function (item) {
                   return item.prizeTypeId;
                 }}
