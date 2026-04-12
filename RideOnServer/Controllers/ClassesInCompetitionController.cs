@@ -75,12 +75,14 @@ namespace RideOnServer.Controllers
                 }
 
                 int newId = ClassInCompetition.CreateClassInCompetition(request);
+                ClassInCompetition? newItem = ClassInCompetition.GetClassById(newId);
 
-                return Ok(new
+                if (newItem == null)
                 {
-                    ClassInCompId = newId,
-                    Message = "Class added to competition successfully"
-                });
+                    return NotFound("Created class was not found");
+                }
+
+                return Ok(newItem);
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -124,7 +126,14 @@ namespace RideOnServer.Controllers
                 }
 
                 ClassInCompetition.UpdateClassInCompetition(request);
-                return Ok("Class updated successfully");
+                ClassInCompetition? updatedItem = ClassInCompetition.GetClassById(classInCompId);
+
+                if (updatedItem == null)
+                {
+                    return NotFound("Updated class was not found");
+                }
+
+                return Ok(updatedItem);
             }
             catch (UnauthorizedAccessException ex)
             {

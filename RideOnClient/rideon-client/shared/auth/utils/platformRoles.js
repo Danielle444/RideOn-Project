@@ -73,7 +73,7 @@ function getMobileHomeScreenName(roleName) {
   }
 
   if (normalizedRoleName === "עובד חווה") {
-    return "WorkerShavingsOrders";
+    return "WorkerHome";
   }
 
   return "";

@@ -38,7 +38,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -69,7 +69,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -106,7 +106,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -141,7 +141,101 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public List<Competition> GetAllCompetitionsForMobileAdmin()
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetAllCompetitionsForMobileAdmin", connection, null))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<Competition> list = new List<Competition>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(MapCompetition(reader));
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public List<Competition> GetCompetitionsForMobileWorker(int ranchId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@RanchId", ranchId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetCompetitionsForMobileWorker", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<Competition> list = new List<Competition>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(MapCompetition(reader));
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public List<Competition> GetCompetitionsForMobilePayer(int personId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@PersonId", personId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetCompetitionsForMobilePayer", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<Competition> list = new List<Competition>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(MapCompetition(reader));
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -184,5 +278,41 @@ namespace RideOnServer.DAL
                     : reader["FieldName"].ToString()
             };
         }
+
+
+        public List<Competition> GetCompetitionsForMobileAdminHome(int systemUserId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+    {
+        { "@SystemUserId", systemUserId }
+    };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetMobileAdminHomeCompetitions", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<Competition> list = new List<Competition>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(MapCompetition(reader));
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+
     }
 }

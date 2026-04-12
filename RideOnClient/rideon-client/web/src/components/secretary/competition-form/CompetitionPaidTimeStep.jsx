@@ -31,6 +31,14 @@ export default function CompetitionPaidTimeStep(props) {
             >
               דלג על השלב כרגע
             </button>
+
+            <button
+              type="button"
+              onClick={props.onPublish}
+              className="rounded-xl bg-[#8B6352] px-5 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-[#7A5547]"
+            >
+              פרסום תחרות
+            </button>
           </div>
         ) : null}
       </div>
