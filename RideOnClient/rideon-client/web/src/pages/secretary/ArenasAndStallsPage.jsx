@@ -1,5 +1,5 @@
 import { ChevronUp, ChevronDown } from "lucide-react";
-import AppLayout from "../../components/layout/AppLayout";
+import SecretaryLayout from "../../components/secretary/SecretaryLayout";
 import ConfirmDialog from "../../components/superuser/ConfirmDialog";
 import ToastMessage from "../../components/common/ToastMessage";
 import secretaryGeneralMenu from "../../components/secretary/secretaryGeneralMenu";
@@ -23,7 +23,9 @@ function SectionHeader(props) {
       </button>
 
       <div className="flex items-center gap-4">
-        <h2 className="text-[1.8rem] font-bold text-[#3F312B]">{props.title}</h2>
+        <h2 className="text-[1.8rem] font-bold text-[#3F312B]">
+          {props.title}
+        </h2>
         <span className="rounded-lg bg-[#F3EEEA] px-3 py-1 text-sm font-semibold text-[#6B574F]">
           {props.countLabel}
         </span>
@@ -45,7 +47,7 @@ export default function ArenasAndStallsPage() {
     : "מזכירת חווה מארחת";
 
   return (
-    <AppLayout
+    <SecretaryLayout
       userName={userName}
       subtitle={subtitle}
       menuItems={secretaryGeneralMenu}
@@ -54,7 +56,7 @@ export default function ArenasAndStallsPage() {
       notificationsOpen={false}
       notificationItems={[]}
     >
-      <div className="rounded-[26px] border border-[#E6DCD5] bg-white shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-[26px] border border-[#E6DCD5] bg-white shadow-sm">
         <div className="border-b border-[#EFE5DF] px-8 py-7">
           <h1 className="text-[2rem] font-bold text-[#3F312B]">מגרשים ותאים</h1>
           <p className="mt-2 text-sm text-[#8A7268]">
@@ -146,6 +148,6 @@ export default function ArenasAndStallsPage() {
         message={page.toast.message}
         onClose={page.closeToast}
       />
-    </AppLayout>
+    </SecretaryLayout>
   );
 }

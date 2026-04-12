@@ -4,7 +4,11 @@ import { useUser } from "../context/UserContext";
 import { useActiveRole } from "../context/ActiveRoleContext";
 import { getPostLoginRoute } from "../../../shared/auth/utils/authNavigation";
 
-export default function ProtectedRoute({ children, requireSuperUser = false }) {
+export default function ProtectedRoute({
+  children,
+  requireSuperUser = false,
+  allowedRoles = [],
+}) {
   const { isLoading, isAuthenticated } = useAuth();
   const { user } = useUser();
   const { activeRole } = useActiveRole();
@@ -26,6 +30,7 @@ export default function ProtectedRoute({ children, requireSuperUser = false }) {
     return <Navigate to="/login" replace />;
   }
 
+  // מסלולי סופר יוזר בלבד
   if (requireSuperUser) {
     if (user.userType !== "superUser") {
       return <Navigate to={getPostLoginRoute(user, activeRole)} replace />;
@@ -41,8 +46,20 @@ export default function ProtectedRoute({ children, requireSuperUser = false }) {
     return children;
   }
 
+  // סופר יוזר לא אמור להיכנס למסלולים רגילים
   if (user.userType === "superUser") {
     return <Navigate to={getSuperUserRoute()} replace />;
+  }
+
+  // אם למסלול יש הגבלת תפקידים רגילים
+  if (allowedRoles.length > 0) {
+    if (!activeRole) {
+      return <Navigate to={getPostLoginRoute(user, activeRole)} replace />;
+    }
+
+    if (!allowedRoles.includes(activeRole.roleName)) {
+      return <Navigate to={getPostLoginRoute(user, activeRole)} replace />;
+    }
   }
 
   return children;

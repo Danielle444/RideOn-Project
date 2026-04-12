@@ -28,6 +28,9 @@ import ReiningPatternsManagementPage from "../pages/superuser/ReiningPatternsMan
 import PrizesManagementPage from "../pages/superuser/PrizesManagementPage";
 import FinesManagementPage from "../pages/superuser/FinesManagementPage";
 import NotificationsManagementPage from "../pages/superuser/NotificationsManagementPage";
+import UnauthorizedPage from "../pages/shared/UnauthorizedPage";
+
+const SECRETARY_ROLE = "מזכירת חווה מארחת";
 import ServicePricesPage from "../pages/secretary/ServicePricesPage";
 import ArenasAndStallsPage from "../pages/secretary/ArenasAndStallsPage";
 import ForgotPasswordScreen from "../pages/auth/ForgotPasswordScreen";
@@ -38,6 +41,8 @@ const router = createBrowserRouter([
     path: "/",
     element: <Navigate to="/login" />,
   },
+
+  // 🔓 Public
   {
     path: "/login",
     element: (
@@ -70,6 +75,8 @@ const router = createBrowserRouter([
       </PublicRoute>
     ),
   },
+
+  // 🔐 General
   {
     path: "/change-password",
     element: (
@@ -78,6 +85,7 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
+
   {
     path: "/select-ranch",
     element: (
@@ -86,10 +94,12 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
+
+  // 🟤 Secretary Routes
   {
     path: "/competitions",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={[SECRETARY_ROLE]}>
         <CompetitionsBoardPage />
       </ProtectedRoute>
     ),
@@ -97,7 +107,7 @@ const router = createBrowserRouter([
   {
     path: "/competitions/create",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={[SECRETARY_ROLE]}>
         <CompetitionFormPage mode="create" />
       </ProtectedRoute>
     ),
@@ -109,7 +119,7 @@ const router = createBrowserRouter([
   {
     path: "/competitions/:competitionId/summary",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={[SECRETARY_ROLE]}>
         <CompetitionSummaryPage />
       </ProtectedRoute>
     ),
@@ -117,7 +127,7 @@ const router = createBrowserRouter([
   {
     path: "/competitions/:competitionId/classes",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={[SECRETARY_ROLE]}>
         <CompetitionClassesPage />
       </ProtectedRoute>
     ),
@@ -125,7 +135,7 @@ const router = createBrowserRouter([
   {
     path: "/competitions/:competitionId/paid-time",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={[SECRETARY_ROLE]}>
         <CompetitionPaidTimePage />
       </ProtectedRoute>
     ),
@@ -133,7 +143,7 @@ const router = createBrowserRouter([
   {
     path: "/competitions/:competitionId/stalls",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={[SECRETARY_ROLE]}>
         <CompetitionStallsPage />
       </ProtectedRoute>
     ),
@@ -141,7 +151,7 @@ const router = createBrowserRouter([
   {
     path: "/competitions/:competitionId/shavings",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={[SECRETARY_ROLE]}>
         <CompetitionShavingsPage />
       </ProtectedRoute>
     ),
@@ -149,7 +159,7 @@ const router = createBrowserRouter([
   {
     path: "/competitions/:competitionId/health-certificates",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={[SECRETARY_ROLE]}>
         <CompetitionHealthCertificatesPage />
       </ProtectedRoute>
     ),
@@ -157,7 +167,7 @@ const router = createBrowserRouter([
   {
     path: "/competitions/:competitionId/change-tracking",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={[SECRETARY_ROLE]}>
         <CompetitionChangeTrackingPage />
       </ProtectedRoute>
     ),
@@ -165,7 +175,7 @@ const router = createBrowserRouter([
   {
     path: "/competitions/:competitionId/payments",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={[SECRETARY_ROLE]}>
         <CompetitionPaymentsPage />
       </ProtectedRoute>
     ),
@@ -173,15 +183,16 @@ const router = createBrowserRouter([
   {
     path: "/competitions/:competitionId/edit",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={[SECRETARY_ROLE]}>
         <CompetitionFormPage mode="edit" />
       </ProtectedRoute>
     ),
   },
+
   {
     path: "/service-prices",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={[SECRETARY_ROLE]}>
         <ServicePricesPage />
       </ProtectedRoute>
     ),
@@ -189,7 +200,7 @@ const router = createBrowserRouter([
   {
     path: "/arenas-and-stalls",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={[SECRETARY_ROLE]}>
         <ArenasAndStallsPage />
       </ProtectedRoute>
     ),
@@ -197,7 +208,7 @@ const router = createBrowserRouter([
   {
     path: "/workers-management",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={[SECRETARY_ROLE]}>
         <WorkersManagementPage />
       </ProtectedRoute>
     ),
@@ -205,11 +216,13 @@ const router = createBrowserRouter([
   {
     path: "/profile-settings",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={[SECRETARY_ROLE]}>
         <ProfileSettingsPage />
       </ProtectedRoute>
     ),
   },
+
+  // 🟣 SuperUser
   {
     path: "/superuser",
     element: <Navigate to="/superuser/requests" replace />,
@@ -285,6 +298,10 @@ const router = createBrowserRouter([
         <NotificationsManagementPage />
       </ProtectedRoute>
     ),
+  },
+  {
+    path: "/unauthorized",
+    element: <UnauthorizedPage />,
   },
 ]);
 

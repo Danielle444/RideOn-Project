@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios from "./axiosInstance";
 import { getToken } from "./storageService";
 
 const API = import.meta.env.VITE_API_BASE_URL;
@@ -30,8 +30,11 @@ function updateServiceProduct(data) {
   return axios.put(`${API}/ServicePrices/products`, data, getAuthHeaders());
 }
 
-function deleteServiceProduct(id) {
-  return axios.delete(`${API}/ServicePrices/products/${id}`, getAuthHeaders());
+function deleteServiceProduct(id, ranchId) {
+  return axios.delete(`${API}/ServicePrices/products/${id}`, {
+    params: { ranchId },
+    ...getAuthHeaders(),
+  });
 }
 
 function deactivateServiceProduct(productId, ranchId) {

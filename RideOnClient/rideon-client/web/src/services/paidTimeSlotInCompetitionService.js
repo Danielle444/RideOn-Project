@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios from "./axiosInstance";
 import { getToken } from "./storageService";
 
 const API = import.meta.env.VITE_API_BASE_URL;

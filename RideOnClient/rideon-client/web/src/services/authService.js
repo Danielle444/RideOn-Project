@@ -1,4 +1,5 @@
-import axios from "axios";
+import axios from "./axiosInstance";
+
 
 const API = import.meta.env.VITE_API_BASE_URL;
 
@@ -32,12 +33,24 @@ function getRoles() {
   return axios.get(`${API}/Roles`);
 }
 
-function changePassword(username, currentPassword, newPassword) {
-  return axios.put(`${API}/SystemUsers/change-password`, {
-    username: username,
-    currentPassword: currentPassword,
-    newPassword: newPassword,
-  });
+function changePassword(personId, currentPassword, newPassword) {
+  const token =
+    localStorage.getItem("rideon_token") ||
+    sessionStorage.getItem("rideon_token");
+
+  return axios.put(
+    `${API}/SystemUsers/change-password`,
+    {
+      personId: personId,
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
 }
 
 function changeSuperUserPassword(currentPassword, newPassword) {

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
+using RideOnServer.BL.DTOs.Auth;
 
 namespace RideOnServer.Controllers
 {
@@ -14,8 +15,32 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                if (UserAccessValidator.IsSuperUser(User))
+                {
+                    List<PrizeType> superUserList = PrizeType.GetAllPrizeTypes();
+                    return Ok(superUserList);
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                List<ApprovedRoleRanch> approvedRoles =
+                    SystemUser.GetApprovedPersonRanchesAndRoles(personId);
+
+                bool hasSecretaryRole = approvedRoles.Any(item =>
+                    !string.IsNullOrWhiteSpace(item.RoleName) &&
+                    item.RoleName.Trim().Equals(RoleNames.HostSecretary, StringComparison.OrdinalIgnoreCase));
+
+                if (!hasSecretaryRole)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לצפות בסוגי פרסים");
+                }
+
                 List<PrizeType> list = PrizeType.GetAllPrizeTypes();
                 return Ok(list);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -29,12 +54,18 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 int id = PrizeType.CreatePrizeType(
                     prizeType.PrizeTypeName,
                     prizeType.PrizeDescription
                 );
 
                 return Ok(id);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -48,6 +79,8 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 PrizeType.UpdatePrizeType(
                     prizeType.PrizeTypeId,
                     prizeType.PrizeTypeName,
@@ -55,6 +88,10 @@ namespace RideOnServer.Controllers
                 );
 
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -68,8 +105,14 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 PrizeType.DeletePrizeType(id);
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {

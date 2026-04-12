@@ -6,15 +6,8 @@ import {
   RefreshCcw,
   ShieldCheck,
   PlusCircle,
-  ChevronDown,
-  ChevronUp,
-  Pencil,
-  X,
-  KeyRound,
-  Smartphone,
-  Monitor,
 } from "lucide-react";
-import AppLayout from "../../components/layout/AppLayout";
+import SecretaryLayout from "../../components/secretary/SecretaryLayout";
 import ToastMessage from "../../components/common/ToastMessage";
 import CustomDropdown from "../../components/common/CustomDropdown";
 import RanchLocationPicker from "../../components/common/RanchLocationPicker";
@@ -22,6 +15,11 @@ import secretaryGeneralMenu from "../../components/secretary/secretaryGeneralMen
 import useProfileSettingsPage from "../../hooks/secretary/useProfileSettingsPage";
 import { getSecretaryDisplayName } from "../../utils/secretaryDisplay.utils";
 import { mapRoleOptionForWeb } from "../../../../shared/auth/utils/platformRoles";
+import SettingsSectionHeader from "../../components/secretary/profile-settings/SettingsSectionHeader";
+import UserProfileCard from "../../components/secretary/profile-settings/UserProfileCard";
+import RanchProfileCard from "../../components/secretary/profile-settings/RanchProfileCard";
+import ProfilesListSection from "../../components/secretary/profile-settings/ProfilesListSection";
+import AddProfileModal from "../../components/secretary/profile-settings/AddProfileModal";
 
 export default function ProfileSettingsPage() {
   const navigate = useNavigate();
@@ -376,7 +374,7 @@ export default function ProfileSettingsPage() {
 
   if (page.loading) {
     return (
-      <AppLayout
+      <SecretaryLayout
         userName={userName}
         subtitle={subtitle}
         menuItems={secretaryGeneralMenu}
@@ -388,12 +386,12 @@ export default function ProfileSettingsPage() {
         <div className="rounded-[26px] border border-[#E6DCD5] bg-white shadow-sm px-8 py-10 text-right">
           <p className="text-[#6D4C41] text-lg">טוענת נתונים...</p>
         </div>
-      </AppLayout>
+      </SecretaryLayout>
     );
   }
 
   return (
-    <AppLayout
+    <SecretaryLayout
       userName={userName}
       subtitle={subtitle}
       menuItems={secretaryGeneralMenu}
@@ -421,66 +419,40 @@ export default function ProfileSettingsPage() {
 
           <div className="p-8 space-y-5">
             <section className="rounded-[24px] border border-[#EADFD8] bg-white overflow-hidden">
-              {renderSectionHeader(
-                "general-info",
-                "פרטים כלליים",
-                "פרטי המשתמש ופרטי החווה הפעילה",
-                UserRound,
-              )}
+              <SettingsSectionHeader
+                sectionKey="general-info"
+                expandedSection={page.expandedSection}
+                onToggle={page.toggleSection}
+                title="פרטים כלליים"
+                subtitle="פרטי המשתמש ופרטי החווה הפעילה"
+                icon={UserRound}
+              />
 
               {page.expandedSection === "general-info" ? (
                 <div className="border-t border-[#EFE5DF] p-5">
                   <div className="grid grid-cols-1 2xl:grid-cols-2 gap-5">
-                    <div className="rounded-[22px] border border-[#E7DCD5] bg-[#FCFAF8] overflow-hidden">
-                      <div className="px-5 py-4 border-b border-[#EFE5DF] flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#F3ECE8] text-[#7B5A4D]">
-                          <UserRound size={17} />
-                        </div>
+                    <UserProfileCard
+                      page={page}
+                      onChangePassword={function () {
+                        navigate("/change-password");
+                      }}
+                    />
 
-                        <div className="text-right">
-                          <h3 className="text-base font-bold text-[#3F312B]">
-                            פרטי משתמש
-                          </h3>
-                          <p className="mt-1 text-sm text-[#8A7268]">
-                            המידע האישי של המשתמש המחובר
-                          </p>
-                        </div>
-                      </div>
-
-                      {renderUserCardContent()}
-                    </div>
-
-                    <div className="rounded-[22px] border border-[#E7DCD5] bg-[#FCFAF8] overflow-hidden">
-                      <div className="px-5 py-4 border-b border-[#EFE5DF] flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#F3ECE8] text-[#7B5A4D]">
-                          <Building2 size={17} />
-                        </div>
-
-                        <div className="text-right">
-                          <h3 className="text-base font-bold text-[#3F312B]">
-                            פרטי החווה הפעילה
-                          </h3>
-                          <p className="mt-1 text-sm text-[#8A7268]">
-                            פרטי החווה של הפרופיל הפעיל כרגע
-                          </p>
-                        </div>
-                      </div>
-
-                      {renderRanchCardContent()}
-                    </div>
+                    <RanchProfileCard page={page} />
                   </div>
                 </div>
               ) : null}
-
             </section>
 
             <section className="rounded-[24px] border border-[#EADFD8] bg-[#FCFAF8] overflow-hidden">
-              {renderSectionHeader(
-                "profiles",
-                "הפרופילים שלך במערכת",
-                "צפייה בכל הפרופילים המשויכים למשתמש",
-                ShieldCheck,
-              )}
+              <SettingsSectionHeader
+                sectionKey="profiles"
+                expandedSection={page.expandedSection}
+                onToggle={page.toggleSection}
+                title="הפרופילים שלך במערכת"
+                subtitle="צפייה בכל הפרופילים המשויכים למשתמש"
+                icon={ShieldCheck}
+              />
 
               {page.expandedSection === "profiles" ? (
                 <div className="border-t border-[#EFE5DF] p-5">
@@ -506,50 +478,10 @@ export default function ProfileSettingsPage() {
                     </button>
                   </div>
 
-                  <div className="rounded-[22px] border border-[#E7DCD5] bg-white overflow-hidden">
-                    <div className="hidden lg:grid grid-cols-[1.5fr_0.8fr_1fr] gap-4 px-5 py-3 bg-[#F8F4F1] border-b border-[#EFE5DF] text-sm font-bold text-[#7B5A4D] text-right">
-                      <div className="pr-2">פרופיל</div>
-                      <div className="text-center">סטטוס</div>
-                      <div className="text-right pr-2">זמינות</div>
-                    </div>
-
-                    <div className="divide-y divide-[#EFE5DF]">
-                      {profileRows.map(function (item, index) {
-                        const isActive =
-                          item.ranchId === page.activeRole?.ranchId &&
-                          item.roleId === page.activeRole?.roleId;
-
-                        return (
-                          <div
-                            key={`${item.ranchId}-${item.roleId}-${index}`}
-                            className={
-                              "px-5 py-4 transition-colors " +
-                              (isActive ? "bg-[#FAF7F4]" : "bg-white")
-                            }
-                          >
-                            <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_0.8fr_1fr] gap-4 items-center text-right">
-                              <div className="pr-2">
-                                <div className="text-lg font-bold text-[#3F312B]">
-                                  {item.ranchName}
-                                </div>
-                                <div className="mt-1 text-sm text-[#7B5A4D]">
-                                  {item.roleName}
-                                </div>
-                              </div>
-
-                              <div className="flex justify-start lg:justify-center">
-                                {renderStatusBadge(item.roleStatus)}
-                              </div>
-
-                              <div className="pr-2 flex items-center justify-start text-right">
-                                {renderPlatformCell(item)}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <ProfilesListSection
+                    items={profileRows}
+                    activeRole={page.activeRole}
+                  />
                 </div>
               ) : null}
             </section>
@@ -662,6 +594,18 @@ export default function ProfileSettingsPage() {
           </div>
         </div>
       ) : null}
+      <AddProfileModal
+        isOpen={page.isAddProfileModalOpen}
+        onClose={page.closeAddProfileModal}
+        availableRanches={page.availableRanches}
+        availableRoles={page.availableRoles}
+        addProfileForm={page.addProfileForm}
+        setAddProfileField={page.setAddProfileField}
+        openDropdownKey={page.openDropdownKey}
+        setOpenDropdownKey={page.setOpenDropdownKey}
+        onSubmit={page.submitAddProfile}
+        addingProfile={page.addingProfile}
+      />
 
       <ToastMessage
         isOpen={page.toast.isOpen}
@@ -669,6 +613,6 @@ export default function ProfileSettingsPage() {
         message={page.toast.message}
         onClose={page.closeToast}
       />
-    </AppLayout>
+    </SecretaryLayout>
   );
 }
