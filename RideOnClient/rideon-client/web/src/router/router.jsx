@@ -31,8 +31,6 @@ import NotificationsManagementPage from "../pages/superuser/NotificationsManagem
 import UnauthorizedPage from "../pages/shared/UnauthorizedPage";
 
 const SECRETARY_ROLE = "מזכירת חווה מארחת";
-import ServicePricesPage from "../pages/secretary/ServicePricesPage";
-import ArenasAndStallsPage from "../pages/secretary/ArenasAndStallsPage";
 import ForgotPasswordScreen from "../pages/auth/ForgotPasswordScreen";
 import ResetPasswordScreen from "../pages/auth/ResetPasswordScreen";
 
