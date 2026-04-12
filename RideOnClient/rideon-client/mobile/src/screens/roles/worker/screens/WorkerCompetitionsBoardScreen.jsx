@@ -10,6 +10,7 @@ import { getWorkerMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { getWorkerCompetitionMenuItems } from "../../../../navigation/competitionMenuConfigs";
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
+import { useCompetition } from "../../../../context/CompetitionContext";
 import { getMobileWorkerCompetitionsBoard } from "../../../../services/competitionService";
 import CompetitionBoardCard from "../../../../components/competitions/CompetitionBoardCard";
 import { formatCompetitionDateRange } from "../../../../../../shared/auth/utils/competitions/competitionFormatters";
@@ -18,6 +19,7 @@ import { canWorkerEnterCompetition } from "../../../../../../shared/auth/utils/c
 export default function WorkerCompetitionsBoardScreen(props) {
   var userContext = useUser();
   var activeRoleContext = useActiveRole();
+  var competitionContext = useCompetition();
 
   var user = userContext.user;
   var activeRole = activeRoleContext.activeRole;
@@ -53,10 +55,17 @@ export default function WorkerCompetitionsBoardScreen(props) {
     }
   }
 
-  async function handleLogout() {
-    if (props.onLogout) {
-      await props.onLogout();
-    }
+  async function setCompetitionAndNavigate(item, screen) {
+    await competitionContext.setActiveCompetitionAndPersist({
+      competitionId: item.competitionId,
+      competitionName: item.competitionName,
+      competitionStatus: item.competitionStatus,
+      ranchId: activeRole.ranchId,
+    });
+
+    setSelectedCompetition(item);
+    setMenuMode("competition");
+    props.navigation.navigate(screen);
   }
 
   function openCompetitionMenu(competition) {
@@ -64,9 +73,16 @@ export default function WorkerCompetitionsBoardScreen(props) {
     setMenuMode("competition");
   }
 
-  function exitCompetitionMenu() {
+  async function exitCompetitionMenu() {
     setSelectedCompetition(null);
     setMenuMode("general");
+    await competitionContext.clearCompetition();
+  }
+
+  async function handleLogout() {
+    if (props.onLogout) {
+      await props.onLogout();
+    }
   }
 
   function handleWorkerMenuPress(item) {
@@ -74,7 +90,7 @@ export default function WorkerCompetitionsBoardScreen(props) {
   }
 
   function handleCompetitionMenuPress(item) {
-    Alert.alert("בהמשך", "המסך " + item.label + " יתחבר כאן בהמשך");
+    props.navigation.navigate(item.screen);
   }
 
   function buildActions(item) {
@@ -83,8 +99,7 @@ export default function WorkerCompetitionsBoardScreen(props) {
         key: "details",
         label: "פרטי תחרות",
         onPress: function () {
-          openCompetitionMenu(item);
-          Alert.alert("בהמשך", "מסך פרטי תחרות יתחבר כאן בהמשך");
+          setCompetitionAndNavigate(item, "WorkerCompetitionShavingsOrders");
         },
         disabled: false,
         variant: "secondary",
@@ -93,8 +108,7 @@ export default function WorkerCompetitionsBoardScreen(props) {
         key: "enter",
         label: "כניסה",
         onPress: function () {
-          openCompetitionMenu(item);
-          Alert.alert("בהמשך", "כניסה לתחרות תחובר בהמשך");
+          setCompetitionAndNavigate(item, "WorkerCompetitionShavingsOrders");
         },
         disabled: !canWorkerEnterCompetition(item.competitionStatus),
         variant: "primary",
@@ -155,6 +169,11 @@ export default function WorkerCompetitionsBoardScreen(props) {
             }
             roleName={(activeRole && activeRole.roleName) || ""}
             ranchName={(activeRole && activeRole.ranchName) || ""}
+            competitionName={
+              competitionContext.activeCompetition
+                ? competitionContext.activeCompetition.competitionName
+                : ""
+            }
             closeMenu={closeMenu}
             items={getWorkerMenuItems()}
             onItemPress={handleWorkerMenuPress}

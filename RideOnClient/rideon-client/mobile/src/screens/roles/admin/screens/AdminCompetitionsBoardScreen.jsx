@@ -10,6 +10,7 @@ import { getAdminMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { getAdminCompetitionMenuItems } from "../../../../navigation/competitionMenuConfigs";
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
+import { useCompetition } from "../../../../context/CompetitionContext";
 import { getMobileAdminCompetitionsBoard } from "../../../../services/competitionService";
 import CompetitionBoardCard from "../../../../components/competitions/CompetitionBoardCard";
 import { formatCompetitionDateRange } from "../../../../../../shared/auth/utils/competitions/competitionFormatters";
@@ -21,6 +22,7 @@ import {
 export default function AdminCompetitionsBoardScreen(props) {
   var userContext = useUser();
   var activeRoleContext = useActiveRole();
+  var competitionContext = useCompetition();
 
   var user = userContext.user;
   var activeRole = activeRoleContext.activeRole;
@@ -32,10 +34,7 @@ export default function AdminCompetitionsBoardScreen(props) {
 
   useEffect(
     function () {
-      if (!activeRole || !activeRole.ranchId) {
-        return;
-      }
-
+      if (!activeRole || !activeRole.ranchId) return;
       loadCompetitions();
     },
     [activeRole],
@@ -44,16 +43,24 @@ export default function AdminCompetitionsBoardScreen(props) {
   async function loadCompetitions() {
     try {
       setLoading(true);
-
       var response = await getMobileAdminCompetitionsBoard(activeRole.ranchId);
       setCompetitions(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      console.error(error);
       Alert.alert("שגיאה", "אירעה שגיאה בטעינת התחרויות");
-      setCompetitions([]);
     } finally {
       setLoading(false);
     }
+  }
+
+  async function setCompetitionAndNavigate(item, screen) {
+    await competitionContext.setActiveCompetitionAndPersist({
+      competitionId: item.competitionId,
+      competitionName: item.competitionName,
+      competitionStatus: item.competitionStatus,
+      ranchId: activeRole.ranchId,
+    });
+
+    props.navigation.navigate(screen);
   }
 
   async function handleLogout() {
@@ -62,22 +69,12 @@ export default function AdminCompetitionsBoardScreen(props) {
     }
   }
 
-  function openCompetitionMenu(competition) {
-    setSelectedCompetition(competition);
-    setMenuMode("competition");
-  }
-
-  function exitCompetitionMenu() {
-    setSelectedCompetition(null);
-    setMenuMode("general");
-  }
-
   function handleAdminMenuPress(item) {
     props.navigation.navigate(item.screen);
   }
 
   function handleCompetitionMenuPress(item) {
-    Alert.alert("בהמשך", "המסך " + item.label + " יתחבר כאן בהמשך");
+    props.navigation.navigate(item.screen);
   }
 
   function buildActions(item) {
@@ -86,8 +83,7 @@ export default function AdminCompetitionsBoardScreen(props) {
         key: "details",
         label: "פרטי תחרות",
         onPress: function () {
-          openCompetitionMenu(item);
-          Alert.alert("בהמשך", "מסך פרטי תחרות יתחבר כאן בהמשך");
+          setCompetitionAndNavigate(item, "AdminCompetitionDetails");
         },
         disabled: false,
         variant: "secondary",
@@ -96,8 +92,7 @@ export default function AdminCompetitionsBoardScreen(props) {
         key: "registration",
         label: "הרשמה",
         onPress: function () {
-          openCompetitionMenu(item);
-          Alert.alert("בהמשך", "מסך הכנסת הרשמות יתחבר כאן בהמשך");
+          setCompetitionAndNavigate(item, "AdminCompetitionRegistrations");
         },
         disabled: !canAdminRegisterCompetition(item.competitionStatus),
         variant: "secondary",
@@ -106,8 +101,7 @@ export default function AdminCompetitionsBoardScreen(props) {
         key: "enter",
         label: "כניסה",
         onPress: function () {
-          openCompetitionMenu(item);
-          Alert.alert("בהמשך", "כניסה לתחרות תחובר בהמשך");
+          setCompetitionAndNavigate(item, "AdminCompetitionPayers");
         },
         disabled: !canAdminEnterCompetition(item.competitionStatus),
         variant: "primary",
@@ -115,41 +109,19 @@ export default function AdminCompetitionsBoardScreen(props) {
     ];
   }
 
-  function renderCompetitionCard(info) {
-    var item = info.item;
-
-    return (
-      <CompetitionBoardCard
-        title={item.competitionName}
-        dateText={formatCompetitionDateRange(
-          item.competitionStartDate,
-          item.competitionEndDate,
-        )}
-        ranchName={
-          activeRole && activeRole.ranchName ? activeRole.ranchName : ""
-        }
-        status={item.competitionStatus}
-        actions={buildActions(item)}
-      />
-    );
-  }
-
   return (
     <MobileScreenLayout
       title="לוח התחרויות"
-      subtitle=""
-      activeBottomTab={null}
       bottomNavItems={getAdminBottomNavConfig(props.navigation)}
-      menuContent={function ({ closeMenu }) {
+      menuContent={({ closeMenu }) => {
         if (menuMode === "competition" && selectedCompetition) {
           return (
             <CompetitionMenuTemplate
-              activeKey=""
-              closeMenu={closeMenu}
               competitionName={selectedCompetition.competitionName}
               items={getAdminCompetitionMenuItems()}
               onItemPress={handleCompetitionMenuPress}
-              onExitCompetition={exitCompetitionMenu}
+              onExitCompetition={() => setMenuMode("general")}
+              closeMenu={closeMenu}
             />
           );
         }
@@ -168,6 +140,11 @@ export default function AdminCompetitionsBoardScreen(props) {
             }
             roleName={(activeRole && activeRole.roleName) || ""}
             ranchName={(activeRole && activeRole.ranchName) || ""}
+            competitionName={
+              competitionContext.activeCompetition
+                ? competitionContext.activeCompetition.competitionName
+                : ""
+            }
             closeMenu={closeMenu}
             items={getAdminMenuItems()}
             onItemPress={handleAdminMenuPress}
@@ -182,24 +159,21 @@ export default function AdminCompetitionsBoardScreen(props) {
       <Text style={roleSharedStyles.sectionTitle}>כל התחרויות</Text>
 
       {loading ? (
-        <View style={competitionBoardStyles.loadingWrapper}>
-          <ActivityIndicator size="large" color="#8B6352" />
-        </View>
+        <ActivityIndicator size="large" color="#8B6352" />
       ) : (
         <View style={competitionBoardStyles.listContent}>
-          {competitions.length === 0 ? (
-            <Text style={competitionBoardStyles.emptyText}>
-              לא נמצאו תחרויות להצגה
-            </Text>
-          ) : (
-            competitions.map(function (item) {
-              return (
-                <View key={String(item.competitionId)}>
-                  {renderCompetitionCard({ item: item })}
-                </View>
-              );
-            })
-          )}
+          {competitions.map((item) => (
+            <CompetitionBoardCard
+              key={item.competitionId}
+              title={item.competitionName}
+              dateText={formatCompetitionDateRange(
+                item.competitionStartDate,
+                item.competitionEndDate,
+              )}
+              status={item.competitionStatus}
+              actions={buildActions(item)}
+            />
+          ))}
         </View>
       )}
     </MobileScreenLayout>

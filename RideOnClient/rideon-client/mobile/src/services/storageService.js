@@ -37,11 +37,32 @@ export async function clearActiveRole() {
   await AsyncStorage.removeItem(STORAGE_KEYS.ACTIVE_ROLE);
 }
 
+// ---------- ACTIVE COMPETITION ----------
+const ACTIVE_COMPETITION_KEY = "rideon_active_competition";
+
+export async function saveActiveCompetition(competition) {
+  if (!competition) return;
+  await AsyncStorage.setItem(
+    ACTIVE_COMPETITION_KEY,
+    JSON.stringify(competition),
+  );
+}
+
+export async function getActiveCompetition() {
+  const data = await AsyncStorage.getItem(ACTIVE_COMPETITION_KEY);
+  return data ? JSON.parse(data) : null;
+}
+
+export async function clearActiveCompetition() {
+  await AsyncStorage.removeItem(ACTIVE_COMPETITION_KEY);
+}
+
 // ---------- CLEAR ALL ----------
 export async function clearAuthStorage() {
   await AsyncStorage.multiRemove([
     STORAGE_KEYS.TOKEN,
     STORAGE_KEYS.USER,
     STORAGE_KEYS.ACTIVE_ROLE,
+    ACTIVE_COMPETITION_KEY,
   ]);
 }

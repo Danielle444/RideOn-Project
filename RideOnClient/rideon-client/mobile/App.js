@@ -7,6 +7,7 @@ import AppNavigator from "./src/navigation/AppNavigator";
 
 import { UserProvider } from "./src/context/UserContext";
 import { ActiveRoleProvider } from "./src/context/ActiveRoleContext";
+import { CompetitionProvider } from "./src/context/CompetitionContext";
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 
 function AppShell() {
@@ -43,9 +44,11 @@ export default function App() {
     <SafeAreaProvider>
       <UserProvider>
         <ActiveRoleProvider>
-          <AuthProvider>
-            <AppShell />
-          </AuthProvider>
+          <CompetitionProvider>
+            <AuthProvider>
+              <AppShell />
+            </AuthProvider>
+          </CompetitionProvider>
         </ActiveRoleProvider>
       </UserProvider>
     </SafeAreaProvider>

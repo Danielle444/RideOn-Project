@@ -16,9 +16,16 @@ export default function SideMenuTemplate(props) {
 
       <View style={roleSharedStyles.menuUserCard}>
         <Text style={roleSharedStyles.menuUserName}>{props.userName}</Text>
+
         <Text style={roleSharedStyles.menuUserMeta}>
           {[props.roleName, props.ranchName].filter(Boolean).join(" · ")}
         </Text>
+
+        {props.competitionName ? (
+          <Text style={roleSharedStyles.menuUserMeta}>
+            {props.competitionName}
+          </Text>
+        ) : null}
       </View>
 
       <ScrollView
