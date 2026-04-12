@@ -73,6 +73,7 @@ export default function StallCompoundModal(props) {
                   setStallTypeProductId(e.target.value);
                 }}
                 placeholder="בחרי סוג תאים"
+                searchable={true}
                 openDropdownKey={openDropdownKey}
                 setOpenDropdownKey={setOpenDropdownKey}
                 dropdownKey="stall-type"

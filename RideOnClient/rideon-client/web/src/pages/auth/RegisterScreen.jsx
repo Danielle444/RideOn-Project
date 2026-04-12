@@ -919,6 +919,7 @@ export default function RegisterScreen() {
                                 options={ranches}
                                 placeholder="בחר חווה"
                                 disabled={false}
+                                searchable={true}
                                 openDropdownKey={openDropdownKey}
                                 setOpenDropdownKey={setOpenDropdownKey}
                                 dropdownKey={"ranch-" + idx}
@@ -961,6 +962,7 @@ export default function RegisterScreen() {
                               options={filteredRoles}
                               placeholder="בחר תפקיד"
                               disabled={false}
+                              searchable={true}
                               openDropdownKey={openDropdownKey}
                               setOpenDropdownKey={setOpenDropdownKey}
                               dropdownKey={"role-" + idx}
