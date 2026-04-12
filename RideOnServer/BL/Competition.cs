@@ -133,6 +133,66 @@ namespace RideOnServer.BL
             dal.UpdateCompetition(competition);
         }
 
+        internal static List<Competition> GetAllCompetitionsForMobileAdmin()
+        {
+            CompetitionDAL dal = new CompetitionDAL();
+            List<Competition> list = dal.GetAllCompetitionsForMobileAdmin();
+
+            foreach (Competition item in list)
+            {
+                item.CompetitionStatus = CalculateEffectiveStatus(item);
+            }
+
+            return list
+                .Where(item => item.CompetitionStatus != CompetitionStatuses.Draft)
+                .OrderBy(item => item.CompetitionStartDate)
+                .ToList();
+        }
+
+        internal static List<Competition> GetCompetitionsForMobileWorker(int ranchId)
+        {
+            if (ranchId <= 0)
+            {
+                throw new Exception("RanchId is invalid");
+            }
+
+            CompetitionDAL dal = new CompetitionDAL();
+            List<Competition> list = dal.GetCompetitionsForMobileWorker(ranchId);
+
+            foreach (Competition item in list)
+            {
+                item.CompetitionStatus = CalculateEffectiveStatus(item);
+            }
+
+            return list
+                .Where(item =>
+                    item.CompetitionStatus == CompetitionStatuses.Active ||
+                    item.CompetitionStatus == CompetitionStatuses.Current ||
+                    item.CompetitionStatus == CompetitionStatuses.Future)
+                .OrderBy(item => item.CompetitionStartDate)
+                .ToList();
+        }
+
+        internal static List<Competition> GetCompetitionsForMobilePayer(int personId)
+        {
+            if (personId <= 0)
+            {
+                throw new Exception("PersonId is invalid");
+            }
+
+            CompetitionDAL dal = new CompetitionDAL();
+            List<Competition> list = dal.GetCompetitionsForMobilePayer(personId);
+
+            foreach (Competition item in list)
+            {
+                item.CompetitionStatus = CalculateEffectiveStatus(item);
+            }
+
+            return list
+                .OrderBy(item => item.CompetitionStartDate)
+                .ToList();
+        }
+
         private static void ValidateCompetitionRequest(
             string competitionName,
             byte fieldId,
@@ -232,5 +292,29 @@ namespace RideOnServer.BL
 
             return CompetitionStatuses.Future;
         }
+
+        internal static List<Competition> GetCompetitionsForMobileAdminHome(int systemUserId)
+        {
+            if (systemUserId <= 0)
+            {
+                throw new Exception("SystemUserId is invalid");
+            }
+
+            CompetitionDAL dal = new CompetitionDAL();
+            List<Competition> list = dal.GetCompetitionsForMobileAdminHome(systemUserId);
+
+            foreach (Competition item in list)
+            {
+                item.CompetitionStatus = CalculateEffectiveStatus(item);
+            }
+
+            return list
+                .Where(item => item.CompetitionStatus != CompetitionStatuses.Draft)
+                .OrderBy(item => item.CompetitionStartDate)
+                .Take(2)
+                .ToList();
+        }
+
+
     }
 }

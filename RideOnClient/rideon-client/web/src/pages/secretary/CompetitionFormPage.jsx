@@ -112,9 +112,13 @@ export default function CompetitionFormPage(props) {
           onSaveDraft={function () {
             page.handleSaveDetails("draft");
           }}
-          onPublish={function () {
-            page.handleSaveDetails("publish");
-          }}
+          onPublish={
+            page.shouldShowPaidTimeStep
+              ? null
+              : function () {
+                  page.handleSaveDetails("publish");
+                }
+          }
           canPublishCompetition={page.canPublishCompetition}
         />
 
@@ -138,6 +142,9 @@ export default function CompetitionFormPage(props) {
             onEdit={page.openEditPaidTimeModal}
             onDelete={page.handleDeletePaidTime}
             onSkip={page.handleSkipPaidTimeStep}
+            onPublish={function () {
+              page.handleSaveDetails("publish");
+            }}
           />
         ) : null}
       </div>

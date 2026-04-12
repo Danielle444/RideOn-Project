@@ -138,5 +138,16 @@ namespace RideOnServer.BL
                 throw new Exception("EndTime must be later than StartTime");
             }
         }
+
+        internal static PaidTimeSlotInCompetition? GetById(int compSlotId)
+        {
+            if (compSlotId <= 0)
+            {
+                throw new Exception("CompSlotId is invalid");
+            }
+
+            PaidTimeSlotInCompetitionDAL dal = new PaidTimeSlotInCompetitionDAL();
+            return dal.GetById(compSlotId);
+        }
     }
 }

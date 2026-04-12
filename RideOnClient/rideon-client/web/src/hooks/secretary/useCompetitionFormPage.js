@@ -145,10 +145,12 @@ export default function useCompetitionFormPage(options) {
 
     if (intent === "continue") {
       setActiveStep("classes");
+      return;
     }
 
     if (intent === "publish") {
-      setActiveStep("classes");
+      navigate("/competitions");
+      return;
     }
   }
 

@@ -78,7 +78,28 @@ function getPayerCompetitionMenuItems() {
   ];
 }
 
+function getWorkerCompetitionMenuItems() {
+  return [
+    {
+      key: "shavings-orders",
+      label: "הזמנות נסורת",
+      icon: "bonfire-outline",
+    },
+    {
+      key: "stall-map",
+      label: "מפת תאים",
+      icon: "location-outline",
+    },
+    {
+      key: "messages",
+      label: "הודעות",
+      icon: "chatbubble-outline",
+    },
+  ];
+}
+
 export {
   getAdminCompetitionMenuItems,
   getPayerCompetitionMenuItems,
+  getWorkerCompetitionMenuItems,
 };

@@ -16,9 +16,8 @@ function getPayerMenuItems() {
 
 function getWorkerMenuItems() {
   return [
-    { key: "orders", label: "הזמנות נסורת", screen: "WorkerShavingsOrders", icon: "cube-outline" },
-    { key: "stall-map", label: "מפת תאים", screen: "WorkerStallMap", icon: "location-outline" },
-    { key: "messages", label: "הודעות", screen: "WorkerMessages", icon: "chatbubble-outline" },
+    { key: "home", label: "דף הבית", screen: "WorkerHome", icon: "home-outline" },
+    { key: "competitions", label: "לוח התחרויות", screen: "WorkerCompetitionsBoard", icon: "trophy-outline" },
     { key: "profile", label: "פרופיל עובד", screen: "WorkerProfile", icon: "person-outline" },
   ];
 }

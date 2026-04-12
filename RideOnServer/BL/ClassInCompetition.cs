@@ -39,6 +39,17 @@ namespace RideOnServer.BL
             return dal.GetClassesByCompetitionId(competitionId);
         }
 
+        internal static ClassInCompetition? GetClassById(int classInCompId)
+        {
+            if (classInCompId <= 0)
+            {
+                throw new Exception("ClassInCompId is invalid");
+            }
+
+            ClassInCompetitionDAL dal = new ClassInCompetitionDAL();
+            return dal.GetClassById(classInCompId);
+        }
+
         internal static int CreateClassInCompetition(CreateClassInCompetitionRequest request)
         {
             ValidateRequest(

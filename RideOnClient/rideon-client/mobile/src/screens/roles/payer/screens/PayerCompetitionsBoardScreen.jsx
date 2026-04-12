@@ -1,41 +1,57 @@
-import { useState } from "react";
-import { Alert, Text } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, Text, View } from "react-native";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
+import competitionBoardStyles from "../../../../styles/competitionBoardStyles";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
-import PayerHomeCard from "../components/PayerHomeCard";
 import { getPayerMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { getPayerCompetitionMenuItems } from "../../../../navigation/competitionMenuConfigs";
 import { getPayerBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
+import { getMobilePayerCompetitionsBoard } from "../../../../services/competitionService";
+import CompetitionBoardCard from "../../../../components/competitions/CompetitionBoardCard";
+import { formatCompetitionDateRange } from "../../../../../../shared/auth/utils/competitions/competitionFormatters";
+import { canPayerEnterCompetition } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
 
 export default function PayerCompetitionsBoardScreen(props) {
-  const { user } = useUser();
-  const { activeRole } = useActiveRole();
+  var userContext = useUser();
+  var activeRoleContext = useActiveRole();
 
-  const [menuMode, setMenuMode] = useState("general");
-  const [selectedCompetition, setSelectedCompetition] = useState(null);
+  var user = userContext.user;
+  var activeRole = activeRoleContext.activeRole;
 
-  const competitions = [
-    {
-      id: 1,
-      title: "אליפות ישראל ברדרסאד'",
-      dateText: "15-17 מרץ 2026",
-      ranchName: "חוות הגליל העליון",
-      status: "כעת",
-      statusStyle: roleSharedStyles.statusNow,
+  var [menuMode, setMenuMode] = useState("general");
+  var [selectedCompetition, setSelectedCompetition] = useState(null);
+  var [competitions, setCompetitions] = useState([]);
+  var [loading, setLoading] = useState(false);
+
+  useEffect(
+    function () {
+      if (!activeRole || !activeRole.ranchId) {
+        return;
+      }
+
+      loadCompetitions();
     },
-    {
-      id: 2,
-      title: "גביע הקיץ - קפיצות",
-      dateText: "22-24 מרץ 2026",
-      ranchName: "מרכז הרכיבה הארצי",
-      status: "פתוחה",
-      statusStyle: roleSharedStyles.statusOpen,
-    },
-  ];
+    [activeRole],
+  );
+
+  async function loadCompetitions() {
+    try {
+      setLoading(true);
+
+      var response = await getMobilePayerCompetitionsBoard(activeRole.ranchId);
+      setCompetitions(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("שגיאה", "אירעה שגיאה בטעינת התחרויות");
+      setCompetitions([]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function openCompetitionMenu(competition) {
     setSelectedCompetition(competition);
@@ -61,6 +77,50 @@ export default function PayerCompetitionsBoardScreen(props) {
     Alert.alert("בהמשך", "המסך " + item.label + " יתחבר כאן בהמשך");
   }
 
+  function buildActions(item) {
+    return [
+      {
+        key: "details",
+        label: "פרטי תחרות",
+        onPress: function () {
+          openCompetitionMenu(item);
+          Alert.alert("בהמשך", "מסך פרטי תחרות יתחבר כאן בהמשך");
+        },
+        disabled: false,
+        variant: "secondary",
+      },
+      {
+        key: "enter",
+        label: "כניסה",
+        onPress: function () {
+          openCompetitionMenu(item);
+          Alert.alert("בהמשך", "כניסה לתחרות תחובר בהמשך");
+        },
+        disabled: !canPayerEnterCompetition(item.competitionStatus),
+        variant: "primary",
+      },
+    ];
+  }
+
+  function renderCompetitionCard(info) {
+    var item = info.item;
+
+    return (
+      <CompetitionBoardCard
+        title={item.competitionName}
+        dateText={formatCompetitionDateRange(
+          item.competitionStartDate,
+          item.competitionEndDate,
+        )}
+        ranchName={
+          activeRole && activeRole.ranchName ? activeRole.ranchName : ""
+        }
+        status={item.competitionStatus}
+        actions={buildActions(item)}
+      />
+    );
+  }
+
   return (
     <MobileScreenLayout
       title="לוח התחרויות"
@@ -73,7 +133,7 @@ export default function PayerCompetitionsBoardScreen(props) {
             <CompetitionMenuTemplate
               activeKey=""
               closeMenu={closeMenu}
-              competitionName={selectedCompetition.title}
+              competitionName={selectedCompetition.competitionName}
               items={getPayerCompetitionMenuItems()}
               onItemPress={handleCompetitionMenuPress}
               onExitCompetition={exitCompetitionMenu}
@@ -84,9 +144,17 @@ export default function PayerCompetitionsBoardScreen(props) {
         return (
           <SideMenuTemplate
             activeKey="competitions"
-            userName={`${user?.firstName || ""} ${user?.lastName || ""}`.trim()}
-            roleName={activeRole?.roleName || ""}
-            ranchName={activeRole?.ranchName || ""}
+            userName={
+              (user &&
+                (
+                  (user.firstName || "") +
+                  " " +
+                  (user.lastName || "")
+                ).trim()) ||
+              ""
+            }
+            roleName={(activeRole && activeRole.roleName) || ""}
+            ranchName={(activeRole && activeRole.ranchName) || ""}
             closeMenu={closeMenu}
             items={getPayerMenuItems()}
             onItemPress={handlePayerMenuPress}
@@ -100,26 +168,27 @@ export default function PayerCompetitionsBoardScreen(props) {
     >
       <Text style={roleSharedStyles.sectionTitle}>התחרויות שלי</Text>
 
-      {competitions.map(function (item) {
-        return (
-          <PayerHomeCard
-            key={item.id}
-            title={item.title}
-            dateText={item.dateText}
-            ranchName={item.ranchName}
-            status={item.status}
-            statusStyle={item.statusStyle}
-            onDetailsPress={function () {
-              openCompetitionMenu(item);
-              Alert.alert("בהמשך", "מסך פרטי תחרות יתחבר כאן בהמשך");
-            }}
-            onEnterPress={function () {
-              openCompetitionMenu(item);
-              Alert.alert("בהמשך", "כניסה לתחרות תחובר בהמשך");
-            }}
-          />
-        );
-      })}
+      {loading ? (
+        <View style={competitionBoardStyles.loadingWrapper}>
+          <ActivityIndicator size="large" color="#8B6352" />
+        </View>
+      ) : (
+        <View style={competitionBoardStyles.listContent}>
+          {competitions.length === 0 ? (
+            <Text style={competitionBoardStyles.emptyText}>
+              לא נמצאו תחרויות להצגה
+            </Text>
+          ) : (
+            competitions.map(function (item) {
+              return (
+                <View key={String(item.competitionId)}>
+                  {renderCompetitionCard({ item: item })}
+                </View>
+              );
+            })
+          )}
+        </View>
+      )}
     </MobileScreenLayout>
   );
 }

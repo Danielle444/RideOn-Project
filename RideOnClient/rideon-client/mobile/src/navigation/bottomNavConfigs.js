@@ -33,7 +33,7 @@ function getPayerBottomNavConfig(navigation) {
       key: "home",
       icon: "home-outline",
       onPress: function () {
-        navigation.navigate("PayerCompetitionsBoard");
+        navigation.navigate("PayerHome");
       },
     },
     {
@@ -55,9 +55,9 @@ function getWorkerBottomNavConfig(navigation) {
     },
     {
       key: "home",
-      icon: "cube-outline",
+      icon: "home-outline",
       onPress: function () {
-        navigation.navigate("WorkerShavingsOrders");
+        navigation.navigate("WorkerHome");
       },
     },
     {

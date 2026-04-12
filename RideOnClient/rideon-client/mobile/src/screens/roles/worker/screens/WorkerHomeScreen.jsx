@@ -12,19 +12,25 @@ import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLa
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
-import { getAdminMenuItems } from "../../../../navigation/sideMenuConfigs";
-import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
+import { getWorkerMenuItems } from "../../../../navigation/sideMenuConfigs";
+import { getWorkerBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import homeScreenStyles from "../../../../styles/homeScreenStyles";
 import HomeCompetitionCard from "../../../../components/home/HomeCompetitionCard";
 import HomeShortcutGrid from "../../../../components/home/HomeShortcutGrid";
-import { getMobileAdminHomeCompetitions } from "../../../../services/competitionService";
-import {
-  canAdminSeeCompetitionDetails,
-  canAdminRegisterCompetition,
-  canAdminEnterCompetition,
-} from "../../../../../../shared/auth/utils/competitions/competitionStatus";
+import { getMobileWorkerCompetitionsBoard } from "../../../../services/competitionService";
+import { canWorkerEnterCompetition } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
 
-export default function AdminHomeScreen(props) {
+function sortAndTakeNearest(items) {
+  return [...items]
+    .sort(function (a, b) {
+      return String(a.competitionStartDate || "").localeCompare(
+        String(b.competitionStartDate || ""),
+      );
+    })
+    .slice(0, 2);
+}
+
+export default function WorkerHomeScreen(props) {
   var userContext = useUser();
   var activeRoleContext = useActiveRole();
 
@@ -49,8 +55,9 @@ export default function AdminHomeScreen(props) {
     try {
       setLoading(true);
 
-      var response = await getMobileAdminHomeCompetitions(activeRole.ranchId);
-      setCompetitions(Array.isArray(response.data) ? response.data : []);
+      var response = await getMobileWorkerCompetitionsBoard(activeRole.ranchId);
+      var items = Array.isArray(response.data) ? response.data : [];
+      setCompetitions(sortAndTakeNearest(items));
     } catch (error) {
       console.error(error);
       setCompetitions([]);
@@ -67,6 +74,11 @@ export default function AdminHomeScreen(props) {
   }
 
   function handleMenuPress(item) {
+    if (item.screen === "WorkerProfile") {
+      Alert.alert("בהמשך", "מסך פרופיל העובד יחובר בהמשך");
+      return;
+    }
+
     props.navigation.navigate(item.screen);
   }
 
@@ -78,16 +90,7 @@ export default function AdminHomeScreen(props) {
         onPress: function () {
           Alert.alert("בהמשך", "מסך פרטי תחרות יחובר בהמשך");
         },
-        disabled: !canAdminSeeCompetitionDetails(item.competitionStatus),
-        variant: "secondary",
-      },
-      {
-        key: "registration",
-        label: "הרשמה",
-        onPress: function () {
-          Alert.alert("בהמשך", "מסך הכנסת הרשמות יחובר בהמשך");
-        },
-        disabled: !canAdminRegisterCompetition(item.competitionStatus),
+        disabled: false,
         variant: "secondary",
       },
       {
@@ -96,7 +99,7 @@ export default function AdminHomeScreen(props) {
         onPress: function () {
           Alert.alert("בהמשך", "כניסה לתחרות תחובר בהמשך");
         },
-        disabled: !canAdminEnterCompetition(item.competitionStatus),
+        disabled: !canWorkerEnterCompetition(item.competitionStatus),
         variant: "primary",
       },
     ];
@@ -110,7 +113,7 @@ export default function AdminHomeScreen(props) {
           label: "לוח התחרויות",
           icon: "trophy-outline",
           onPress: function () {
-            props.navigation.navigate("AdminCompetitionsBoard");
+            props.navigation.navigate("WorkerCompetitionsBoard");
           },
         },
         {
@@ -118,7 +121,7 @@ export default function AdminHomeScreen(props) {
           label: "פרופיל",
           icon: "person-outline",
           onPress: function () {
-            props.navigation.navigate("AdminProfile");
+            Alert.alert("בהמשך", "מסך פרופיל העובד יחובר בהמשך");
           },
         },
         {
@@ -150,7 +153,7 @@ export default function AdminHomeScreen(props) {
       title="דף הבית"
       subtitle=""
       activeBottomTab="home"
-      bottomNavItems={getAdminBottomNavConfig(props.navigation)}
+      bottomNavItems={getWorkerBottomNavConfig(props.navigation)}
       menuContent={function ({ closeMenu }) {
         return (
           <SideMenuTemplate
@@ -159,7 +162,7 @@ export default function AdminHomeScreen(props) {
             roleName={(activeRole && activeRole.roleName) || ""}
             ranchName={(activeRole && activeRole.ranchName) || ""}
             closeMenu={closeMenu}
-            items={getAdminMenuItems()}
+            items={getWorkerMenuItems()}
             onItemPress={handleMenuPress}
             onSwitchRole={function () {
               props.navigation.replace("SelectActiveRole");
@@ -181,17 +184,18 @@ export default function AdminHomeScreen(props) {
           <Text style={homeScreenStyles.welcomeRole}>
             {activeRole?.roleName}
           </Text>
-
+          
           <Text style={homeScreenStyles.welcomeSubtitle}>
             זה התפקיד הפעיל שלך בחווה {activeRole?.ranchName}
           </Text>
+
         </View>
 
         <TouchableOpacity
           activeOpacity={0.9}
           style={homeScreenStyles.quickButton}
           onPress={function () {
-            props.navigation.navigate("AdminCompetitionsBoard");
+            props.navigation.navigate("WorkerCompetitionsBoard");
           }}
         >
           <Ionicons name="arrow-back-outline" size={24} color="#FFFFFF" />
@@ -200,7 +204,7 @@ export default function AdminHomeScreen(props) {
               מעבר מהיר ללוח התחרויות
             </Text>
             <Text style={homeScreenStyles.quickButtonSubtitle}>
-              לצפייה בכל התחרויות והמשך עבודה
+              לצפייה בתחרויות הקרובות וכניסה לעבודה
             </Text>
           </View>
         </TouchableOpacity>
@@ -214,7 +218,7 @@ export default function AdminHomeScreen(props) {
             </View>
           ) : competitions.length === 0 ? (
             <Text style={homeScreenStyles.emptyText}>
-              עדיין לא נמצאו תחרויות קרובות עם מידע שהכנסת
+              עדיין לא נמצאו תחרויות קרובות להצגה
             </Text>
           ) : (
             competitions.map(function (item) {
