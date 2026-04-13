@@ -201,6 +201,57 @@ namespace RideOnServer.DAL
             }
         }
 
+        public List<CompetitionPayerListItem> GetCompetitionPayersBySystemUser(
+    int systemUserId,
+    GetCompetitionPayersFiltersRequest filters)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+    {
+        { "@SystemUserId", systemUserId },
+        { "@CompetitionId", filters.CompetitionId },
+        { "@SearchText", (object?)filters.SearchText ?? DBNull.Value }
+    };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_GetCompetitionPayersBySystemUser",
+                        connection,
+                        paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<CompetitionPayerListItem> list = new List<CompetitionPayerListItem>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(new CompetitionPayerListItem
+                            {
+                                PersonId = Convert.ToInt32(reader["PersonId"]),
+                                FirstName = reader["FirstName"].ToString() ?? string.Empty,
+                                LastName = reader["LastName"].ToString() ?? string.Empty,
+                                CellPhone = reader["CellPhone"] == DBNull.Value ? null : reader["CellPhone"].ToString(),
+                                Email = reader["Email"] == DBNull.Value ? null : reader["Email"].ToString(),
+                                TotalAmount = Convert.ToDecimal(reader["TotalAmount"]),
+                                PaidAmount = Convert.ToDecimal(reader["PaidAmount"]),
+                                PaymentStatus = reader["PaymentStatus"].ToString() ?? string.Empty
+                            });
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+
 
     }
 }

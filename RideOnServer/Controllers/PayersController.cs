@@ -168,5 +168,42 @@ namespace RideOnServer.Controllers
         }
 
 
+        [HttpGet("competition")]
+        public IActionResult GetCompetitionPayers(
+                [FromQuery] int ranchId,
+                [FromQuery] int competitionId,
+                [FromQuery] string? search)
+        {
+            try
+            {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                GetCompetitionPayersFiltersRequest filters = new GetCompetitionPayersFiltersRequest
+                {
+                    CompetitionId = competitionId,
+                    SearchText = search
+                };
+
+                List<CompetitionPayerListItem> payers =
+                    Payer.GetCompetitionPayersBySystemUser(currentPersonId, filters);
+
+                return Ok(payers);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
     }
 }

@@ -23,6 +23,7 @@ import AdminCompetitionPaidTimesScreen from "../screens/roles/admin/screens/Admi
 import AdminCompetitionHealthCertificatesScreen from "../screens/roles/admin/screens/AdminCompetitionHealthCertificatesScreen";
 import AdminAddPayerScreen from "../screens/roles/admin/screens/AdminAddPayerScreen";
 import AdminEditPayerScreen from "../screens/roles/admin/screens/AdminEditPayerScreen";
+import AdminCompetitionPayerAccountScreen from "../screens/roles/admin/screens/AdminCompetitionPayerAccountScreen";
 
 import PayerHomeScreen from "../screens/roles/payer/screens/PayerHomeScreen";
 import PayerCompetitionsBoardScreen from "../screens/roles/payer/screens/PayerCompetitionsBoardScreen";
@@ -233,6 +234,19 @@ export default function AppNavigator(props) {
             screenProps,
             ["אדמין חווה"],
             <AdminCompetitionPayersScreen
+              {...screenProps}
+              onLogout={props.onLogout}
+            />,
+          );
+        }}
+      </Stack.Screen>
+
+      <Stack.Screen name="AdminCompetitionPayerAccount">
+        {function (screenProps) {
+          return withGuard(
+            screenProps,
+            ["אדמין חווה"],
+            <AdminCompetitionPayerAccountScreen
               {...screenProps}
               onLogout={props.onLogout}
             />,

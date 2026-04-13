@@ -127,6 +127,28 @@ namespace RideOnServer.BL
             dal.RemoveManagedPayer(systemUserId, personId);
         }
 
+        internal static List<CompetitionPayerListItem> GetCompetitionPayersBySystemUser(int systemUserId,GetCompetitionPayersFiltersRequest filters)
+        {
+            if (systemUserId <= 0)
+            {
+                throw new Exception("Invalid SystemUserId");
+            }
+
+            if (filters == null)
+            {
+                throw new Exception("Filters are required");
+            }
+
+            if (filters.CompetitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            PayerDAL dal = new PayerDAL();
+            return dal.GetCompetitionPayersBySystemUser(systemUserId, filters);
+        }
+
+
 
     }
 }
