@@ -7,28 +7,10 @@ function getAdminMenuItems() {
       icon: "trophy-outline",
     },
     {
-      key: "riders",
-      label: "ניהול רוכבים",
-      screen: "AdminRiders",
-      icon: "people-outline",
-    },
-    {
-      key: "horses",
-      label: "ניהול סוסים",
-      screen: "AdminHorses",
-      icon: "business-outline",
-    },
-    {
       key: "payers",
       label: "ניהול משלמים",
       screen: "AdminPayers",
       icon: "card-outline",
-    },
-    {
-      key: "trainers",
-      label: "ניהול מאמנים",
-      screen: "AdminTrainers",
-      icon: "person-circle-outline",
     },
   ];
 }

@@ -1,9 +1,9 @@
 import ProfileScreenTemplate from "../../../../components/profile/ProfileScreenTemplate";
 import useProfileScreen from "../../../../hooks/useProfileScreen";
-import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
-import { getAdminMenuItems } from "../../../../navigation/sideMenuConfigs";
+import { getWorkerBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
+import { getWorkerMenuItems } from "../../../../navigation/sideMenuConfigs";
 
-export default function AdminProfileScreen(props) {
+export default function WorkerProfileScreen(props) {
   var page = useProfileScreen();
 
   return (
@@ -11,8 +11,8 @@ export default function AdminProfileScreen(props) {
       page={page}
       navigation={props.navigation}
       onLogout={props.onLogout}
-      bottomNavItems={getAdminBottomNavConfig(props.navigation)}
-      menuItems={getAdminMenuItems()}
+      bottomNavItems={getWorkerBottomNavConfig(props.navigation)}
+      menuItems={getWorkerMenuItems()}
     />
   );
 }

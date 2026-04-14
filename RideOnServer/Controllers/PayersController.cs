@@ -205,5 +205,109 @@ namespace RideOnServer.Controllers
             }
         }
 
+
+        [HttpGet("{personId}/managers")]
+        public IActionResult GetPayerManagers(int personId)
+        {
+            try
+            {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                if (currentPersonId != personId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לצפות במנהלים של משלם אחר");
+                }
+
+                List<PayerManagerItem> admins = Payer.GetPayerManagers(personId);
+                return Ok(admins);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("{personId}/available-managers")]
+        public IActionResult GetAvailablePayerManagers(int personId, [FromQuery] string? search)
+        {
+            try
+            {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                if (currentPersonId != personId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לצפות במנהלים זמינים עבור משלם אחר");
+                }
+
+                List<AvailablePayerManagerItem> admins =
+                    Payer.GetAvailablePayerManagers(personId, search);
+
+                return Ok(admins);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("{personId}/managers")]
+        public IActionResult AddPayerManager(int personId, [FromBody] AddPayerManagerRequest request)
+        {
+            try
+            {
+                if (personId != request.PersonId)
+                {
+                    return BadRequest("PersonId in URL does not match body");
+                }
+
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                Payer.AddPayerManager(currentPersonId, request);
+                return Ok("Managing admin added successfully");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpDelete("{personId}/managers")]
+        public IActionResult RemovePayerManager(int personId, [FromBody] RemovePayerManagerRequest request)
+        {
+            try
+            {
+                if (personId != request.PersonId)
+                {
+                    return BadRequest("PersonId in URL does not match body");
+                }
+
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                Payer.RemovePayerManager(currentPersonId, request);
+                return Ok("Managing admin removed successfully");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+
     }
 }

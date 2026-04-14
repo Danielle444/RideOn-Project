@@ -40,7 +40,7 @@ function getPayerBottomNavConfig(navigation) {
       key: "profile",
       icon: "person-outline",
       onPress: function () {
-        alert("מסך פרופיל של משלם יתחבר בהמשך");
+        navigation.navigate("PayerProfile");
       },
     },
   ];
@@ -64,7 +64,7 @@ function getWorkerBottomNavConfig(navigation) {
       key: "profile",
       icon: "person-outline",
       onPress: function () {
-        alert("מסך פרופיל עובד יתחבר בהמשך");
+        navigation.navigate("WorkerProfile");
       },
     },
   ];
