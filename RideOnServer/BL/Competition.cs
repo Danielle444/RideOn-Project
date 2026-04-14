@@ -9,6 +9,7 @@ namespace RideOnServer.BL
         public int HostRanchId { get; set; }
         public byte FieldId { get; set; }
         public int CreatedBySystemUserId { get; set; }
+        public string? HostRanchName { get; set; }
         public string CompetitionName { get; set; } = string.Empty;
         public DateTime CompetitionStartDate { get; set; }
         public DateTime CompetitionEndDate { get; set; }

@@ -3,13 +3,14 @@ import MobileEntryGateScreen from "../screens/navigation/MobileEntryGateScreen";
 import SelectActiveRoleScreen from "../screens/role-selection/SelectActiveRoleScreen";
 import ChangePasswordScreen from "../screens/auth/ChangePasswordScreen";
 
+import CompetitionInvitationScreen from "../screens/common/competition/CompetitionInvitationScreen";
+
 import AdminHomeScreen from "../screens/roles/admin/screens/AdminHomeScreen";
 import AdminCompetitionsBoardScreen from "../screens/roles/admin/screens/AdminCompetitionsBoardScreen";
 import AdminProfileScreen from "../screens/roles/admin/screens/AdminProfileScreen";
 import AdminHorsesScreen from "../screens/roles/admin/screens/AdminHorsesScreen";
 import AdminPayersScreen from "../screens/roles/admin/screens/AdminPayersScreen";
 
-import AdminCompetitionDetailsScreen from "../screens/roles/admin/screens/AdminCompetitionDetailsScreen";
 import AdminCompetitionRegistrationsScreen from "../screens/roles/admin/screens/AdminCompetitionRegistrationsScreen";
 import AdminCompetitionRidersScreen from "../screens/roles/admin/screens/AdminCompetitionRidersScreen";
 import AdminCompetitionHorsesScreen from "../screens/roles/admin/screens/AdminCompetitionHorsesScreen";
@@ -25,7 +26,6 @@ import AdminCompetitionPayerAccountScreen from "../screens/roles/admin/screens/A
 
 import PayerHomeScreen from "../screens/roles/payer/screens/PayerHomeScreen";
 import PayerCompetitionsBoardScreen from "../screens/roles/payer/screens/PayerCompetitionsBoardScreen";
-import PayerCompetitionAccountScreen from "../screens/roles/payer/screens/PayerCompetitionAccountScreen";
 import PayerCompetitionClassesScreen from "../screens/roles/payer/screens/PayerCompetitionClassesScreen";
 import PayerCompetitionPaidTimesScreen from "../screens/roles/payer/screens/PayerCompetitionPaidTimesScreen";
 import PayerCompetitionStallsScreen from "../screens/roles/payer/screens/PayerCompetitionStallsScreen";
@@ -88,7 +88,7 @@ export default function AppNavigator(props) {
           return withGuard(
             screenProps,
             ["אדמין חווה"],
-            <AdminHomeScreen {...screenProps} onLogout={props.onLogout} />
+            <AdminHomeScreen {...screenProps} onLogout={props.onLogout} />,
           );
         }}
       </Stack.Screen>
@@ -101,7 +101,7 @@ export default function AppNavigator(props) {
             <AdminCompetitionsBoardScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -111,7 +111,7 @@ export default function AppNavigator(props) {
           return withGuard(
             screenProps,
             ["אדמין חווה"],
-            <AdminProfileScreen {...screenProps} onLogout={props.onLogout} />
+            <AdminProfileScreen {...screenProps} onLogout={props.onLogout} />,
           );
         }}
       </Stack.Screen>
@@ -121,7 +121,7 @@ export default function AppNavigator(props) {
           return withGuard(
             screenProps,
             ["אדמין חווה"],
-            <AdminHorsesScreen {...screenProps} onLogout={props.onLogout} />
+            <AdminHorsesScreen {...screenProps} onLogout={props.onLogout} />,
           );
         }}
       </Stack.Screen>
@@ -131,7 +131,7 @@ export default function AppNavigator(props) {
           return withGuard(
             screenProps,
             ["אדמין חווה"],
-            <AdminPayersScreen {...screenProps} onLogout={props.onLogout} />
+            <AdminPayersScreen {...screenProps} onLogout={props.onLogout} />,
           );
         }}
       </Stack.Screen>
@@ -141,7 +141,7 @@ export default function AppNavigator(props) {
           return withGuard(
             screenProps,
             ["אדמין חווה"],
-            <AdminAddPayerScreen {...screenProps} onLogout={props.onLogout} />
+            <AdminAddPayerScreen {...screenProps} onLogout={props.onLogout} />,
           );
         }}
       </Stack.Screen>
@@ -151,7 +151,7 @@ export default function AppNavigator(props) {
           return withGuard(
             screenProps,
             ["אדמין חווה"],
-            <AdminEditPayerScreen {...screenProps} onLogout={props.onLogout} />
+            <AdminEditPayerScreen {...screenProps} onLogout={props.onLogout} />,
           );
         }}
       </Stack.Screen>
@@ -161,10 +161,10 @@ export default function AppNavigator(props) {
           return withGuard(
             screenProps,
             ["אדמין חווה"],
-            <AdminCompetitionDetailsScreen
+            <CompetitionInvitationScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -177,7 +177,7 @@ export default function AppNavigator(props) {
             <AdminCompetitionRegistrationsScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -190,7 +190,7 @@ export default function AppNavigator(props) {
             <AdminCompetitionRidersScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -203,7 +203,7 @@ export default function AppNavigator(props) {
             <AdminCompetitionHorsesScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -216,7 +216,7 @@ export default function AppNavigator(props) {
             <AdminCompetitionPayersScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -229,7 +229,7 @@ export default function AppNavigator(props) {
             <AdminCompetitionPayerAccountScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -242,7 +242,7 @@ export default function AppNavigator(props) {
             <AdminCompetitionTrainersScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -255,7 +255,7 @@ export default function AppNavigator(props) {
             <AdminCompetitionClassesScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -268,7 +268,7 @@ export default function AppNavigator(props) {
             <AdminCompetitionStallsShavingsScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -281,7 +281,7 @@ export default function AppNavigator(props) {
             <AdminCompetitionPaidTimesScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -294,7 +294,7 @@ export default function AppNavigator(props) {
             <AdminCompetitionHealthCertificatesScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -304,7 +304,7 @@ export default function AppNavigator(props) {
           return withGuard(
             screenProps,
             ["משלם"],
-            <PayerHomeScreen {...screenProps} onLogout={props.onLogout} />
+            <PayerHomeScreen {...screenProps} onLogout={props.onLogout} />,
           );
         }}
       </Stack.Screen>
@@ -317,7 +317,7 @@ export default function AppNavigator(props) {
             <PayerCompetitionsBoardScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -327,20 +327,20 @@ export default function AppNavigator(props) {
           return withGuard(
             screenProps,
             ["משלם"],
-            <PayerProfileScreen {...screenProps} onLogout={props.onLogout} />
+            <PayerProfileScreen {...screenProps} onLogout={props.onLogout} />,
           );
         }}
       </Stack.Screen>
 
-      <Stack.Screen name="PayerCompetitionAccount">
+      <Stack.Screen name="PayerCompetitionDetails">
         {function (screenProps) {
           return withGuard(
             screenProps,
             ["משלם"],
-            <PayerCompetitionAccountScreen
+            <CompetitionInvitationScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -353,7 +353,7 @@ export default function AppNavigator(props) {
             <PayerCompetitionClassesScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -366,7 +366,7 @@ export default function AppNavigator(props) {
             <PayerCompetitionPaidTimesScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -379,7 +379,7 @@ export default function AppNavigator(props) {
             <PayerCompetitionStallsScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -389,7 +389,7 @@ export default function AppNavigator(props) {
           return withGuard(
             screenProps,
             ["עובד חווה"],
-            <WorkerHomeScreen {...screenProps} onLogout={props.onLogout} />
+            <WorkerHomeScreen {...screenProps} onLogout={props.onLogout} />,
           );
         }}
       </Stack.Screen>
@@ -402,7 +402,7 @@ export default function AppNavigator(props) {
             <WorkerCompetitionsBoardScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -412,7 +412,7 @@ export default function AppNavigator(props) {
           return withGuard(
             screenProps,
             ["עובד חווה"],
-            <WorkerProfileScreen {...screenProps} onLogout={props.onLogout} />
+            <WorkerProfileScreen {...screenProps} onLogout={props.onLogout} />,
           );
         }}
       </Stack.Screen>
@@ -425,7 +425,7 @@ export default function AppNavigator(props) {
             <WorkerShavingsOrdersScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -438,7 +438,7 @@ export default function AppNavigator(props) {
             <WorkerCompetitionShavingsOrdersScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -451,7 +451,7 @@ export default function AppNavigator(props) {
             <WorkerCompetitionStallMapScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>
@@ -464,7 +464,7 @@ export default function AppNavigator(props) {
             <WorkerCompetitionMessagesScreen
               {...screenProps}
               onLogout={props.onLogout}
-            />
+            />,
           );
         }}
       </Stack.Screen>

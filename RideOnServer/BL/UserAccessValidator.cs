@@ -1,5 +1,6 @@
-﻿using System.Security.Claims;
-using RideOnServer.BL.DTOs.Auth;
+﻿using RideOnServer.BL.DTOs.Auth;
+using RideOnServer.DAL;
+using System.Security.Claims;
 
 namespace RideOnServer.BL
 {
@@ -138,5 +139,31 @@ namespace RideOnServer.BL
                 throw new UnauthorizedAccessException("אין לך הרשאה לבצע פעולה זו עבור משתמש אחר");
             }
         }
+
+        public static void EnsureUserHasAnyApprovedRole(int personId, params string[] allowedRoleNames)
+        {
+            if (personId <= 0)
+            {
+                throw new UnauthorizedAccessException("Invalid PersonId");
+            }
+
+            if (allowedRoleNames == null || allowedRoleNames.Length == 0)
+            {
+                throw new UnauthorizedAccessException("No allowed roles were provided");
+            }
+
+            SystemUserDAL dal = new SystemUserDAL();
+            List<ApprovedRoleRanch> approvedRoles = dal.GetApprovedPersonRanchesAndRoles(personId);
+
+            bool hasAllowedRole = approvedRoles.Any(x =>
+                !string.IsNullOrWhiteSpace(x.RoleName) &&
+                allowedRoleNames.Contains(x.RoleName));
+
+            if (!hasAllowedRole)
+            {
+                throw new UnauthorizedAccessException("אין לך הרשאה לצפות במסך זה");
+            }
+        }
+
     }
 }
