@@ -231,7 +231,7 @@ export default function useServicePricesPage() {
       message: `האם את בטוחה שברצונך למחוק את "${item.productName}"?`,
       onConfirm: async function () {
         try {
-          await deleteServiceProduct(item.productId);
+          await deleteServiceProduct(item.productId, ranchId);
           closeConfirmDialog();
           showToast("success", "המוצר נמחק בהצלחה");
           await loadDashboard();

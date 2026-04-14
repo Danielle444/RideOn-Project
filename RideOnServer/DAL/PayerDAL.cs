@@ -201,6 +201,213 @@ namespace RideOnServer.DAL
             }
         }
 
+        public List<CompetitionPayerListItem> GetCompetitionPayersBySystemUser(
+    int systemUserId,
+    GetCompetitionPayersFiltersRequest filters)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+    {
+        { "@SystemUserId", systemUserId },
+        { "@CompetitionId", filters.CompetitionId },
+        { "@SearchText", (object?)filters.SearchText ?? DBNull.Value }
+    };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_GetCompetitionPayersBySystemUser",
+                        connection,
+                        paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<CompetitionPayerListItem> list = new List<CompetitionPayerListItem>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(new CompetitionPayerListItem
+                            {
+                                PersonId = Convert.ToInt32(reader["PersonId"]),
+                                FirstName = reader["FirstName"].ToString() ?? string.Empty,
+                                LastName = reader["LastName"].ToString() ?? string.Empty,
+                                CellPhone = reader["CellPhone"] == DBNull.Value ? null : reader["CellPhone"].ToString(),
+                                Email = reader["Email"] == DBNull.Value ? null : reader["Email"].ToString(),
+                                TotalAmount = Convert.ToDecimal(reader["TotalAmount"]),
+                                PaidAmount = Convert.ToDecimal(reader["PaidAmount"]),
+                                PaymentStatus = reader["PaymentStatus"].ToString() ?? string.Empty
+                            });
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public List<PayerManagerItem> GetPayerManagers(int personId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@p_personid", personId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_getmanagingadminsforpayer",
+                        connection,
+                        paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<PayerManagerItem> list = new List<PayerManagerItem>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(new PayerManagerItem
+                            {
+                                AdminPersonId = Convert.ToInt32(reader["AdminPersonId"]),
+                                FirstName = reader["FirstName"].ToString() ?? string.Empty,
+                                LastName = reader["LastName"].ToString() ?? string.Empty,
+                                CellPhone = reader["CellPhone"] == DBNull.Value ? null : reader["CellPhone"].ToString(),
+                                Email = reader["Email"] == DBNull.Value ? null : reader["Email"].ToString(),
+                                RanchId = Convert.ToInt32(reader["RanchId"]),
+                                RanchName = reader["RanchName"].ToString() ?? string.Empty,
+                                RoleId = Convert.ToByte(reader["RoleId"]),
+                                RoleName = reader["RoleName"].ToString() ?? string.Empty,
+                                ApprovalStatus = reader["ApprovalStatus"].ToString() ?? string.Empty,
+                                RequestDate = reader["RequestDate"] == DBNull.Value ? null : Convert.ToDateTime(reader["RequestDate"]),
+                                UpdateDate = reader["UpdateDate"] == DBNull.Value ? null : Convert.ToDateTime(reader["UpdateDate"])
+                            });
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public List<AvailablePayerManagerItem> GetAvailablePayerManagers(int personId, string? searchText)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@p_personid", personId },
+                { "@p_search_text", (object?)searchText ?? DBNull.Value }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_getavailablemanagingadminsforpayer",
+                        connection,
+                        paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<AvailablePayerManagerItem> list = new List<AvailablePayerManagerItem>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(new AvailablePayerManagerItem
+                            {
+                                AdminPersonId = Convert.ToInt32(reader["AdminPersonId"]),
+                                FirstName = reader["FirstName"].ToString() ?? string.Empty,
+                                LastName = reader["LastName"].ToString() ?? string.Empty,
+                                CellPhone = reader["CellPhone"] == DBNull.Value ? null : reader["CellPhone"].ToString(),
+                                Email = reader["Email"] == DBNull.Value ? null : reader["Email"].ToString(),
+                                RanchId = Convert.ToInt32(reader["RanchId"]),
+                                RanchName = reader["RanchName"].ToString() ?? string.Empty,
+                                RoleId = Convert.ToByte(reader["RoleId"]),
+                                RoleName = reader["RoleName"].ToString() ?? string.Empty
+                            });
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public void AddPayerManager(int personId, int adminPersonId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@p_personid", personId },
+                { "@p_systemuserid", adminPersonId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_addmanagingadminforpayer",
+                        connection,
+                        paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public void RemovePayerManager(int personId, int adminPersonId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@p_personid", personId },
+                { "@p_systemuserid", adminPersonId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_removemanagingadminforpayer",
+                        connection,
+                        paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+
 
     }
 }

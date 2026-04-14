@@ -55,7 +55,7 @@ export default function ChangePasswordScreen(props) {
       return "הסיסמה החדשה חייבת להיות שונה מהסיסמה הנוכחית";
     }
 
-    if (!user || !user.username) {
+    if (!user || !user.personId) {
       return "לא נמצאו פרטי משתמש מחובר";
     }
 
@@ -87,8 +87,9 @@ export default function ChangePasswordScreen(props) {
         {
           text: "אישור",
           onPress: function () {
-            setTimeout(() => {
-            props.navigation.replace("MobileEntryGate");}, 0);
+            setTimeout(function () {
+              props.navigation.replace("MobileEntryGate");
+            }, 0);
           },
         },
       ]);
@@ -130,9 +131,7 @@ export default function ChangePasswordScreen(props) {
                   style={styles.eyeButton}
                 >
                   <Ionicons
-                    name={
-                      showCurrentPassword ? "eye-off-outline" : "eye-outline"
-                    }
+                    name={showCurrentPassword ? "eye-off-outline" : "eye-outline"}
                     size={20}
                     color="#8B6352"
                   />
@@ -194,9 +193,7 @@ export default function ChangePasswordScreen(props) {
                   style={styles.eyeButton}
                 >
                   <Ionicons
-                    name={
-                      showConfirmPassword ? "eye-off-outline" : "eye-outline"
-                    }
+                    name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
                     size={20}
                     color="#8B6352"
                   />

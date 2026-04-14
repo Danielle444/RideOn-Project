@@ -271,6 +271,68 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [Authorize]
+        [HttpGet("{competitionId}/invitation")]
+        public IActionResult GetCompetitionInvitationDetails(int competitionId)
+        {
+            try
+            {
+                int personId = GetPersonIdFromClaims();
+
+                Competition? competition = Competition.GetCompetitionById(competitionId);
+
+                if (competition == null)
+                {
+                    return NotFound("Competition not found");
+                }
+
+                string? roleName = User.Claims.FirstOrDefault(c => c.Type == "RoleName")?.Value;
+
+                if (string.IsNullOrWhiteSpace(roleName))
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "Missing role");
+                }
+
+                if (roleName == RoleNames.HostSecretary)
+                {
+                    UserAccessValidator.EnsureUserHasRoleInRanch(
+                        personId,
+                        competition.HostRanchId,
+                        RoleNames.HostSecretary
+                    );
+                }
+                else if (roleName == RoleNames.RanchAdmin)
+                {
+                    UserAccessValidator.EnsureUserHasAnyApprovedRole(personId, RoleNames.RanchAdmin);
+                }
+                else if (roleName == RoleNames.Payer)
+                {
+                    UserAccessValidator.EnsureUserHasAnyApprovedRole(personId, RoleNames.Payer);
+                }
+                else
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לצפות בפרטי תחרות");
+                }
+
+                if (competition.CompetitionStatus == CompetitionStatuses.Draft &&
+                    roleName != RoleNames.HostSecretary)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "טיוטת תחרות זמינה רק לחווה המארחת");
+                }
+
+                var response = CompetitionInvitationManager.GetInvitationDetails(competitionId);
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
 
         private int GetPersonIdFromClaims()
         {

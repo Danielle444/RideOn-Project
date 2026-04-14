@@ -12,16 +12,14 @@ import {
   clearAuthStorage,
 } from "../services/storageService";
 import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
-import { isRoleSupportedOnMobile } from "../../../shared/auth/utils/platformRoles";
 import { useUser } from "./UserContext";
 import { useActiveRole } from "./ActiveRoleContext";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider(props) {
-  const { user, setUser, setIsUserHydrated } = useUser();
-  const { setActiveRole, setActiveRoleAndPersist, clearActiveRole } =
-    useActiveRole();
+  const { setUser, setIsUserHydrated } = useUser();
+  const { setActiveRole, clearActiveRole } = useActiveRole();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -64,11 +62,10 @@ export function AuthProvider(props) {
   async function loginAndInitialize(username, password) {
     try {
       await clearAuthStorage();
-      
+
       const response = await loginRequest(username.trim(), password);
       const data = response.data;
 
-      // ❗ בדיקה לפני שמירה
       if (
         !data ||
         !data.token ||
@@ -98,7 +95,6 @@ export function AuthProvider(props) {
         approvedRolesAndRanches: data.approvedRolesAndRanches,
       };
 
-      // ✅ רק עכשיו שומרים
       await saveToken(data.token);
       await saveUser(userData);
 
@@ -113,6 +109,7 @@ export function AuthProvider(props) {
     } catch (err) {
       if (err && err.isAuthError) {
         await logout();
+
         return {
           ok: false,
           message: "ההתחברות פגה, יש להתחבר מחדש",
@@ -128,17 +125,23 @@ export function AuthProvider(props) {
 
   async function changePasswordAndRefresh(currentPassword, newPassword) {
     try {
-      if (!user || !user.username) {
+      const currentUser = await getUser();
+
+      if (!currentUser || !currentUser.personId) {
         return {
           ok: false,
           message: "לא נמצאו פרטי משתמש מחובר",
         };
       }
 
-      await changePasswordRequest(user.username, currentPassword, newPassword);
+      await changePasswordRequest(
+        currentUser.personId,
+        currentPassword,
+        newPassword
+      );
 
       const updatedUser = {
-        ...user,
+        ...currentUser,
         mustChangePassword: false,
       };
 
@@ -164,8 +167,8 @@ export function AuthProvider(props) {
 
   async function logout() {
     await clearAuthStorage();
+    await clearActiveRole();
     setUser(null);
-    setActiveRole(null);
     setIsUserHydrated(true);
     setIsAuthenticated(false);
   }

@@ -3,15 +3,14 @@ import MobileEntryGateScreen from "../screens/navigation/MobileEntryGateScreen";
 import SelectActiveRoleScreen from "../screens/role-selection/SelectActiveRoleScreen";
 import ChangePasswordScreen from "../screens/auth/ChangePasswordScreen";
 
+import CompetitionInvitationScreen from "../screens/common/competition/CompetitionInvitationScreen";
+
 import AdminHomeScreen from "../screens/roles/admin/screens/AdminHomeScreen";
 import AdminCompetitionsBoardScreen from "../screens/roles/admin/screens/AdminCompetitionsBoardScreen";
 import AdminProfileScreen from "../screens/roles/admin/screens/AdminProfileScreen";
-import AdminRidersScreen from "../screens/roles/admin/screens/AdminRidersScreen";
 import AdminHorsesScreen from "../screens/roles/admin/screens/AdminHorsesScreen";
 import AdminPayersScreen from "../screens/roles/admin/screens/AdminPayersScreen";
-import AdminTrainersScreen from "../screens/roles/admin/screens/AdminTrainersScreen";
 
-import AdminCompetitionDetailsScreen from "../screens/roles/admin/screens/AdminCompetitionDetailsScreen";
 import AdminCompetitionRegistrationsScreen from "../screens/roles/admin/screens/AdminCompetitionRegistrationsScreen";
 import AdminCompetitionRidersScreen from "../screens/roles/admin/screens/AdminCompetitionRidersScreen";
 import AdminCompetitionHorsesScreen from "../screens/roles/admin/screens/AdminCompetitionHorsesScreen";
@@ -23,13 +22,14 @@ import AdminCompetitionPaidTimesScreen from "../screens/roles/admin/screens/Admi
 import AdminCompetitionHealthCertificatesScreen from "../screens/roles/admin/screens/AdminCompetitionHealthCertificatesScreen";
 import AdminAddPayerScreen from "../screens/roles/admin/screens/AdminAddPayerScreen";
 import AdminEditPayerScreen from "../screens/roles/admin/screens/AdminEditPayerScreen";
+import AdminCompetitionPayerAccountScreen from "../screens/roles/admin/screens/AdminCompetitionPayerAccountScreen";
 
 import PayerHomeScreen from "../screens/roles/payer/screens/PayerHomeScreen";
 import PayerCompetitionsBoardScreen from "../screens/roles/payer/screens/PayerCompetitionsBoardScreen";
-import PayerCompetitionAccountScreen from "../screens/roles/payer/screens/PayerCompetitionAccountScreen";
 import PayerCompetitionClassesScreen from "../screens/roles/payer/screens/PayerCompetitionClassesScreen";
 import PayerCompetitionPaidTimesScreen from "../screens/roles/payer/screens/PayerCompetitionPaidTimesScreen";
 import PayerCompetitionStallsScreen from "../screens/roles/payer/screens/PayerCompetitionStallsScreen";
+import PayerProfileScreen from "../screens/roles/payer/screens/PayerProfileScreen";
 
 import WorkerHomeScreen from "../screens/roles/worker/screens/WorkerHomeScreen";
 import WorkerShavingsOrdersScreen from "../screens/roles/worker/screens/WorkerShavingsOrdersScreen";
@@ -37,6 +37,7 @@ import WorkerCompetitionsBoardScreen from "../screens/roles/worker/screens/Worke
 import WorkerCompetitionShavingsOrdersScreen from "../screens/roles/worker/screens/WorkerCompetitionShavingsOrdersScreen";
 import WorkerCompetitionStallMapScreen from "../screens/roles/worker/screens/WorkerCompetitionStallMapScreen";
 import WorkerCompetitionMessagesScreen from "../screens/roles/worker/screens/WorkerCompetitionMessagesScreen";
+import WorkerProfileScreen from "../screens/roles/worker/screens/WorkerProfileScreen";
 
 import GuardedScreen from "./GuardedScreen";
 
@@ -115,16 +116,6 @@ export default function AppNavigator(props) {
         }}
       </Stack.Screen>
 
-      <Stack.Screen name="AdminRiders">
-        {function (screenProps) {
-          return withGuard(
-            screenProps,
-            ["אדמין חווה"],
-            <AdminRidersScreen {...screenProps} onLogout={props.onLogout} />,
-          );
-        }}
-      </Stack.Screen>
-
       <Stack.Screen name="AdminHorses">
         {function (screenProps) {
           return withGuard(
@@ -165,22 +156,12 @@ export default function AppNavigator(props) {
         }}
       </Stack.Screen>
 
-      <Stack.Screen name="AdminTrainers">
-        {function (screenProps) {
-          return withGuard(
-            screenProps,
-            ["אדמין חווה"],
-            <AdminTrainersScreen {...screenProps} onLogout={props.onLogout} />,
-          );
-        }}
-      </Stack.Screen>
-
       <Stack.Screen name="AdminCompetitionDetails">
         {function (screenProps) {
           return withGuard(
             screenProps,
             ["אדמין חווה"],
-            <AdminCompetitionDetailsScreen
+            <CompetitionInvitationScreen
               {...screenProps}
               onLogout={props.onLogout}
             />,
@@ -233,6 +214,19 @@ export default function AppNavigator(props) {
             screenProps,
             ["אדמין חווה"],
             <AdminCompetitionPayersScreen
+              {...screenProps}
+              onLogout={props.onLogout}
+            />,
+          );
+        }}
+      </Stack.Screen>
+
+      <Stack.Screen name="AdminCompetitionPayerAccount">
+        {function (screenProps) {
+          return withGuard(
+            screenProps,
+            ["אדמין חווה"],
+            <AdminCompetitionPayerAccountScreen
               {...screenProps}
               onLogout={props.onLogout}
             />,
@@ -328,12 +322,22 @@ export default function AppNavigator(props) {
         }}
       </Stack.Screen>
 
-      <Stack.Screen name="PayerCompetitionAccount">
+      <Stack.Screen name="PayerProfile">
         {function (screenProps) {
           return withGuard(
             screenProps,
             ["משלם"],
-            <PayerCompetitionAccountScreen
+            <PayerProfileScreen {...screenProps} onLogout={props.onLogout} />,
+          );
+        }}
+      </Stack.Screen>
+
+      <Stack.Screen name="PayerCompetitionDetails">
+        {function (screenProps) {
+          return withGuard(
+            screenProps,
+            ["משלם"],
+            <CompetitionInvitationScreen
               {...screenProps}
               onLogout={props.onLogout}
             />,
@@ -399,6 +403,16 @@ export default function AppNavigator(props) {
               {...screenProps}
               onLogout={props.onLogout}
             />,
+          );
+        }}
+      </Stack.Screen>
+
+      <Stack.Screen name="WorkerProfile">
+        {function (screenProps) {
+          return withGuard(
+            screenProps,
+            ["עובד חווה"],
+            <WorkerProfileScreen {...screenProps} onLogout={props.onLogout} />,
           );
         }}
       </Stack.Screen>

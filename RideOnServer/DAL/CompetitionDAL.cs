@@ -275,17 +275,33 @@ namespace RideOnServer.DAL
                     : reader["StallMapUrl"].ToString(),
                 FieldName = reader["FieldName"] == DBNull.Value
                     ? null
-                    : reader["FieldName"].ToString()
+                    : reader["FieldName"].ToString(),
+                HostRanchName = HasColumn(reader, "HostRanchName") && reader["HostRanchName"] != DBNull.Value
+                    ? reader["HostRanchName"].ToString()
+                    : null,
             };
+        }
+
+        private bool HasColumn(NpgsqlDataReader reader, string columnName)
+        {
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                if (reader.GetName(i).Equals(columnName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
 
         public List<Competition> GetCompetitionsForMobileAdminHome(int systemUserId)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
-    {
-        { "@SystemUserId", systemUserId }
-    };
+            {
+                { "@SystemUserId", systemUserId }
+            };
 
             try
             {
@@ -304,6 +320,46 @@ namespace RideOnServer.DAL
                         }
 
                         return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public List<string> GetJudgeNamesByCompetitionId(int competitionId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@CompetitionId", competitionId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetJudgesByCompetitionId", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<string> list = new List<string>();
+
+                        while (reader.Read())
+                        {
+                            string fullName =
+                                ((reader["FirstNameHebrew"] == DBNull.Value ? "" : reader["FirstNameHebrew"].ToString()) + " " +
+                                 (reader["LastNameHebrew"] == DBNull.Value ? "" : reader["LastNameHebrew"].ToString())).Trim();
+
+                            if (!string.IsNullOrWhiteSpace(fullName))
+                            {
+                                list.Add(fullName);
+                            }
+                        }
+
+                        return list.Distinct().ToList();
                     }
                 }
             }

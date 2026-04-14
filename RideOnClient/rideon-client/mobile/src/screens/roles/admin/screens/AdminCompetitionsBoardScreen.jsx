@@ -60,7 +60,10 @@ export default function AdminCompetitionsBoardScreen(props) {
       ranchId: activeRole.ranchId,
     });
 
-    props.navigation.navigate(screen);
+    props.navigation.navigate(screen, {
+      competitionId: item.competitionId,
+      competitionName: item.competitionName,
+    });
   }
 
   async function handleLogout() {
@@ -166,6 +169,7 @@ export default function AdminCompetitionsBoardScreen(props) {
             <CompetitionBoardCard
               key={item.competitionId}
               title={item.competitionName}
+              ranchName={item.hostRanchName || ""}
               dateText={formatCompetitionDateRange(
                 item.competitionStartDate,
                 item.competitionEndDate,

@@ -36,10 +36,21 @@ function removeManagedPayer(personId, ranchId) {
   });
 }
 
+function getCompetitionPayers(ranchId, competitionId, search) {
+  return axios.get("/Payers/competition", {
+    params: {
+      ranchId: ranchId,
+      competitionId: competitionId,
+      search: search || null,
+    },
+  });
+}
+
 export {
   getManagedPayers,
   findPotentialPayerByContact,
   requestManagedPayer,
   updateManagedPayer,
   removeManagedPayer,
+  getCompetitionPayers,
 };

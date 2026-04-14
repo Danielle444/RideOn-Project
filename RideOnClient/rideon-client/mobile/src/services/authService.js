@@ -52,11 +52,11 @@ function getPersonByNationalIdForRegistration(nationalId) {
   });
 }
 
-function changePassword(username, currentPassword, newPassword) {
+function changePassword(personId, currentPassword, newPassword) {
   return axios.put(
     `${API_BASE_URL}/SystemUsers/change-password`,
     {
-      username: username,
+      personId: personId,
       currentPassword: currentPassword,
       newPassword: newPassword,
     },
