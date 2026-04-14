@@ -6,8 +6,8 @@ import ChangePasswordScreen from "../screens/auth/ChangePasswordScreen";
 import AdminHomeScreen from "../screens/roles/admin/screens/AdminHomeScreen";
 import AdminCompetitionsBoardScreen from "../screens/roles/admin/screens/AdminCompetitionsBoardScreen";
 import AdminProfileScreen from "../screens/roles/admin/screens/AdminProfileScreen";
+import AdminHorsesScreen from "../screens/roles/admin/screens/AdminHorsesScreen";
 import AdminPayersScreen from "../screens/roles/admin/screens/AdminPayersScreen";
-
 
 import AdminCompetitionDetailsScreen from "../screens/roles/admin/screens/AdminCompetitionDetailsScreen";
 import AdminCompetitionRegistrationsScreen from "../screens/roles/admin/screens/AdminCompetitionRegistrationsScreen";
@@ -112,6 +112,16 @@ export default function AppNavigator(props) {
             screenProps,
             ["אדמין חווה"],
             <AdminProfileScreen {...screenProps} onLogout={props.onLogout} />
+          );
+        }}
+      </Stack.Screen>
+
+      <Stack.Screen name="AdminHorses">
+        {function (screenProps) {
+          return withGuard(
+            screenProps,
+            ["אדמין חווה"],
+            <AdminHorsesScreen {...screenProps} onLogout={props.onLogout} />
           );
         }}
       </Stack.Screen>

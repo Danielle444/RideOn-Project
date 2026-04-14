@@ -1,4 +1,7 @@
-﻿namespace RideOnServer.BL
+﻿using RideOnServer.BL.DTOs.Horses;
+using RideOnServer.DAL;
+
+namespace RideOnServer.BL
 {
     public class Horse
     {
@@ -17,5 +20,47 @@
         public short? BirthYear { get; set; }
 
         public string? Gender { get; set; }
+
+
+        internal static List<HorseListItem> GetHorsesByRanch(GetHorsesFiltersRequest filters)
+        {
+            if (filters == null)
+            {
+                throw new Exception("Filters are required");
+            }
+
+            if (filters.RanchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            HorseDAL dal = new HorseDAL();
+            return dal.GetHorsesByRanch(filters);
+        }
+
+        internal static void UpdateHorseBarnName(UpdateHorseBarnNameRequest request)
+        {
+            if (request == null)
+            {
+                throw new Exception("Request is required");
+            }
+
+            if (request.HorseId <= 0)
+            {
+                throw new Exception("Invalid HorseId");
+            }
+
+            if (request.RanchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            HorseDAL dal = new HorseDAL();
+            dal.UpdateHorseBarnName(request);
+        }
+
+
+
+
     }
 }

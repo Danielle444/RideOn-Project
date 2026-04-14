@@ -7,6 +7,12 @@ function getAdminMenuItems() {
       icon: "trophy-outline",
     },
     {
+      key: "horses",
+      label: "ניהול סוסים",
+      screen: "AdminHorses",
+      icon: "business-outline",
+    },
+    {
       key: "payers",
       label: "ניהול משלמים",
       screen: "AdminPayers",
