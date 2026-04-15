@@ -1,7 +1,7 @@
 import { createContext, useContext, useState } from "react";
 import {
   saveActiveRole,
-  removeActiveRole,
+  clearActiveRole as clearActiveRoleFromStorage,
 } from "../services/storageService";
 
 const ActiveRoleContext = createContext(null);
@@ -15,7 +15,7 @@ export function ActiveRoleProvider(props) {
   }
 
   async function clearActiveRole() {
-    await removeActiveRole();
+    await clearActiveRoleFromStorage();
     setActiveRole(null);
   }
 
