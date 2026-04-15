@@ -32,9 +32,11 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (Exception ex)
             {
-                throw new Exception($"Database error: {ex.Message}");
+                Console.WriteLine("=== RoleDAL.GetAllRoles ERROR ===");
+                Console.WriteLine(ex.ToString());
+                throw;
             }
         }
     }

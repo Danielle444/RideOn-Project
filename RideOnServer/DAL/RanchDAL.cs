@@ -32,9 +32,11 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException ex)
+            catch (Exception ex)
             {
-                throw new Exception($"Database error: {ex.Message}");
+                Console.WriteLine("=== RanchDAL.GetAllRanchesNames ERROR ===");
+                Console.WriteLine(ex.ToString());
+                throw;
             }
         }
 
@@ -64,9 +66,11 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException ex)
+            catch (Exception ex)
             {
-                throw new Exception($"Database error: {ex.Message}");
+                Console.WriteLine("=== RanchDAL.GetRanchesForRegistration ERROR ===");
+                Console.WriteLine(ex.ToString());
+                throw;
             }
         }
 
@@ -104,9 +108,11 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException ex)
+            catch (Exception ex)
             {
-                throw new Exception($"Database error: {ex.Message}");
+                Console.WriteLine("=== RanchDAL.GetRanchById ERROR ===");
+                Console.WriteLine(ex.ToString());
+                throw;
             }
         }
 
@@ -135,9 +141,11 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (NpgsqlException ex)
+            catch (Exception ex)
             {
-                throw new Exception($"Database error: {ex.Message}");
+                Console.WriteLine("=== RanchDAL.UpdateRanch ERROR ===");
+                Console.WriteLine(ex.ToString());
+                throw;
             }
         }
     }
