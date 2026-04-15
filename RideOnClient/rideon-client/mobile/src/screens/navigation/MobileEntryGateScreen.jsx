@@ -36,15 +36,15 @@ export default function MobileEntryGateScreen(props) {
         return;
       }
 
-      // חשוב: אם המשתמש לא מחובר, לא מנווטים מכאן בכלל.
-      // App.js כבר יעביר אוטומטית ל-AuthNavigator.
+      // אם המשתמש לא מחובר - לא עושים ניווט מכאן.
+      // App.js כבר יציג את AuthNavigator לבד.
       if (!isAuthenticated || !user) {
         return;
       }
 
       handleNavigation();
     },
-    [isFocused, isUserHydrated, isAuthenticated, user, activeRole],
+    [isFocused, isUserHydrated, isAuthenticated, user, activeRole]
   );
 
   async function handleNavigation() {
