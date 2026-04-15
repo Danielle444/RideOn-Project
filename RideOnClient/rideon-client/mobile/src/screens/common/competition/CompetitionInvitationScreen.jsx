@@ -217,7 +217,11 @@ export default function CompetitionInvitationScreen(props) {
     setLoading(true);
     setScreenError("");
 
-    getCompetitionInvitationDetails(competitionId)
+    getCompetitionInvitationDetails(
+      competitionId,
+      activeRole?.roleId,
+      activeRole?.ranchId,
+    )
       .then(function (response) {
         setDetails(response.data || null);
       })

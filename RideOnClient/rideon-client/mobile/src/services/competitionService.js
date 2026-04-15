@@ -32,8 +32,13 @@ function getMobilePayerCompetitionsBoard(ranchId) {
   });
 }
 
-function getCompetitionInvitationDetails(competitionId) {
-  return axios.get("/Competitions/" + competitionId + "/invitation");
+function getCompetitionInvitationDetails(competitionId, roleId, ranchId) {
+  return axios.get("/Competitions/" + competitionId + "/invitation", {
+    params: {
+      roleId: roleId,
+      ranchId: ranchId,
+    },
+  });
 }
 
 export {
