@@ -1,49 +1,63 @@
-import { Alert, Pressable, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
-import AdminHomeCard from "../components/AdminHomeCard";
-import roleSharedStyles from "../../../../styles/roleSharedStyles";
-import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
-import { getAdminMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
+import { getAdminMenuItems } from "../../../../navigation/sideMenuConfigs";
+import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
+import homeScreenStyles from "../../../../styles/homeScreenStyles";
+import HomeCompetitionCard from "../../../../components/home/HomeCompetitionCard";
+import HomeShortcutGrid from "../../../../components/home/HomeShortcutGrid";
+import { getMobileAdminHomeCompetitions } from "../../../../services/competitionService";
+import {
+  canAdminSeeCompetitionDetails,
+  canAdminRegisterCompetition,
+  canAdminEnterCompetition,
+} from "../../../../../../shared/auth/utils/competitions/competitionStatus";
 
 export default function AdminHomeScreen(props) {
-  const { user } = useUser();
-  const { activeRole } = useActiveRole();
+  var userContext = useUser();
+  var activeRoleContext = useActiveRole();
 
-  const competitions = [
-    {
-      id: 1,
-      title: "ריינינג 1+2 2026",
-      dateText: "17-15 במרץ, 2026",
-      ranchName: "חוות דאבל קיי",
-      status: "כעת",
-      registrationDisabled: true,
-      enterDisabled: false,
-    },
-    {
-      id: 2,
-      title: "גביע הקיץ - קפיצות",
-      dateText: "24-22 במרץ, 2026",
-      ranchName: "מרכז הרכיבה הארצי",
-      status: "פתוחה",
-      registrationDisabled: false,
-      enterDisabled: true,
-    },
-    {
-      id: 3,
-      title: "תחרות מסלולים ים המלח",
-      dateText: "04-02 באפריל, 2026",
-      ranchName: "חוות סוסים המדבר",
-      status: "סגורה",
-      registrationDisabled: false,
-      enterDisabled: true,
-    },
-  ];
+  var user = userContext.user;
+  var activeRole = activeRoleContext.activeRole;
 
-  function goToCompetitionsBoard() {
-    props.navigation.navigate("AdminCompetitionsBoard");
+  var [competitions, setCompetitions] = useState([]);
+  var [loading, setLoading] = useState(false);
+
+  useEffect(
+    function () {
+      if (!activeRole || !activeRole.ranchId) {
+        return;
+      }
+
+      loadHomeCompetitions();
+    },
+    [activeRole],
+  );
+
+  async function loadHomeCompetitions() {
+    try {
+      setLoading(true);
+
+      var response = await getMobileAdminHomeCompetitions(activeRole.ranchId);
+      setCompetitions(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error(error);
+      setCompetitions([]);
+      Alert.alert("שגיאה", "אירעה שגיאה בטעינת דף הבית");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleLogout() {
@@ -51,6 +65,85 @@ export default function AdminHomeScreen(props) {
       await props.onLogout();
     }
   }
+
+  function handleMenuPress(item) {
+    props.navigation.navigate(item.screen);
+  }
+
+  function buildCompetitionActions(item) {
+    return [
+      {
+        key: "details",
+        label: "פרטי תחרות",
+        onPress: function () {
+          Alert.alert("בהמשך", "מסך פרטי תחרות יחובר בהמשך");
+        },
+        disabled: !canAdminSeeCompetitionDetails(item.competitionStatus),
+        variant: "secondary",
+      },
+      {
+        key: "registration",
+        label: "הרשמה",
+        onPress: function () {
+          Alert.alert("בהמשך", "מסך הכנסת הרשמות יחובר בהמשך");
+        },
+        disabled: !canAdminRegisterCompetition(item.competitionStatus),
+        variant: "secondary",
+      },
+      {
+        key: "enter",
+        label: "כניסה",
+        onPress: function () {
+          Alert.alert("בהמשך", "כניסה לתחרות תחובר בהמשך");
+        },
+        disabled: !canAdminEnterCompetition(item.competitionStatus),
+        variant: "primary",
+      },
+    ];
+  }
+
+  var shortcutItems = useMemo(
+    function () {
+      return [
+        {
+          key: "board",
+          label: "לוח התחרויות",
+          icon: "trophy-outline",
+          onPress: function () {
+            props.navigation.navigate("AdminCompetitionsBoard");
+          },
+        },
+        {
+          key: "profile",
+          label: "פרופיל",
+          icon: "person-outline",
+          onPress: function () {
+            props.navigation.navigate("AdminProfile");
+          },
+        },
+        {
+          key: "switch-role",
+          label: "החלפת פרופיל",
+          icon: "sync-outline",
+          onPress: function () {
+            props.navigation.replace("SelectActiveRole");
+          },
+        },
+        {
+          key: "refresh",
+          label: "רענון נתונים",
+          icon: "refresh-outline",
+          onPress: loadHomeCompetitions,
+        },
+      ];
+    },
+    [props.navigation, activeRole],
+  );
+
+  var userName = (
+    (user && ((user.firstName || "") + " " + (user.lastName || "")).trim()) ||
+    ""
+  ).trim();
 
   return (
     <MobileScreenLayout
@@ -61,62 +154,87 @@ export default function AdminHomeScreen(props) {
       menuContent={function ({ closeMenu }) {
         return (
           <SideMenuTemplate
-            userName={`${user?.firstName || ""} ${user?.lastName || ""}`.trim()}
-            roleName={activeRole?.roleName || ""}
-            ranchName={activeRole?.ranchName || ""}
+            activeKey="home"
+            userName={userName}
+            roleName={(activeRole && activeRole.roleName) || ""}
+            ranchName={(activeRole && activeRole.ranchName) || ""}
             closeMenu={closeMenu}
-            items={getAdminMenuItems(props.navigation)}
-            onItemPress={function (item) {
-              props.navigation.navigate(item.screen);
-            }}
+            items={getAdminMenuItems()}
+            onItemPress={handleMenuPress}
             onSwitchRole={function () {
-              props.navigation.navigate("SelectActiveRole");
+              props.navigation.replace("SelectActiveRole");
             }}
             onLogout={handleLogout}
           />
         );
       }}
     >
-      <View style={roleSharedStyles.welcomeCard}>
-        <Text style={roleSharedStyles.welcomeTitle}>
-          שלום {user?.firstName || ""},
-        </Text>
-        <Text style={roleSharedStyles.welcomeText}>
-          ברוכה הבאה למערכת RideOn
-        </Text>
-      </View>
-
-      <Pressable
-        style={roleSharedStyles.shortcutButton}
-        onPress={goToCompetitionsBoard}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={homeScreenStyles.pageContent}
       >
-        <Text style={roleSharedStyles.shortcutButtonText}>לוח התחרויות</Text>
-      </Pressable>
+        <View style={homeScreenStyles.welcomeCard}>
+          <Text style={homeScreenStyles.welcomeTitle}>
+            שלום {user?.firstName} {user?.lastName}
+          </Text>
 
-      <Text style={roleSharedStyles.sectionTitle}>תחרויות קרובות</Text>
+          <Text style={homeScreenStyles.welcomeRole}>
+            {activeRole?.roleName}
+          </Text>
 
-      {competitions.map(function (item) {
-        return (
-          <AdminHomeCard
-            key={item.id}
-            title={item.title}
-            dateText={item.dateText}
-            ranchName={item.ranchName}
-            status={item.status}
-            registrationDisabled={item.registrationDisabled}
-            enterDisabled={item.enterDisabled}
-            onDetailsPress={function () {
-              Alert.alert("בהמשך", "מסך פרטי תחרות יתחבר כאן בהמשך");
-            }}
-            onRegistrationPress={function () {
-              Alert.alert("בהמשך", "מסך הרשמה יתחבר כאן בהמשך");
-            }}
-            onEnterPress={function () {
-              Alert.alert("בהמשך", "כניסה לתחרות תחובר בהמשך");
-            }}
-          />
-        );
-      })}
+          <Text style={homeScreenStyles.welcomeSubtitle}>
+            זה התפקיד הפעיל שלך בחווה {activeRole?.ranchName}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={homeScreenStyles.quickButton}
+          onPress={function () {
+            props.navigation.navigate("AdminCompetitionsBoard");
+          }}
+        >
+          <Ionicons name="arrow-back-outline" size={24} color="#FFFFFF" />
+          <View style={homeScreenStyles.quickButtonTextWrap}>
+            <Text style={homeScreenStyles.quickButtonTitle}>
+              מעבר מהיר ללוח התחרויות
+            </Text>
+            <Text style={homeScreenStyles.quickButtonSubtitle}>
+              לצפייה בכל התחרויות והמשך עבודה
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        <View style={homeScreenStyles.sectionCard}>
+          <Text style={homeScreenStyles.sectionTitle}>תחרויות קרובות</Text>
+
+          {loading ? (
+            <View style={homeScreenStyles.loadingWrapper}>
+              <ActivityIndicator size="large" color="#8B6352" />
+            </View>
+          ) : competitions.length === 0 ? (
+            <Text style={homeScreenStyles.emptyText}>
+              עדיין לא נמצאו תחרויות קרובות עם מידע שהכנסת
+            </Text>
+          ) : (
+            competitions.map(function (item) {
+              return (
+                <HomeCompetitionCard
+                  key={String(item.competitionId)}
+                  item={item}
+                  ranchName={(activeRole && activeRole.ranchName) || ""}
+                  actions={buildCompetitionActions(item)}
+                />
+              );
+            })
+          )}
+        </View>
+
+        <View style={homeScreenStyles.sectionCard}>
+          <Text style={homeScreenStyles.sectionTitle}>קיצורים</Text>
+          <HomeShortcutGrid items={shortcutItems} />
+        </View>
+      </ScrollView>
     </MobileScreenLayout>
   );
 }

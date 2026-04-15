@@ -38,6 +38,26 @@ export default function useCompetitionPaidTimeStep(options) {
     [activeStep, competitionId, currentRanchId, shouldShowPaidTimeStep],
   );
 
+  function sortPaidTimeSlots(items) {
+    return [...items].sort(function (a, b) {
+      var aDate = a.slotDate ? String(a.slotDate) : "";
+      var bDate = b.slotDate ? String(b.slotDate) : "";
+
+      if (aDate !== bDate) {
+        return aDate.localeCompare(bDate);
+      }
+
+      var aStart = a.startTime ? String(a.startTime) : "";
+      var bStart = b.startTime ? String(b.startTime) : "";
+
+      if (aStart !== bStart) {
+        return aStart.localeCompare(bStart);
+      }
+
+      return Number(a.compSlotId || 0) - Number(b.compSlotId || 0);
+    });
+  }
+
   async function loadPaidTimeSectionData(competitionIdValue, ranchId) {
     try {
       setLoadingPaidTime(true);
@@ -46,9 +66,9 @@ export default function useCompetitionPaidTimeStep(options) {
         competitionIdValue,
         ranchId,
       );
-      setPaidTimeSlotsInCompetition(
-        Array.isArray(response.data) ? response.data : [],
-      );
+
+      var items = Array.isArray(response.data) ? response.data : [];
+      setPaidTimeSlotsInCompetition(sortPaidTimeSlots(items));
     } catch (error) {
       console.error(error);
       onShowToast(
@@ -94,8 +114,40 @@ export default function useCompetitionPaidTimeStep(options) {
       setPaidTimeModalError("");
 
       if (editPaidTimeItem) {
-        await updatePaidTimeSlotInCompetition(editPaidTimeItem.compSlotId, {
-          compSlotId: editPaidTimeItem.compSlotId,
+        var updateResponse = await updatePaidTimeSlotInCompetition(
+          editPaidTimeItem.compSlotId,
+          {
+            compSlotId: editPaidTimeItem.compSlotId,
+            competitionId: competitionId,
+            hostRanchId: currentRanchId,
+            paidTimeSlotId: formData.paidTimeSlotId,
+            arenaRanchId: currentRanchId,
+            arenaId: formData.arenaId,
+            slotDate: formData.slotDate,
+            startTime: formData.startTime,
+            endTime: formData.endTime,
+            slotStatus: formData.slotStatus,
+            slotNotes: formData.slotNotes,
+          },
+        );
+
+        var updatedItem = updateResponse.data;
+
+        setPaidTimeSlotsInCompetition(function (prev) {
+          var next = prev.map(function (item) {
+            if (item.compSlotId === updatedItem.compSlotId) {
+              return updatedItem;
+            }
+
+            return item;
+          });
+
+          return sortPaidTimeSlots(next);
+        });
+
+        onShowToast("success", "סלוט הפייד־טיים עודכן בהצלחה");
+      } else {
+        var createResponse = await createPaidTimeSlotInCompetition({
           competitionId: competitionId,
           hostRanchId: currentRanchId,
           paidTimeSlotId: formData.paidTimeSlotId,
@@ -108,27 +160,16 @@ export default function useCompetitionPaidTimeStep(options) {
           slotNotes: formData.slotNotes,
         });
 
-        onShowToast("success", "סלוט הפייד־טיים עודכן בהצלחה");
-      } else {
-        await createPaidTimeSlotInCompetition({
-          competitionId: competitionId,
-          hostRanchId: currentRanchId,
-          paidTimeSlotId: formData.paidTimeSlotId,
-          arenaRanchId: currentRanchId,
-          arenaId: formData.arenaId,
-          slotDate: formData.slotDate,
-          startTime: formData.startTime,
-          endTime: formData.endTime,
-          slotStatus: formData.slotStatus,
-          slotNotes: formData.slotNotes,
+        var newItem = createResponse.data;
+
+        setPaidTimeSlotsInCompetition(function (prev) {
+          return sortPaidTimeSlots([...prev, newItem]);
         });
 
         onShowToast("success", "סלוט הפייד־טיים נוסף בהצלחה");
       }
 
       closePaidTimeModal();
-      await loadPaidTimeSectionData(competitionId, currentRanchId);
-
       return true;
     } catch (error) {
       console.error(error);
@@ -159,8 +200,14 @@ export default function useCompetitionPaidTimeStep(options) {
         currentRanchId,
         false,
       );
+
+      setPaidTimeSlotsInCompetition(function (prev) {
+        return prev.filter(function (currentItem) {
+          return currentItem.compSlotId !== item.compSlotId;
+        });
+      });
+
       onShowToast("success", "סלוט הפייד־טיים נמחק בהצלחה");
-      await loadPaidTimeSectionData(competitionId, currentRanchId);
     } catch (error) {
       console.error(error);
       onShowToast(
@@ -182,5 +229,6 @@ export default function useCompetitionPaidTimeStep(options) {
     closePaidTimeModal,
     handleSubmitPaidTime,
     handleDeletePaidTime,
+    loadPaidTimeSectionData,
   };
 }

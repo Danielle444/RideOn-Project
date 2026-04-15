@@ -1,43 +1,70 @@
-import { Alert, Text } from "react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, Text, View } from "react-native";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
-import AdminHomeCard from "../components/AdminHomeCard";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
+import competitionBoardStyles from "../../../../styles/competitionBoardStyles";
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import { getAdminMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { getAdminCompetitionMenuItems } from "../../../../navigation/competitionMenuConfigs";
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
+import { useCompetition } from "../../../../context/CompetitionContext";
+import { getMobileAdminCompetitionsBoard } from "../../../../services/competitionService";
+import CompetitionBoardCard from "../../../../components/competitions/CompetitionBoardCard";
+import { formatCompetitionDateRange } from "../../../../../../shared/auth/utils/competitions/competitionFormatters";
+import {
+  canAdminEnterCompetition,
+  canAdminRegisterCompetition,
+} from "../../../../../../shared/auth/utils/competitions/competitionStatus";
 
 export default function AdminCompetitionsBoardScreen(props) {
-  const { user } = useUser();
-  const { activeRole } = useActiveRole();
+  var userContext = useUser();
+  var activeRoleContext = useActiveRole();
+  var competitionContext = useCompetition();
 
-  const [menuMode, setMenuMode] = useState("general");
-  const [selectedCompetition, setSelectedCompetition] = useState(null);
+  var user = userContext.user;
+  var activeRole = activeRoleContext.activeRole;
 
-  const competitions = [
-    {
-      id: 1,
-      title: "ריינינג 1+2 2026",
-      dateText: "17-15 במרץ, 2026",
-      ranchName: "חוות דאבל קיי",
-      status: "כעת",
-      registrationDisabled: true,
-      enterDisabled: false,
+  var [menuMode, setMenuMode] = useState("general");
+  var [selectedCompetition, setSelectedCompetition] = useState(null);
+  var [competitions, setCompetitions] = useState([]);
+  var [loading, setLoading] = useState(false);
+
+  useEffect(
+    function () {
+      if (!activeRole || !activeRole.ranchId) return;
+      loadCompetitions();
     },
-    {
-      id: 2,
-      title: "גביע הקיץ - קפיצות",
-      dateText: "24-22 במרץ, 2026",
-      ranchName: "מרכז הרכיבה הארצי",
-      status: "פתוחה",
-      registrationDisabled: false,
-      enterDisabled: true,
-    },
-  ];
+    [activeRole],
+  );
+
+  async function loadCompetitions() {
+    try {
+      setLoading(true);
+      var response = await getMobileAdminCompetitionsBoard(activeRole.ranchId);
+      setCompetitions(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      Alert.alert("שגיאה", "אירעה שגיאה בטעינת התחרויות");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function setCompetitionAndNavigate(item, screen) {
+    await competitionContext.setActiveCompetitionAndPersist({
+      competitionId: item.competitionId,
+      competitionName: item.competitionName,
+      competitionStatus: item.competitionStatus,
+      ranchId: activeRole.ranchId,
+    });
+
+    props.navigation.navigate(screen, {
+      competitionId: item.competitionId,
+      competitionName: item.competitionName,
+    });
+  }
 
   async function handleLogout() {
     if (props.onLogout) {
@@ -45,40 +72,59 @@ export default function AdminCompetitionsBoardScreen(props) {
     }
   }
 
-  function openCompetitionMenu(competition) {
-    setSelectedCompetition(competition);
-    setMenuMode("competition");
-  }
-
-  function exitCompetitionMenu() {
-    setSelectedCompetition(null);
-    setMenuMode("general");
-  }
-
   function handleAdminMenuPress(item) {
     props.navigation.navigate(item.screen);
   }
 
   function handleCompetitionMenuPress(item) {
-    Alert.alert("בהמשך", "המסך " + item.label + " יתחבר כאן בהמשך");
+    props.navigation.navigate(item.screen);
+  }
+
+  function buildActions(item) {
+    return [
+      {
+        key: "details",
+        label: "פרטי תחרות",
+        onPress: function () {
+          setCompetitionAndNavigate(item, "AdminCompetitionDetails");
+        },
+        disabled: false,
+        variant: "secondary",
+      },
+      {
+        key: "registration",
+        label: "הרשמה",
+        onPress: function () {
+          setCompetitionAndNavigate(item, "AdminCompetitionRegistrations");
+        },
+        disabled: !canAdminRegisterCompetition(item.competitionStatus),
+        variant: "secondary",
+      },
+      {
+        key: "enter",
+        label: "כניסה",
+        onPress: function () {
+          setCompetitionAndNavigate(item, "AdminCompetitionPayers");
+        },
+        disabled: !canAdminEnterCompetition(item.competitionStatus),
+        variant: "primary",
+      },
+    ];
   }
 
   return (
     <MobileScreenLayout
       title="לוח התחרויות"
-      subtitle=""
-      activeBottomTab={null}
       bottomNavItems={getAdminBottomNavConfig(props.navigation)}
-      menuContent={function ({ closeMenu }) {
+      menuContent={({ closeMenu }) => {
         if (menuMode === "competition" && selectedCompetition) {
           return (
             <CompetitionMenuTemplate
-              activeKey=""
-              closeMenu={closeMenu}
-              competitionName={selectedCompetition.title}
+              competitionName={selectedCompetition.competitionName}
               items={getAdminCompetitionMenuItems()}
               onItemPress={handleCompetitionMenuPress}
-              onExitCompetition={exitCompetitionMenu}
+              onExitCompetition={() => setMenuMode("general")}
+              closeMenu={closeMenu}
             />
           );
         }
@@ -86,9 +132,22 @@ export default function AdminCompetitionsBoardScreen(props) {
         return (
           <SideMenuTemplate
             activeKey="competitions"
-            userName={`${user?.firstName || ""} ${user?.lastName || ""}`.trim()}
-            roleName={activeRole?.roleName || ""}
-            ranchName={activeRole?.ranchName || ""}
+            userName={
+              (user &&
+                (
+                  (user.firstName || "") +
+                  " " +
+                  (user.lastName || "")
+                ).trim()) ||
+              ""
+            }
+            roleName={(activeRole && activeRole.roleName) || ""}
+            ranchName={(activeRole && activeRole.ranchName) || ""}
+            competitionName={
+              competitionContext.activeCompetition
+                ? competitionContext.activeCompetition.competitionName
+                : ""
+            }
             closeMenu={closeMenu}
             items={getAdminMenuItems()}
             onItemPress={handleAdminMenuPress}
@@ -100,33 +159,27 @@ export default function AdminCompetitionsBoardScreen(props) {
         );
       }}
     >
-      <Text style={roleSharedStyles.sectionTitle}>תחרויות פעילות</Text>
+      <Text style={roleSharedStyles.sectionTitle}>כל התחרויות</Text>
 
-      {competitions.map(function (item) {
-        return (
-          <AdminHomeCard
-            key={item.id}
-            title={item.title}
-            dateText={item.dateText}
-            ranchName={item.ranchName}
-            status={item.status}
-            registrationDisabled={item.registrationDisabled}
-            enterDisabled={item.enterDisabled}
-            onDetailsPress={function () {
-              openCompetitionMenu(item);
-              Alert.alert("בהמשך", "מסך פרטי תחרות יתחבר כאן בהמשך");
-            }}
-            onRegistrationPress={function () {
-              openCompetitionMenu(item);
-              Alert.alert("בהמשך", "מסך הרשמה יתחבר כאן בהמשך");
-            }}
-            onEnterPress={function () {
-              openCompetitionMenu(item);
-              Alert.alert("בהמשך", "כניסה לתחרות תחובר בהמשך");
-            }}
-          />
-        );
-      })}
+      {loading ? (
+        <ActivityIndicator size="large" color="#8B6352" />
+      ) : (
+        <View style={competitionBoardStyles.listContent}>
+          {competitions.map((item) => (
+            <CompetitionBoardCard
+              key={item.competitionId}
+              title={item.competitionName}
+              ranchName={item.hostRanchName || ""}
+              dateText={formatCompetitionDateRange(
+                item.competitionStartDate,
+                item.competitionEndDate,
+              )}
+              status={item.competitionStatus}
+              actions={buildActions(item)}
+            />
+          ))}
+        </View>
+      )}
     </MobileScreenLayout>
   );
 }

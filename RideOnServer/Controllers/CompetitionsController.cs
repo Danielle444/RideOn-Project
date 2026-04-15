@@ -163,6 +163,177 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [Authorize]
+        [HttpGet("mobile/admin-board")]
+        public IActionResult GetMobileAdminCompetitionsBoard([FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = GetPersonIdFromClaims();
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                List<Competition> list = Competition.GetAllCompetitionsForMobileAdmin();
+                return Ok(list);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize]
+        [HttpGet("mobile/worker-board")]
+        public IActionResult GetMobileWorkerCompetitionsBoard([FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = GetPersonIdFromClaims();
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchWorker
+                );
+
+                List<Competition> list = Competition.GetCompetitionsForMobileWorker(ranchId);
+                return Ok(list);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize]
+        [HttpGet("mobile/payer-board")]
+        public IActionResult GetMobilePayerCompetitionsBoard([FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = GetPersonIdFromClaims();
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.Payer
+                );
+
+                List<Competition> list = Competition.GetCompetitionsForMobilePayer(personId);
+                return Ok(list);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize]
+        [HttpGet("mobile/admin-home")]
+        public IActionResult GetMobileAdminHomeCompetitions([FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = GetPersonIdFromClaims();
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                List<Competition> list = Competition.GetCompetitionsForMobileAdminHome(personId);
+                return Ok(list);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize]
+        [HttpGet("{competitionId}/invitation")]
+        public IActionResult GetCompetitionInvitationDetails(int competitionId)
+        {
+            try
+            {
+                int personId = GetPersonIdFromClaims();
+
+                Competition? competition = Competition.GetCompetitionById(competitionId);
+
+                if (competition == null)
+                {
+                    return NotFound("Competition not found");
+                }
+
+                string? roleName = User.Claims.FirstOrDefault(c => c.Type == "RoleName")?.Value;
+
+                if (string.IsNullOrWhiteSpace(roleName))
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "Missing role");
+                }
+
+                if (roleName == RoleNames.HostSecretary)
+                {
+                    UserAccessValidator.EnsureUserHasRoleInRanch(
+                        personId,
+                        competition.HostRanchId,
+                        RoleNames.HostSecretary
+                    );
+                }
+                else if (roleName == RoleNames.RanchAdmin)
+                {
+                    UserAccessValidator.EnsureUserHasAnyApprovedRole(personId, RoleNames.RanchAdmin);
+                }
+                else if (roleName == RoleNames.Payer)
+                {
+                    UserAccessValidator.EnsureUserHasAnyApprovedRole(personId, RoleNames.Payer);
+                }
+                else
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לצפות בפרטי תחרות");
+                }
+
+                if (competition.CompetitionStatus == CompetitionStatuses.Draft &&
+                    roleName != RoleNames.HostSecretary)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "טיוטת תחרות זמינה רק לחווה המארחת");
+                }
+
+                var response = CompetitionInvitationManager.GetInvitationDetails(competitionId);
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+
         private int GetPersonIdFromClaims()
         {
             string? personIdClaim = User.Claims.FirstOrDefault(c => c.Type == "PersonId")?.Value;

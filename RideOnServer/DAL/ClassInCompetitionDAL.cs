@@ -45,17 +45,72 @@ namespace RideOnServer.DAL
                                 PrizeTypeName = reader["PrizeTypeName"] == DBNull.Value ? null : reader["PrizeTypeName"].ToString(),
                                 PrizeAmount = reader["PrizeAmount"] == DBNull.Value ? null : Convert.ToDecimal(reader["PrizeAmount"]),
                                 PatternNumber = reader["PatternNumber"] == DBNull.Value ? null : Convert.ToInt16(reader["PatternNumber"]),
-                                JudgeIds = new List<int>()
+                                JudgeIds = reader["JudgeIds"] == DBNull.Value
+                                    ? new List<int>()
+                                    : ((int[])reader["JudgeIds"]).ToList()
                             });
                         }
                     }
+                    return list;
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
 
-                    foreach (ClassInCompetition item in list)
+        public ClassInCompetition? GetClassById(int classInCompId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@ClassInCompId", classInCompId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    ClassInCompetition? item = null;
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetClassById", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            item = new ClassInCompetition
+                            {
+                                ClassInCompId = Convert.ToInt32(reader["ClassInCompId"]),
+                                CompetitionId = Convert.ToInt32(reader["CompetitionId"]),
+                                ClassTypeId = Convert.ToInt16(reader["ClassTypeId"]),
+                                ArenaRanchId = reader["ArenaRanchId"] == DBNull.Value ? 0 : Convert.ToInt32(reader["ArenaRanchId"]),
+                                ArenaId = reader["ArenaId"] == DBNull.Value ? (byte)0 : Convert.ToByte(reader["ArenaId"]),
+                                ArenaName = reader["ArenaName"] == DBNull.Value ? null : reader["ArenaName"].ToString(),
+                                ClassDateTime = reader["ClassDateTime"] == DBNull.Value ? null : (DateTime?)reader["ClassDateTime"],
+                                ClassName = reader["ClassName"] == DBNull.Value ? null : reader["ClassName"].ToString(),
+                                OrganizerCost = reader["OrganizerCost"] == DBNull.Value ? null : Convert.ToDecimal(reader["OrganizerCost"]),
+                                FederationCost = reader["FederationCost"] == DBNull.Value ? null : Convert.ToDecimal(reader["FederationCost"]),
+                                StartTime = reader["StartTime"] == DBNull.Value ? null : (TimeSpan?)reader["StartTime"],
+                                OrderInDay = reader["OrderInDay"] == DBNull.Value ? null : Convert.ToByte(reader["OrderInDay"]),
+                                ClassNotes = reader["ClassNotes"] == DBNull.Value ? null : reader["ClassNotes"].ToString(),
+                                JudgesDisplay = reader["JudgesDisplay"] == DBNull.Value ? null : reader["JudgesDisplay"].ToString(),
+                                PrizeTypeId = reader["PrizeTypeId"] == DBNull.Value ? null : Convert.ToByte(reader["PrizeTypeId"]),
+                                PrizeTypeName = reader["PrizeTypeName"] == DBNull.Value ? null : reader["PrizeTypeName"].ToString(),
+                                PrizeAmount = reader["PrizeAmount"] == DBNull.Value ? null : Convert.ToDecimal(reader["PrizeAmount"]),
+                                PatternNumber = reader["PatternNumber"] == DBNull.Value ? null : Convert.ToInt16(reader["PatternNumber"]),
+                                JudgeIds = new List<int>()
+                            };
+                        }
+                    }
+
+                    if (item != null)
                     {
                         item.JudgeIds = GetJudgeIdsByClassId(item.ClassInCompId, connection);
                     }
 
-                    return list;
+                    return item;
                 }
             }
             catch (NpgsqlException ex)

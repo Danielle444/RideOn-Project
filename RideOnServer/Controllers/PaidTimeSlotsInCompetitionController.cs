@@ -103,12 +103,14 @@ namespace RideOnServer.Controllers
                 }
 
                 int newId = PaidTimeSlotInCompetition.CreatePaidTimeSlotInCompetition(request);
+                PaidTimeSlotInCompetition? newItem = PaidTimeSlotInCompetition.GetById(newId);
 
-                return Ok(new
+                if (newItem == null)
                 {
-                    CompSlotId = newId,
-                    Message = "Paid time slot added successfully"
-                });
+                    return NotFound("Created paid time slot was not found");
+                }
+
+                return Ok(newItem);
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -152,7 +154,14 @@ namespace RideOnServer.Controllers
                 }
 
                 PaidTimeSlotInCompetition.UpdatePaidTimeSlotInCompetition(request);
-                return Ok("Paid time slot updated successfully");
+                PaidTimeSlotInCompetition? updatedItem = PaidTimeSlotInCompetition.GetById(compSlotId);
+
+                if (updatedItem == null)
+                {
+                    return NotFound("Updated paid time slot was not found");
+                }
+
+                return Ok(updatedItem);
             }
             catch (UnauthorizedAccessException ex)
             {

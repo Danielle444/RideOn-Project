@@ -5,7 +5,7 @@ import {
   updateClassInCompetition,
   deleteClassInCompetition,
 } from "../../services/classInCompetitionService";
-import { getAllPatterns } from "../../services/superUserService";
+import { getAllPatternsWithManeuvers } from "../../services/superUserService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function useCompetitionClassesStep(options) {
@@ -54,7 +54,7 @@ export default function useCompetitionClassesStep(options) {
 
   async function loadPatterns() {
     try {
-      var response = await getAllPatterns();
+      var response = await getAllPatternsWithManeuvers();
       setPatterns(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error(error);
@@ -65,8 +65,13 @@ export default function useCompetitionClassesStep(options) {
     try {
       setLoadingClasses(true);
 
-      var response = await getClassesByCompetitionId(competitionIdValue, ranchId);
-      setClassesInCompetition(Array.isArray(response.data) ? response.data : []);
+      var response = await getClassesByCompetitionId(
+        competitionIdValue,
+        ranchId,
+      );
+
+      var items = Array.isArray(response.data) ? response.data : [];
+      setClassesInCompetition(items);
     } catch (error) {
       console.error(error);
       onShowToast("error", getErrorMessage(error, "שגיאה בטעינת המקצים"));
@@ -106,6 +111,22 @@ export default function useCompetitionClassesStep(options) {
     setCreateClassDefaultDate("");
   }
 
+  function sortClasses(items) {
+    return [...items].sort(function (a, b) {
+      var aOrder = Number(a.orderInDay || 0);
+      var bOrder = Number(b.orderInDay || 0);
+
+      if (aOrder !== bOrder) {
+        return aOrder - bOrder;
+      }
+
+      var aTime = a.startTime ? String(a.startTime) : "";
+      var bTime = b.startTime ? String(b.startTime) : "";
+
+      return aTime.localeCompare(bTime);
+    });
+  }
+
   async function handleSubmitClass(formData) {
     if (!competitionId || !currentRanchId) {
       setClassModalError("יש לשמור קודם את התחרות");
@@ -135,20 +156,38 @@ export default function useCompetitionClassesStep(options) {
       };
 
       if (editClassItem) {
-        await updateClassInCompetition(editClassItem.classInCompId, {
+        var updateResponse = await updateClassInCompetition(editClassItem.classInCompId, {
           classInCompId: editClassItem.classInCompId,
           ...payload,
         });
 
+        var updatedItem = updateResponse.data;
+
+        setClassesInCompetition(function (prev) {
+          var next = prev.map(function (item) {
+            if (item.classInCompId === updatedItem.classInCompId) {
+              return updatedItem;
+            }
+
+            return item;
+          });
+
+          return sortClasses(next);
+        });
+
         onShowToast("success", "המקצה עודכן בהצלחה");
       } else {
-        await createClassInCompetition(payload);
+        var createResponse = await createClassInCompetition(payload);
+        var newItem = createResponse.data;
+
+        setClassesInCompetition(function (prev) {
+          return sortClasses([...prev, newItem]);
+        });
+
         onShowToast("success", "המקצה נוסף בהצלחה");
       }
 
       closeClassModal();
-      await loadClassesSectionData(competitionId, currentRanchId);
-
       return true;
     } catch (error) {
       console.error(error);
@@ -176,8 +215,14 @@ export default function useCompetitionClassesStep(options) {
         competitionId,
         currentRanchId,
       );
+
+      setClassesInCompetition(function (prev) {
+        return prev.filter(function (currentItem) {
+          return currentItem.classInCompId !== item.classInCompId;
+        });
+      });
+
       onShowToast("success", "המקצה נמחק בהצלחה");
-      await loadClassesSectionData(competitionId, currentRanchId);
     } catch (error) {
       console.error(error);
       onShowToast("error", getErrorMessage(error, "שגיאה במחיקת המקצה"));

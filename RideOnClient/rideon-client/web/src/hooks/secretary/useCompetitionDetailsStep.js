@@ -9,7 +9,7 @@ import {
   getAllClassTypes,
   getAllJudges,
   getAllPrizeTypes,
-  getAllPatterns,
+  getAllPatternsWithManeuvers,
 } from "../../services/superUserService";
 import { getArenasByRanchId } from "../../services/arenaService";
 import { getAllPaidTimeBaseSlots } from "../../services/paidTimeSlotInCompetitionService";
@@ -95,7 +95,7 @@ export default function useCompetitionDetailsStep(options) {
         getArenasByRanchId(currentRanchId),
         getAllPaidTimeBaseSlots(currentRanchId),
         getAllPrizeTypes(),
-        getAllPatterns(),
+        getAllPatternsWithManeuvers(),
       ]);
 
       var fieldsRes = results[0];

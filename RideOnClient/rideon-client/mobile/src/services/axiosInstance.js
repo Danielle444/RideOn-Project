@@ -1,10 +1,10 @@
 import axios from "axios";
 import { getToken, clearAuthStorage } from "./storageService";
 
-const API = "http://10.0.0.6:5268/api";
+import { API_BASE_URL } from "../../../shared/config/apiBaseUrl";
 
 const axiosInstance = axios.create({
-  baseURL: API,
+  baseURL: API_BASE_URL,
   timeout: 8000,
 });
 

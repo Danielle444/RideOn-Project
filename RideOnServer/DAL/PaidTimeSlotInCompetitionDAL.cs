@@ -177,5 +177,50 @@ namespace RideOnServer.DAL
                 throw new Exception($"Database error: {ex.Message}");
             }
         }
+
+        public PaidTimeSlotInCompetition? GetById(int compSlotId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+    {
+        { "@CompSlotId", compSlotId }
+    };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetPaidTimeSlotInCompById", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return new PaidTimeSlotInCompetition
+                            {
+                                CompSlotId = Convert.ToInt32(reader["CompSlotId"]),
+                                CompetitionId = Convert.ToInt32(reader["CompetitionId"]),
+                                PaidTimeSlotId = Convert.ToInt32(reader["PaidTimeSlotId"]),
+                                SlotDate = Convert.ToDateTime(reader["SlotDate"]),
+                                TimeOfDay = reader["TimeOfDay"]?.ToString(),
+                                StartTime = (TimeSpan)reader["StartTime"],
+                                EndTime = (TimeSpan)reader["EndTime"],
+                                ArenaRanchId = Convert.ToInt32(reader["ArenaRanchId"]),
+                                ArenaId = Convert.ToByte(reader["ArenaId"]),
+                                ArenaName = reader["ArenaName"]?.ToString(),
+                                SlotStatus = reader["SlotStatus"]?.ToString(),
+                                SlotNotes = reader["SlotNotes"]?.ToString()
+                            };
+                        }
+
+                        return null;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
     }
 }

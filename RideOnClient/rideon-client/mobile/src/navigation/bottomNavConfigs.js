@@ -33,14 +33,14 @@ function getPayerBottomNavConfig(navigation) {
       key: "home",
       icon: "home-outline",
       onPress: function () {
-        navigation.navigate("PayerCompetitionsBoard");
+        navigation.navigate("PayerHome");
       },
     },
     {
       key: "profile",
       icon: "person-outline",
       onPress: function () {
-        alert("מסך פרופיל של משלם יתחבר בהמשך");
+        navigation.navigate("PayerProfile");
       },
     },
   ];
@@ -55,16 +55,16 @@ function getWorkerBottomNavConfig(navigation) {
     },
     {
       key: "home",
-      icon: "cube-outline",
+      icon: "home-outline",
       onPress: function () {
-        navigation.navigate("WorkerShavingsOrders");
+        navigation.navigate("WorkerHome");
       },
     },
     {
       key: "profile",
       icon: "person-outline",
       onPress: function () {
-        alert("מסך פרופיל עובד יתחבר בהמשך");
+        navigation.navigate("WorkerProfile");
       },
     },
   ];
