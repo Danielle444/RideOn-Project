@@ -1,7 +1,8 @@
 import axios from "axios";
 import { getToken, clearAuthStorage } from "./storageService";
 
-import { API_BASE_URL } from "../../../shared/config/apiBaseUrl";
+import { API_BASE_URL } from "../config/apiBaseUrl";
+
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
