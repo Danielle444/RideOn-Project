@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import styles from "../../styles/authStyles";
@@ -15,44 +15,46 @@ import { useAuth } from "../../context/AuthContext";
 
 export default function MobileEntryGateScreen(props) {
   const isFocused = useIsFocused();
+  const hasNavigatedRef = useRef(false);
 
   const { user, isUserHydrated } = useUser();
   const { activeRole, setActiveRoleAndPersist } = useActiveRole();
-  const { logout, isAuthenticated } = useAuth();
-
-  const [didNavigate, setDidNavigate] = useState(false);
+  const { isAuthenticated } = useAuth();
 
   useEffect(
     function () {
       if (!isFocused) {
-        setDidNavigate(false);
+        hasNavigatedRef.current = false;
         return;
       }
 
-      if (!isUserHydrated || didNavigate) {
+      if (!isUserHydrated) {
+        return;
+      }
+
+      if (hasNavigatedRef.current) {
+        return;
+      }
+
+      // חשוב: אם המשתמש לא מחובר, לא מנווטים מכאן בכלל.
+      // App.js כבר יעביר אוטומטית ל-AuthNavigator.
+      if (!isAuthenticated || !user) {
         return;
       }
 
       handleNavigation();
     },
-    [isFocused, isUserHydrated, isAuthenticated, user, activeRole, didNavigate]
+    [isFocused, isUserHydrated, isAuthenticated, user, activeRole],
   );
 
   async function handleNavigation() {
-    if (!isAuthenticated || !user) {
-      setDidNavigate(true);
-      await logout();
-
-      props.navigation.reset({
-        index: 0,
-        routes: [{ name: "Login" }],
-      });
-
+    if (!user) {
       return;
     }
 
     if (user.mustChangePassword) {
-      setDidNavigate(true);
+      hasNavigatedRef.current = true;
+
       props.navigation.reset({
         index: 0,
         routes: [{ name: "ChangePassword" }],
@@ -64,7 +66,8 @@ export default function MobileEntryGateScreen(props) {
       const screenName = getMobileHomeScreenName(activeRole.roleName);
 
       if (screenName) {
-        setDidNavigate(true);
+        hasNavigatedRef.current = true;
+
         props.navigation.reset({
           index: 0,
           routes: [{ name: screenName }],
@@ -82,7 +85,8 @@ export default function MobileEntryGateScreen(props) {
     if (autoSelection.shouldAutoSelect && autoSelection.result?.ok) {
       await setActiveRoleAndPersist(autoSelection.result.activeRole);
 
-      setDidNavigate(true);
+      hasNavigatedRef.current = true;
+
       props.navigation.reset({
         index: 0,
         routes: [{ name: autoSelection.result.destination }],
@@ -90,7 +94,8 @@ export default function MobileEntryGateScreen(props) {
       return;
     }
 
-    setDidNavigate(true);
+    hasNavigatedRef.current = true;
+
     props.navigation.reset({
       index: 0,
       routes: [{ name: "SelectActiveRole" }],
