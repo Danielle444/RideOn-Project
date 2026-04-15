@@ -10,7 +10,9 @@ import {
   saveToken,
   saveUser,
   clearAuthStorage,
+  isTokenValid,
 } from "../services/storageService";
+import { registerUnauthorizedHandler } from "../services/axiosInstance";
 import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 import { useUser } from "./UserContext";
 import { useActiveRole } from "./ActiveRoleContext";
@@ -28,16 +30,47 @@ export function AuthProvider(props) {
     loadAuthState();
   }, []);
 
+  useEffect(function () {
+    registerUnauthorizedHandler(handleUnauthorized);
+
+    return function () {
+      registerUnauthorizedHandler(null);
+    };
+  }, []);
+
+  async function resetAuthState() {
+    setUser(null);
+    setActiveRole(null);
+    setIsUserHydrated(true);
+    setIsAuthenticated(false);
+  }
+
+  async function handleUnauthorized() {
+    await clearAuthStorage();
+    await clearActiveRole();
+    await resetAuthState();
+  }
+
   async function loadAuthState() {
     try {
       const token = await getToken();
       const storedUser = await getUser();
-      const activeRole = await getActiveRole();
+      const storedActiveRole = await getActiveRole();
 
-      setUser(storedUser);
-      setActiveRole(activeRole);
-      setIsAuthenticated(!!token && !!storedUser);
+      const tokenIsValid = isTokenValid(token);
+
+      if (!tokenIsValid || !storedUser) {
+        await clearAuthStorage();
+        setUser(null);
+        setActiveRole(null);
+        setIsAuthenticated(false);
+      } else {
+        setUser(storedUser);
+        setActiveRole(storedActiveRole);
+        setIsAuthenticated(true);
+      }
     } catch (error) {
+      await clearAuthStorage();
       setUser(null);
       setActiveRole(null);
       setIsAuthenticated(false);
@@ -62,6 +95,7 @@ export function AuthProvider(props) {
   async function loginAndInitialize(username, password) {
     try {
       await clearAuthStorage();
+      setActiveRole(null);
 
       const response = await loginRequest(username.trim(), password);
       const data = response.data;
@@ -82,6 +116,16 @@ export function AuthProvider(props) {
         return {
           ok: false,
           message: "אין למשתמש תפקיד מאושר",
+        };
+      }
+
+      if (!isTokenValid(data.token)) {
+        await clearAuthStorage();
+        await resetAuthState();
+
+        return {
+          ok: false,
+          message: "התקבל טוקן לא תקין מהשרת",
         };
       }
 
@@ -168,9 +212,7 @@ export function AuthProvider(props) {
   async function logout() {
     await clearAuthStorage();
     await clearActiveRole();
-    setUser(null);
-    setIsUserHydrated(true);
-    setIsAuthenticated(false);
+    await resetAuthState();
   }
 
   return (

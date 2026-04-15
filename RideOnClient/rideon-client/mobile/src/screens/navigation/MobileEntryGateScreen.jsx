@@ -18,25 +18,36 @@ export default function MobileEntryGateScreen(props) {
 
   const { user, isUserHydrated } = useUser();
   const { activeRole, setActiveRoleAndPersist } = useActiveRole();
-  const { logout } = useAuth();
+  const { logout, isAuthenticated } = useAuth();
 
   const [didNavigate, setDidNavigate] = useState(false);
 
   useEffect(
     function () {
-      if (!isFocused || !isUserHydrated || didNavigate) {
+      if (!isFocused) {
+        setDidNavigate(false);
+        return;
+      }
+
+      if (!isUserHydrated || didNavigate) {
         return;
       }
 
       handleNavigation();
     },
-    [isFocused, isUserHydrated, user, activeRole, didNavigate],
+    [isFocused, isUserHydrated, isAuthenticated, user, activeRole, didNavigate]
   );
 
   async function handleNavigation() {
-    if (!user) {
+    if (!isAuthenticated || !user) {
       setDidNavigate(true);
       await logout();
+
+      props.navigation.reset({
+        index: 0,
+        routes: [{ name: "Login" }],
+      });
+
       return;
     }
 
@@ -80,9 +91,10 @@ export default function MobileEntryGateScreen(props) {
     }
 
     setDidNavigate(true);
-    setTimeout(function () {
-      props.navigation.replace("SelectActiveRole");
-    }, 0);
+    props.navigation.reset({
+      index: 0,
+      routes: [{ name: "SelectActiveRole" }],
+    });
   }
 
   return (
