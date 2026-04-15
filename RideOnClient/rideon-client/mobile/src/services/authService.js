@@ -1,5 +1,6 @@
 import axios from "./axiosInstance";
-import { API_BASE_URL } from "../../../shared/config/apiBaseUrl";
+import { API_BASE_URL } from "../config/apiBaseUrl";
+
 
 function login(username, password) {
   return axios.post(
