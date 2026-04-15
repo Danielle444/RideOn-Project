@@ -303,7 +303,10 @@ namespace RideOnServer.Controllers
                 }
                 else if (roleName == RoleNames.RanchAdmin)
                 {
-                    UserAccessValidator.EnsureUserHasAnyApprovedRole(personId, RoleNames.RanchAdmin);
+                    UserAccessValidator.EnsureUserHasAnyApprovedRole(
+                        personId,
+                        RoleNames.RanchAdmin
+                    );
                 }
                 else if (roleName == RoleNames.Payer)
                 {
@@ -332,7 +335,6 @@ namespace RideOnServer.Controllers
                 return BadRequest(ex.Message);
             }
         }
-
 
         private int GetPersonIdFromClaims()
         {
