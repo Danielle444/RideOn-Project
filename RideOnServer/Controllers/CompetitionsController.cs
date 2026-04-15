@@ -286,14 +286,17 @@ namespace RideOnServer.Controllers
                     return NotFound("Competition not found");
                 }
 
-                string? roleName = User.Claims.FirstOrDefault(c => c.Type == "RoleName")?.Value;
+                var roles = User.Claims
+                    .Where(c => c.Type == "RoleName")
+                    .Select(c => c.Value)
+                    .ToList();
 
-                if (string.IsNullOrWhiteSpace(roleName))
+                if (roles.Count == 0)
                 {
-                    return StatusCode(StatusCodes.Status403Forbidden, "Missing role");
+                    return StatusCode(StatusCodes.Status403Forbidden, "Missing roles");
                 }
 
-                if (roleName == RoleNames.HostSecretary)
+                if (roles.Contains(RoleNames.HostSecretary))
                 {
                     UserAccessValidator.EnsureUserHasRoleInRanch(
                         personId,
@@ -301,16 +304,19 @@ namespace RideOnServer.Controllers
                         RoleNames.HostSecretary
                     );
                 }
-                else if (roleName == RoleNames.RanchAdmin)
+                else if (roles.Contains(RoleNames.RanchAdmin))
                 {
                     UserAccessValidator.EnsureUserHasAnyApprovedRole(
                         personId,
                         RoleNames.RanchAdmin
                     );
                 }
-                else if (roleName == RoleNames.Payer)
+                else if (roles.Contains(RoleNames.Payer))
                 {
-                    UserAccessValidator.EnsureUserHasAnyApprovedRole(personId, RoleNames.Payer);
+                    UserAccessValidator.EnsureUserHasAnyApprovedRole(
+                        personId,
+                        RoleNames.Payer
+                    );
                 }
                 else
                 {
@@ -318,7 +324,7 @@ namespace RideOnServer.Controllers
                 }
 
                 if (competition.CompetitionStatus == CompetitionStatuses.Draft &&
-                    roleName != RoleNames.HostSecretary)
+                    !roles.Contains(RoleNames.HostSecretary))
                 {
                     return StatusCode(StatusCodes.Status403Forbidden, "טיוטת תחרות זמינה רק לחווה המארחת");
                 }
