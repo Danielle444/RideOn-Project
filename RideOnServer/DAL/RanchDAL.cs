@@ -119,7 +119,6 @@ namespace RideOnServer.DAL
                 { "@ContactEmail", (object?)request.ContactEmail ?? DBNull.Value },
                 { "@ContactPhone", (object?)request.ContactPhone ?? DBNull.Value },
                 { "@WebsiteUrl", (object?)request.WebsiteUrl ?? DBNull.Value },
-                { "@Location", DBNull.Value },
                 { "@Latitude", (object?)request.Latitude ?? DBNull.Value },
                 { "@Longitude", (object?)request.Longitude ?? DBNull.Value }
             };

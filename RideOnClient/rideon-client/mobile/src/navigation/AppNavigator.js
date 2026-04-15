@@ -8,6 +8,7 @@ import AdminProfileScreen from "../screens/roles/admin/screens/AdminProfileScree
 import PayerHomeScreen from "../screens/roles/payer/screens/PayerHomeScreen";
 import PayerCompetitionsBoardScreen from "../screens/roles/payer/screens/PayerCompetitionsBoardScreen";
 import WorkerShavingsOrdersScreen from "../screens/roles/worker/screens/WorkerShavingsOrdersScreen";
+import StallMapScreen from "../screens/payer/StallMapScreen";
 import GuardedScreen from "./GuardedScreen";
 
 const Stack = createNativeStackNavigator();
@@ -126,6 +127,19 @@ export default function AppNavigator(props) {
                 {...screenProps}
                 onLogout={props.onLogout}
               />
+            </GuardedScreen>
+          );
+        }}
+      </Stack.Screen>
+
+      <Stack.Screen name="StallMap">
+        {function (screenProps) {
+          return (
+            <GuardedScreen
+              navigation={screenProps.navigation}
+              allowedRoles={["משלם"]}
+            >
+              <StallMapScreen {...screenProps} />
             </GuardedScreen>
           );
         }}

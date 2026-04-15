@@ -1,5 +1,6 @@
 import { Building2, Pencil, X } from "lucide-react";
 import ProfileFieldBox from "./ProfileFieldBox";
+import RanchLocationPicker from "../../common/RanchLocationPicker";
 
 export default function RanchProfileCard(props) {
   const page = props.page;
@@ -75,39 +76,35 @@ export default function RanchProfileCard(props) {
             }}
           />
 
-          <ProfileFieldBox
-            label="Latitude"
-            value={
-              page.isEditingRanch
-                ? page.ranchForm.latitude
-                : page.data?.activeRanch?.latitude === null ||
-                    page.data?.activeRanch?.latitude === undefined
-                  ? ""
-                  : String(page.data.activeRanch.latitude)
-            }
-            editable={page.isEditingRanch}
-            onChange={function (e) {
-              page.setRanchField("latitude", e.target.value);
-            }}
-            textAlign="left"
-          />
+          <div className="col-span-1 md:col-span-2">
+            <div className="rounded-2xl border border-[#E7DCD5] bg-white px-4 py-4">
+              <label className="block text-sm font-semibold text-[#7B5A4D] text-right mb-3">
+                מיקום החווה
+              </label>
 
-          <ProfileFieldBox
-            label="Longitude"
-            value={
-              page.isEditingRanch
-                ? page.ranchForm.longitude
-                : page.data?.activeRanch?.longitude === null ||
-                    page.data?.activeRanch?.longitude === undefined
-                  ? ""
-                  : String(page.data.activeRanch.longitude)
-            }
-            editable={page.isEditingRanch}
-            onChange={function (e) {
-              page.setRanchField("longitude", e.target.value);
-            }}
-            textAlign="left"
-          />
+              {page.isEditingRanch ? (
+                <RanchLocationPicker
+                  latitude={page.ranchForm.latitude}
+                  longitude={page.ranchForm.longitude}
+                  onChange={function (coords) {
+                    page.setRanchField("latitude", coords.latitude);
+                    page.setRanchField("longitude", coords.longitude);
+                  }}
+                />
+              ) : (
+                page.data?.activeRanch?.latitude && page.data?.activeRanch?.longitude ? (
+                  <RanchLocationPicker
+                    latitude={page.data.activeRanch.latitude}
+                    longitude={page.data.activeRanch.longitude}
+                    readOnly={true}
+                    onChange={function () {}}
+                  />
+                ) : (
+                  <p className="text-sm text-[#BCAAA4] text-right">לא הוגדר מיקום</p>
+                )
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap justify-start gap-3">

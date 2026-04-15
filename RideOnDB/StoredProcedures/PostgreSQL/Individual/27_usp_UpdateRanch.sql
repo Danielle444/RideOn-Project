@@ -4,7 +4,6 @@ CREATE OR REPLACE FUNCTION usp_UpdateRanch(
     p_ContactEmail TEXT DEFAULT NULL,
     p_ContactPhone TEXT DEFAULT NULL,
     p_WebsiteUrl   TEXT DEFAULT NULL,
-    p_Location     TEXT DEFAULT NULL,
     p_Latitude     DOUBLE PRECISION DEFAULT NULL,
     p_Longitude    DOUBLE PRECISION DEFAULT NULL
 )
@@ -16,7 +15,6 @@ BEGIN
         contactemail = p_ContactEmail,
         contactphone = p_ContactPhone,
         websiteurl   = p_WebsiteUrl,
-        location     = p_Location,
         latitude     = p_Latitude,
         longitude    = p_Longitude
     WHERE ranchid = p_RanchId;
