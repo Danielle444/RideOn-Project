@@ -468,6 +468,19 @@ export default function AppNavigator(props) {
           );
         }}
       </Stack.Screen>
+
+      <Stack.Screen name="StallMap">
+        {function (screenProps) {
+          return (
+            <GuardedScreen
+              navigation={screenProps.navigation}
+              allowedRoles={["משלם"]}
+            >
+              <StallMapScreen {...screenProps} />
+            </GuardedScreen>
+          );
+        }}
+      </Stack.Screen>
     </Stack.Navigator>
   );
 }

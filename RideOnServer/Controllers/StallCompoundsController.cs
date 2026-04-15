@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.StallCompounds;
+using RideOnServer.BL.DTOs.StallMap;
+using RideOnServer.DAL;
 
 namespace RideOnServer.Controllers
 {
@@ -106,6 +108,34 @@ namespace RideOnServer.Controllers
 
                 StallCompound.DeleteCompound(ranchId, compoundId);
                 return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("layout")]
+        [Authorize]
+        public IActionResult SaveLayout([FromBody] SaveLayoutRequest request)
+        {
+            try
+            {
+                int personId = GetPersonIdFromClaims();
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
+                var dal = new StallAssignmentDAL();
+                dal.SaveCompoundLayout(request.RanchId, request.CompoundId, request.LayoutJson);
+                return Ok("Layout saved");
             }
             catch (UnauthorizedAccessException ex)
             {
