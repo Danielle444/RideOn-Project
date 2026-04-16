@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { useUser } from "../context/UserContext";
@@ -8,58 +7,6 @@ export default function GuardedScreen(props) {
   const { isLoading, isAuthenticated } = useAuth();
   const { user, isUserHydrated } = useUser();
   const { activeRole } = useActiveRole();
-
-  useEffect(
-    function () {
-      if (isLoading || !isUserHydrated) {
-        return;
-      }
-
-      if (!isAuthenticated || !user) {
-        props.navigation.reset({
-          index: 0,
-          routes: [{ name: "Login" }],
-        });
-        return;
-      }
-
-      if (user.mustChangePassword) {
-        props.navigation.reset({
-          index: 0,
-          routes: [{ name: "ChangePassword" }],
-        });
-        return;
-      }
-
-      if (!activeRole) {
-        props.navigation.reset({
-          index: 0,
-          routes: [{ name: "SelectActiveRole" }],
-        });
-        return;
-      }
-
-      if (
-        Array.isArray(props.allowedRoles) &&
-        props.allowedRoles.length > 0 &&
-        !props.allowedRoles.includes(activeRole.roleName)
-      ) {
-        props.navigation.reset({
-          index: 0,
-          routes: [{ name: "SelectActiveRole" }],
-        });
-      }
-    },
-    [
-      isLoading,
-      isAuthenticated,
-      user,
-      isUserHydrated,
-      activeRole,
-      props.navigation,
-      props.allowedRoles,
-    ],
-  );
 
   if (isLoading || !isUserHydrated) {
     return (
@@ -76,7 +23,15 @@ export default function GuardedScreen(props) {
     );
   }
 
-  if (!isAuthenticated || !user || !activeRole) {
+  if (!isAuthenticated || !user) {
+    return null;
+  }
+
+  if (user.mustChangePassword) {
+    return null;
+  }
+
+  if (!activeRole) {
     return null;
   }
 

@@ -143,6 +143,7 @@ export function AuthProvider(props) {
       await saveUser(userData);
 
       setUser(userData);
+      setActiveRole(null);
       setIsAuthenticated(true);
       setIsUserHydrated(true);
 
