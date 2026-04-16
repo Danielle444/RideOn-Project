@@ -36,8 +36,6 @@ export default function MobileEntryGateScreen(props) {
         return;
       }
 
-      // אם המשתמש לא מחובר - לא עושים ניווט מכאן.
-      // App.js כבר יציג את AuthNavigator לבד.
       if (!isAuthenticated || !user) {
         return;
       }
@@ -54,11 +52,7 @@ export default function MobileEntryGateScreen(props) {
 
     if (user.mustChangePassword) {
       hasNavigatedRef.current = true;
-
-      props.navigation.reset({
-        index: 0,
-        routes: [{ name: "ChangePassword" }],
-      });
+      props.navigation.replace("ChangePassword");
       return;
     }
 
@@ -67,11 +61,7 @@ export default function MobileEntryGateScreen(props) {
 
       if (screenName) {
         hasNavigatedRef.current = true;
-
-        props.navigation.reset({
-          index: 0,
-          routes: [{ name: screenName }],
-        });
+        props.navigation.replace(screenName);
         return;
       }
     }
@@ -86,20 +76,12 @@ export default function MobileEntryGateScreen(props) {
       await setActiveRoleAndPersist(autoSelection.result.activeRole);
 
       hasNavigatedRef.current = true;
-
-      props.navigation.reset({
-        index: 0,
-        routes: [{ name: autoSelection.result.destination }],
-      });
+      props.navigation.replace(autoSelection.result.destination);
       return;
     }
 
     hasNavigatedRef.current = true;
-
-    props.navigation.reset({
-      index: 0,
-      routes: [{ name: "SelectActiveRole" }],
-    });
+    props.navigation.replace("SelectActiveRole");
   }
 
   return (

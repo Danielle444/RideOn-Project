@@ -29,7 +29,7 @@ function AppShell() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer key={isAuthenticated ? "app" : "auth"}>
       {isAuthenticated ? (
         <AppNavigator onLogout={logout} />
       ) : (
