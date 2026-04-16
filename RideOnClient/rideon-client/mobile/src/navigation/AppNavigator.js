@@ -30,6 +30,7 @@ import PayerCompetitionClassesScreen from "../screens/roles/payer/screens/PayerC
 import PayerCompetitionPaidTimesScreen from "../screens/roles/payer/screens/PayerCompetitionPaidTimesScreen";
 import PayerCompetitionStallsScreen from "../screens/roles/payer/screens/PayerCompetitionStallsScreen";
 import PayerProfileScreen from "../screens/roles/payer/screens/PayerProfileScreen";
+import PayerCompetitionAccountScreen from "../screens/roles/payer/screens/PayerCompetitionAccountScreen";
 
 import WorkerHomeScreen from "../screens/roles/worker/screens/WorkerHomeScreen";
 import WorkerShavingsOrdersScreen from "../screens/roles/worker/screens/WorkerShavingsOrdersScreen";
@@ -338,6 +339,19 @@ export default function AppNavigator(props) {
             screenProps,
             ["משלם"],
             <CompetitionInvitationScreen
+              {...screenProps}
+              onLogout={props.onLogout}
+            />,
+          );
+        }}
+      </Stack.Screen>
+
+      <Stack.Screen name="PayerCompetitionAccount">
+        {function (screenProps) {
+          return withGuard(
+            screenProps,
+            ["משלם"],
+            <PayerCompetitionAccountScreen
               {...screenProps}
               onLogout={props.onLogout}
             />,
