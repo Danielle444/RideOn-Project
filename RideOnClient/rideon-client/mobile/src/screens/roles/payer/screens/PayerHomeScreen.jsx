@@ -19,6 +19,7 @@ import HomeCompetitionCard from "../../../../components/home/HomeCompetitionCard
 import HomeShortcutGrid from "../../../../components/home/HomeShortcutGrid";
 import { getMobilePayerCompetitionsBoard } from "../../../../services/competitionService";
 import { canPayerEnterCompetition } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
+import { useCompetition } from "../../../../context/CompetitionContext";
 
 function sortAndTakeNearest(items) {
   return [...items]
@@ -39,6 +40,8 @@ export default function PayerHomeScreen(props) {
 
   var [competitions, setCompetitions] = useState([]);
   var [loading, setLoading] = useState(false);
+
+  var competitionContext = useCompetition();
 
   useEffect(
     function () {
@@ -87,8 +90,15 @@ export default function PayerHomeScreen(props) {
       {
         key: "details",
         label: "פרטי תחרות",
-        onPress: function () {
-          Alert.alert("בהמשך", "מסך פרטי תחרות יחובר בהמשך");
+        onPress: async function () {
+          await competitionContext.setActiveCompetitionAndPersist({
+            competitionId: item.competitionId,
+            competitionName: item.competitionName,
+            competitionStatus: item.competitionStatus,
+            ranchId: activeRole.ranchId,
+          });
+
+          props.navigation.navigate("PayerCompetitionDetails");
         },
         disabled: false,
         variant: "secondary",
@@ -96,8 +106,15 @@ export default function PayerHomeScreen(props) {
       {
         key: "enter",
         label: "כניסה",
-        onPress: function () {
-          Alert.alert("בהמשך", "כניסה לתחרות תחובר בהמשך");
+        onPress: async function () {
+          await competitionContext.setActiveCompetitionAndPersist({
+            competitionId: item.competitionId,
+            competitionName: item.competitionName,
+            competitionStatus: item.competitionStatus,
+            ranchId: activeRole.ranchId,
+          });
+
+          props.navigation.navigate("PayerCompetitionAccount");
         },
         disabled: !canPayerEnterCompetition(item.competitionStatus),
         variant: "primary",
@@ -184,11 +201,10 @@ export default function PayerHomeScreen(props) {
           <Text style={homeScreenStyles.welcomeRole}>
             {activeRole?.roleName}
           </Text>
-          
+
           <Text style={homeScreenStyles.welcomeSubtitle}>
             זה התפקיד הפעיל שלך במערכת
           </Text>
-
         </View>
 
         <TouchableOpacity

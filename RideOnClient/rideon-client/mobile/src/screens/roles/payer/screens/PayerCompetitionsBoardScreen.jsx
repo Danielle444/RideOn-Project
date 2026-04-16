@@ -99,7 +99,7 @@ export default function PayerCompetitionsBoardScreen(props) {
         key: "details",
         label: "פרטי תחרות",
         onPress: function () {
-          setCompetitionAndNavigate(item, "PayerCompetitionAccount");
+          setCompetitionAndNavigate(item, "PayerCompetitionDetails");
         },
         disabled: false,
         variant: "secondary",
