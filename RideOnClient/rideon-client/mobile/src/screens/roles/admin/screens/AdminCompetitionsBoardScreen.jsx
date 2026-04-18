@@ -18,6 +18,8 @@ import {
   canAdminEnterCompetition,
   canAdminRegisterCompetition,
 } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
+import { sortCompetitionsByStatusAndDate } from "../../../../../../shared/auth/utils/competitions/competitionSorting";
+import { MOBILE_COMPETITION_STATUS_ORDER } from "../../../../config/competitionStatusOrder";
 
 export default function AdminCompetitionsBoardScreen(props) {
   var userContext = useUser();
@@ -44,9 +46,16 @@ export default function AdminCompetitionsBoardScreen(props) {
     try {
       setLoading(true);
       var response = await getMobileAdminCompetitionsBoard(activeRole.ranchId);
-      setCompetitions(Array.isArray(response.data) ? response.data : []);
+
+      setCompetitions(
+        sortCompetitionsByStatusAndDate(
+          Array.isArray(response.data) ? response.data : [],
+          MOBILE_COMPETITION_STATUS_ORDER,
+        ),
+      );
     } catch (error) {
       Alert.alert("שגיאה", "אירעה שגיאה בטעינת התחרויות");
+      setCompetitions([]);
     } finally {
       setLoading(false);
     }

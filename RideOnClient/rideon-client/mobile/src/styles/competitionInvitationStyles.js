@@ -248,6 +248,24 @@ const competitionInvitationStyles = StyleSheet.create({
     lineHeight: 18,
   },
 
+  classCardPressable: {
+    width: "100%",
+  },
+
+  classExpandHint: {
+    textAlign: "right",
+    fontSize: 12,
+    color: "#8D756A",
+    marginTop: 2,
+  },
+
+  classDetailsWrap: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#F1E7E2",
+  },
+
   serviceCategoryWrap: {
     marginBottom: 14,
   },
