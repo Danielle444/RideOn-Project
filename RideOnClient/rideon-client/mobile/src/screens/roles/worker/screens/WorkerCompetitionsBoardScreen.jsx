@@ -15,6 +15,8 @@ import { getMobileWorkerCompetitionsBoard } from "../../../../services/competiti
 import CompetitionBoardCard from "../../../../components/competitions/CompetitionBoardCard";
 import { formatCompetitionDateRange } from "../../../../../../shared/auth/utils/competitions/competitionFormatters";
 import { canWorkerEnterCompetition } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
+import { sortCompetitionsByStatusAndDate } from "../../../../../../shared/auth/utils/competitions/competitionSorting";
+import { MOBILE_COMPETITION_STATUS_ORDER } from "../../../../config/competitionStatusOrder";
 
 export default function WorkerCompetitionsBoardScreen(props) {
   var userContext = useUser();
@@ -45,7 +47,12 @@ export default function WorkerCompetitionsBoardScreen(props) {
       setLoading(true);
 
       var response = await getMobileWorkerCompetitionsBoard(activeRole.ranchId);
-      setCompetitions(Array.isArray(response.data) ? response.data : []);
+      setCompetitions(
+        sortCompetitionsByStatusAndDate(
+          Array.isArray(response.data) ? response.data : [],
+          MOBILE_COMPETITION_STATUS_ORDER,
+        ),
+      );
     } catch (error) {
       console.error(error);
       Alert.alert("שגיאה", "אירעה שגיאה בטעינת התחרויות");

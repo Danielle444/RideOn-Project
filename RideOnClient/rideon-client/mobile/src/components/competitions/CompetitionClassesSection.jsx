@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import competitionInvitationStyles from "../../styles/competitionInvitationStyles";
 import CompetitionDayTabs from "./CompetitionDayTabs";
 import CompetitionSectionCard from "./CompetitionSectionCard";
@@ -18,7 +18,7 @@ function formatPrice(value) {
 
 function formatTime(value) {
   if (!value) {
-    return "—";
+    return "";
   }
 
   return String(value).slice(0, 5);
@@ -29,6 +29,7 @@ export default function CompetitionClassesSection(props) {
   var [selectedKey, setSelectedKey] = useState(
     groups.length > 0 ? groups[0].key : ""
   );
+  var [expandedClassId, setExpandedClassId] = useState(null);
 
   useEffect(
     function () {
@@ -37,6 +38,8 @@ export default function CompetitionClassesSection(props) {
       } else {
         setSelectedKey("");
       }
+
+      setExpandedClassId(null);
     },
     [groups]
   );
@@ -44,6 +47,16 @@ export default function CompetitionClassesSection(props) {
   var selectedGroup = groups.find(function (group) {
     return group.key === selectedKey;
   });
+
+  function toggleClass(itemId) {
+    setExpandedClassId(function (prev) {
+      if (prev === itemId) {
+        return null;
+      }
+
+      return itemId;
+    });
+  }
 
   return (
     <CompetitionSectionCard title="מקצים" initialExpanded={false}>
@@ -56,42 +69,80 @@ export default function CompetitionClassesSection(props) {
           <CompetitionDayTabs
             groups={groups}
             activeKey={selectedKey}
-            onChange={setSelectedKey}
+            onChange={function (nextKey) {
+              setSelectedKey(nextKey);
+              setExpandedClassId(null);
+            }}
           />
 
           {selectedGroup?.items?.map(function (item) {
+            var itemId = String(item.classInCompId);
+            var isExpanded = expandedClassId === itemId;
+            var formattedTime = formatTime(item.startTime);
+
             return (
               <View
-                key={String(item.classInCompId)}
+                key={itemId}
                 style={competitionInvitationStyles.itemCard}
               >
-                <View style={competitionInvitationStyles.itemHeaderRow}>
-                  <Text style={competitionInvitationStyles.itemTitle}>
-                    {item.className || "ללא שם מקצה"}
+                <Pressable
+                  onPress={function () {
+                    toggleClass(itemId);
+                  }}
+                  style={competitionInvitationStyles.classCardPressable}
+                >
+                  <View style={competitionInvitationStyles.itemHeaderRow}>
+                    <Text style={competitionInvitationStyles.itemTitle}>
+                      {item.className || "ללא שם מקצה"}
+                    </Text>
+
+                    <Text style={competitionInvitationStyles.priceText}>
+                      {formatPrice(item.totalPrice)}
+                    </Text>
+                  </View>
+
+                  <Text style={competitionInvitationStyles.classExpandHint}>
+                    {isExpanded ? "הסתר פרטים" : "הצג פרטים"}
                   </Text>
+                </Pressable>
 
-                  <Text style={competitionInvitationStyles.priceText}>
-                    {formatPrice(item.totalPrice)}
-                  </Text>
-                </View>
+                {isExpanded ? (
+                  <View style={competitionInvitationStyles.classDetailsWrap}>
+                    {item.arenaName ? (
+                      <Text style={competitionInvitationStyles.itemMeta}>
+                        מגרש: {item.arenaName}
+                      </Text>
+                    ) : null}
 
-                <Text style={competitionInvitationStyles.itemMeta}>
-                  זירה: {item.arenaName || "—"}
-                </Text>
+                    {formattedTime ? (
+                      <Text style={competitionInvitationStyles.itemMeta}>
+                        שעה: {formattedTime}
+                      </Text>
+                    ) : null}
 
-                <Text style={competitionInvitationStyles.itemMeta}>
-                  שעה: {formatTime(item.startTime)}
-                </Text>
+                    {item.judgesDisplay ? (
+                      <Text style={competitionInvitationStyles.itemMeta}>
+                        שופטים: {item.judgesDisplay}
+                      </Text>
+                    ) : null}
 
-                <Text style={competitionInvitationStyles.itemMeta}>
-                  שופטים: {item.judgesDisplay || "—"}
-                </Text>
+                    <Text style={competitionInvitationStyles.itemMeta}>
+                      למארגן: {formatPrice(item.organizerCost)}
+                    </Text>
 
-                {item.prizeTypeName ? (
-                  <Text style={competitionInvitationStyles.itemMeta}>
-                    פרס: {item.prizeTypeName}
-                    {item.prizeAmount ? " • " + formatPrice(item.prizeAmount) : ""}
-                  </Text>
+                    <Text style={competitionInvitationStyles.itemMeta}>
+                      להתאחדות: {formatPrice(item.federationCost)}
+                    </Text>
+
+                    {item.prizeTypeName ? (
+                      <Text style={competitionInvitationStyles.itemMeta}>
+                        פרס: {item.prizeTypeName}
+                        {item.prizeAmount !== null && item.prizeAmount !== undefined
+                          ? " • " + formatPrice(item.prizeAmount)
+                          : ""}
+                      </Text>
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
             );

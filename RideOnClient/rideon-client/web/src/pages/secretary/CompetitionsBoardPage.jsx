@@ -10,6 +10,8 @@ import { useActiveRole } from "../../context/ActiveRoleContext";
 import { getCompetitionsByHostRanch } from "../../services/competitionService";
 import { saveActiveCompetition } from "../../services/competitionSessionService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
+import { sortCompetitionsByStatusAndDate } from "../../../../shared/auth/utils/competitions/competitionSorting";
+import { WEB_SECRETARY_COMPETITION_STATUS_ORDER } from "../../config/competitionStatusOrder";
 
 export default function CompetitionsBoardPage() {
   const navigate = useNavigate();
@@ -40,7 +42,11 @@ export default function CompetitionsBoardPage() {
     message: "",
   });
 
-  const userName = ((user?.firstName || "") + " " + (user?.lastName || "")).trim();
+  const userName = (
+    (user?.firstName || "") +
+    " " +
+    (user?.lastName || "")
+  ).trim();
 
   const subtitle =
     [activeRole?.roleName, activeRole?.ranchName].filter(Boolean).join(" · ") ||
@@ -90,7 +96,12 @@ export default function CompetitionsBoardPage() {
         dateTo: effectiveDateTo || null,
       });
 
-      setCompetitions(Array.isArray(response.data) ? response.data : []);
+      setCompetitions(
+        sortCompetitionsByStatusAndDate(
+          response.data || [],
+          WEB_SECRETARY_COMPETITION_STATUS_ORDER,
+        ),
+      );
     } catch (error) {
       console.error(error);
       setCompetitions([]);
