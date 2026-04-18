@@ -53,6 +53,58 @@ namespace RideOnServer.DAL
             }
         }
 
+        public List<CompetitionHorseListItem> GetHorsesForCompetition(GetCompetitionHorsesFiltersRequest filters)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@p_competitionid", filters.CompetitionId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_gethorsesforcompetition",
+                        connection,
+                        paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<CompetitionHorseListItem> horses = new List<CompetitionHorseListItem>();
+
+                        while (reader.Read())
+                        {
+                            CompetitionHorseListItem item = new CompetitionHorseListItem
+                            {
+                                HorseId = Convert.ToInt32(reader["HorseId"]),
+                                HorseName = reader["HorseName"].ToString() ?? string.Empty,
+                                BarnName = reader["BarnName"] == DBNull.Value ? null : reader["BarnName"].ToString(),
+                                FederationNumber = reader["FederationNumber"] == DBNull.Value ? null : reader["FederationNumber"].ToString()
+                            };
+
+                            if (string.IsNullOrWhiteSpace(filters.SearchText) ||
+                                item.HorseName.Contains(filters.SearchText, StringComparison.OrdinalIgnoreCase) ||
+                                (!string.IsNullOrWhiteSpace(item.BarnName) &&
+                                 item.BarnName.Contains(filters.SearchText, StringComparison.OrdinalIgnoreCase)) ||
+                                (!string.IsNullOrWhiteSpace(item.FederationNumber) &&
+                                 item.FederationNumber.Contains(filters.SearchText, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                horses.Add(item);
+                            }
+                        }
+
+                        return horses;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
         public void UpdateHorseBarnName(UpdateHorseBarnNameRequest request)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
@@ -82,5 +134,10 @@ namespace RideOnServer.DAL
                 throw new Exception($"Database error: {ex.Message}");
             }
         }
+
+
+
+
+
     }
 }

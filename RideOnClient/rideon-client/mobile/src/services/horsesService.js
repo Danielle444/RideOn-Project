@@ -9,6 +9,16 @@ function getHorsesByRanch(ranchId, searchText) {
   });
 }
 
+function getCompetitionHorses(ranchId, competitionId, searchText) {
+  return axios.get("/Horses/competition", {
+    params: {
+      ranchId: ranchId,
+      competitionId: competitionId,
+      search: searchText || null,
+    },
+  });
+}
+
 function updateHorseBarnName(horseId, ranchId, barnName) {
   return axios.put("/Horses/" + horseId + "/barnname", {
     horseId: horseId,
@@ -19,5 +29,6 @@ function updateHorseBarnName(horseId, ranchId, barnName) {
 
 export {
   getHorsesByRanch,
+  getCompetitionHorses,
   updateHorseBarnName,
 };
