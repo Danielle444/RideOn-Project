@@ -44,6 +44,41 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("competition")]
+        public IActionResult GetCompetitionHorses(
+            [FromQuery] int ranchId,
+            [FromQuery] int competitionId,
+            [FromQuery] string? search)
+        {
+            try
+            {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                GetCompetitionHorsesFiltersRequest filters = new GetCompetitionHorsesFiltersRequest
+                {
+                    CompetitionId = competitionId,
+                    SearchText = search
+                };
+
+                List<CompetitionHorseListItem> horses = Horse.GetHorsesForCompetition(filters);
+                return Ok(horses);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpPut("{horseId}/barnname")]
         public IActionResult UpdateHorseBarnName(
             int horseId,

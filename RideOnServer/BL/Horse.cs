@@ -59,6 +59,22 @@ namespace RideOnServer.BL
             dal.UpdateHorseBarnName(request);
         }
 
+        internal static List<CompetitionHorseListItem> GetHorsesForCompetition(GetCompetitionHorsesFiltersRequest filters)
+        {
+            if (filters == null)
+            {
+                throw new Exception("Filters are required");
+            }
+
+            if (filters.CompetitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            HorseDAL dal = new HorseDAL();
+            return dal.GetHorsesForCompetition(filters);
+        }
+
 
 
 
