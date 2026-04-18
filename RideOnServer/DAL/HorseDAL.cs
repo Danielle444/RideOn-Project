@@ -57,7 +57,8 @@ namespace RideOnServer.DAL
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
-                { "@p_competitionid", filters.CompetitionId }
+                { "@p_competitionid", filters.CompetitionId },
+                { "@p_ranchid", filters.RanchId }
             };
 
             try

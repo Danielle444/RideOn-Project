@@ -71,6 +71,11 @@ namespace RideOnServer.BL
                 throw new Exception("Invalid CompetitionId");
             }
 
+            if (filters.RanchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
             HorseDAL dal = new HorseDAL();
             return dal.GetHorsesForCompetition(filters);
         }

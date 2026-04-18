@@ -63,6 +63,7 @@ namespace RideOnServer.Controllers
                 GetCompetitionHorsesFiltersRequest filters = new GetCompetitionHorsesFiltersRequest
                 {
                     CompetitionId = competitionId,
+                    RanchId = ranchId,
                     SearchText = search
                 };
 
