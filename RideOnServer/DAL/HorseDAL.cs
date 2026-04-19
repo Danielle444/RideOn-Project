@@ -136,9 +136,119 @@ namespace RideOnServer.DAL
             }
         }
 
+        public List<HealthCertificateItem> GetHealthCertificatesForCompetition(int competitionId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@CompetitionId", competitionId }
+            };
 
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
 
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_GetHealthCertificatesForCompetition",
+                        connection,
+                        paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<HealthCertificateItem> list = new List<HealthCertificateItem>();
 
+                        while (reader.Read())
+                        {
+                            list.Add(new HealthCertificateItem
+                            {
+                                HorseId = Convert.ToInt32(reader["HorseId"]),
+                                HorseName = reader["HorseName"].ToString() ?? string.Empty,
+                                BarnName = reader["BarnName"] as string,
+                                HcPath = reader["HcPath"] as string,
+                                HcUploadDate = reader["HcUploadDate"] as DateTime?,
+                                HcApprovalStatus = reader["HcApprovalStatus"] as string,
+                                HcApprovalDate = reader["HcApprovalDate"] == DBNull.Value
+                                    ? null
+                                    : DateOnly.FromDateTime(Convert.ToDateTime(reader["HcApprovalDate"])),
+                                HcApproverSystemUserId = reader["HcApproverSystemUserId"] == DBNull.Value
+                                    ? null
+                                    : Convert.ToInt32(reader["HcApproverSystemUserId"])
+                            });
+                        }
 
+                        return list;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetHealthCertificatesForCompetition: {ex.Message}");
+                throw;
+            }
+        }
+
+        public void SaveHealthCertificate(int horseId, int competitionId, string hcPath, DateTime uploadDate)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@HorseId", horseId },
+                { "@CompetitionId", competitionId },
+                { "@HcPath", hcPath },
+                { "@HcUploadDate", uploadDate }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_SaveHealthCertificate",
+                        connection,
+                        paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in SaveHealthCertificate: {ex.Message}");
+                throw;
+            }
+        }
+
+        public void ApproveHealthCertificate(int horseId, int competitionId, int approverSystemUserId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@HorseId", horseId },
+                { "@CompetitionId", competitionId },
+                { "@HcApproverSystemUserId", approverSystemUserId },
+                { "@HcApprovalDate", DateOnly.FromDateTime(DateTime.UtcNow) }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_ApproveHealthCertificate",
+                        connection,
+                        paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in ApproveHealthCertificate: {ex.Message}");
+                throw;
+            }
+        }
     }
 }

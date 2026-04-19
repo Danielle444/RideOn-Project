@@ -112,5 +112,68 @@ namespace RideOnServer.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [HttpGet("health-certificates")]
+        public IActionResult GetHealthCertificates([FromQuery] int competitionId)
+        {
+            try
+            {
+                var certificates = HorseParticipationInCompetition.GetHealthCertificatesForCompetition(competitionId);
+                return Ok(new { data = certificates });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetHealthCertificates: {ex.Message}");
+                return StatusCode(500, "שגיאה בשליפת תעודות הבריאות");
+            }
+        }
+
+        [HttpPost("health-certificates/save")]
+        public IActionResult SaveHealthCertificate([FromBody] SaveHealthCertificateRequest request)
+        {
+            try
+            {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    request.CompetitionId,
+                    RoleNames.RanchAdmin
+                );
+
+                HorseParticipationInCompetition.SaveHealthCertificate(request);
+                return Ok(new { message = "תעודת הבריאות נשמרה בהצלחה" });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in SaveHealthCertificate: {ex.Message}");
+                return StatusCode(500, "שגיאה בשמירת תעודת הבריאות");
+            }
+        }
+
+        [HttpPost("health-certificates/approve")]
+        public IActionResult ApproveHealthCertificate([FromBody] ApproveHealthCertificateRequest request)
+        {
+            try
+            {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                HorseParticipationInCompetition.ApproveHealthCertificate(request, currentPersonId);
+                return Ok(new { message = "תעודת הבריאות אושרה בהצלחה" });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in ApproveHealthCertificate: {ex.Message}");
+                return StatusCode(500, "שגיאה באישור תעודת הבריאות");
+            }
+        }
     }
 }
