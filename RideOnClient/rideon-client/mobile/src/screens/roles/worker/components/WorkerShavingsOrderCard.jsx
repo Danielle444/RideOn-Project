@@ -1,9 +1,18 @@
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import workerStyles from "../../../../styles/workerStyles";
 
+function getStatusLabel(status) {
+  if (status === "Pending") return "ממתין לאספקה";
+  if (status === "WaitingApproval") return "ממתין לאישור מזכירה";
+  if (status === "Closed") return "סגורה";
+  return status;
+}
+
 export default function WorkerShavingsOrderCard(props) {
+  const statusLabel = getStatusLabel(props.deliveryStatus);
+
   return (
     <View style={roleSharedStyles.card}>
       <View style={roleSharedStyles.cardTopRow}>
@@ -15,7 +24,7 @@ export default function WorkerShavingsOrderCard(props) {
           <Text style={roleSharedStyles.cardTitle}>{props.orderTitle}</Text>
 
           <View style={workerStyles.orderStatusBadge}>
-            <Text style={workerStyles.orderStatusText}>{props.orderStatus}</Text>
+            <Text style={workerStyles.orderStatusText}>{statusLabel}</Text>
           </View>
         </View>
       </View>
@@ -23,35 +32,68 @@ export default function WorkerShavingsOrderCard(props) {
       <View style={workerStyles.orderDetailsWrap}>
         <View style={workerStyles.orderDetailRow}>
           <Text style={workerStyles.orderDetailLabel}>שם חווה:</Text>
-          <Text style={workerStyles.orderDetailValue}>{props.ranchName}</Text>
+          <Text style={workerStyles.orderDetailValue}>{props.ranchName || "-"}</Text>
         </View>
 
         <View style={workerStyles.orderDetailRow}>
-          <Text style={workerStyles.orderDetailLabel}>מספר תא/ים:</Text>
-          <Text style={workerStyles.orderDetailValue}>{props.stallNumber}</Text>
+          <Text style={workerStyles.orderDetailLabel}>תחרות:</Text>
+          <Text style={workerStyles.orderDetailValue}>{props.competitionName || "-"}</Text>
         </View>
 
         <View style={workerStyles.orderDetailRow}>
-          <Text style={workerStyles.orderDetailLabel}>כמות שקי נסורת:</Text>
-          <Text style={workerStyles.orderDetailValue}>{props.bagsAmount}</Text>
+          <Text style={workerStyles.orderDetailLabel}>תא:</Text>
+          <Text style={workerStyles.orderDetailValue}>{props.stallName || "-"}</Text>
+        </View>
+
+        <View style={workerStyles.orderDetailRow}>
+          <Text style={workerStyles.orderDetailLabel}>כמות שקים:</Text>
+          <Text style={workerStyles.orderDetailValue}>{props.bagQuantity} שקים</Text>
+        </View>
+
+        <View style={workerStyles.orderDetailRow}>
+          <Text style={workerStyles.orderDetailLabel}>משלם:</Text>
+          <Text style={workerStyles.orderDetailValue}>
+            {props.payerFirstName} {props.payerLastName}
+          </Text>
         </View>
       </View>
 
-      <View style={roleSharedStyles.buttonsRow}>
-        <Pressable
-          style={[roleSharedStyles.primaryButton, workerStyles.doneButton]}
-          onPress={props.onDonePress}
-        >
-          <Text style={roleSharedStyles.primaryButtonText}>סופק</Text>
-        </Pressable>
+      {props.deliveryStatus === "Pending" && (
+        <View style={roleSharedStyles.buttonsRow}>
+          <Pressable
+            style={[roleSharedStyles.primaryButton, { opacity: props.uploading ? 0.6 : 1 }]}
+            onPress={props.onCapturePhoto}
+            disabled={props.uploading}
+          >
+            {props.uploading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Ionicons name="camera-outline" size={18} color="#fff" style={{ marginLeft: 6 }} />
+                <Text style={roleSharedStyles.primaryButtonText}>צלם ואשר אספקה</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
+      )}
 
-        <Pressable
-          style={roleSharedStyles.primaryButton}
-          onPress={props.onInTreatmentPress}
-        >
-          <Text style={roleSharedStyles.primaryButtonText}>בטיפול</Text>
-        </Pressable>
-      </View>
+      {props.deliveryStatus === "WaitingApproval" && (
+        <View style={[roleSharedStyles.buttonsRow, { justifyContent: "center" }]}>
+          <Ionicons name="time-outline" size={16} color="#8B6352" />
+          <Text style={[workerStyles.orderDetailLabel, { marginRight: 4 }]}>
+            ממתין לאישור מזכירה
+          </Text>
+        </View>
+      )}
+
+      {props.deliveryStatus === "Closed" && (
+        <View style={[roleSharedStyles.buttonsRow, { justifyContent: "center" }]}>
+          <Ionicons name="checkmark-circle-outline" size={16} color="#4CAF50" />
+          <Text style={[workerStyles.orderDetailLabel, { marginRight: 4, color: "#4CAF50" }]}>
+            הזמנה סגורה
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
