@@ -27,8 +27,24 @@ function updateHorseBarnName(horseId, ranchId, barnName) {
   });
 }
 
+function getHealthCertificates(competitionId) {
+  return axios.get("/Horses/health-certificates", {
+    params: { competitionId },
+  });
+}
+
+function saveHealthCertificate(horseId, competitionId, hcPath) {
+  return axios.post("/Horses/health-certificates/save", {
+    horseId,
+    competitionId,
+    hcPath,
+  });
+}
+
 export {
   getHorsesByRanch,
   getCompetitionHorses,
   updateHorseBarnName,
+  getHealthCertificates,
+  saveHealthCertificate,
 };
