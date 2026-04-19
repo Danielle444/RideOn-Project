@@ -49,6 +49,10 @@ namespace RideOnServer.Controllers
 
                 return Ok(response);
             }
+            catch (InvalidOperationException ex) when (ex.Message == "PENDING_APPROVAL")
+            {
+                return BadRequest("PENDING_APPROVAL");
+            }
             catch (Exception ex)
             {
                 return BadRequest(ex.Message);

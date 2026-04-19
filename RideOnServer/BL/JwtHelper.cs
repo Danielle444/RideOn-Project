@@ -17,7 +17,7 @@ namespace RideOnServer.BL
                 return expirationHours;
             }
 
-            return 2;
+            return 24;
         }
 
         public static string GenerateToken(SystemUser user, List<ApprovedRoleRanch> approvedRolesAndRanches, IConfiguration configuration)

@@ -52,23 +52,39 @@ function updateRanchRequestStatus(data) {
   );
 }
 
+// PAYER REGISTRATIONS
+function getPendingPayerRegistrations() {
+  return axios.get(`${API}/Payers/pending-registrations`, getAuthHeaders());
+}
+
+function approvePayerRegistration(data) {
+  return axios.post(`${API}/Payers/approve-registration`, data, getAuthHeaders());
+}
+
+function rejectPayerRegistration(data) {
+  return axios.post(`${API}/Payers/reject-registration`, data, getAuthHeaders());
+}
+
 // REQUESTS SUMMARY
 async function getPendingRequestsSummary() {
-  const [adminRes, secretaryRes, ranchRes] = await Promise.all([
+  const [adminRes, secretaryRes, ranchRes, payerRes] = await Promise.all([
     getRoleRequests(2, "Pending", null),
     getRoleRequests(3, "Pending", null),
     getRanchRequests("Pending", null),
+    getPendingPayerRegistrations().catch(function () { return { data: [] }; }),
   ]);
 
   const adminCount = Array.isArray(adminRes.data) ? adminRes.data.length : 0;
   const secretaryCount = Array.isArray(secretaryRes.data) ? secretaryRes.data.length : 0;
   const ranchCount = Array.isArray(ranchRes.data) ? ranchRes.data.length : 0;
+  const payerCount = Array.isArray(payerRes.data) ? payerRes.data.length : 0;
 
   return {
     admin: adminCount,
     secretary: secretaryCount,
     ranch: ranchCount,
-    total: adminCount + secretaryCount + ranchCount,
+    payer: payerCount,
+    total: adminCount + secretaryCount + ranchCount + payerCount,
   };
 }
 
@@ -232,6 +248,9 @@ export {
   updateRoleRequestStatus,
   getRanchRequests,
   updateRanchRequestStatus,
+  getPendingPayerRegistrations,
+  approvePayerRegistration,
+  rejectPayerRegistration,
   getPendingRequestsSummary,
   getAllSuperUsers,
   createSuperUser,

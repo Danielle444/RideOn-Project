@@ -46,6 +46,10 @@ function getCompetitionPayers(ranchId, competitionId, search) {
   });
 }
 
+function createPayerWithCredentials(payload) {
+  return axios.post("/Payers/create-with-credentials", payload);
+}
+
 export {
   getManagedPayers,
   findPotentialPayerByContact,
@@ -53,4 +57,5 @@ export {
   updateManagedPayer,
   removeManagedPayer,
   getCompetitionPayers,
+  createPayerWithCredentials,
 };

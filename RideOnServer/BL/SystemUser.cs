@@ -27,11 +27,11 @@ namespace RideOnServer.BL
             if (systemUser == null)
                 return null;
 
-            if (!systemUser.IsActive)
-                return null;
-
             if (!PasswordHelper.VerifyPassword(password, systemUser.PasswordSalt, systemUser.PasswordHash))
                 return null;
+
+            if (!systemUser.IsActive)
+                throw new InvalidOperationException("PENDING_APPROVAL");
 
             List<ApprovedRoleRanch> approvedRolesAndRanches = GetApprovedPersonRanchesAndRoles(systemUser.PersonId);
 

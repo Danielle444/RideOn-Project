@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 import ProfileSectionCard from "./ProfileSectionCard";
 import ProfileFieldRow from "./ProfileFieldRow";
+import RanchLocationPickerMobile from "./RanchLocationPickerMobile";
 import profileStyles from "../../styles/profileStyles";
 
 export default function RanchProfileSection(props) {
@@ -51,41 +52,28 @@ export default function RanchProfileSection(props) {
         }}
       />
 
-      <ProfileFieldRow
-        label="קו רוחב"
-        value={
-          page.isEditingRanch
-            ? page.ranchForm.latitude
-            : page.data?.activeRanch?.latitude === null ||
-              page.data?.activeRanch?.latitude === undefined
-            ? ""
-            : String(page.data.activeRanch.latitude)
-        }
-        editable={page.isEditingRanch}
-        textAlign="left"
-        keyboardType="numeric"
-        onChange={function (value) {
-          page.setRanchField("latitude", value);
-        }}
-      />
-
-      <ProfileFieldRow
-        label="קו אורך"
-        value={
-          page.isEditingRanch
-            ? page.ranchForm.longitude
-            : page.data?.activeRanch?.longitude === null ||
-              page.data?.activeRanch?.longitude === undefined
-            ? ""
-            : String(page.data.activeRanch.longitude)
-        }
-        editable={page.isEditingRanch}
-        textAlign="left"
-        keyboardType="numeric"
-        onChange={function (value) {
-          page.setRanchField("longitude", value);
-        }}
-      />
+      <View style={{ marginTop: 8 }}>
+        <Text style={{ fontSize: 13, fontWeight: "600", color: "#7B5A4D", textAlign: "right", marginBottom: 6 }}>
+          מיקום החווה
+        </Text>
+        <RanchLocationPickerMobile
+          latitude={
+            page.isEditingRanch
+              ? page.ranchForm.latitude
+              : page.data?.activeRanch?.latitude
+          }
+          longitude={
+            page.isEditingRanch
+              ? page.ranchForm.longitude
+              : page.data?.activeRanch?.longitude
+          }
+          readOnly={!page.isEditingRanch}
+          onChange={function (loc) {
+            page.setRanchField("latitude", String(loc.latitude));
+            page.setRanchField("longitude", String(loc.longitude));
+          }}
+        />
+      </View>
 
       {canEdit ? (
         <View style={profileStyles.buttonsRow}>

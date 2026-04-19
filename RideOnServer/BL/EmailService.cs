@@ -27,6 +27,21 @@ namespace RideOnServer.BL
             Send(toEmail, subject, body);
         }
 
+        public void SendPayerRegistrationLinkEmail(
+            string toEmail, string firstName, string ranchName, string registrationLink)
+        {
+            string subject = "הזמנה להשלמת הרשמה - RideOn";
+            string body =
+                $"שלום {firstName},\n\n" +
+                $"חווה {ranchName} הוסיפה אותך כמשלם במערכת RideOn.\n\n" +
+                $"לחץ על הקישור הבא להשלמת ההרשמה ובחירת סיסמה:\n" +
+                $"{registrationLink}\n\n" +
+                $"הקישור תקף ל-72 שעות.\n\n" +
+                $"לאחר השלמת ההרשמה, חשבונך יועבר לאישור מנהל המערכת.\n\n" +
+                $"בהצלחה,\nצוות RideOn";
+            Send(toEmail, subject, body);
+        }
+
         private void Send(string toEmail, string subject, string body)
         {
             string smtpHost = _configuration["Email:SmtpHost"]!;
