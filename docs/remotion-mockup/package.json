@@ -1,0 +1,19 @@
+{
+  "name": "rideon-ml-explainer",
+  "version": "1.0.0",
+  "description": "RideOn Smart Prediction - ML explainer video",
+  "scripts": {
+    "start": "npx remotion studio",
+    "preview": "npx remotion studio"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "@remotion/google-fonts": "^4.0.448",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "remotion": "^4.0.0"
+  },
+  "remotion": {
+    "entryPoint": "src/index.js"
+  }
+}

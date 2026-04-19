@@ -378,6 +378,60 @@ namespace RideOnServer.DAL
             }
         }
 
+        public (int NewPersonId, string Username) CreatePayerWithCredentials(
+            string firstName,
+            string lastName,
+            string email,
+            string? cellPhone,
+            string username,
+            string passwordHash,
+            string passwordSalt,
+            int ranchId,
+            short payerRoleId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@p_FirstName",    firstName },
+                { "@p_LastName",     lastName },
+                { "@p_Email",        email },
+                { "@p_CellPhone",    (object?)cellPhone ?? DBNull.Value },
+                { "@p_Username",     username },
+                { "@p_PasswordHash", passwordHash },
+                { "@p_PasswordSalt", passwordSalt },
+                { "@p_RanchId",      ranchId },
+                { "@p_RoleId",       payerRoleId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_CreatePayerWithCredentials",
+                        connection,
+                        paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return (
+                                Convert.ToInt32(reader["NewPersonId"]),
+                                reader["Username"].ToString() ?? string.Empty
+                            );
+                        }
+
+                        throw new Exception("Stored procedure returned no result");
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
         public void RemovePayerManager(int personId, int adminPersonId)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
@@ -396,6 +450,119 @@ namespace RideOnServer.DAL
                         "usp_removemanagingadminforpayer",
                         connection,
                         paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public List<PendingPayerRegistrationItem> GetPendingPayerRegistrations()
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_GetPendingPayerRegistrations",
+                        connection,
+                        new Dictionary<string, object>()))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<PendingPayerRegistrationItem> list = new List<PendingPayerRegistrationItem>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(new PendingPayerRegistrationItem
+                            {
+                                PersonId    = Convert.ToInt32(reader["PersonId"]),
+                                FirstName   = reader["FirstName"].ToString() ?? string.Empty,
+                                LastName    = reader["LastName"].ToString() ?? string.Empty,
+                                Email       = reader["Email"] == DBNull.Value ? null : reader["Email"].ToString(),
+                                CellPhone   = reader["CellPhone"] == DBNull.Value ? null : reader["CellPhone"].ToString(),
+                                Username    = reader["Username"].ToString() ?? string.Empty,
+                                RanchId     = Convert.ToInt32(reader["RanchId"]),
+                                RanchName   = reader["RanchName"].ToString() ?? string.Empty,
+                                RoleId      = Convert.ToInt16(reader["RoleId"]),
+                                RequestDate = Convert.ToDateTime(reader["RequestDate"])
+                            });
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public void ApprovePendingPayer(int personId, int ranchId, short roleId)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand cmd1 = CreateCommandWithStoredProcedure(
+                        "usp_UpdatePersonRoleStatus",
+                        connection,
+                        new Dictionary<string, object>
+                        {
+                            { "@p_PersonId",   personId },
+                            { "@p_RanchId",    ranchId },
+                            { "@p_RoleId",     roleId },
+                            { "@p_RoleStatus", "Approved" }
+                        }))
+                    {
+                        cmd1.ExecuteNonQuery();
+                    }
+
+                    using (NpgsqlCommand cmd2 = CreateCommandWithStoredProcedure(
+                        "usp_ToggleSystemUserStatus",
+                        connection,
+                        new Dictionary<string, object>
+                        {
+                            { "@p_SystemUserId", personId },
+                            { "@p_IsActive",     true }
+                        }))
+                    {
+                        cmd2.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public void RejectPendingPayer(int personId, int ranchId, short roleId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@p_PersonId",   personId },
+                { "@p_RanchId",    ranchId },
+                { "@p_RoleId",     roleId },
+                { "@p_RoleStatus", "Rejected" }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_UpdatePersonRoleStatus", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }

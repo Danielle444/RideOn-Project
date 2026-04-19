@@ -140,6 +140,29 @@ namespace RideOnServer.BL
             }
         }
 
+        public static string GetRanchNameFromClaims(ClaimsPrincipal user, int ranchId)
+        {
+            List<string> ranchIds = user.Claims
+                .Where(c => c.Type == "RanchId")
+                .Select(c => c.Value)
+                .ToList();
+
+            List<string> ranchNames = user.Claims
+                .Where(c => c.Type == "RanchName")
+                .Select(c => c.Value)
+                .ToList();
+
+            for (int i = 0; i < ranchIds.Count; i++)
+            {
+                if (int.TryParse(ranchIds[i], out int id) && id == ranchId && i < ranchNames.Count)
+                {
+                    return ranchNames[i];
+                }
+            }
+
+            return "החווה";
+        }
+
         public static void EnsureUserHasAnyApprovedRole(int personId, params string[] allowedRoleNames)
         {
             if (personId <= 0)

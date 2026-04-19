@@ -24,6 +24,7 @@ import { useCompetition } from "../../../../context/CompetitionContext";
 import {
   findPotentialPayerByContact,
   requestManagedPayer,
+  createPayerWithCredentials,
 } from "../../../../services/payerService";
 
 export default function AdminAddPayerScreen(props) {
@@ -39,6 +40,7 @@ export default function AdminAddPayerScreen(props) {
   var [cellPhone, setCellPhone] = useState("");
   var [email, setEmail] = useState("");
   var [isSubmitting, setIsSubmitting] = useState(false);
+  var [isCreatingWithCredentials, setIsCreatingWithCredentials] = useState(false);
 
   async function handleLogout() {
     if (props.onLogout) {
@@ -142,6 +144,60 @@ export default function AdminAddPayerScreen(props) {
     }
   }
 
+  async function handleCreateWithCredentials() {
+    if (!activeRole || !activeRole.ranchId) {
+      Alert.alert("שגיאה", "לא נמצאה חווה פעילה");
+      return;
+    }
+
+    if (!firstName.trim()) {
+      Alert.alert("שגיאה", "יש להזין שם פרטי");
+      return;
+    }
+
+    if (!lastName.trim()) {
+      Alert.alert("שגיאה", "יש להזין שם משפחה");
+      return;
+    }
+
+    if (!email.trim() || !email.includes("@")) {
+      Alert.alert("שגיאה", "יש להזין כתובת אימייל תקינה (חובה לשליחת פרטי התחברות)");
+      return;
+    }
+
+    try {
+      setIsCreatingWithCredentials(true);
+
+      await createPayerWithCredentials({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        cellPhone: cellPhone.trim() || null,
+        ranchId: activeRole.ranchId,
+      });
+
+      Alert.alert(
+        "המשלם נוצר בהצלחה",
+        "נשלח מייל למשלם עם פרטי ההתחברות הזמניים. המשלם יתחבר ויחליף סיסמה בכניסה הראשונה.",
+        [
+          {
+            text: "אישור",
+            onPress: function () {
+              props.navigation.goBack();
+            },
+          },
+        ],
+      );
+    } catch (error) {
+      Alert.alert(
+        "שגיאה",
+        String(error?.response?.data || "אירעה שגיאה ביצירת המשלם"),
+      );
+    } finally {
+      setIsCreatingWithCredentials(false);
+    }
+  }
+
   return (
     <MobileScreenLayout
       title="הוספת משלם"
@@ -240,13 +296,39 @@ export default function AdminAddPayerScreen(props) {
 
           <View style={styles.infoBox}>
             <Ionicons
+              name="mail-outline"
+              size={20}
+              color="#8B6352"
+            />
+            <Text style={styles.infoText}>
+              "צור משלם ושלח פרטים" — יוצר חשבון עם סיסמה זמנית ושולח מייל
+              ישירות למשלם עם פרטי ההתחברות. המשלם יחליף סיסמה בכניסה הראשונה.
+              דרוש מייל תקין.
+            </Text>
+          </View>
+
+          <Pressable
+            style={[
+              styles.submitButton,
+              isCreatingWithCredentials ? styles.submitButtonDisabled : null,
+            ]}
+            onPress={handleCreateWithCredentials}
+            disabled={isCreatingWithCredentials}
+          >
+            <Text style={styles.submitButtonText}>
+              {isCreatingWithCredentials ? "יוצר חשבון ושולח מייל..." : "צור משלם ושלח פרטי התחברות"}
+            </Text>
+          </Pressable>
+
+          <View style={styles.infoBox}>
+            <Ionicons
               name="information-circle-outline"
               size={20}
               color="#8B6352"
             />
             <Text style={styles.infoText}>
-              המערכת תבדוק אם האדם כבר קיים. אם כן, תישלח בקשת ניהול. אם לא,
-              תיווצר רשומה חלקית ותישלח בקשה להשלמת פרטים בהמשך.
+              "בדוק ושלח בקשה" — בודק אם האדם קיים ושולח בקשת ניהול לאישור
+              (ללא יצירת חשבון חדש).
             </Text>
           </View>
 
@@ -254,6 +336,7 @@ export default function AdminAddPayerScreen(props) {
             style={[
               styles.submitButton,
               isSubmitting ? styles.submitButtonDisabled : null,
+              { backgroundColor: "#A47B6A" },
             ]}
             onPress={handleSubmit}
             disabled={isSubmitting}

@@ -161,6 +161,13 @@ export function AuthProvider(props) {
         };
       }
 
+      if (err?.response?.data === "PENDING_APPROVAL") {
+        return {
+          ok: false,
+          message: "חשבונך ממתין לאישור מנהל המערכת",
+        };
+      }
+
       return {
         ok: false,
         message: "שגיאה בהתחברות",

@@ -2,6 +2,7 @@ const tabs = [
   { key: "admin", label: "בקשות אדמין" },
   { key: "secretary", label: "בקשות מזכירה" },
   { key: "ranch", label: "בקשות חוות" },
+  { key: "payer", label: "רישום משלמים" },
 ];
 
 export default function RequestsTabs(props) {

@@ -33,6 +33,7 @@ import UnauthorizedPage from "../pages/shared/UnauthorizedPage";
 const SECRETARY_ROLE = "מזכירת חווה מארחת";
 import ForgotPasswordScreen from "../pages/auth/ForgotPasswordScreen";
 import ResetPasswordScreen from "../pages/auth/ResetPasswordScreen";
+import CompleteRegistrationPage from "../pages/auth/CompleteRegistrationPage";
 
 const router = createBrowserRouter([
   {
@@ -72,6 +73,10 @@ const router = createBrowserRouter([
         <ResetPasswordScreen />
       </PublicRoute>
     ),
+  },
+  {
+    path: "/complete-registration",
+    element: <CompleteRegistrationPage />,
   },
 
   // 🔐 General

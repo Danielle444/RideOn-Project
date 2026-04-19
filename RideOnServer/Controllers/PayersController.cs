@@ -10,6 +10,89 @@ namespace RideOnServer.Controllers
     [Authorize]
     public class PayersController : ControllerBase
     {
+        private readonly IConfiguration _configuration;
+
+        public PayersController(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
+
+        [HttpPost("create-with-credentials")]
+        public IActionResult CreatePayerWithCredentials([FromBody] CreatePayerWithCredentialsRequest request)
+        {
+            try
+            {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    request.RanchId,
+                    RoleNames.RanchAdmin
+                );
+
+                // שליפת שם החווה לשימוש במייל
+                string ranchName = UserAccessValidator.GetRanchNameFromClaims(User, request.RanchId);
+
+                int newPersonId = Payer.CreatePayerWithCredentials(request, ranchName, _configuration);
+
+                return Ok(new
+                {
+                    PersonId = newPersonId,
+                    Message = "Payer created and registration email sent"
+                });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("pending-registrations")]
+        public IActionResult GetPendingPayerRegistrations()
+        {
+            try
+            {
+                var list = Payer.GetPendingPayerRegistrations();
+                return Ok(list);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("approve-registration")]
+        public IActionResult ApprovePayerRegistration([FromBody] PayerRegistrationActionRequest request)
+        {
+            try
+            {
+                Payer.ApprovePendingPayer(request);
+                return Ok(new { message = "המשלם אושר בהצלחה" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("reject-registration")]
+        public IActionResult RejectPayerRegistration([FromBody] PayerRegistrationActionRequest request)
+        {
+            try
+            {
+                Payer.RejectPendingPayer(request);
+                return Ok(new { message = "המשלם נדחה" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpGet]
         public IActionResult GetManagedPayers(
             [FromQuery] int ranchId,

@@ -10,6 +10,9 @@ import {
   getRanchRequests,
   updateRoleRequestStatus,
   updateRanchRequestStatus,
+  getPendingPayerRegistrations,
+  approvePayerRegistration,
+  rejectPayerRegistration,
   getPendingRequestsSummary,
 } from "../../services/superUserService";
 
@@ -18,7 +21,7 @@ export default function UserRequestsPage() {
   const tabFromUrl = searchParams.get("tab");
 
   const [activeTab, setActiveTab] = useState(
-    tabFromUrl === "secretary" || tabFromUrl === "ranch" || tabFromUrl === "admin"
+    tabFromUrl === "secretary" || tabFromUrl === "ranch" || tabFromUrl === "admin" || tabFromUrl === "payer"
       ? tabFromUrl
       : "admin",
   );
@@ -33,6 +36,7 @@ export default function UserRequestsPage() {
     admin: 0,
     secretary: 0,
     ranch: 0,
+    payer: 0,
   });
 
   const [confirmDialog, setConfirmDialog] = useState({
@@ -49,7 +53,8 @@ export default function UserRequestsPage() {
       if (
         tabFromUrl === "secretary" ||
         tabFromUrl === "ranch" ||
-        tabFromUrl === "admin"
+        tabFromUrl === "admin" ||
+        tabFromUrl === "payer"
       ) {
         setActiveTab(tabFromUrl);
       }
@@ -65,6 +70,7 @@ export default function UserRequestsPage() {
         admin: summary.admin || 0,
         secretary: summary.secretary || 0,
         ranch: summary.ranch || 0,
+        payer: summary.payer || 0,
       });
     } catch (err) {
       console.error("Failed loading pending request counts:", err);
@@ -80,7 +86,10 @@ export default function UserRequestsPage() {
     try {
       setLoading(true);
 
-      if (activeTab === "ranch") {
+      if (activeTab === "payer") {
+        const response = await getPendingPayerRegistrations();
+        setRows(response.data || []);
+      } else if (activeTab === "ranch") {
         const response = await getRanchRequests(status, search);
         setRows(response.data || []);
       } else {
@@ -122,6 +131,10 @@ export default function UserRequestsPage() {
       return `ranch-${item.requestId}`;
     }
 
+    if (activeTab === "payer") {
+      return `payer-${item.personId}-${item.ranchId}`;
+    }
+
     return `role-${item.personId}-${item.ranchId}-${item.roleId}`;
   }
 
@@ -135,7 +148,13 @@ export default function UserRequestsPage() {
     try {
       setActionLoadingKey(rowKey);
 
-      if (activeTab === "ranch") {
+      if (activeTab === "payer") {
+        await approvePayerRegistration({
+          personId: item.personId,
+          ranchId: item.ranchId,
+          roleId: item.roleId,
+        });
+      } else if (activeTab === "ranch") {
         await updateRanchRequestStatus({
           requestId: item.requestId,
           newStatus: "Approved",
@@ -164,7 +183,13 @@ export default function UserRequestsPage() {
     try {
       setActionLoadingKey(rowKey);
 
-      if (activeTab === "ranch") {
+      if (activeTab === "payer") {
+        await rejectPayerRegistration({
+          personId: item.personId,
+          ranchId: item.ranchId,
+          roleId: item.roleId,
+        });
+      } else if (activeTab === "ranch") {
         await updateRanchRequestStatus({
           requestId: item.requestId,
           newStatus: "Rejected",
@@ -284,13 +309,15 @@ export default function UserRequestsPage() {
             pendingCounts={pendingCounts}
           />
 
-          <RequestsFiltersBar
-            status={status}
-            onStatusChange={setStatus}
-            searchInput={searchInput}
-            onSearchInputChange={setSearchInput}
-            onSearchClick={handleSearchClick}
-          />
+          {activeTab !== "payer" && (
+            <RequestsFiltersBar
+              status={status}
+              onStatusChange={setStatus}
+              searchInput={searchInput}
+              onSearchInputChange={setSearchInput}
+              onSearchClick={handleSearchClick}
+            />
+          )}
         </div>
 
         <div className="border-t border-[#EFE5DF] px-6 pb-4">
