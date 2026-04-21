@@ -1,5 +1,11 @@
 import React from "react";
-import { ActivityIndicator, ScrollView, Text, View, Pressable } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
@@ -94,6 +100,8 @@ export default function AdminCompetitionRegistrationsScreen(props) {
               selectedRider={registration.selectedRider}
               selectedTrainer={registration.selectedTrainer}
               selectedPayer={registration.selectedPayer}
+              prizeRecipientName={registration.prizeRecipientName}
+              setPrizeRecipientName={registration.setPrizeRecipientName}
               setSelectedClass={registration.setSelectedClass}
               setSelectedHorse={registration.setSelectedHorse}
               setSelectedRider={registration.setSelectedRider}
