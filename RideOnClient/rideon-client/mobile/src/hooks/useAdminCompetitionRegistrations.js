@@ -349,6 +349,10 @@ export default function useAdminCompetitionRegistrations(params) {
       return "יש לבחור סוס";
     }
 
+    if (!selectedTrainer || !selectedTrainer.federationMemberId) {
+      return "יש לבחור מאמן";
+    }
+
     if (!selectedPayer || !selectedPayer.personId) {
       return "יש לבחור משלם";
     }
@@ -381,9 +385,7 @@ export default function useAdminCompetitionRegistrations(params) {
         ranchId: activeRole.ranchId,
         horseId: selectedHorse.horseId,
         riderFederationMemberId: selectedRider.federationMemberId,
-        coachFederationMemberId: selectedTrainer
-          ? selectedTrainer.federationMemberId
-          : null,
+        coachFederationMemberId: selectedTrainer.federationMemberId,
         paidByPersonId: selectedPayer.personId,
         prizeRecipientName: null,
       };
@@ -408,11 +410,19 @@ export default function useAdminCompetitionRegistrations(params) {
         !!selectedClass &&
         !!selectedHorse &&
         !!selectedRider &&
+        !!selectedTrainer &&
         !!selectedPayer &&
         !isSaving
       );
     },
-    [selectedClass, selectedHorse, selectedRider, selectedPayer, isSaving],
+    [
+      selectedClass,
+      selectedHorse,
+      selectedRider,
+      selectedTrainer,
+      selectedPayer,
+      isSaving,
+    ],
   );
 
   return {

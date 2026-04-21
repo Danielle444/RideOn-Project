@@ -54,5 +54,39 @@ namespace RideOnServer.BL
             FederationMemberDAL dal = new FederationMemberDAL();
             return dal.GetCompetitionTrainersByRanch(filters);
         }
+
+        internal static List<CompetitionFederationMemberListItem> GetRidersByRanch(
+            GetRanchFederationMembersFiltersRequest filters)
+        {
+            if (filters == null)
+            {
+                throw new Exception("Filters are required");
+            }
+
+            if (filters.RanchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            FederationMemberDAL dal = new FederationMemberDAL();
+            return dal.GetRidersByRanch(filters);
+        }
+
+        internal static List<CompetitionFederationMemberListItem> GetTrainersByRanch(
+            GetRanchFederationMembersFiltersRequest filters)
+        {
+            if (filters == null)
+            {
+                throw new Exception("Filters are required");
+            }
+
+            if (filters.RanchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            FederationMemberDAL dal = new FederationMemberDAL();
+            return dal.GetTrainersByRanch(filters);
+        }
     }
 }

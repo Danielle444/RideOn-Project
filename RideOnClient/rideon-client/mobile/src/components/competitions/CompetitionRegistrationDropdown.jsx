@@ -77,37 +77,26 @@ export default function CompetitionRegistrationDropdown(props) {
   return (
     <View style={styles.dropdownBlock}>
       <View style={styles.dropdownHeaderRow}>
-        <Pressable
-          style={[
-            styles.inlineLockButton,
-            isLocked ? styles.inlineLockButtonActive : null,
-          ]}
-          onPress={props.onToggleLock}
-          hitSlop={8}
-        >
-          <Ionicons
-            name={isLocked ? "lock-closed-outline" : "lock-open-outline"}
-            size={16}
-            color={isLocked ? "#FFFFFF" : "#7B5A4D"}
-          />
-          <Text
-            style={[
-              styles.inlineLockButtonText,
-              isLocked ? styles.inlineLockButtonTextActive : null,
-            ]}
-          >
-            נעול
-          </Text>
-        </Pressable>
+        <Text style={styles.fieldLabel}>{props.label}</Text>
 
-        <View style={styles.dropdownHeaderRight}>
+        <View style={styles.dropdownHeaderActions}>
           {selectedItem ? (
             <Pressable onPress={handleClearSelection} hitSlop={8}>
               <Text style={styles.clearText}>נקה</Text>
             </Pressable>
           ) : null}
 
-          <Text style={styles.fieldLabel}>{props.label}</Text>
+          <Pressable
+            onPress={props.onToggleLock}
+            hitSlop={8}
+            style={styles.inlineLockIconButton}
+          >
+            <Ionicons
+              name={isLocked ? "lock-closed-outline" : "lock-open-outline"}
+              size={18}
+              color="#7B5A4D"
+            />
+          </Pressable>
         </View>
       </View>
 

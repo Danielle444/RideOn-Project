@@ -61,7 +61,7 @@ var styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  dropdownHeaderRight: {
+  dropdownHeaderActions: {
     flexDirection: "row-reverse",
     alignItems: "center",
     gap: 10,
@@ -80,31 +80,11 @@ var styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  inlineLockButton: {
-    minHeight: 34,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    flexDirection: "row-reverse",
+  inlineLockIconButton: {
+    minWidth: 28,
+    minHeight: 28,
     alignItems: "center",
-    gap: 6,
-    borderWidth: 1,
-    borderColor: "#D7C0B3",
-    backgroundColor: "#FFF8F3",
-  },
-
-  inlineLockButtonActive: {
-    backgroundColor: "#7B5A4D",
-    borderColor: "#7B5A4D",
-  },
-
-  inlineLockButtonText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#7B5A4D",
-  },
-
-  inlineLockButtonTextActive: {
-    color: "#FFFFFF",
+    justifyContent: "center",
   },
 
   dropdownTrigger: {
