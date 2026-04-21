@@ -61,7 +61,7 @@ export default function CompetitionRegistrationFormCard(props) {
 
       <CompetitionRegistrationDropdown
         label="מאמן"
-        placeholder="אפשר להשאיר ריק"
+        placeholder="בחרי מאמן"
         searchPlaceholder="חיפוש מאמן"
         items={props.trainers}
         selectedItem={props.selectedTrainer}

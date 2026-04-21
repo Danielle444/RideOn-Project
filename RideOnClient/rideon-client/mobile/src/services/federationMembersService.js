@@ -1,39 +1,41 @@
 import axios from "./axiosInstance";
 
-function getCompetitionRiders(ranchId, competitionId, searchText) {
-  return axios.get("/FederationMembers/competition/riders", {
+const API = "/FederationMembers";
+
+function getCompetitionRiders(ranchId, competitionId, search) {
+  return axios.get(`${API}/competition/riders`, {
     params: {
       ranchId: ranchId,
       competitionId: competitionId,
-      search: searchText || null,
+      search: search || null,
     },
   });
 }
 
-function getCompetitionTrainers(ranchId, competitionId, searchText) {
-  return axios.get("/FederationMembers/competition/trainers", {
+function getCompetitionTrainers(ranchId, competitionId, search) {
+  return axios.get(`${API}/competition/trainers`, {
     params: {
       ranchId: ranchId,
       competitionId: competitionId,
-      search: searchText || null,
+      search: search || null,
     },
   });
 }
 
-function getRidersByRanch(ranchId, searchText) {
-  return axios.get("/FederationMembers/ranch/riders", {
+function getRidersByRanch(ranchId, search) {
+  return axios.get(`${API}/ranch/riders`, {
     params: {
       ranchId: ranchId,
-      search: searchText || null,
+      search: search || null,
     },
   });
 }
 
-function getTrainersByRanch(ranchId, searchText) {
-  return axios.get("/FederationMembers/ranch/trainers", {
+function getTrainersByRanch(ranchId, search) {
+  return axios.get(`${API}/ranch/trainers`, {
     params: {
       ranchId: ranchId,
-      search: searchText || null,
+      search: search || null,
     },
   });
 }
