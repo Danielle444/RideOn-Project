@@ -20,7 +20,27 @@ function getCompetitionTrainers(ranchId, competitionId, searchText) {
   });
 }
 
+function getRidersByRanch(ranchId, searchText) {
+  return axios.get("/FederationMembers/ranch/riders", {
+    params: {
+      ranchId: ranchId,
+      search: searchText || null,
+    },
+  });
+}
+
+function getTrainersByRanch(ranchId, searchText) {
+  return axios.get("/FederationMembers/ranch/trainers", {
+    params: {
+      ranchId: ranchId,
+      search: searchText || null,
+    },
+  });
+}
+
 export {
   getCompetitionRiders,
   getCompetitionTrainers,
+  getRidersByRanch,
+  getTrainersByRanch,
 };
