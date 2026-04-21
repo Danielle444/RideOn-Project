@@ -88,5 +88,81 @@ namespace RideOnServer.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [Authorize]
+        [HttpGet("ranch/riders")]
+        public IActionResult GetRidersByRanch(
+            [FromQuery] int ranchId,
+            [FromQuery] string? search)
+        {
+            try
+            {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                GetRanchFederationMembersFiltersRequest filters =
+                    new GetRanchFederationMembersFiltersRequest
+                    {
+                        RanchId = ranchId,
+                        SearchText = search
+                    };
+
+                List<CompetitionFederationMemberListItem> riders =
+                    FederationMember.GetRidersByRanch(filters);
+
+                return Ok(riders);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize]
+        [HttpGet("ranch/trainers")]
+        public IActionResult GetTrainersByRanch(
+            [FromQuery] int ranchId,
+            [FromQuery] string? search)
+        {
+            try
+            {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                GetRanchFederationMembersFiltersRequest filters =
+                    new GetRanchFederationMembersFiltersRequest
+                    {
+                        RanchId = ranchId,
+                        SearchText = search
+                    };
+
+                List<CompetitionFederationMemberListItem> trainers =
+                    FederationMember.GetTrainersByRanch(filters);
+
+                return Ok(trainers);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }
