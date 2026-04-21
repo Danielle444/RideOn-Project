@@ -202,15 +202,16 @@ namespace RideOnServer.DAL
         }
 
         public List<CompetitionPayerListItem> GetCompetitionPayersBySystemUser(
-    int systemUserId,
-    GetCompetitionPayersFiltersRequest filters)
+            int systemUserId,
+            GetCompetitionPayersFiltersRequest filters)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
-    {
-        { "@SystemUserId", systemUserId },
-        { "@CompetitionId", filters.CompetitionId },
-        { "@SearchText", (object?)filters.SearchText ?? DBNull.Value }
-    };
+            {
+                { "@SystemUserId", systemUserId },
+                { "@CompetitionId", filters.CompetitionId },
+                { "@RanchId", filters.RanchId },
+                { "@SearchText", (object?)filters.SearchText ?? DBNull.Value }
+            };
 
             try
             {

@@ -267,9 +267,10 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin
                 );
 
-                GetCompetitionPayersFiltersRequest filters = new GetCompetitionPayersFiltersRequest
+                var filters = new GetCompetitionPayersFiltersRequest
                 {
                     CompetitionId = competitionId,
+                    RanchId = ranchId,
                     SearchText = search
                 };
 
