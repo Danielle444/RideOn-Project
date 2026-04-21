@@ -1,5 +1,7 @@
-﻿using Microsoft.Data.SqlClient;
+using Npgsql;
 using RideOnServer.BL;
+using RideOnServer.BL.DTOs.Auth;
+using RideOnServer.BL.DTOs.Auth.SuperUser;
 
 namespace RideOnServer.DAL
 {
@@ -7,38 +9,39 @@ namespace RideOnServer.DAL
     {
         public SuperUser? GetSuperUserForLogin(string email)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
-            {
-                { "@Email", email }
-            };
-
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetSuperUserForLogin", connection, paramDic))
-                    using (SqlDataReader reader = command.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            return new SuperUser
-                            {
-                                SuperUserId = Convert.ToInt32(reader["SuperUserId"]),
-                                Email = reader["Email"].ToString() ?? string.Empty,
-                                PasswordHash = reader["PasswordHash"].ToString() ?? string.Empty,
-                                PasswordSalt = reader["PasswordSalt"].ToString() ?? string.Empty,
-                                IsActive = Convert.ToBoolean(reader["IsActive"]),
-                                MustChangePassword = Convert.ToBoolean(reader["MustChangePassword"])
-                            };
-                        }
+                    string query = "SELECT * FROM usp_getsuperuserforlogin(@p_email)";
 
-                        return null;
+                    using (NpgsqlCommand command = new NpgsqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@p_email", email);
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                return new SuperUser
+                                {
+                                    SuperUserId = Convert.ToInt32(reader["SuperUserId"]),
+                                    Email = reader["Email"].ToString() ?? string.Empty,
+                                    PasswordHash = reader["PasswordHash"].ToString() ?? string.Empty,
+                                    PasswordSalt = reader["PasswordSalt"].ToString() ?? string.Empty,
+                                    IsActive = Convert.ToBoolean(reader["IsActive"]),
+                                    MustChangePassword = Convert.ToBoolean(reader["MustChangePassword"])
+                                };
+                            }
+
+                            return null;
+                        }
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -53,12 +56,12 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetSuperUserById", connection, paramDic))
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetSuperUserById", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -77,7 +80,7 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -92,17 +95,17 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateSuperUserLastLogin", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateSuperUserLastLogin", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -119,45 +122,46 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateSuperUserPassword", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateSuperUserPassword", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
         }
 
-        public int InsertSuperUser(string email, string passwordHash, string passwordSalt)
+        public int InsertSuperUser(string email, string passwordHash, string passwordSalt, bool mustChangePassword)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
                 { "@Email", email },
                 { "@PasswordHash", passwordHash },
-                { "@PasswordSalt", passwordSalt }
+                { "@PasswordSalt", passwordSalt },
+                { "@MustChangePassword", mustChangePassword }
             };
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_InsertSuperUser", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_InsertSuperUser", connection, paramDic))
                     {
                         object result = command.ExecuteScalar()!;
                         return Convert.ToInt32(result);
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -172,21 +176,249 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_CheckSuperUserEmailExists", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_CheckSuperUserEmailExists", connection, paramDic))
                     {
                         object result = command.ExecuteScalar()!;
                         return Convert.ToInt32(result) == 1;
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException  ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
         }
+
+        public List<RoleRequest> GetRoleRequests(byte roleId, string? status, string? searchText)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+    {
+        { "@RoleId", roleId },
+        { "@RoleStatus", status },
+        { "@SearchText", searchText }
+    };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetRoleRequests", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<RoleRequest> list = new List<RoleRequest>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(new RoleRequest
+                            {
+                                PersonId = Convert.ToInt32(reader["PersonId"]),
+                                RanchId = Convert.ToInt32(reader["RanchId"]),
+                                RoleId = Convert.ToByte(reader["RoleId"]),
+                                FullName = reader["FullName"].ToString()!,
+                                NationalId = reader["NationalId"].ToString()!,
+                                Email = reader["Email"]?.ToString(),
+                                CellPhone = reader["CellPhone"]?.ToString(),
+                                RanchName = reader["RanchName"].ToString()!,
+                                RoleName = reader["RoleName"].ToString()!,
+                                RoleStatus = reader["RoleStatus"].ToString()!
+                            });
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException  ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public List<NewRanchRequest> GetNewRanchRequests(string? status, string? searchText)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+    {
+        { "@RequestStatus", status },
+        { "@SearchText", searchText }
+    };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetNewRanchRequests", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<NewRanchRequest> list = new List<NewRanchRequest>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(new NewRanchRequest
+                            {
+                                RequestId = Convert.ToInt32(reader["RequestId"]),
+                                RanchId = Convert.ToInt32(reader["RanchId"]),
+                                SubmittedBySystemUserId = Convert.ToInt32(reader["SubmittedBySystemUserId"]),
+                                RequestDate = Convert.ToDateTime(reader["RequestDate"]),
+                                RanchName = reader["RanchName"].ToString()!,
+                                PersonId = Convert.ToInt32(reader["PersonId"]),
+                                FullName = reader["FullName"].ToString()!,
+                                NationalId = reader["NationalId"].ToString()!,
+                                Email = reader["Email"]?.ToString(),
+                                CellPhone = reader["CellPhone"]?.ToString(),
+                                RequestStatus = reader["RequestStatus"].ToString()!,
+                                ResolvedBySuperUserId = reader["ResolvedBySuperUserId"] == DBNull.Value
+                                    ? null
+                                    : Convert.ToInt32(reader["ResolvedBySuperUserId"]),
+                                ResolvedBySuperUserEmail = reader["ResolvedBySuperUserEmail"] == DBNull.Value
+                                    ? null
+                                    : reader["ResolvedBySuperUserEmail"].ToString(),
+                                ResolvedDate = reader["ResolvedDate"] == DBNull.Value
+                                    ? null
+                                    : Convert.ToDateTime(reader["ResolvedDate"])
+                            });
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException  ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public void UpdateRoleRequestStatus(int personId, int ranchId, byte roleId, string roleStatus)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@PersonId", personId },
+                { "@RanchId", ranchId },
+                { "@RoleId", roleId },
+                { "@RoleStatus", roleStatus }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdatePersonRoleStatus", connection, paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException  ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public void UpdateNewRanchRequestStatus(int requestId, int resolvedBySuperUserId, string newStatus)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@RequestId", requestId },
+                { "@ResolvedBySuperUserId", resolvedBySuperUserId },
+                { "@NewStatus", newStatus }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateNewRanchRequestStatus", connection, paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException  ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public List<SuperUserListItem> GetAllSuperUsers()
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetAllSuperUsers", connection, null))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<SuperUserListItem> list = new List<SuperUserListItem>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(new SuperUserListItem
+                            {
+                                SuperUserId = Convert.ToInt32(reader["SuperUserId"]),
+                                Email = reader["Email"].ToString() ?? string.Empty,
+                                IsActive = Convert.ToBoolean(reader["IsActive"]),
+                                MustChangePassword = Convert.ToBoolean(reader["MustChangePassword"]),
+                                CreatedDate = Convert.ToDateTime(reader["CreatedDate"]),
+                                LastLoginDate = reader["LastLoginDate"] == DBNull.Value
+                                    ? null
+                                    : Convert.ToDateTime(reader["LastLoginDate"])
+                            });
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException  ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public string GetRanchStatusById(int ranchId)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    string query = "SELECT ranchstatus FROM ranch WHERE ranchid = @RanchId";
+
+                    using (NpgsqlCommand command = new NpgsqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@RanchId", ranchId);
+
+                        object? result = command.ExecuteScalar();
+
+                        if (result == null || result == DBNull.Value)
+                            throw new Exception("Ranch not found");
+
+                        return result.ToString() ?? string.Empty;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+
+
     }
 }

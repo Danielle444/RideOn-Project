@@ -1,7 +1,7 @@
-using Microsoft.Data.SqlClient;
-using System.Data;
+using Npgsql;
 using RideOnServer.BL;
-using RideOnServer.BL.DTOs;
+using RideOnServer.BL.DTOs.Auth;
+using RideOnServer.BL.DTOs.Profile;
 
 namespace RideOnServer.DAL
 {
@@ -16,12 +16,12 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetSystemUserForLogin", connection, paramDic))
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetSystemUserForLogin", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
@@ -43,7 +43,94 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public SystemUser? GetSystemUserByPersonId(int personId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@SystemUserId", personId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetSystemUserById", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return new SystemUser
+                            {
+                                PersonId = Convert.ToInt32(reader["SystemUserId"]),
+                                Username = reader["Username"].ToString()!,
+                                PasswordHash = reader["PasswordHash"].ToString()!,
+                                PasswordSalt = reader["PasswordSalt"].ToString()!,
+                                IsActive = Convert.ToBoolean(reader["IsActive"]),
+                                MustChangePassword = Convert.ToBoolean(reader["MustChangePassword"]),
+                                CreatedDate = Convert.ToDateTime(reader["CreatedDate"]),
+                                FirstName = reader["FirstName"].ToString()!,
+                                LastName = reader["LastName"].ToString()!
+                            };
+                        }
+
+                        return null;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public SystemUserProfile? GetSystemUserProfileById(int systemUserId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@SystemUserId", systemUserId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetSystemUserProfileById", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return new SystemUserProfile
+                            {
+                                PersonId = Convert.ToInt32(reader["PersonId"]),
+                                Username = reader["Username"].ToString()!,
+                                FirstName = reader["FirstName"].ToString()!,
+                                LastName = reader["LastName"].ToString()!,
+                                NationalId = reader["NationalId"].ToString()!,
+                                Gender = reader["Gender"] == DBNull.Value ? null : reader["Gender"].ToString(),
+                                DateOfBirth = reader["DateOfBirth"] == DBNull.Value ? null : Convert.ToDateTime(reader["DateOfBirth"]),
+                                CellPhone = reader["CellPhone"] == DBNull.Value ? null : reader["CellPhone"].ToString(),
+                                Email = reader["Email"] == DBNull.Value ? null : reader["Email"].ToString(),
+                                IsActive = Convert.ToBoolean(reader["IsActive"]),
+                                MustChangePassword = Convert.ToBoolean(reader["MustChangePassword"]),
+                                CreatedDate = Convert.ToDateTime(reader["CreatedDate"])
+                            };
+                        }
+
+                        return null;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -58,12 +145,12 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetApprovedPersonRanchesAndRoles", connection, paramDic))
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetApprovedPersonRanchesAndRoles", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
                     {
                         List<ApprovedRoleRanch> approvedRolesAndRanches = new List<ApprovedRoleRanch>();
 
@@ -82,7 +169,77 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public List<UserProfileRole> GetPersonRanchesAndRoles(int personId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@PersonId", personId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetPersonRanchesAndRoles", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<UserProfileRole> profiles = new List<UserProfileRole>();
+
+                        while (reader.Read())
+                        {
+                            profiles.Add(new UserProfileRole
+                            {
+                                RanchId = Convert.ToInt32(reader["RanchId"]),
+                                RanchName = reader["RanchName"].ToString()!,
+                                RoleId = Convert.ToByte(reader["RoleId"]),
+                                RoleName = reader["RoleName"].ToString()!,
+                                RoleStatus = reader["RoleStatus"].ToString()!
+                            });
+                        }
+
+                        return profiles;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public void UpdateUserProfile(UpdateUserProfileRequest request)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@PersonId", request.PersonId },
+                { "@FirstName", request.FirstName },
+                { "@LastName", request.LastName },
+                { "@Gender", (object?)request.Gender ?? DBNull.Value },
+                { "@CellPhone", (object?)request.CellPhone ?? DBNull.Value },
+                { "@Email", (object?)request.Email ?? DBNull.Value }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdatePerson", connection, paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -97,18 +254,18 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_CheckNationalIdExists", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_CheckNationalIdExists", connection, paramDic))
                     {
                         object result = command.ExecuteScalar()!;
                         return Convert.ToInt32(result) == 1;
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -123,18 +280,18 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_CheckUsernameExists", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_CheckUsernameExists", connection, paramDic))
                     {
                         object result = command.ExecuteScalar()!;
                         return Convert.ToInt32(result) == 1;
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -152,17 +309,17 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_AssignPersonRoleAtRanch", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_AssignPersonRoleAtRanch", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -180,17 +337,17 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdatePersonRoleStatus", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdatePersonRoleStatus", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -207,17 +364,17 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateSystemUserPassword", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateSystemUserPassword", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -233,17 +390,17 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_SetMustChangePassword", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_SetMustChangePassword", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
@@ -253,49 +410,129 @@ namespace RideOnServer.DAL
         {
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = new SqlCommand("usp_RegisterSystemUserWithRoles", connection))
-                    {
-                        command.CommandType = CommandType.StoredProcedure;
+                    int[] ranchIds = request.RanchRoles
+                        .Select(pair => pair.RanchId)
+                        .ToArray();
 
+                    short[] roleIds = request.RanchRoles
+                        .Select(pair => (short)pair.RoleId)
+                        .ToArray();
+
+                    string sql = @"
+                SELECT * FROM usp_RegisterSystemUserWithRoles(
+                    @NationalId,
+                    @FirstName,
+                    @LastName,
+                    @Username,
+                    @PasswordHash,
+                    @PasswordSalt,
+                    @RanchIds,
+                    @RoleIds,
+                    @Gender,
+                    @DateOfBirth,
+                    @CellPhone,
+                    @Email
+                )";
+
+                    using (NpgsqlCommand command = new NpgsqlCommand(sql, connection))
+                    {
                         command.Parameters.AddWithValue("@NationalId", request.NationalId);
                         command.Parameters.AddWithValue("@FirstName", request.FirstName);
                         command.Parameters.AddWithValue("@LastName", request.LastName);
-                        command.Parameters.AddWithValue("@Gender", (object?)request.Gender ?? DBNull.Value);
-                        command.Parameters.AddWithValue("@DateOfBirth", (object?)request.DateOfBirth ?? DBNull.Value);
-                        command.Parameters.AddWithValue("@CellPhone", request.CellPhone);
-                        command.Parameters.AddWithValue("@Email", request.Email);
                         command.Parameters.AddWithValue("@Username", request.Username);
                         command.Parameters.AddWithValue("@PasswordHash", passwordHash);
                         command.Parameters.AddWithValue("@PasswordSalt", passwordSalt);
+                        command.Parameters.AddWithValue("@RanchIds", ranchIds);
+                        command.Parameters.AddWithValue("@RoleIds", roleIds);
 
-                        DataTable ranchRolesTable = new DataTable();
-                        ranchRolesTable.Columns.Add("RanchId", typeof(int));
-                        ranchRolesTable.Columns.Add("RoleId", typeof(byte));
+                        command.Parameters.AddWithValue("@Gender",
+                            string.IsNullOrWhiteSpace(request.Gender) ? DBNull.Value : request.Gender);
 
-                        foreach (RegisterRanchRoleRequest pair in request.RanchRoles)
-                        {
-                            ranchRolesTable.Rows.Add(pair.RanchId, pair.RoleId);
-                        }
+                        var dateParam = command.Parameters.Add("@DateOfBirth", NpgsqlTypes.NpgsqlDbType.Date);
+                        dateParam.Value = request.DateOfBirth.HasValue
+                            ? request.DateOfBirth.Value.Date
+                            : DBNull.Value;
 
-                        SqlParameter ranchRolesParam = command.Parameters.AddWithValue("@RanchRoles", ranchRolesTable);
-                        ranchRolesParam.SqlDbType = SqlDbType.Structured;
-                        ranchRolesParam.TypeName = "RegisterRanchRoleTableType";
+                        command.Parameters.AddWithValue("@CellPhone", request.CellPhone);
+
+                        command.Parameters.AddWithValue("@Email",
+                            string.IsNullOrWhiteSpace(request.Email) ? DBNull.Value : request.Email);
 
                         object result = command.ExecuteScalar()!;
                         return Convert.ToInt32(result);
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
         }
 
+        public int CreatePendingRanchRequest(CreateRanchRequest request)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
 
+                    using (NpgsqlTransaction transaction = connection.BeginTransaction())
+                    {
+                        try
+                        {
+                            int newRanchId;
+                            int newRequestId;
+
+                            Dictionary<string, object> ranchParamDic = new Dictionary<string, object>
+                            {
+                                { "@RanchName", request.RanchName },
+                                { "@ContactEmail", (object?)request.ContactEmail ?? DBNull.Value },
+                                { "@ContactPhone", (object?)request.ContactPhone ?? DBNull.Value },
+                                { "@WebsiteUrl", (object?)request.WebsiteUrl ?? DBNull.Value },
+                                { "@Lat", (object?)request.Latitude ?? DBNull.Value },
+                                { "@Long", (object?)request.Longitude ?? DBNull.Value }
+                            };
+
+                            using (NpgsqlCommand ranchCommand = CreateCommandWithStoredProcedure("usp_InsertRanch", connection, ranchParamDic))
+                            {
+                                ranchCommand.Transaction = transaction;
+                                object ranchResult = ranchCommand.ExecuteScalar()!;
+                                newRanchId = Convert.ToInt32(ranchResult);
+                            }
+
+                            Dictionary<string, object> requestParamDic = new Dictionary<string, object>
+                            {
+                                { "@RanchId", newRanchId },
+                                { "@SubmittedBySystemUserId", DBNull.Value }
+                            };
+
+                            using (NpgsqlCommand requestCommand = CreateCommandWithStoredProcedure("usp_InsertNewRanchRequest", connection, requestParamDic))
+                            {
+                                requestCommand.Transaction = transaction;
+                                object requestResult = requestCommand.ExecuteScalar()!;
+                                newRequestId = Convert.ToInt32(requestResult);
+                            }
+
+                            transaction.Commit();
+                            return newRequestId;
+                        }
+                        catch
+                        {
+                            transaction.Rollback();
+                            throw;
+                        }
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
     }
 }

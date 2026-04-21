@@ -1,72 +1,45 @@
-import { useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { useUser } from "../../context/UserContext";
 import { useActiveRole } from "../../context/ActiveRoleContext";
-import { useAuth } from "../../context/AuthContext";
-import SecretaryTopBar from "./SecretaryTopBar";
-import SecretarySidebarGeneral from "./SecretarySidebarGeneral";
-import SecretarySidebarCompetition from "./SecretarySidebarCompetition";
+import AppLayout from "../layout/AppLayout";
+
+const SECRETARY_ROLE = "מזכירת חווה מארחת";
 
 export default function SecretaryLayout(props) {
-  const navigate = useNavigate();
-
   const { user } = useUser();
   const { activeRole } = useActiveRole();
-  const { logout } = useAuth();
 
-  function handleLogout() {
-    logout();
-    navigate("/login");
+  if (!user) {
+    return <Navigate to="/login" replace />;
   }
 
-  function handleNotificationsClick() {
-    alert("מסך התראות יתחבר כאן בהמשך");
+  if (user.userType === "superUser") {
+    return <Navigate to="/superuser/requests" replace />;
   }
 
-  function handleGeneralNavigate(itemKey) {
-    if (itemKey === "competitions-board") {
-      navigate("/competitions");
-      return;
-    }
-
-    alert("המסך יתחבר כאן בהמשך");
+  if (!activeRole) {
+    return <Navigate to="/select-ranch" replace />;
   }
 
-  function handleCompetitionNavigate() {
-    alert("המסך יתחבר כאן בהמשך");
+  if (activeRole.roleName !== SECRETARY_ROLE) {
+    return <Navigate to="/select-ranch" replace />;
   }
-
-  function handleBackToCompetitions() {
-    navigate("/competitions");
-  }
-
-  const SidebarComponent =
-    props.sidebarMode === "competition"
-      ? SecretarySidebarCompetition
-      : SecretarySidebarGeneral;
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#F5F1EE]">
-      <SecretaryTopBar
-        onLogout={handleLogout}
-        onNotificationsClick={handleNotificationsClick}
-      />
-
-      <div className="min-h-[calc(100vh-48px)] flex">
-        <SidebarComponent
-          userName={`${user?.firstName || ""} ${user?.lastName || ""}`.trim()}
-          roleName={activeRole?.roleName || ""}
-          ranchName={activeRole?.ranchName || "לא נבחרה חווה"}
-          activeItemKey={props.activeItemKey}
-          onNavigate={
-            props.sidebarMode === "competition"
-              ? handleCompetitionNavigate
-              : handleGeneralNavigate
-          }
-          onBackToCompetitions={handleBackToCompetitions}
-        />
-
-        <main className="flex-1 p-6">{props.children}</main>
-      </div>
-    </div>
+    <AppLayout
+      userName={props.userName}
+      subtitle={props.subtitle}
+      contextNote={props.contextNote}
+      menuItems={props.menuItems}
+      activeItemKey={props.activeItemKey}
+      onNavigate={props.onNavigate}
+      onNotificationsClick={props.onNotificationsClick}
+      notificationCount={props.notificationCount}
+      notificationsOpen={props.notificationsOpen}
+      notificationItems={props.notificationItems}
+      onNotificationItemClick={props.onNotificationItemClick}
+    >
+      {props.children}
+    </AppLayout>
   );
 }

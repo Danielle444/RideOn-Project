@@ -10,18 +10,18 @@ import {
   saveToken,
   saveUser,
   clearAuthStorage,
+  isTokenValid,
 } from "../services/storageService";
+import { registerUnauthorizedHandler } from "../services/axiosInstance";
 import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
-import { isRoleSupportedOnMobile } from "../../../shared/auth/utils/platformRoles";
 import { useUser } from "./UserContext";
 import { useActiveRole } from "./ActiveRoleContext";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider(props) {
-  const { user, setUser, setIsUserHydrated } = useUser();
-  const { setActiveRole, setActiveRoleAndPersist, clearActiveRole } =
-    useActiveRole();
+  const { setUser, setIsUserHydrated } = useUser();
+  const { setActiveRole, clearActiveRole } = useActiveRole();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -30,16 +30,47 @@ export function AuthProvider(props) {
     loadAuthState();
   }, []);
 
+  useEffect(function () {
+    registerUnauthorizedHandler(handleUnauthorized);
+
+    return function () {
+      registerUnauthorizedHandler(null);
+    };
+  }, []);
+
+  async function resetAuthState() {
+    setUser(null);
+    setActiveRole(null);
+    setIsUserHydrated(true);
+    setIsAuthenticated(false);
+  }
+
+  async function handleUnauthorized() {
+    await clearAuthStorage();
+    await clearActiveRole();
+    await resetAuthState();
+  }
+
   async function loadAuthState() {
     try {
       const token = await getToken();
       const storedUser = await getUser();
-      const activeRole = await getActiveRole();
+      const storedActiveRole = await getActiveRole();
 
-      setUser(storedUser);
-      setActiveRole(activeRole);
-      setIsAuthenticated(!!token && !!storedUser);
+      const tokenIsValid = isTokenValid(token);
+
+      if (!tokenIsValid || !storedUser) {
+        await clearAuthStorage();
+        setUser(null);
+        setActiveRole(null);
+        setIsAuthenticated(false);
+      } else {
+        setUser(storedUser);
+        setActiveRole(storedActiveRole);
+        setIsAuthenticated(true);
+      }
     } catch (error) {
+      await clearAuthStorage();
       setUser(null);
       setActiveRole(null);
       setIsAuthenticated(false);
@@ -64,11 +95,39 @@ export function AuthProvider(props) {
   async function loginAndInitialize(username, password) {
     try {
       await clearAuthStorage();
-      setUser(null);
       setActiveRole(null);
 
       const response = await loginRequest(username.trim(), password);
       const data = response.data;
+
+      if (
+        !data ||
+        !data.token ||
+        !data.personId ||
+        !data.approvedRolesAndRanches
+      ) {
+        return {
+          ok: false,
+          message: "נתוני התחברות לא תקינים",
+        };
+      }
+
+      if (data.approvedRolesAndRanches.length === 0) {
+        return {
+          ok: false,
+          message: "אין למשתמש תפקיד מאושר",
+        };
+      }
+
+      if (!isTokenValid(data.token)) {
+        await clearAuthStorage();
+        await resetAuthState();
+
+        return {
+          ok: false,
+          message: "התקבל טוקן לא תקין מהשרת",
+        };
+      }
 
       const userData = {
         personId: data.personId,
@@ -80,59 +139,61 @@ export function AuthProvider(props) {
         approvedRolesAndRanches: data.approvedRolesAndRanches,
       };
 
-      if (
-        !data.approvedRolesAndRanches ||
-        data.approvedRolesAndRanches.length === 0
-      ) {
-        await clearAuthStorage();
-        setUser(null);
-        setActiveRole(null);
-
-        return {
-          ok: false,
-          message: "אין למשתמש תפקיד מאושר במערכת",
-        };
-      }
-
       await saveToken(data.token);
       await saveUser(userData);
 
       setUser(userData);
+      setActiveRole(null);
+      setIsAuthenticated(true);
       setIsUserHydrated(true);
 
-      if (
-        data.approvedRolesAndRanches.length === 1 &&
-        isRoleSupportedOnMobile(data.approvedRolesAndRanches[0].roleName)
-      ) {
-        await setActiveRoleAndPersist(data.approvedRolesAndRanches[0]);
-      } else {
-        await clearActiveRole();
+      return {
+        ok: true,
+        user: userData,
+      };
+    } catch (err) {
+      if (err && err.isAuthError) {
+        await logout();
+
+        return {
+          ok: false,
+          message: "ההתחברות פגה, יש להתחבר מחדש",
+        };
       }
 
-      setIsAuthenticated(true);
+      if (err?.response?.data === "PENDING_APPROVAL") {
+        return {
+          ok: false,
+          message: "חשבונך ממתין לאישור מנהל המערכת",
+        };
+      }
 
-      return { ok: true };
-    } catch (err) {
       return {
         ok: false,
-        message: String(getApiErrorMessage(err, "שגיאה בהתחברות")),
+        message: "שגיאה בהתחברות",
       };
     }
   }
 
   async function changePasswordAndRefresh(currentPassword, newPassword) {
     try {
-      if (!user || !user.username) {
+      const currentUser = await getUser();
+
+      if (!currentUser || !currentUser.personId) {
         return {
           ok: false,
           message: "לא נמצאו פרטי משתמש מחובר",
         };
       }
 
-      await changePasswordRequest(user.username, currentPassword, newPassword);
+      await changePasswordRequest(
+        currentUser.personId,
+        currentPassword,
+        newPassword
+      );
 
       const updatedUser = {
-        ...user,
+        ...currentUser,
         mustChangePassword: false,
       };
 
@@ -141,6 +202,14 @@ export function AuthProvider(props) {
 
       return { ok: true };
     } catch (error) {
+      if (error && error.isAuthError) {
+        await logout();
+        return {
+          ok: false,
+          message: "ההתחברות פגה, יש להתחבר מחדש",
+        };
+      }
+
       return {
         ok: false,
         message: String(getApiErrorMessage(error, "שגיאה בהחלפת סיסמה")),
@@ -150,10 +219,8 @@ export function AuthProvider(props) {
 
   async function logout() {
     await clearAuthStorage();
-    setUser(null);
-    setActiveRole(null);
-    setIsUserHydrated(true);
-    setIsAuthenticated(false);
+    await clearActiveRole();
+    await resetAuthState();
   }
 
   return (

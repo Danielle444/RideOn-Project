@@ -2,7 +2,6 @@
 {
     public class Pattern
     {
-        public byte PatternNumber { get; set; }
-
+        public short PatternNumber { get; set; }
     }
 }

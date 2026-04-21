@@ -1,5 +1,6 @@
 ﻿using RideOnServer.DAL;
-using RideOnServer.BL.DTOs;
+using RideOnServer.BL.DTOs.Auth;
+using RideOnServer.BL.DTOs.Profile;
 
 namespace RideOnServer.BL
 {
@@ -18,6 +19,7 @@ namespace RideOnServer.BL
             return dal.GetSystemUserForLogin(username);
         }
 
+
         internal static SystemUser? Login(string username, string password)
         {
             SystemUser? systemUser = GetSystemUserForLogin(username);
@@ -25,11 +27,11 @@ namespace RideOnServer.BL
             if (systemUser == null)
                 return null;
 
-            if (!systemUser.IsActive)
-                return null;
-
             if (!PasswordHelper.VerifyPassword(password, systemUser.PasswordSalt, systemUser.PasswordHash))
                 return null;
+
+            if (!systemUser.IsActive)
+                throw new InvalidOperationException("PENDING_APPROVAL");
 
             List<ApprovedRoleRanch> approvedRolesAndRanches = GetApprovedPersonRanchesAndRoles(systemUser.PersonId);
 
@@ -43,6 +45,72 @@ namespace RideOnServer.BL
         {
             SystemUserDAL dal = new SystemUserDAL();
             return dal.GetApprovedPersonRanchesAndRoles(personId);
+        }
+
+        internal static List<UserProfileRole> GetPersonRanchesAndRoles(int personId)
+        {
+            SystemUserDAL dal = new SystemUserDAL();
+            return dal.GetPersonRanchesAndRoles(personId);
+        }
+
+        internal static SystemUserProfile GetSystemUserProfileById(int systemUserId)
+        {
+            SystemUserDAL dal = new SystemUserDAL();
+            SystemUserProfile? profile = dal.GetSystemUserProfileById(systemUserId);
+
+            if (profile == null)
+            {
+                throw new Exception("System user not found");
+            }
+
+            return profile;
+        }
+
+        internal static ProfileSettingsResponse GetProfileSettings(int personId, int ranchId, byte roleId)
+        {
+            SystemUserProfile userProfile = GetSystemUserProfileById(personId);
+            RanchProfile activeRanch = Ranch.GetRanchById(ranchId);
+
+            List<ApprovedRoleRanch> approvedProfiles = GetApprovedPersonRanchesAndRoles(personId);
+            List<UserProfileRole> allProfiles = GetPersonRanchesAndRoles(personId);
+
+            UserProfileRole? activeProfile = allProfiles.FirstOrDefault(functionProfile =>
+                functionProfile.RanchId == ranchId && functionProfile.RoleId == roleId);
+
+            if (activeProfile == null)
+            {
+                throw new Exception("Active profile not found for this user");
+            }
+
+            return new ProfileSettingsResponse
+            {
+                UserProfile = userProfile,
+                ActiveRanch = activeRanch,
+                ActiveProfile = activeProfile,
+                ApprovedProfiles = approvedProfiles,
+                AllProfiles = allProfiles
+            };
+        }
+
+        internal static void UpdateUserProfile(UpdateUserProfileRequest request)
+        {
+            if (request.PersonId <= 0)
+            {
+                throw new Exception("Invalid PersonId");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.FirstName))
+            {
+                throw new Exception("FirstName is required");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.LastName))
+            {
+                throw new Exception("LastName is required");
+            }
+
+            SystemUserDAL dal = new SystemUserDAL();
+            dal.UpdateUserProfile(request);
         }
 
         internal static RegisterResponse Register(RegisterRequest request)
@@ -102,7 +170,7 @@ namespace RideOnServer.BL
         {
             SystemUserDAL dal = new SystemUserDAL();
 
-            SystemUser? systemUser = GetSystemUserForLogin(request.Username);
+            SystemUser? systemUser = dal.GetSystemUserByPersonId(request.PersonId);
 
             if (systemUser == null)
             {
@@ -114,22 +182,18 @@ namespace RideOnServer.BL
                 throw new Exception("User is inactive");
             }
 
-            if (!PasswordHelper.VerifyPassword(request.CurrentPassword, systemUser.PasswordSalt, systemUser.PasswordHash))
+            if (!PasswordHelper.VerifyPassword(
+                request.CurrentPassword,
+                systemUser.PasswordSalt,
+                systemUser.PasswordHash))
             {
                 throw new Exception("Current password is incorrect");
             }
 
-            if (request.CurrentPassword == request.NewPassword)
-            {
-                throw new Exception("New password must be different from current password");
-            }
-
-            PasswordPolicyValidator.ValidateOrThrow(request.NewPassword);
-
             string newSalt = PasswordHelper.GenerateSalt();
             string newHash = PasswordHelper.HashPassword(request.NewPassword, newSalt);
 
-            dal.UpdateSystemUserPassword(systemUser.PersonId, newHash, newSalt);
+            dal.UpdateSystemUserPassword(request.PersonId, newHash, newSalt);
         }
 
         internal static void SetMustChangePassword(int systemUserId, bool mustChangePassword)
@@ -150,8 +214,13 @@ namespace RideOnServer.BL
             return dal.CheckUsernameExists(username);
         }
 
+        internal static int CreatePendingRanchRequest(CreateRanchRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.RanchName))
+                throw new Exception("Ranch name is required");
 
-
-
+            SystemUserDAL dal = new SystemUserDAL();
+            return dal.CreatePendingRanchRequest(request);
+        }
     }
 }

@@ -1,6 +1,7 @@
-﻿using Microsoft.Data.SqlClient;
+using Npgsql;
 using RideOnServer.BL;
-
+using Microsoft.Extensions.Configuration;
+ 
 namespace RideOnServer.DAL
 {
     public class RoleDAL : DBServices
@@ -9,12 +10,12 @@ namespace RideOnServer.DAL
         {
             try
             {
-                using (SqlConnection connection = Connect("DefaultConnection"))
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (SqlCommand command = CreateCommandWithStoredProcedure("usp_GetAllRoles", connection, null))
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetAllRoles", connection, null))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
                     {
                         List<Role> roles = new List<Role>();
 
@@ -31,9 +32,11 @@ namespace RideOnServer.DAL
                     }
                 }
             }
-            catch (SqlException ex)
+            catch (Exception ex)
             {
-                throw new Exception($"Database error: {ex.Message}");
+                Console.WriteLine("=== RoleDAL.GetAllRoles ERROR ===");
+                Console.WriteLine(ex.ToString());
+                throw;
             }
         }
     }

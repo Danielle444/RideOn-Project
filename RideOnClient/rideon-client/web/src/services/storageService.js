@@ -1,12 +1,12 @@
-const TOKEN_KEY = 'rideon_token';
-const USER_KEY = 'rideon_user';
-const ACTIVE_ROLE_KEY = 'rideon_active_role';
-const REMEMBER_ME_KEY = 'rideon_remember_me';
+import { STORAGE_KEYS } from "../../../shared/auth/constants/storageKeys";
+
+const REMEMBER_ME_KEY = "rideon_remember_me";
 
 function getStorage(rememberMe) {
   return rememberMe ? localStorage : sessionStorage;
 }
 
+// ---------- REMEMBER ME ----------
 function saveRememberMe(rememberMe) {
   localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify(rememberMe));
 }
@@ -29,28 +29,34 @@ function removeRememberMe() {
   localStorage.removeItem(REMEMBER_ME_KEY);
 }
 
+// ---------- TOKEN ----------
 function saveToken(token, rememberMe) {
   const storage = getStorage(rememberMe);
-  storage.setItem(TOKEN_KEY, token);
+  storage.setItem(STORAGE_KEYS.TOKEN, token);
 }
 
 function getToken() {
-  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+  return (
+    localStorage.getItem(STORAGE_KEYS.TOKEN) ||
+    sessionStorage.getItem(STORAGE_KEYS.TOKEN)
+  );
 }
 
 function removeToken() {
-  localStorage.removeItem(TOKEN_KEY);
-  sessionStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(STORAGE_KEYS.TOKEN);
+  sessionStorage.removeItem(STORAGE_KEYS.TOKEN);
 }
 
+// ---------- USER ----------
 function saveUser(user, rememberMe) {
   const storage = getStorage(rememberMe);
-  storage.setItem(USER_KEY, JSON.stringify(user));
+  storage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
 }
 
 function getUser() {
   const user =
-    localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY);
+    localStorage.getItem(STORAGE_KEYS.USER) ||
+    sessionStorage.getItem(STORAGE_KEYS.USER);
 
   if (!user) {
     return null;
@@ -64,19 +70,20 @@ function getUser() {
 }
 
 function removeUser() {
-  localStorage.removeItem(USER_KEY);
-  sessionStorage.removeItem(USER_KEY);
+  localStorage.removeItem(STORAGE_KEYS.USER);
+  sessionStorage.removeItem(STORAGE_KEYS.USER);
 }
 
+// ---------- ACTIVE ROLE ----------
 function saveActiveRole(activeRole, rememberMe) {
   const storage = getStorage(rememberMe);
-  storage.setItem(ACTIVE_ROLE_KEY, JSON.stringify(activeRole));
+  storage.setItem(STORAGE_KEYS.ACTIVE_ROLE, JSON.stringify(activeRole));
 }
 
 function getActiveRole() {
   const activeRole =
-    localStorage.getItem(ACTIVE_ROLE_KEY) ||
-    sessionStorage.getItem(ACTIVE_ROLE_KEY);
+    localStorage.getItem(STORAGE_KEYS.ACTIVE_ROLE) ||
+    sessionStorage.getItem(STORAGE_KEYS.ACTIVE_ROLE);
 
   if (!activeRole) {
     return null;
@@ -90,10 +97,11 @@ function getActiveRole() {
 }
 
 function removeActiveRole() {
-  localStorage.removeItem(ACTIVE_ROLE_KEY);
-  sessionStorage.removeItem(ACTIVE_ROLE_KEY);
+  localStorage.removeItem(STORAGE_KEYS.ACTIVE_ROLE);
+  sessionStorage.removeItem(STORAGE_KEYS.ACTIVE_ROLE);
 }
 
+// ---------- CLEAR ALL ----------
 function clearAuthStorage() {
   removeToken();
   removeUser();
@@ -114,5 +122,5 @@ export {
   saveActiveRole,
   getActiveRole,
   removeActiveRole,
-  clearAuthStorage
+  clearAuthStorage,
 };

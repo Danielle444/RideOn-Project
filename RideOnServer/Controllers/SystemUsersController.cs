@@ -1,8 +1,9 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
-using RideOnServer.BL.DTOs;
-using RideOnServer.DAL;
+using RideOnServer.BL.DTOs.Auth;
+using RideOnServer.BL.DTOs.Auth.SuperUser;
+using RideOnServer.BL.DTOs.Profile;
 
 namespace RideOnServer.Controllers
 {
@@ -10,7 +11,6 @@ namespace RideOnServer.Controllers
     [ApiController]
     public class SystemUsersController : ControllerBase
     {
-
         private readonly IConfiguration _configuration;
 
         public SystemUsersController(IConfiguration configuration)
@@ -30,7 +30,8 @@ namespace RideOnServer.Controllers
                     return Unauthorized("Invalid username, password, or no approved role");
                 }
 
-                List<ApprovedRoleRanch> approvedRolesAndRanches = SystemUser.GetApprovedPersonRanchesAndRoles(systemUser.PersonId);
+                List<ApprovedRoleRanch> approvedRolesAndRanches =
+                    SystemUser.GetApprovedPersonRanchesAndRoles(systemUser.PersonId);
 
                 string token = JwtHelper.GenerateToken(systemUser, approvedRolesAndRanches, _configuration);
 
@@ -48,6 +49,55 @@ namespace RideOnServer.Controllers
 
                 return Ok(response);
             }
+            catch (InvalidOperationException ex) when (ex.Message == "PENDING_APPROVAL")
+            {
+                return BadRequest("PENDING_APPROVAL");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize]
+        [HttpGet("profile-settings")]
+        public IActionResult GetProfileSettings(
+            [FromQuery] int personId,
+            [FromQuery] int ranchId,
+            [FromQuery] byte roleId)
+        {
+            try
+            {
+                UserAccessValidator.EnsureCurrentUserIsPerson(User, personId);
+
+                ProfileSettingsResponse response = SystemUser.GetProfileSettings(personId, ranchId, roleId);
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize]
+        [HttpPut("profile")]
+        public IActionResult UpdateUserProfile([FromBody] UpdateUserProfileRequest request)
+        {
+            try
+            {
+                UserAccessValidator.EnsureCurrentUserIsPerson(User, request.PersonId);
+
+                SystemUser.UpdateUserProfile(request);
+                return Ok("User profile updated successfully");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
             catch (Exception ex)
             {
                 return BadRequest(ex.Message);
@@ -59,6 +109,10 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                OtpService otpService = new OtpService(_configuration);
+                if (!otpService.VerifyOtp(registerRequest.Email, registerRequest.OtpCode))
+                    return BadRequest("קוד האימות אינו תקף או פג תוקפו");
+
                 RegisterResponse response = SystemUser.Register(registerRequest);
                 return Ok(response);
             }
@@ -67,6 +121,8 @@ namespace RideOnServer.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [Authorize]
         [HttpPost("{personId}/roles")]
         public IActionResult AssignRoleToPerson(int personId, [FromBody] AssignRoleRequest request)
         {
@@ -77,8 +133,14 @@ namespace RideOnServer.Controllers
 
             try
             {
+                UserAccessValidator.EnsureCurrentUserIsPerson(User, request.PersonId);
+
                 SystemUser.AssignRoleToExistingUser(request.PersonId, request.RanchId, request.RoleId);
                 return Ok("Role assigned successfully.");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -86,11 +148,14 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [Authorize]
         [HttpPut("role-status")]
         public IActionResult UpdatePersonRoleStatus([FromBody] UpdatePersonRoleStatusRequest request)
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 SystemUser.UpdatePersonRoleStatus(
                     request.PersonId,
                     request.RanchId,
@@ -100,19 +165,35 @@ namespace RideOnServer.Controllers
 
                 return Ok("Role status updated successfully");
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
             catch (Exception ex)
             {
                 return BadRequest(ex.Message);
             }
         }
 
+        [Authorize]
         [HttpPut("change-password")]
         public IActionResult ChangePassword([FromBody] ChangePasswordRequest request)
         {
             try
             {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                if (request.PersonId != currentPersonId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לשנות סיסמה עבור משתמש אחר");
+                }
+
                 SystemUser.ChangePassword(request);
                 return Ok("Password changed successfully");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -120,13 +201,20 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [Authorize]
         [HttpPut("must-change-password")]
         public IActionResult SetMustChangePassword([FromBody] SetMustChangePasswordRequest request)
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 SystemUser.SetMustChangePassword(request.SystemUserId, request.MustChangePassword);
                 return Ok("MustChangePassword updated successfully");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -148,9 +236,81 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("ranch-request")]
+        public IActionResult CreateRanchRequest([FromBody] CreateRanchRequest request)
+        {
+            try
+            {
+                int requestId = SystemUser.CreatePendingRanchRequest(request);
 
+                return Ok(new
+                {
+                    RequestId = requestId,
+                    Message = "Ranch request created successfully"
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
 
+        [HttpPost("send-otp")]
+        public IActionResult SendOtp([FromBody] SendOtpRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.Email))
+                    return BadRequest("כתובת מייל נדרשת");
 
+                if (!request.Email.Contains("@") || !request.Email.Contains("."))
+                    return BadRequest("כתובת מייל אינה תקינה");
+
+                OtpService otpService = new OtpService(_configuration);
+                otpService.SendAndStoreOtp(request.Email);
+                return Ok(new { message = "קוד אימות נשלח למייל" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("forgot-password")]
+        public IActionResult ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.Email))
+                    return BadRequest("כתובת מייל נדרשת");
+
+                PasswordResetService service = new PasswordResetService(_configuration);
+                service.RequestReset(request.Email);
+                return Ok(new { message = "אם המייל קיים במערכת, ישלח אליך קישור לאיפוס" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("reset-password")]
+        public IActionResult ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.NewPassword))
+                    return BadRequest("פרטים חסרים");
+
+                PasswordResetService service = new PasswordResetService(_configuration);
+                service.ResetPassword(request.Token, request.NewPassword);
+                return Ok(new { message = "הסיסמה אופסה בהצלחה" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
 
 
     }

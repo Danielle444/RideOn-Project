@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import styles from "../../styles/authStyles";
@@ -15,33 +15,43 @@ import { useAuth } from "../../context/AuthContext";
 
 export default function MobileEntryGateScreen(props) {
   const isFocused = useIsFocused();
+  const hasNavigatedRef = useRef(false);
 
   const { user, isUserHydrated } = useUser();
   const { activeRole, setActiveRoleAndPersist } = useActiveRole();
-  const { logout } = useAuth();
-
-  const [didNavigate, setDidNavigate] = useState(false);
+  const { isAuthenticated } = useAuth();
 
   useEffect(
     function () {
-      if (!isFocused || !isUserHydrated || didNavigate) {
+      if (!isFocused) {
+        hasNavigatedRef.current = false;
+        return;
+      }
+
+      if (!isUserHydrated) {
+        return;
+      }
+
+      if (hasNavigatedRef.current) {
+        return;
+      }
+
+      if (!isAuthenticated || !user) {
         return;
       }
 
       handleNavigation();
     },
-    [isFocused, isUserHydrated, user, activeRole, didNavigate]
+    [isFocused, isUserHydrated, isAuthenticated, user, activeRole]
   );
 
   async function handleNavigation() {
     if (!user) {
-      setDidNavigate(true);
-      await logout();
       return;
     }
 
     if (user.mustChangePassword) {
-      setDidNavigate(true);
+      hasNavigatedRef.current = true;
       props.navigation.replace("ChangePassword");
       return;
     }
@@ -50,7 +60,7 @@ export default function MobileEntryGateScreen(props) {
       const screenName = getMobileHomeScreenName(activeRole.roleName);
 
       if (screenName) {
-        setDidNavigate(true);
+        hasNavigatedRef.current = true;
         props.navigation.replace(screenName);
         return;
       }
@@ -65,12 +75,12 @@ export default function MobileEntryGateScreen(props) {
     if (autoSelection.shouldAutoSelect && autoSelection.result?.ok) {
       await setActiveRoleAndPersist(autoSelection.result.activeRole);
 
-      setDidNavigate(true);
+      hasNavigatedRef.current = true;
       props.navigation.replace(autoSelection.result.destination);
       return;
     }
 
-    setDidNavigate(true);
+    hasNavigatedRef.current = true;
     props.navigation.replace("SelectActiveRole");
   }
 

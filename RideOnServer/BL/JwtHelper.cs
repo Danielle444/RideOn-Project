@@ -1,5 +1,5 @@
 ﻿using Microsoft.IdentityModel.Tokens;
-using RideOnServer.BL.DTOs;
+using RideOnServer.BL.DTOs.Auth;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -8,6 +8,18 @@ namespace RideOnServer.BL
 {
     public class JwtHelper
     {
+        private static int GetExpirationHours(IConfiguration configuration)
+        {
+            string? rawValue = configuration["Jwt:ExpirationHours"];
+
+            if (int.TryParse(rawValue, out int expirationHours) && expirationHours > 0)
+            {
+                return expirationHours;
+            }
+
+            return 24;
+        }
+
         public static string GenerateToken(SystemUser user, List<ApprovedRoleRanch> approvedRolesAndRanches, IConfiguration configuration)
         {
             List<Claim> claims = new List<Claim>
@@ -28,14 +40,22 @@ namespace RideOnServer.BL
                 claims.Add(new Claim("RanchName", item.RanchName));
             }
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Key"]));
-            var signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(configuration["Jwt:Key"])
+            );
+
+            var signingCredentials = new SigningCredentials(
+                key,
+                SecurityAlgorithms.HmacSha256
+            );
+
+            int expirationHours = GetExpirationHours(configuration);
 
             var token = new JwtSecurityToken(
                 issuer: configuration["Jwt:Issuer"],
                 audience: configuration["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddHours(2),
+                expires: DateTime.UtcNow.AddHours(expirationHours),
                 signingCredentials: signingCredentials
             );
 
@@ -53,14 +73,22 @@ namespace RideOnServer.BL
                 new Claim("UserType", "SuperUser")
             };
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Key"]));
-            var signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(configuration["Jwt:Key"])
+            );
+
+            var signingCredentials = new SigningCredentials(
+                key,
+                SecurityAlgorithms.HmacSha256
+            );
+
+            int expirationHours = GetExpirationHours(configuration);
 
             var token = new JwtSecurityToken(
                 issuer: configuration["Jwt:Issuer"],
                 audience: configuration["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddHours(2),
+                expires: DateTime.UtcNow.AddHours(expirationHours),
                 signingCredentials: signingCredentials
             );
 

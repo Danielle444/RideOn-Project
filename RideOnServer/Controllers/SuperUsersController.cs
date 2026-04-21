@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
-using RideOnServer.BL.DTOs;
+using RideOnServer.BL.DTOs.Auth;
+using RideOnServer.BL.DTOs.Auth.SuperUser;
 
 namespace RideOnServer.Controllers
 {
@@ -46,17 +48,25 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [Authorize]
         [HttpPost]
         public IActionResult CreateSuperUser([FromBody] CreateSuperUserRequest request)
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 int newSuperUserId = SuperUser.CreateSuperUser(request.Email, request.Password);
+
                 return Ok(new
                 {
                     SuperUserId = newSuperUserId,
                     Message = "Super user created successfully"
                 });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -64,13 +74,181 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [Authorize]
         [HttpPut("change-password")]
         public IActionResult ChangePassword([FromBody] ChangeSuperUserPasswordRequest request)
         {
             try
             {
-                SuperUser.ChangePassword(request.SuperUserId, request.CurrentPassword, request.NewPassword);
+                UserAccessValidator.EnsureSuperUser(User);
+
+                int superUserId = UserAccessValidator.GetSuperUserIdFromClaims(User);
+
+                SuperUser.ChangePassword(superUserId, request.CurrentPassword, request.NewPassword);
+
                 return Ok("Password changed successfully");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize]
+        [HttpGet("me")]
+        public IActionResult GetMe()
+        {
+            try
+            {
+                UserAccessValidator.EnsureSuperUser(User);
+
+                int superUserId = UserAccessValidator.GetSuperUserIdFromClaims(User);
+
+                SuperUser? superUser = SuperUser.GetSuperUserById(superUserId);
+
+                if (superUser == null)
+                {
+                    return NotFound("Super user not found");
+                }
+
+                return Ok(new
+                {
+                    superUser.SuperUserId,
+                    superUser.Email,
+                    superUser.IsActive,
+                    superUser.MustChangePassword
+                });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize]
+        [HttpGet("role-requests")]
+        public IActionResult GetRoleRequests([FromQuery] byte roleId, [FromQuery] string? status, [FromQuery] string? search)
+        {
+            try
+            {
+                UserAccessValidator.EnsureSuperUser(User);
+
+                var list = SuperUser.GetRoleRequests(roleId, status, search);
+                return Ok(list);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize]
+        [HttpGet("ranch-requests")]
+        public IActionResult GetNewRanchRequests([FromQuery] string? status, [FromQuery] string? search)
+        {
+            try
+            {
+                UserAccessValidator.EnsureSuperUser(User);
+
+                var list = SuperUser.GetNewRanchRequests(status, search);
+                return Ok(list);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize]
+        [HttpPut("role-requests/status")]
+        public IActionResult UpdateRoleRequestStatus([FromBody] UpdateRoleRequestStatusRequest request)
+        {
+            try
+            {
+                UserAccessValidator.EnsureSuperUser(User);
+
+                SuperUser.UpdateRoleRequestStatus(
+                    request.PersonId,
+                    request.RanchId,
+                    request.RoleId,
+                    request.RoleStatus
+                );
+
+                return Ok("Role request status updated successfully");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize]
+        [HttpPut("ranch-requests/status")]
+        public IActionResult UpdateNewRanchRequestStatus([FromBody] UpdateNewRanchRequestStatusRequest request)
+        {
+            try
+            {
+                UserAccessValidator.EnsureSuperUser(User);
+
+                int superUserId = UserAccessValidator.GetSuperUserIdFromClaims(User);
+
+                if (request.ResolvedBySuperUserId != 0 && request.ResolvedBySuperUserId != superUserId)
+                {
+                    return BadRequest("ResolvedBySuperUserId does not match logged-in super user");
+                }
+
+                SuperUser.UpdateNewRanchRequestStatus(
+                    request.RequestId,
+                    superUserId,
+                    request.NewStatus
+                );
+
+                return Ok("New ranch request status updated successfully");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize]
+        [HttpGet]
+        public IActionResult GetAllSuperUsers()
+        {
+            try
+            {
+                UserAccessValidator.EnsureSuperUser(User);
+
+                List<SuperUserListItem> list = SuperUser.GetAllSuperUsers();
+                return Ok(list);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {

@@ -1,7 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function CustomDropdown(props) {
   const containerRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const [searchText, setSearchText] = useState("");
+
+  const isOpen = props.openDropdownKey === props.dropdownKey;
 
   useEffect(
     function () {
@@ -12,6 +16,7 @@ export default function CustomDropdown(props) {
           props.openDropdownKey === props.dropdownKey
         ) {
           props.setOpenDropdownKey("");
+          setSearchText("");
         }
       }
 
@@ -24,17 +29,26 @@ export default function CustomDropdown(props) {
     [props.openDropdownKey, props.dropdownKey, props.setOpenDropdownKey]
   );
 
-  function getSelectedOption() {
-    let i;
+  useEffect(
+    function () {
+      if (isOpen && props.searchable && searchInputRef.current) {
+        searchInputRef.current.focus();
+      }
+      if (!isOpen) {
+        setSearchText("");
+      }
+    },
+    [isOpen, props.searchable]
+  );
 
-    for (i = 0; i < props.options.length; i++) {
+  function getSelectedOption() {
+    for (let i = 0; i < props.options.length; i++) {
       if (
         String(props.getOptionValue(props.options[i])) === String(props.value)
       ) {
         return props.options[i];
       }
     }
-
     return null;
   }
 
@@ -58,10 +72,19 @@ export default function CustomDropdown(props) {
     });
 
     props.setOpenDropdownKey("");
+    setSearchText("");
   }
 
   const selectedOption = getSelectedOption();
-  const isOpen = props.openDropdownKey === props.dropdownKey;
+
+  const visibleOptions = props.searchable && searchText.trim()
+    ? props.options.filter(function (option) {
+        return props
+          .getOptionLabel(option)
+          .toLowerCase()
+          .includes(searchText.trim().toLowerCase());
+      })
+    : props.options;
 
   return (
     <div className="relative" ref={containerRef}>
@@ -86,35 +109,52 @@ export default function CustomDropdown(props) {
       </button>
 
       {isOpen && !props.disabled && (
-        <div className="absolute right-0 left-0 top-full mt-2 z-50 rounded-xl border border-[#D7CCC8] bg-white shadow-lg max-h-56 overflow-y-auto">
-          {props.options.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-[#8D6E63] text-right">
-              אין אפשרויות להצגה
+        <div className="absolute right-0 left-0 top-full mt-2 z-50 rounded-xl border border-[#D7CCC8] bg-white shadow-lg">
+          {props.searchable && (
+            <div className="p-2 border-b border-[#F5EBE4]">
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchText}
+                onChange={function (e) {
+                  setSearchText(e.target.value);
+                }}
+                placeholder="חיפוש..."
+                dir="rtl"
+                className="w-full px-3 py-1.5 text-sm rounded-lg border border-[#D7CCC8] bg-[#FAF5F1] text-right text-[#212121] placeholder-[#BCAAA4] focus:outline-none focus:border-[#795548] focus:ring-1 focus:ring-[#795548]/20"
+              />
             </div>
-          ) : (
-            props.options.map(function (option) {
-              const optionValue = props.getOptionValue(option);
-              const isSelected = String(optionValue) === String(props.value);
-
-              return (
-                <button
-                  key={String(optionValue)}
-                  type="button"
-                  onClick={function () {
-                    handleSelect(optionValue);
-                  }}
-                  className={
-                    "w-full px-4 py-3 text-sm text-right transition-colors border-b border-[#F5EBE4] last:border-b-0 " +
-                    (isSelected
-                      ? "bg-[#F5EDE8] text-[#4E342E] font-semibold"
-                      : "bg-white text-[#212121] hover:bg-[#FAF5F1]")
-                  }
-                >
-                  {props.getOptionLabel(option)}
-                </button>
-              );
-            })
           )}
+          <div className="max-h-52 overflow-y-auto">
+            {visibleOptions.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-[#8D6E63] text-right">
+                {searchText.trim() ? "לא נמצאו תוצאות" : "אין אפשרויות להצגה"}
+              </div>
+            ) : (
+              visibleOptions.map(function (option) {
+                const optionValue = props.getOptionValue(option);
+                const isSelected = String(optionValue) === String(props.value);
+
+                return (
+                  <button
+                    key={String(optionValue)}
+                    type="button"
+                    onClick={function () {
+                      handleSelect(optionValue);
+                    }}
+                    className={
+                      "w-full px-4 py-3 text-sm text-right transition-colors border-b border-[#F5EBE4] last:border-b-0 " +
+                      (isSelected
+                        ? "bg-[#F5EDE8] text-[#4E342E] font-semibold"
+                        : "bg-white text-[#212121] hover:bg-[#FAF5F1]")
+                    }
+                  >
+                    {props.getOptionLabel(option)}
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
       )}
     </div>

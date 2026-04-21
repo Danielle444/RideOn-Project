@@ -63,7 +63,8 @@ export default function SelectActiveRoleScreen(props) {
 
     try {
       await setActiveRoleAndPersist(result.activeRole);
-      props.navigation.replace(result.destination);
+      setTimeout(() => {
+      props.navigation.replace(result.destination);}, 0);
     } catch (error) {
       setIsNavigating(false);
       Alert.alert("שגיאה", "אירעה שגיאה במעבר לתפקיד שנבחר");

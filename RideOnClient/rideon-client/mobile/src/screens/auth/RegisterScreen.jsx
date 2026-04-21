@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -19,7 +20,8 @@ import { useNavigation } from "@react-navigation/native";
 
 import {
   register,
-  getRanches,
+  getRanchesForRegistration,
+  createRanchRequest,
   getRoles,
   checkUsername,
   getPersonByNationalIdForRegistration,
@@ -42,7 +44,6 @@ export default function RegisterScreen() {
   var navigation = useNavigation();
 
   var [activeSection, setActiveSection] = useState(1);
-
   var [showPasswordInfo, setShowPasswordInfo] = useState(false);
 
   var [form, setForm] = useState({
@@ -82,11 +83,21 @@ export default function RegisterScreen() {
 
   var [showPassword, setShowPassword] = useState(false);
   var [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
   var [showDatePicker, setShowDatePicker] = useState(false);
 
+  var [showRanchModal, setShowRanchModal] = useState(false);
+  var [creatingRanchRequest, setCreatingRanchRequest] = useState(false);
+  var [ranchModalError, setRanchModalError] = useState("");
+
+  var [newRanch, setNewRanch] = useState({
+    ranchName: "",
+    contactEmail: "",
+    contactPhone: "",
+    websiteUrl: "",
+  });
+
   useEffect(function () {
-    Promise.all([getRoles(), getRanches()])
+    Promise.all([getRoles(), getRanchesForRegistration()])
       .then(function ([rolesResponse, ranchesResponse]) {
         setRoles(Array.isArray(rolesResponse.data) ? rolesResponse.data : []);
         setRanches(
@@ -153,6 +164,21 @@ export default function RegisterScreen() {
             email: "",
           };
         });
+      }
+    };
+  }
+
+  function setNewRanchField(fieldName) {
+    return function (value) {
+      setNewRanch(function (prevRanch) {
+        return {
+          ...prevRanch,
+          [fieldName]: value,
+        };
+      });
+
+      if (ranchModalError) {
+        setRanchModalError("");
       }
     };
   }
@@ -239,6 +265,28 @@ export default function RegisterScreen() {
         email: "",
       };
     });
+  }
+
+  function openCreateRanchModal() {
+    setRanchModalError("");
+    setNewRanch(function () {
+      return {
+        ranchName: "",
+        contactEmail: form.email || "",
+        contactPhone: form.cellPhone || "",
+        websiteUrl: "",
+      };
+    });
+    setShowRanchModal(true);
+  }
+
+  function closeCreateRanchModal() {
+    if (creatingRanchRequest) {
+      return;
+    }
+
+    setShowRanchModal(false);
+    setRanchModalError("");
   }
 
   async function tryAutoFillUsernameFromEmail(emailValue) {
@@ -397,6 +445,91 @@ export default function RegisterScreen() {
 
     setError("");
     setActiveSection(3);
+  }
+
+  async function handleCreateRanchRequest() {
+    setRanchModalError("");
+    setError("");
+    setSuccess("");
+
+    if (!newRanch.ranchName.trim()) {
+      setRanchModalError("יש להזין שם חווה");
+      return;
+    }
+
+    if (!form.firstName.trim()) {
+      setRanchModalError("יש למלא שם פרטי לפני יצירת בקשת חווה");
+      return;
+    }
+
+    if (!form.lastName.trim()) {
+      setRanchModalError("יש למלא שם משפחה לפני יצירת בקשת חווה");
+      return;
+    }
+
+    if (!form.nationalId.trim()) {
+      setRanchModalError("יש למלא תעודת זהות לפני יצירת בקשת חווה");
+      return;
+    }
+
+    if (!form.cellPhone.trim()) {
+      setRanchModalError("יש למלא טלפון נייד לפני יצירת בקשת חווה");
+      return;
+    }
+
+    try {
+      setCreatingRanchRequest(true);
+
+      await createRanchRequest({
+        ranchName: newRanch.ranchName.trim(),
+        contactEmail: newRanch.contactEmail.trim() || null,
+        contactPhone: newRanch.contactPhone.trim() || null,
+        websiteUrl: newRanch.websiteUrl.trim() || null,
+        latitude: null,
+        longitude: null,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        nationalId: form.nationalId.trim(),
+        email: form.email.trim() || null,
+        cellPhone: form.cellPhone.trim(),
+      });
+
+      var ranchesResponse = await getRanchesForRegistration();
+      var refreshedRanches = Array.isArray(ranchesResponse.data)
+        ? ranchesResponse.data
+        : [];
+
+      setRanches(refreshedRanches);
+
+      var createdRanch = refreshedRanches.find(function (item) {
+        return item.ranchName === newRanch.ranchName.trim();
+      });
+
+      if (createdRanch) {
+        setRanchRolePairs(function (prevPairs) {
+          return prevPairs.map(function (pair, index) {
+            if (index === 0 && !pair.ranchId) {
+              return {
+                ...pair,
+                ranchId: String(createdRanch.ranchId),
+              };
+            }
+
+            return pair;
+          });
+        });
+      }
+
+      setShowRanchModal(false);
+      setSuccess("בקשת חווה נשלחה בהצלחה. החווה תופיע לאחר אישור מנהל.");
+
+      Alert.alert("הצלחה", "בקשת החווה נשלחה בהצלחה");
+    } catch (err) {
+      var message = getApiErrorMessage(err, "שגיאה ביצירת בקשת חווה");
+      setRanchModalError(String(message));
+    } finally {
+      setCreatingRanchRequest(false);
+    }
   }
 
   async function handleSubmit() {
@@ -568,6 +701,7 @@ export default function RegisterScreen() {
             placeholderTextColor="#B7AAA3"
             style={styles.passwordInput}
             secureTextEntry={!isVisible}
+            textAlign="right"
           />
         </View>
       </View>
@@ -749,6 +883,13 @@ export default function RegisterScreen() {
               })}
             </Picker>
           </View>
+
+          <Pressable
+            onPress={openCreateRanchModal}
+            style={styles.ranchLinkButton}
+          >
+            <Text style={styles.ranchLinkText}>לא מצאתי את החווה שלי</Text>
+          </Pressable>
         </View>
 
         {!!pair.ranchId && (
@@ -1058,6 +1199,114 @@ export default function RegisterScreen() {
             onChange={handleDateChange}
           />
         )}
+
+        <Modal
+          visible={showRanchModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={closeCreateRanchModal}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Pressable
+                  onPress={closeCreateRanchModal}
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons name="close" size={20} color="#6A3F2C" />
+                </Pressable>
+
+                <Text style={styles.modalTitle}>בקשה להוספת חווה</Text>
+              </View>
+
+              <ScrollView
+                contentContainerStyle={styles.modalContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <Text style={styles.modalSubtitle}>
+                  לא מצאת את החווה שלך? אפשר לשלוח בקשה להוספת חווה חדשה. הבקשה
+                  תועבר לאישור מנהל המערכת.
+                </Text>
+
+                {renderTextField(
+                  "שם החווה",
+                  newRanch.ranchName,
+                  setNewRanchField("ranchName"),
+                  "הזיני שם חווה",
+                  {},
+                  "",
+                  false,
+                )}
+
+                {renderTextField(
+                  "אימייל חווה",
+                  newRanch.contactEmail,
+                  setNewRanchField("contactEmail"),
+                  "example@email.com",
+                  {
+                    autoCapitalize: "none",
+                    keyboardType: "email-address",
+                  },
+                  "",
+                  false,
+                )}
+
+                {renderTextField(
+                  "טלפון חווה",
+                  newRanch.contactPhone,
+                  setNewRanchField("contactPhone"),
+                  "050-0000000",
+                  {
+                    keyboardType: "phone-pad",
+                  },
+                  "",
+                  false,
+                )}
+
+                {renderTextField(
+                  "אתר חווה",
+                  newRanch.websiteUrl,
+                  setNewRanchField("websiteUrl"),
+                  "https://example.com",
+                  {
+                    autoCapitalize: "none",
+                    keyboardType: "url",
+                  },
+                  "",
+                  false,
+                )}
+
+                {!!ranchModalError && (
+                  <Text style={styles.errorText}>{ranchModalError}</Text>
+                )}
+
+                <View style={styles.stepButtonsRow}>
+                  <Pressable
+                    style={styles.secondaryButton}
+                    onPress={closeCreateRanchModal}
+                    disabled={creatingRanchRequest}
+                  >
+                    <Text style={styles.secondaryButtonText}>ביטול</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.primaryButtonCompact,
+                      creatingRanchRequest ? styles.primaryButtonDisabled : null,
+                    ]}
+                    onPress={handleCreateRanchRequest}
+                    disabled={creatingRanchRequest}
+                  >
+                    <Text style={styles.primaryButtonText}>
+                      {creatingRanchRequest ? "שולח..." : "שלח בקשת חווה"}
+                    </Text>
+                  </Pressable>
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

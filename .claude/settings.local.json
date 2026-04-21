@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__claude_ai_Supabase__list_projects",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\Amit Hoffman\\\\Desktop\\\\RideOn-Project\\\\fix_dal.ps1\")",
+      "Bash(python \"C:\\\\Users\\\\Amit Hoffman\\\\Desktop\\\\RideOn-Project\\\\split_sp.py\")"
+    ]
+  }
+}

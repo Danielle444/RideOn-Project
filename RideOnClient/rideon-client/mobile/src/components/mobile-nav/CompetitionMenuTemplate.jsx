@@ -1,4 +1,4 @@
-import { View, Text, Pressable, Image } from "react-native";
+import { View, Text, Pressable, Image, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import roleSharedStyles from "../../styles/roleSharedStyles";
 import logo from "shared/assets/logo.png";
@@ -20,7 +20,11 @@ export default function CompetitionMenuTemplate(props) {
         </Text>
       </View>
 
-      <View>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 20 }}
+        showsVerticalScrollIndicator={false}
+      >
         {props.items.map(function (item) {
           var isActive = props.activeKey === item.key;
 
@@ -43,7 +47,7 @@ export default function CompetitionMenuTemplate(props) {
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
       <View style={roleSharedStyles.separator} />
 

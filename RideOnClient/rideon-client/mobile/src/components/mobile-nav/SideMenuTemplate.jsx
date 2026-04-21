@@ -1,4 +1,4 @@
-import { View, Text, Pressable, Image } from "react-native";
+import { View, Text, Pressable, Image, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import roleSharedStyles from "../../styles/roleSharedStyles";
 import logo from "shared/assets/logo.png";
@@ -16,12 +16,23 @@ export default function SideMenuTemplate(props) {
 
       <View style={roleSharedStyles.menuUserCard}>
         <Text style={roleSharedStyles.menuUserName}>{props.userName}</Text>
+
         <Text style={roleSharedStyles.menuUserMeta}>
           {[props.roleName, props.ranchName].filter(Boolean).join(" · ")}
         </Text>
+
+        {props.competitionName ? (
+          <Text style={roleSharedStyles.menuUserMeta}>
+            {props.competitionName}
+          </Text>
+        ) : null}
       </View>
 
-      <View>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 20 }}
+      >
         {props.items.map(function (item) {
           var isActive = props.activeKey === item.key;
 
@@ -44,7 +55,7 @@ export default function SideMenuTemplate(props) {
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
       <View style={roleSharedStyles.separator} />
 
