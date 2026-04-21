@@ -1,5 +1,6 @@
 import React from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import CompetitionRegistrationDropdown from "./CompetitionRegistrationDropdown";
 import styles from "../../styles/adminCompetitionRegistrationsStyles";
 
@@ -92,6 +93,52 @@ export default function CompetitionRegistrationFormCard(props) {
           props.onToggleLock("payer");
         }}
       />
+
+      <View style={styles.dropdownBlock}>
+        <View style={styles.dropdownHeaderRow}>
+          <Text style={styles.fieldLabel}>שם מקבל הפרס</Text>
+
+          <View style={styles.dropdownHeaderActions}>
+            {props.prizeRecipientName ? (
+              <Pressable
+                onPress={function () {
+                  props.setPrizeRecipientName("");
+                }}
+                hitSlop={8}
+              >
+                <Text style={styles.clearText}>נקה</Text>
+              </Pressable>
+            ) : null}
+
+            <Pressable
+              onPress={function () {
+                props.onToggleLock("prizeRecipient");
+              }}
+              hitSlop={8}
+              style={styles.inlineLockIconButton}
+            >
+              <Ionicons
+                name={
+                  props.locks.prizeRecipient
+                    ? "lock-closed-outline"
+                    : "lock-open-outline"
+                }
+                size={18}
+                color="#7B5A4D"
+              />
+            </Pressable>
+          </View>
+        </View>
+
+        <TextInput
+          value={props.prizeRecipientName}
+          onChangeText={props.setPrizeRecipientName}
+          placeholder="שם מקבל הפרס"
+          placeholderTextColor="#9E8A7F"
+          style={styles.dropdownSearchInput}
+          textAlign="right"
+        />
+      </View>
     </View>
   );
 }

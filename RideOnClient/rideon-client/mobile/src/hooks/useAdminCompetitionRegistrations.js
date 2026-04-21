@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import {
@@ -149,13 +149,7 @@ function formatPayerLabel(item) {
     return "";
   }
 
-  var fullName = String(item.fullName || "").trim();
-
-  if (item.cellPhone) {
-    return fullName + " • " + item.cellPhone;
-  }
-
-  return fullName;
+  return String(item.fullName || "").trim();
 }
 
 export default function useAdminCompetitionRegistrations(params) {
@@ -174,6 +168,7 @@ export default function useAdminCompetitionRegistrations(params) {
   var [selectedRider, setSelectedRider] = useState(null);
   var [selectedTrainer, setSelectedTrainer] = useState(null);
   var [selectedPayer, setSelectedPayer] = useState(null);
+  var [prizeRecipientName, setPrizeRecipientName] = useState("");
 
   var [locks, setLocks] = useState({
     class: false,
@@ -181,11 +176,28 @@ export default function useAdminCompetitionRegistrations(params) {
     rider: false,
     coach: false,
     payer: false,
+    prizeRecipient: false,
   });
 
   var [loading, setLoading] = useState(false);
   var [isSaving, setIsSaving] = useState(false);
   var [screenError, setScreenError] = useState("");
+
+  useEffect(
+    function () {
+      if (locks.prizeRecipient) {
+        return;
+      }
+
+      if (!selectedPayer) {
+        setPrizeRecipientName("");
+        return;
+      }
+
+      setPrizeRecipientName(formatPayerLabel(selectedPayer));
+    },
+    [selectedPayer, locks.prizeRecipient],
+  );
 
   useFocusEffect(
     useCallback(
@@ -334,6 +346,10 @@ export default function useAdminCompetitionRegistrations(params) {
     setSelectedPayer(function (prevValue) {
       return locks.payer ? prevValue : null;
     });
+
+    setPrizeRecipientName(function (prevValue) {
+      return locks.prizeRecipient ? prevValue : "";
+    });
   }
 
   function validateForm() {
@@ -387,7 +403,9 @@ export default function useAdminCompetitionRegistrations(params) {
         riderFederationMemberId: selectedRider.federationMemberId,
         coachFederationMemberId: selectedTrainer.federationMemberId,
         paidByPersonId: selectedPayer.personId,
-        prizeRecipientName: null,
+        prizeRecipientName: prizeRecipientName
+          ? prizeRecipientName.trim()
+          : null,
       };
 
       await createEntry(payload);
@@ -437,12 +455,14 @@ export default function useAdminCompetitionRegistrations(params) {
     selectedRider,
     selectedTrainer,
     selectedPayer,
+    prizeRecipientName,
 
     setSelectedClass,
     setSelectedHorse,
     setSelectedRider,
     setSelectedTrainer,
     setSelectedPayer,
+    setPrizeRecipientName,
 
     locks,
     handleToggleLock,
