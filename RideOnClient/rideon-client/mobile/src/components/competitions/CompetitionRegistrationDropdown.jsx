@@ -3,6 +3,51 @@ import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import styles from "../../styles/adminCompetitionRegistrationsStyles";
 
+function getSafeText(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  return String(value).trim();
+}
+
+function buildRenderKey(props, item, index) {
+  var explicitKey = null;
+
+  if (typeof props.getItemKey === "function") {
+    explicitKey = props.getItemKey(item);
+  }
+
+  if (explicitKey !== null && explicitKey !== undefined && explicitKey !== "") {
+    return String(explicitKey);
+  }
+
+  var itemId = null;
+
+  if (typeof props.getItemId === "function") {
+    itemId = props.getItemId(item);
+  }
+
+  var labelText = "";
+  if (typeof props.getItemLabel === "function") {
+    labelText = getSafeText(props.getItemLabel(item));
+  }
+
+  var blockLabel = getSafeText(props.label || "dropdown");
+
+  if (itemId !== null && itemId !== undefined && itemId !== "") {
+    return blockLabel + "-id-" + String(itemId) + "-idx-" + String(index);
+  }
+
+  return (
+    blockLabel +
+    "-label-" +
+    labelText +
+    "-idx-" +
+    String(index)
+  );
+}
+
 export default function CompetitionRegistrationDropdown(props) {
   var [isOpen, setIsOpen] = useState(false);
   var [searchText, setSearchText] = useState("");
@@ -14,23 +59,31 @@ export default function CompetitionRegistrationDropdown(props) {
 
   var filteredItems = useMemo(
     function () {
-      var normalizedSearch = String(searchText || "").trim().toLowerCase();
+      var normalizedSearch = getSafeText(searchText).toLowerCase();
 
-      if (!normalizedSearch) {
-        return items;
-      }
+      return items
+        .map(function (item, index) {
+          var label = "";
 
-      return items.filter(function (item) {
-        var label = "";
+          try {
+            label = getSafeText(props.getItemLabel(item));
+          } catch (error) {
+            label = "";
+          }
 
-        try {
-          label = String(props.getItemLabel(item) || "");
-        } catch (error) {
-          label = "";
-        }
+          return {
+            item: item,
+            label: label,
+            renderKey: buildRenderKey(props, item, index),
+          };
+        })
+        .filter(function (entry) {
+          if (!normalizedSearch) {
+            return true;
+          }
 
-        return label.toLowerCase().includes(normalizedSearch);
-      });
+          return entry.label.toLowerCase().includes(normalizedSearch);
+        });
     },
     [items, props, searchText],
   );
@@ -71,7 +124,7 @@ export default function CompetitionRegistrationDropdown(props) {
       return props.placeholder || "בחרי ערך";
     }
 
-    return String(props.getItemLabel(selectedItem) || props.placeholder || "");
+    return getSafeText(props.getItemLabel(selectedItem) || props.placeholder || "");
   }
 
   return (
@@ -145,20 +198,16 @@ export default function CompetitionRegistrationDropdown(props) {
                 <Text style={styles.dropdownEmptyText}>לא נמצאו תוצאות</Text>
               </View>
             ) : (
-              filteredItems.map(function (item) {
-                var itemId = String(props.getItemId(item));
-
+              filteredItems.map(function (entry) {
                 return (
                   <Pressable
-                    key={itemId}
+                    key={entry.renderKey}
                     style={styles.dropdownItem}
                     onPress={function () {
-                      handleSelect(item);
+                      handleSelect(entry.item);
                     }}
                   >
-                    <Text style={styles.dropdownItemText}>
-                      {props.getItemLabel(item)}
-                    </Text>
+                    <Text style={styles.dropdownItemText}>{entry.label}</Text>
                   </Pressable>
                 );
               })

@@ -187,6 +187,55 @@ var styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
+
+  tabsWrapper: {
+    flexDirection: "row-reverse",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: "#E7D6CA",
+    gap: 8,
+  },
+
+  tabButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+
+  tabButtonActive: {
+    backgroundColor: "#7B5A4D",
+  },
+
+  tabButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#6D564A",
+  },
+
+  tabButtonTextActive: {
+    color: "#FFFFFF",
+  },
+
+  tabButtonDisabled: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    backgroundColor: "#F3ECE7",
+  },
+
+  tabButtonTextDisabled: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#A79185",
+  },
 });
 
 export default styles;
