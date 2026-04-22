@@ -5,6 +5,7 @@ import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLa
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
 import CompetitionRegistrationsClassesTab from "../../../../components/competitions/CompetitionRegistrationsClassesTab";
 import CompetitionPaidTimeTab from "../../../../components/competitions/CompetitionPaidTimeTab";
+import CompetitionStallBookingsTab from "../../../../components/competitionRegistrations/CompetitionStallBookingsTab";
 
 import styles from "../../../../styles/adminCompetitionRegistrationsStyles";
 
@@ -17,6 +18,7 @@ import { useCompetition } from "../../../../context/CompetitionContext";
 
 import useAdminCompetitionRegistrations from "../../../../hooks/useAdminCompetitionRegistrations";
 import useAdminCompetitionPaidTimes from "../../../../hooks/useAdminCompetitionPaidTimes";
+import useAdminCompetitionStallBookings from "../../../../hooks/useAdminCompetitionStallBookings";
 
 function RegistrationsTabs(props) {
   return (
@@ -61,8 +63,23 @@ function RegistrationsTabs(props) {
         </Text>
       </Pressable>
 
-      <Pressable style={styles.tabButtonDisabled}>
-        <Text style={styles.tabButtonTextDisabled}>תאים</Text>
+      <Pressable
+        style={[
+          styles.tabButton,
+          props.activeTab === "stalls" ? styles.tabButtonActive : null,
+        ]}
+        onPress={function () {
+          props.onChangeTab("stalls");
+        }}
+      >
+        <Text
+          style={[
+            styles.tabButtonText,
+            props.activeTab === "stalls" ? styles.tabButtonTextActive : null,
+          ]}
+        >
+          תאים
+        </Text>
       </Pressable>
 
       <Pressable style={styles.tabButtonDisabled}>
@@ -95,6 +112,12 @@ export default function AdminCompetitionRegistrationsScreen(props) {
   });
 
   var paidTime = useAdminCompetitionPaidTimes({
+    user: user,
+    activeRole: activeRole,
+    competitionId: competitionId,
+  });
+
+  var stallBookings = useAdminCompetitionStallBookings({
     user: user,
     activeRole: activeRole,
     competitionId: competitionId,
@@ -206,6 +229,35 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             canSubmit={paidTime.canSubmit}
             isSaving={paidTime.isSaving}
             onSubmit={paidTime.handleCreatePaidTimeRequest}
+          />
+        ) : null}
+
+        {activeTab === "stalls" ? (
+          <CompetitionStallBookingsTab
+            loading={stallBookings.loading}
+            screenError={stallBookings.screenError}
+            horses={stallBookings.horses}
+            stallTypeOptions={stallBookings.stallTypeOptions}
+            availablePayersForSelectedHorse={
+              stallBookings.availablePayersForSelectedHorse
+            }
+            selectedHorse={stallBookings.selectedHorse}
+            selectedPayers={stallBookings.selectedPayers}
+            selectedStallType={stallBookings.selectedStallType}
+            checkInDate={stallBookings.checkInDate}
+            checkOutDate={stallBookings.checkOutDate}
+            notes={stallBookings.notes}
+            setSelectedHorse={stallBookings.setSelectedHorse}
+            setSelectedStallType={stallBookings.setSelectedStallType}
+            togglePayerSelection={stallBookings.togglePayerSelection}
+            setCheckInDate={stallBookings.setCheckInDate}
+            setCheckOutDate={stallBookings.setCheckOutDate}
+            setNotes={stallBookings.setNotes}
+            isSaving={stallBookings.isSaving}
+            onSubmit={stallBookings.handleCreateStallBooking}
+            formatHorseLabel={stallBookings.formatHorseLabel}
+            formatPayerLabel={stallBookings.formatPayerLabel}
+            formatStallTypeLabel={stallBookings.formatStallTypeLabel}
           />
         ) : null}
       </ScrollView>
