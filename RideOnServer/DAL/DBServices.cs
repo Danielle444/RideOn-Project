@@ -248,7 +248,7 @@ namespace RideOnServer.DAL
         public static NpgsqlConnection GetDefaultConnection()
         {
             DBServices db = new DBServices();
-            return db.Connect("myPostgresDB");
+            return db.Connect("DefaultConnection");
         }
     }
 }
