@@ -1,5 +1,7 @@
 using Npgsql;
+using NpgsqlTypes;
 using RideOnServer.BL.DTOs.ShavingsOrders;
+using System.Text.Json;
 
 namespace RideOnServer.DAL
 {
@@ -7,7 +9,7 @@ namespace RideOnServer.DAL
     {
         public List<WorkerShavingsOrderItem> GetWorkerShavingsOrders(int workerSystemUserId)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
                 { "@WorkerSystemUserId", workerSystemUserId }
             };
@@ -35,11 +37,11 @@ namespace RideOnServer.DAL
                                 Notes = reader["Notes"] as string,
                                 RequestedDeliveryTime = reader["RequestedDeliveryTime"] as DateTime?,
                                 ArrivalTime = reader["ArrivalTime"] as DateTime?,
-                                DeliveryStatus = reader["DeliveryStatus"].ToString() ?? string.Empty,
+                                DeliveryStatus = reader["DeliveryStatus"]?.ToString() ?? string.Empty,
                                 DeliveryPhotoUrl = reader["DeliveryPhotoUrl"] as string,
                                 DeliveryPhotoDate = reader["DeliveryPhotoDate"] as DateTime?,
-                                PayerFirstName = reader["PayerFirstName"].ToString() ?? string.Empty,
-                                PayerLastName = reader["PayerLastName"].ToString() ?? string.Empty,
+                                PayerFirstName = reader["PayerFirstName"]?.ToString() ?? string.Empty,
+                                PayerLastName = reader["PayerLastName"]?.ToString() ?? string.Empty,
                                 StallName = reader["StallName"] as string,
                                 RanchName = reader["RanchName"] as string,
                                 CompetitionName = reader["CompetitionName"] as string,
@@ -59,7 +61,7 @@ namespace RideOnServer.DAL
 
         public void SaveDeliveryPhoto(int shavingsOrderId, string photoUrl, DateTime photoDate)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
                 { "@ShavingsOrderId", shavingsOrderId },
                 { "@DeliveryPhotoUrl", photoUrl },
@@ -90,7 +92,7 @@ namespace RideOnServer.DAL
 
         public List<PendingDeliveryApprovalItem> GetPendingDeliveryApprovals(int ranchId)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
                 { "@RanchId", ranchId }
             };
@@ -118,11 +120,11 @@ namespace RideOnServer.DAL
                                 Notes = reader["Notes"] as string,
                                 DeliveryPhotoUrl = reader["DeliveryPhotoUrl"] as string,
                                 DeliveryPhotoDate = reader["DeliveryPhotoDate"] as DateTime?,
-                                PayerFirstName = reader["PayerFirstName"].ToString() ?? string.Empty,
-                                PayerLastName = reader["PayerLastName"].ToString() ?? string.Empty,
+                                PayerFirstName = reader["PayerFirstName"]?.ToString() ?? string.Empty,
+                                PayerLastName = reader["PayerLastName"]?.ToString() ?? string.Empty,
                                 StallName = reader["StallName"] as string,
-                                WorkerFirstName = reader["WorkerFirstName"].ToString() ?? string.Empty,
-                                WorkerLastName = reader["WorkerLastName"].ToString() ?? string.Empty,
+                                WorkerFirstName = reader["WorkerFirstName"]?.ToString() ?? string.Empty,
+                                WorkerLastName = reader["WorkerLastName"]?.ToString() ?? string.Empty,
                             });
                         }
 
@@ -139,7 +141,7 @@ namespace RideOnServer.DAL
 
         public void ApproveDelivery(int shavingsOrderId, int approvedByPersonId, DateTime approvedAt)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
                 { "@ShavingsOrderId", shavingsOrderId },
                 { "@ApprovedByPersonId", approvedByPersonId },
@@ -166,6 +168,199 @@ namespace RideOnServer.DAL
                 Console.WriteLine($"Error in ApproveDelivery: {ex.Message}");
                 throw;
             }
+        }
+
+        public static int CreateShavingsOrder(CreateShavingsOrderRequest request)
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT usp_createshavingsorder(@competitionId, @orderedBySystemUserId, @catalogItemId, @notes, @requestedDeliveryTime, @stalls::jsonb, @payers::jsonb)",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
+            cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
+            cmd.Parameters.AddWithValue("@catalogItemId", request.CatalogItemId);
+            cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@requestedDeliveryTime", NpgsqlDbType.Timestamp, request.RequestedDeliveryTime);
+
+            string stallsJson = JsonSerializer.Serialize(request.Stalls);
+            cmd.Parameters.AddWithValue("@stalls", NpgsqlDbType.Jsonb, stallsJson);
+
+            string payersJson = JsonSerializer.Serialize(request.Payers);
+            cmd.Parameters.AddWithValue("@payers", NpgsqlDbType.Jsonb, payersJson);
+
+            object? result = cmd.ExecuteScalar();
+
+            if (result == null || result == DBNull.Value)
+            {
+                throw new Exception("Failed to create shavings order.");
+            }
+
+            return Convert.ToInt32(result);
+        }
+
+        public static List<ShavingsAvailableStallItem> GetStallBookingsForShavings(int competitionId, int ranchId)
+        {
+            List<ShavingsAvailableStallItem> stalls = new List<ShavingsAvailableStallItem>();
+
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT * FROM usp_getstallbookingsforshavings(@competitionId, @ranchId)",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@competitionId", competitionId);
+            cmd.Parameters.AddWithValue("@ranchId", ranchId);
+
+            using NpgsqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                stalls.Add(new ShavingsAvailableStallItem
+                {
+                    StallBookingId = Convert.ToInt32(reader["stallbookingid"]),
+                    HorseId = reader["horseid"] == DBNull.Value ? null : Convert.ToInt32(reader["horseid"]),
+                    HorseName = reader["horsename"] == DBNull.Value ? null : reader["horsename"].ToString(),
+                    CheckInDate = Convert.ToDateTime(reader["startdate"]),
+                    CheckOutDate = Convert.ToDateTime(reader["enddate"]),
+                    StallCompoundId = reader["compoundid"] == DBNull.Value ? null : Convert.ToInt16(reader["compoundid"]),
+                    StallId = reader["stallid"] == DBNull.Value ? null : Convert.ToInt16(reader["stallid"])
+                });
+            }
+
+            return stalls;
+        }
+
+        public static List<CompetitionShavingsOrderListItem> GetShavingsOrdersForCompetitionAndRanch(int competitionId, int ranchId)
+        {
+            List<CompetitionShavingsOrderListItem> orders = new List<CompetitionShavingsOrderListItem>();
+
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT * FROM usp_getshavingsordersforcompetitionandranch(@competitionId, @ranchId)",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@competitionId", competitionId);
+            cmd.Parameters.AddWithValue("@ranchId", ranchId);
+
+            using NpgsqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                orders.Add(new CompetitionShavingsOrderListItem
+                {
+                    ShavingsOrderId = Convert.ToInt32(reader["shavingsorderid"]),
+                    RequestedDeliveryTime = reader["requesteddeliverytime"] == DBNull.Value ? null : Convert.ToDateTime(reader["requesteddeliverytime"]),
+                    BagQuantity = reader["bagquantity"] == DBNull.Value ? null : Convert.ToInt16(reader["bagquantity"]),
+                    DeliveryStatus = reader["deliverystatus"]?.ToString() ?? string.Empty,
+                    Notes = reader["notes"] == DBNull.Value ? null : reader["notes"].ToString(),
+                    WorkerSystemUserId = reader["workersystemuserid"] == DBNull.Value ? null : Convert.ToInt32(reader["workersystemuserid"]),
+                    ApprovedByPersonId = reader["approvedbypersonid"] == DBNull.Value ? null : Convert.ToInt32(reader["approvedbypersonid"]),
+                    ApprovedAt = reader["approvedat"] == DBNull.Value ? null : Convert.ToDateTime(reader["approvedat"])
+                });
+            }
+
+            return orders;
+        }
+
+        public static List<ShavingsOrderDetailsItem> GetShavingsOrderDetails(int shavingsOrderId)
+        {
+            List<ShavingsOrderDetailsItem> details = new List<ShavingsOrderDetailsItem>();
+
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT * FROM usp_getshavingsorderdetails(@shavingsOrderId)",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@shavingsOrderId", shavingsOrderId);
+
+            using NpgsqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                details.Add(new ShavingsOrderDetailsItem
+                {
+                    StallBookingId = Convert.ToInt32(reader["stallbookingid"]),
+                    HorseId = reader["horseid"] == DBNull.Value ? null : Convert.ToInt32(reader["horseid"]),
+                    HorseName = reader["horsename"] == DBNull.Value ? null : reader["horsename"].ToString(),
+                    BagQuantityPerStall = Convert.ToInt16(reader["bagquantityperstall"])
+                });
+            }
+
+            return details;
+        }
+
+        public static List<ShavingsOrderPayerItem> GetPayersForShavingsOrder(int shavingsOrderId)
+        {
+            List<ShavingsOrderPayerItem> payers = new List<ShavingsOrderPayerItem>();
+
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT * FROM usp_getpayersforshavingsorder(@shavingsOrderId)",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@shavingsOrderId", shavingsOrderId);
+
+            using NpgsqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                payers.Add(new ShavingsOrderPayerItem
+                {
+                    ShavingsOrderId = Convert.ToInt32(reader["shavingsorderid"]),
+                    BillId = Convert.ToInt32(reader["billid"]),
+                    PaidByPersonId = Convert.ToInt32(reader["paidbypersonid"]),
+                    PayerFullName = reader["payerfullname"]?.ToString() ?? string.Empty,
+                    AmountToPay = Convert.ToDecimal(reader["amounttopay"]),
+                    DateOpened = Convert.ToDateTime(reader["dateopened"]),
+                    DateClosed = reader["dateclosed"] == DBNull.Value ? null : Convert.ToDateTime(reader["dateclosed"])
+                });
+            }
+
+            return payers;
+        }
+
+        public static List<ShavingsOrderPayerItem> GetAllShavingsOrderPayersForCompetitionAndRanch(int competitionId, int ranchId)
+        {
+            List<ShavingsOrderPayerItem> payers = new List<ShavingsOrderPayerItem>();
+
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT * FROM usp_getallshavingsorderpayersforcompetitionandranch(@competitionId, @ranchId)",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@competitionId", competitionId);
+            cmd.Parameters.AddWithValue("@ranchId", ranchId);
+
+            using NpgsqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                payers.Add(new ShavingsOrderPayerItem
+                {
+                    ShavingsOrderId = Convert.ToInt32(reader["shavingsorderid"]),
+                    BillId = Convert.ToInt32(reader["billid"]),
+                    PaidByPersonId = Convert.ToInt32(reader["paidbypersonid"]),
+                    PayerFullName = reader["payerfullname"]?.ToString() ?? string.Empty,
+                    AmountToPay = Convert.ToDecimal(reader["amounttopay"]),
+                    DateOpened = Convert.ToDateTime(reader["dateopened"]),
+                    DateClosed = reader["dateclosed"] == DBNull.Value ? null : Convert.ToDateTime(reader["dateclosed"])
+                });
+            }
+
+            return payers;
         }
     }
 }

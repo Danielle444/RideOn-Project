@@ -31,7 +31,7 @@ namespace RideOnServer.DAL
         protected NpgsqlCommand CreateCommandWithStoredProcedure(
             string spName,
             NpgsqlConnection con,
-            Dictionary<string, object>? paramDic)
+            Dictionary<string, object?>? paramDic)
         {
             var paramList = new List<string>();
 
@@ -62,46 +62,63 @@ namespace RideOnServer.DAL
         }
 
         private void AddParameterWithType(
-    NpgsqlCommand cmd,
-    string parameterName,
-    string originalKey,
-    object? value)
+            NpgsqlCommand cmd,
+            string parameterName,
+            string originalKey,
+            object? value)
         {
             string key = originalKey.TrimStart('@').ToLowerInvariant();
 
-            if (key == "classdatetime")
+            // NULL handling
+            if (value == null || value == DBNull.Value)
             {
-                var param = cmd.Parameters.Add(parameterName, NpgsqlDbType.Timestamp);
-                param.Value = value == null || value == DBNull.Value
-                    ? DBNull.Value
-                    : ((DateTime)value);
+                cmd.Parameters.AddWithValue(parameterName, DBNull.Value);
                 return;
             }
 
+            // JSON / JSONB
+            if (key.Contains("json") ||
+                key.Contains("payers") ||
+                key.Contains("stalls"))
+            {
+                var param = cmd.Parameters.Add(parameterName, NpgsqlDbType.Jsonb);
+                param.Value = value;
+                return;
+            }
+
+            // Date-only fields
             if (key == "competitionstartdate" ||
                 key == "competitionenddate" ||
                 key == "registrationopendate" ||
                 key == "registrationenddate" ||
                 key == "paidtimeregistrationdate" ||
                 key == "paidtimepublicationdate" ||
-                key == "slotdate")
+                key == "slotdate" ||
+                key == "checkindate" ||
+                key == "checkoutdate" ||
+                key == "startdate" ||
+                key == "enddate")
             {
                 var param = cmd.Parameters.Add(parameterName, NpgsqlDbType.Date);
-                param.Value = value == null || value == DBNull.Value
-                    ? DBNull.Value
-                    : ((DateTime)value).Date;
+
+                if (value is DateTime dt)
+                {
+                    param.Value = dt.Date;
+                }
+                else
+                {
+                    param.Value = value;
+                }
+
                 return;
             }
 
+            // Time-only fields
             if (key == "starttime" || key == "endtime")
             {
                 var param = cmd.Parameters.Add(parameterName, NpgsqlDbType.Time);
 
-                if (value == null || value == DBNull.Value)
-                {
-                    param.Value = DBNull.Value;
-                }
-                else if (value is TimeSpan ts)
+                if (value is TimeSpan ts)
                 {
                     param.Value = ts;
                 }
@@ -117,6 +134,41 @@ namespace RideOnServer.DAL
                 return;
             }
 
+            // Timestamp without timezone fields
+            if (key == "requesteddeliverytime")
+            {
+                var param = cmd.Parameters.Add(parameterName, NpgsqlDbType.Timestamp);
+                param.Value = value;
+                return;
+            }
+
+            // Timestamp with timezone fields
+            if (key == "classdatetime" ||
+                key == "prequestdatetime" ||
+                key == "srequestdatetime" ||
+                key == "dateopened" ||
+                key == "dateclosed" ||
+                key == "requestdate" ||
+                key == "deliveryphotodate" ||
+                key == "approvedat")
+            {
+                var param = cmd.Parameters.Add(parameterName, NpgsqlDbType.TimestampTz);
+                param.Value = value;
+                return;
+            }
+
+            // Timestamp without timezone fields that exist in DB as plain timestamp
+            if (key == "approvaldate" ||
+                key == "arrivaltime" ||
+                key == "responsetime" ||
+                key == "assignedstarttime")
+            {
+                var param = cmd.Parameters.Add(parameterName, NpgsqlDbType.Timestamp);
+                param.Value = value;
+                return;
+            }
+
+            // Text fields
             if (key.Contains("notes") ||
                 key.Contains("name") ||
                 key.Contains("status") ||
@@ -124,18 +176,11 @@ namespace RideOnServer.DAL
                 key.Contains("url"))
             {
                 var param = cmd.Parameters.Add(parameterName, NpgsqlDbType.Text);
-                param.Value = value == null || value == DBNull.Value
-                    ? DBNull.Value
-                    : value;
+                param.Value = value;
                 return;
             }
 
-            if (value == null || value == DBNull.Value)
-            {
-                cmd.Parameters.AddWithValue(parameterName, DBNull.Value);
-                return;
-            }
-
+            // Primitive types
             if (value is int intValue)
             {
                 cmd.Parameters.Add(parameterName, NpgsqlDbType.Integer).Value = intValue;
@@ -184,7 +229,26 @@ namespace RideOnServer.DAL
                 return;
             }
 
+            if (value is DateTime dateTimeValue)
+            {
+                // Safe fallback for DateTime values שלא זוהו לפי שם
+                cmd.Parameters.Add(parameterName, NpgsqlDbType.TimestampTz).Value = dateTimeValue;
+                return;
+            }
+
+            if (value is TimeSpan timeSpanValue)
+            {
+                cmd.Parameters.Add(parameterName, NpgsqlDbType.Time).Value = timeSpanValue;
+                return;
+            }
+
             cmd.Parameters.AddWithValue(parameterName, value);
+        }
+
+        public static NpgsqlConnection GetDefaultConnection()
+        {
+            DBServices db = new DBServices();
+            return db.Connect("myPostgresDB");
         }
     }
 }

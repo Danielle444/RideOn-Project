@@ -197,10 +197,10 @@ namespace RideOnServer.DAL
         public List<ServicePriceHistoryRow> GetPriceHistoryForProduct(short productId, int ranchId)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
-    {
-        { "@ProductId", productId },
-        { "@RanchId", ranchId }
-    };
+            {
+                { "@ProductId", productId },
+                { "@RanchId", ranchId }
+            };
 
             try
             {
