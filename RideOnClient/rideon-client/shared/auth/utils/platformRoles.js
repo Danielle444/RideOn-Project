@@ -78,7 +78,7 @@ function getMobileHomeScreenName(roleName) {
 
   return "";
 }
-
+// OrenNoteFuture - add getWebHomeScreenName for when we add roles to web
 export {
   WEB_SUPPORTED_ROLE_NAMES,
   MOBILE_SUPPORTED_ROLE_NAMES,
