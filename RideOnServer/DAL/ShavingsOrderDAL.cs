@@ -16,40 +16,38 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                using NpgsqlConnection connection = DBServices.GetDefaultConnection();
+                connection.Open();
+
+                using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                    "usp_GetWorkerShavingsOrders",
+                    connection,
+                    paramDic))
+                using (NpgsqlDataReader reader = command.ExecuteReader())
                 {
-                    connection.Open();
+                    List<WorkerShavingsOrderItem> list = new List<WorkerShavingsOrderItem>();
 
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
-                        "usp_GetWorkerShavingsOrders",
-                        connection,
-                        paramDic))
-                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    while (reader.Read())
                     {
-                        List<WorkerShavingsOrderItem> list = new List<WorkerShavingsOrderItem>();
-
-                        while (reader.Read())
+                        list.Add(new WorkerShavingsOrderItem
                         {
-                            list.Add(new WorkerShavingsOrderItem
-                            {
-                                ShavingsOrderId = Convert.ToInt32(reader["ShavingsOrderId"]),
-                                BagQuantity = Convert.ToInt32(reader["BagQuantity"]),
-                                Notes = reader["Notes"] as string,
-                                RequestedDeliveryTime = reader["RequestedDeliveryTime"] as DateTime?,
-                                ArrivalTime = reader["ArrivalTime"] as DateTime?,
-                                DeliveryStatus = reader["DeliveryStatus"]?.ToString() ?? string.Empty,
-                                DeliveryPhotoUrl = reader["DeliveryPhotoUrl"] as string,
-                                DeliveryPhotoDate = reader["DeliveryPhotoDate"] as DateTime?,
-                                PayerFirstName = reader["PayerFirstName"]?.ToString() ?? string.Empty,
-                                PayerLastName = reader["PayerLastName"]?.ToString() ?? string.Empty,
-                                StallName = reader["StallName"] as string,
-                                RanchName = reader["RanchName"] as string,
-                                CompetitionName = reader["CompetitionName"] as string,
-                            });
-                        }
-
-                        return list;
+                            ShavingsOrderId = Convert.ToInt32(reader["ShavingsOrderId"]),
+                            BagQuantity = Convert.ToInt32(reader["BagQuantity"]),
+                            Notes = reader["Notes"] as string,
+                            RequestedDeliveryTime = reader["RequestedDeliveryTime"] as DateTime?,
+                            ArrivalTime = reader["ArrivalTime"] as DateTime?,
+                            DeliveryStatus = reader["DeliveryStatus"]?.ToString() ?? string.Empty,
+                            DeliveryPhotoUrl = reader["DeliveryPhotoUrl"] as string,
+                            DeliveryPhotoDate = reader["DeliveryPhotoDate"] as DateTime?,
+                            PayerFirstName = reader["PayerFirstName"]?.ToString() ?? string.Empty,
+                            PayerLastName = reader["PayerLastName"]?.ToString() ?? string.Empty,
+                            StallName = reader["StallName"] as string,
+                            RanchName = reader["RanchName"] as string,
+                            CompetitionName = reader["CompetitionName"] as string,
+                        });
                     }
+
+                    return list;
                 }
             }
             catch (Exception ex)
@@ -70,17 +68,15 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (NpgsqlConnection connection = Connect("DefaultConnection"))
-                {
-                    connection.Open();
+                using NpgsqlConnection connection = DBServices.GetDefaultConnection();
+                connection.Open();
 
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
-                        "usp_SaveDeliveryPhoto",
-                        connection,
-                        paramDic))
-                    {
-                        command.ExecuteNonQuery();
-                    }
+                using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                    "usp_SaveDeliveryPhoto",
+                    connection,
+                    paramDic))
+                {
+                    command.ExecuteNonQuery();
                 }
             }
             catch (Exception ex)
@@ -99,37 +95,35 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                using NpgsqlConnection connection = DBServices.GetDefaultConnection();
+                connection.Open();
+
+                using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                    "usp_GetPendingDeliveryApprovals",
+                    connection,
+                    paramDic))
+                using (NpgsqlDataReader reader = command.ExecuteReader())
                 {
-                    connection.Open();
+                    List<PendingDeliveryApprovalItem> list = new List<PendingDeliveryApprovalItem>();
 
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
-                        "usp_GetPendingDeliveryApprovals",
-                        connection,
-                        paramDic))
-                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    while (reader.Read())
                     {
-                        List<PendingDeliveryApprovalItem> list = new List<PendingDeliveryApprovalItem>();
-
-                        while (reader.Read())
+                        list.Add(new PendingDeliveryApprovalItem
                         {
-                            list.Add(new PendingDeliveryApprovalItem
-                            {
-                                ShavingsOrderId = Convert.ToInt32(reader["ShavingsOrderId"]),
-                                BagQuantity = Convert.ToInt32(reader["BagQuantity"]),
-                                Notes = reader["Notes"] as string,
-                                DeliveryPhotoUrl = reader["DeliveryPhotoUrl"] as string,
-                                DeliveryPhotoDate = reader["DeliveryPhotoDate"] as DateTime?,
-                                PayerFirstName = reader["PayerFirstName"]?.ToString() ?? string.Empty,
-                                PayerLastName = reader["PayerLastName"]?.ToString() ?? string.Empty,
-                                StallName = reader["StallName"] as string,
-                                WorkerFirstName = reader["WorkerFirstName"]?.ToString() ?? string.Empty,
-                                WorkerLastName = reader["WorkerLastName"]?.ToString() ?? string.Empty,
-                            });
-                        }
-
-                        return list;
+                            ShavingsOrderId = Convert.ToInt32(reader["ShavingsOrderId"]),
+                            BagQuantity = Convert.ToInt32(reader["BagQuantity"]),
+                            Notes = reader["Notes"] as string,
+                            DeliveryPhotoUrl = reader["DeliveryPhotoUrl"] as string,
+                            DeliveryPhotoDate = reader["DeliveryPhotoDate"] as DateTime?,
+                            PayerFirstName = reader["PayerFirstName"]?.ToString() ?? string.Empty,
+                            PayerLastName = reader["PayerLastName"]?.ToString() ?? string.Empty,
+                            StallName = reader["StallName"] as string,
+                            WorkerFirstName = reader["WorkerFirstName"]?.ToString() ?? string.Empty,
+                            WorkerLastName = reader["WorkerLastName"]?.ToString() ?? string.Empty,
+                        });
                     }
+
+                    return list;
                 }
             }
             catch (Exception ex)
@@ -150,17 +144,15 @@ namespace RideOnServer.DAL
 
             try
             {
-                using (NpgsqlConnection connection = Connect("DefaultConnection"))
-                {
-                    connection.Open();
+                using NpgsqlConnection connection = DBServices.GetDefaultConnection();
+                connection.Open();
 
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
-                        "usp_ApproveDelivery",
-                        connection,
-                        paramDic))
-                    {
-                        command.ExecuteNonQuery();
-                    }
+                using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                    "usp_ApproveDelivery",
+                    connection,
+                    paramDic))
+                {
+                    command.ExecuteNonQuery();
                 }
             }
             catch (Exception ex)
