@@ -33,7 +33,7 @@ namespace RideOnServer.DAL
             NpgsqlConnection con,
             Dictionary<string, object?>? paramDic)
         {
-            var paramList = new List<string>();
+            var paramPlaceholders = new List<string>();
 
             NpgsqlCommand cmd = new NpgsqlCommand
             {
@@ -46,19 +46,17 @@ namespace RideOnServer.DAL
             if (paramDic != null)
             {
                 int i = 1;
-
                 foreach (var param in paramDic)
                 {
                     string parameterName = $"p{i}";
-                    string originalKey = param.Key.TrimStart('@');
-                    paramList.Add($"{originalKey} => @{parameterName}");
+                    paramPlaceholders.Add($"@{parameterName}");
 
                     AddParameterWithType(cmd, parameterName, param.Key, param.Value);
                     i++;
                 }
             }
 
-            cmd.CommandText = $"SELECT * FROM {spName}({string.Join(", ", paramList)})";
+            cmd.CommandText = $"SELECT * FROM {spName}({string.Join(", ", paramPlaceholders)})";
             return cmd;
         }
 
