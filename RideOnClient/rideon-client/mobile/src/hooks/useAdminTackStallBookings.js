@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert } from "react-native";
-import { createEquipmentStallBookings } from "../services/stallBookingsService";
+import { createTackStallBookings } from "../services/stallBookingsService";
 
 function uniqByPersonId(items) {
   var map = {};
@@ -36,58 +36,81 @@ function getMaxDateString(dateStrings) {
   return validDates.length > 0 ? validDates[validDates.length - 1] : "";
 }
 
-export default function useAdminEquipmentStallBookings(params) {
+export default function useAdminTackStallBookings(params) {
   var user = params.user;
   var activeRole = params.activeRole;
   var competitionId = params.competitionId;
   var selectedHorseBookings = params.selectedHorseBookings;
   var existingStallBookings = params.existingStallBookings;
   var horseStallTypeOptions = params.horseStallTypeOptions;
-  var equipmentStallTypeOptions = params.equipmentStallTypeOptions;
+  var tackStallTypeOptions = params.tackStallTypeOptions;
   var selectedHorseStallType = params.selectedHorseStallType;
   var checkInDate = params.checkInDate;
   var checkOutDate = params.checkOutDate;
   var allSelectedHorsePayers = params.allSelectedHorsePayers;
   var reloadStallBookings = params.reloadStallBookings;
 
-  var [selectedEquipmentStallType, setSelectedEquipmentStallType] = useState(null);
-  var [equipmentQuantity, setEquipmentQuantity] = useState("1");
-  var [equipmentSplitMode, setEquipmentSplitMode] = useState("equal");
-  var [selectedEquipmentPayers, setSelectedEquipmentPayers] = useState([]);
-  var [equipmentNotes, setEquipmentNotes] = useState("");
-  var [equipmentStartDate, setEquipmentStartDate] = useState("");
-  var [equipmentEndDate, setEquipmentEndDate] = useState("");
-  var [isSavingEquipment, setIsSavingEquipment] = useState(false);
+  var [selectedTackStallType, setSelectedTackStallType] = useState(null);
+  var [tackQuantity, setTackQuantity] = useState("1");
+  var [tackSplitMode, setTackSplitMode] = useState("equal");
+  var [selectedTackPayers, setSelectedTackPayers] = useState([]);
+  var [tackNotes, setTackNotes] = useState("");
+  var [tackStartDate, setTackStartDate] = useState("");
+  var [tackEndDate, setTackEndDate] = useState("");
+  var [isSavingTack, setIsSavingTack] = useState(false);
 
-  var allHorseStallTypes = useMemo(
+  var allTackTypes = useMemo(
     function () {
-      var fromSelected = selectedHorseBookings
+      var optionMap = {};
+
+      horseStallTypeOptions.forEach(function (item) {
+        var id = Number(item && item.priceCatalogId);
+        if (id) {
+          optionMap[id] = item;
+        }
+      });
+
+      var selectedIds = selectedHorseBookings
         .map(function (booking) {
-          return booking.stallType || selectedHorseStallType;
+          var stallType =
+            booking && booking.stallType
+              ? booking.stallType
+              : selectedHorseStallType;
+
+          return Number(stallType && stallType.priceCatalogId);
         })
         .filter(Boolean);
 
-      var fromExisting = existingStallBookings
+      var existingIds = existingStallBookings
         .filter(function (booking) {
-          return booking && !booking.isEquipmentBooking && booking.catalogItemId;
+          return booking && !booking.isTackBooking && booking.catalogItemId;
         })
         .map(function (booking) {
-          return horseStallTypeOptions.find(function (item) {
-            return item.priceCatalogId === booking.catalogItemId;
-          });
+          return Number(booking.catalogItemId);
         })
         .filter(Boolean);
 
-      return uniqByPriceCatalogId(fromSelected.concat(fromExisting));
+      var uniqueIds = Array.from(new Set(selectedIds.concat(existingIds)));
+
+      return uniqueIds
+        .map(function (id) {
+          return optionMap[id] || null;
+        })
+        .filter(Boolean);
     },
-    [selectedHorseBookings, selectedHorseStallType, existingStallBookings, horseStallTypeOptions]
+    [
+      selectedHorseBookings,
+      selectedHorseStallType,
+      existingStallBookings,
+      horseStallTypeOptions,
+    ],
   );
 
-  var defaultEquipmentDateRange = useMemo(
+  var defaultTackDateRange = useMemo(
     function () {
       var existingHorseBookingStartDates = existingStallBookings
         .filter(function (booking) {
-          return booking && !booking.isEquipmentBooking;
+          return booking && !booking.isTackBooking;
         })
         .map(function (booking) {
           return booking.startDate;
@@ -95,7 +118,7 @@ export default function useAdminEquipmentStallBookings(params) {
 
       var existingHorseBookingEndDates = existingStallBookings
         .filter(function (booking) {
-          return booking && !booking.isEquipmentBooking;
+          return booking && !booking.isTackBooking;
         })
         .map(function (booking) {
           return booking.endDate;
@@ -111,46 +134,46 @@ export default function useAdminEquipmentStallBookings(params) {
 
       return {
         startDate: getMinDateString(
-          existingHorseBookingStartDates.concat(selectedStartDates)
+          existingHorseBookingStartDates.concat(selectedStartDates),
         ),
         endDate: getMaxDateString(
-          existingHorseBookingEndDates.concat(selectedEndDates)
+          existingHorseBookingEndDates.concat(selectedEndDates),
         ),
       };
     },
-    [existingStallBookings, selectedHorseBookings, checkInDate, checkOutDate]
+    [existingStallBookings, selectedHorseBookings, checkInDate, checkOutDate],
   );
 
   useEffect(
     function () {
-      setEquipmentStartDate(defaultEquipmentDateRange.startDate || "");
-      setEquipmentEndDate(defaultEquipmentDateRange.endDate || "");
+      setTackStartDate(defaultTackDateRange.startDate || "");
+      setTackEndDate(defaultTackDateRange.endDate || "");
     },
-    [defaultEquipmentDateRange.startDate, defaultEquipmentDateRange.endDate]
+    [defaultTackDateRange.startDate, defaultTackDateRange.endDate],
   );
 
   useEffect(
     function () {
-      if (allHorseStallTypes.length === 1) {
-        setSelectedEquipmentStallType(allHorseStallTypes[0]);
+      if (allTackTypes.length === 1) {
+        setSelectedTackStallType(allTackTypes[0]);
       } else if (
-        selectedEquipmentStallType &&
-        !allHorseStallTypes.some(function (item) {
-          return item.priceCatalogId === selectedEquipmentStallType.priceCatalogId;
+        selectedTackStallType &&
+        !allTackTypes.some(function (item) {
+          return item.priceCatalogId === selectedTackStallType.priceCatalogId;
         })
       ) {
-        setSelectedEquipmentStallType(null);
+        setSelectedTackStallType(null);
       }
     },
-    [allHorseStallTypes, selectedEquipmentStallType]
+    [allTackTypes, selectedTackStallType],
   );
 
-  function toggleEquipmentPayerSelection(payerItem) {
+  function toggleTackPayerSelection(payerItem) {
     if (!payerItem || !payerItem.paidByPersonId) {
       return;
     }
 
-    setSelectedEquipmentPayers(function (prev) {
+    setSelectedTackPayers(function (prev) {
       var exists = prev.some(function (item) {
         return item.paidByPersonId === payerItem.paidByPersonId;
       });
@@ -165,23 +188,23 @@ export default function useAdminEquipmentStallBookings(params) {
     });
   }
 
-  var effectiveEquipmentPayers = useMemo(
+  var effectiveTackPayers = useMemo(
     function () {
-      if (equipmentSplitMode === "equal") {
+      if (tackSplitMode === "equal") {
         return allSelectedHorsePayers;
       }
 
-      return selectedEquipmentPayers;
+      return selectedTackPayers;
     },
-    [equipmentSplitMode, allSelectedHorsePayers, selectedEquipmentPayers]
+    [tackSplitMode, allSelectedHorsePayers, selectedTackPayers],
   );
 
-  var equipmentPricingSummary = useMemo(
+  var tackPricingSummary = useMemo(
     function () {
-      var quantity = Number(equipmentQuantity || 0);
-      var unitPrice = Number(selectedEquipmentStallType?.itemPrice || 0);
+      var quantity = Number(tackQuantity || 0);
+      var unitPrice = Number(selectedTackStallType?.itemPrice || 0);
       var total = quantity * unitPrice;
-      var payerCount = effectiveEquipmentPayers.length;
+      var payerCount = effectiveTackPayers.length;
       var perPayer = payerCount > 0 ? Math.ceil(total / payerCount) : 0;
 
       return {
@@ -192,29 +215,29 @@ export default function useAdminEquipmentStallBookings(params) {
         amountPerPayer: perPayer,
       };
     },
-    [equipmentQuantity, selectedEquipmentStallType, effectiveEquipmentPayers]
+    [tackQuantity, selectedTackStallType, effectiveTackPayers],
   );
 
-  async function handleSubmitEquipmentDraft() {
-    if (!selectedEquipmentStallType || !selectedEquipmentStallType.priceCatalogId) {
+  async function handleSubmitTackDraft() {
+    if (!selectedTackStallType || !selectedTackStallType.priceCatalogId) {
       Alert.alert("שגיאה", "יש לבחור סוג תא ציוד");
       return;
     }
 
-    if (!equipmentStartDate || !equipmentEndDate) {
+    if (!tackStartDate || !tackEndDate) {
       Alert.alert("שגיאה", "יש לבחור תאריכי כניסה ויציאה לתאי ציוד");
       return;
     }
 
-    var quantityNumber = Number(equipmentQuantity || 0);
+    var quantityNumber = Number(tackQuantity || 0);
 
     if (!quantityNumber || quantityNumber <= 0) {
       Alert.alert("שגיאה", "יש להזין כמות תקינה של תאי ציוד");
       return;
     }
 
-    if (!effectiveEquipmentPayers || effectiveEquipmentPayers.length === 0) {
-      Alert.alert("שגיאה", "יש לבחור לפחות משלם אחד עבור תאי הציוד");
+    if (!effectiveTackPayers || effectiveTackPayers.length === 0) {
+      Alert.alert("שגיאה", "יש לבחור לפחות משלם אחד עבור תאי ציוד");
       return;
     }
 
@@ -229,18 +252,18 @@ export default function useAdminEquipmentStallBookings(params) {
     }
 
     try {
-      setIsSavingEquipment(true);
+      setIsSavingTack(true);
 
-      await createEquipmentStallBookings({
+      await createTackStallBookings({
         competitionId: competitionId,
         orderedBySystemUserId: user.personId,
-        catalogItemId: selectedEquipmentStallType.priceCatalogId,
-        notes: equipmentNotes ? equipmentNotes.trim() : null,
+        catalogItemId: selectedTackStallType.priceCatalogId,
+        notes: tackNotes ? tackNotes.trim() : null,
         ranchId: activeRole.ranchId,
-        startDate: equipmentStartDate,
-        endDate: equipmentEndDate,
+        startDate: tackStartDate,
+        endDate: tackEndDate,
         quantity: quantityNumber,
-        payers: effectiveEquipmentPayers.map(function (payer) {
+        payers: effectiveTackPayers.map(function (payer) {
           return {
             payerPersonId: payer.paidByPersonId,
           };
@@ -252,39 +275,39 @@ export default function useAdminEquipmentStallBookings(params) {
       }
 
       Alert.alert("נשמר", "תאי הציוד הוזמנו בהצלחה");
-      setEquipmentQuantity("1");
-      setEquipmentSplitMode("equal");
-      setSelectedEquipmentPayers([]);
-      setEquipmentNotes("");
+      setTackQuantity("1");
+      setTackSplitMode("equal");
+      setSelectedTackPayers([]);
+      setTackNotes("");
     } catch (error) {
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה בשמירת תאי הציוד")
+        String(error?.response?.data || "אירעה שגיאה בשמירת תאי הציוד"),
       );
     } finally {
-      setIsSavingEquipment(false);
+      setIsSavingTack(false);
     }
   }
 
   return {
-    selectedEquipmentStallType: selectedEquipmentStallType,
-    setSelectedEquipmentStallType: setSelectedEquipmentStallType,
-    equipmentQuantity: equipmentQuantity,
-    setEquipmentQuantity: setEquipmentQuantity,
-    equipmentSplitMode: equipmentSplitMode,
-    setEquipmentSplitMode: setEquipmentSplitMode,
-    selectedEquipmentPayers: selectedEquipmentPayers,
-    toggleEquipmentPayerSelection: toggleEquipmentPayerSelection,
-    equipmentNotes: equipmentNotes,
-    setEquipmentNotes: setEquipmentNotes,
-    equipmentStartDate: equipmentStartDate,
-    setEquipmentStartDate: setEquipmentStartDate,
-    equipmentEndDate: equipmentEndDate,
-    setEquipmentEndDate: setEquipmentEndDate,
-    effectiveEquipmentPayers: effectiveEquipmentPayers,
-    equipmentPricingSummary: equipmentPricingSummary,
-    allHorseStallTypes: allHorseStallTypes,
-    isSavingEquipment: isSavingEquipment,
-    handleSubmitEquipmentDraft: handleSubmitEquipmentDraft,
+    selectedTackStallType: selectedTackStallType,
+    setSelectedTackStallType: setSelectedTackStallType,
+    tackQuantity: tackQuantity,
+    setTackQuantity: setTackQuantity,
+    tackSplitMode: tackSplitMode,
+    setTackSplitMode: setTackSplitMode,
+    selectedTackPayers: selectedTackPayers,
+    toggleTackPayerSelection: toggleTackPayerSelection,
+    tackNotes: tackNotes,
+    setTackNotes: setTackNotes,
+    tackStartDate: tackStartDate,
+    setTackStartDate: setTackStartDate,
+    tackEndDate: tackEndDate,
+    setTackEndDate: setTackEndDate,
+    effectiveTackPayers: effectiveTackPayers,
+    tackPricingSummary: tackPricingSummary,
+    allTackTypes: allTackTypes,
+    isSavingTack: isSavingTack,
+    handleSubmitTackDraft: handleSubmitTackDraft,
   };
-}0
+}

@@ -37,6 +37,7 @@ export default function useAdminHorseStallBookings(params) {
   var checkInDate = params.checkInDate;
   var checkOutDate = params.checkOutDate;
   var notes = params.notes;
+  var reloadStallBookings = params.reloadStallBookings;
 
   var [selectedHorseToAdd, setSelectedHorseToAdd] = useState(null);
   var [selectedHorseBookings, setSelectedHorseBookings] = useState([]);
@@ -274,6 +275,10 @@ export default function useAdminHorseStallBookings(params) {
       });
 
       await Promise.all(requests);
+
+      if (reloadStallBookings) {
+        await reloadStallBookings();
+      }
 
       Alert.alert("נשמר", "תאי הסוסים הוזמנו בהצלחה");
       setSelectedHorseBookings([]);
