@@ -234,7 +234,7 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             loading={stallBookings.loading}
             screenError={stallBookings.screenError}
             horseStallTypeOptions={stallBookings.horseStallTypeOptions}
-            equipmentStallTypeOptions={stallBookings.equipmentStallTypeOptions}
+            tackStallTypeOptions={stallBookings.tackStallTypeOptions}
             selectedHorseToAdd={stallBookings.selectedHorseToAdd}
             setSelectedHorseToAdd={stallBookings.setSelectedHorseToAdd}
             selectedHorseStallType={stallBookings.selectedHorseStallType}
@@ -257,6 +257,12 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             setNotes={stallBookings.setNotes}
             selectedHorseBookings={stallBookings.selectedHorseBookings}
             availableHorseOptions={stallBookings.availableHorseOptions}
+            allEligibleHorsesAlreadyBooked={
+              stallBookings.allEligibleHorsesAlreadyBooked
+            }
+            hasAnyHorseStallBookingsForCompetition={
+              stallBookings.hasAnyHorseStallBookingsForCompetition
+            }
             getAvailablePayersForHorse={
               stallBookings.getAvailablePayersForHorse
             }
@@ -264,40 +270,45 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             toggleHorsePayerSelection={stallBookings.toggleHorsePayerSelection}
             expandedHorseEditorId={stallBookings.expandedHorseEditorId}
             toggleHorseEditor={stallBookings.toggleHorseEditor}
-            selectedEquipmentStallType={
-              stallBookings.selectedEquipmentStallType
+            selectedTackStallType={
+              stallBookings.selectedTackStallType
             }
-            setSelectedEquipmentStallType={
-              stallBookings.setSelectedEquipmentStallType
+            setSelectedTackStallType={
+              stallBookings.setSelectedTackStallType
             }
-            equipmentQuantity={stallBookings.equipmentQuantity}
-            setEquipmentQuantity={stallBookings.setEquipmentQuantity}
-            equipmentSplitMode={stallBookings.equipmentSplitMode}
-            setEquipmentSplitMode={stallBookings.setEquipmentSplitMode}
-            selectedEquipmentPayers={stallBookings.selectedEquipmentPayers}
-            toggleEquipmentPayerSelection={
-              stallBookings.toggleEquipmentPayerSelection
+            tackQuantity={stallBookings.tackQuantity}
+            setTackQuantity={stallBookings.setTackQuantity}
+            tackSplitMode={stallBookings.tackSplitMode}
+            setTackSplitMode={stallBookings.setTackSplitMode}
+            selectedTackPayers={stallBookings.selectedTackPayers}
+            toggleTackPayerSelection={
+              stallBookings.toggleTackPayerSelection
             }
-            equipmentNotes={stallBookings.equipmentNotes}
-            setEquipmentNotes={stallBookings.setEquipmentNotes}
-            equipmentStartDate={stallBookings.equipmentStartDate}
-            setEquipmentStartDate={stallBookings.setEquipmentStartDate}
-            equipmentEndDate={stallBookings.equipmentEndDate}
-            setEquipmentEndDate={stallBookings.setEquipmentEndDate}
+            tackNotes={stallBookings.tackNotes}
+            setTackNotes={stallBookings.setTackNotes}
+            tackStartDate={stallBookings.tackStartDate}
+            setTackStartDate={stallBookings.setTackStartDate}
+            tackEndDate={stallBookings.tackEndDate}
+            setTackEndDate={stallBookings.setTackEndDate}
+            tackPricingSummary={stallBookings.tackPricingSummary}
             allSelectedHorsePayers={stallBookings.allSelectedHorsePayers}
-            equipmentPricingSummary={stallBookings.equipmentPricingSummary}
+            allHorseStallTypes={stallBookings.allHorseStallTypes}
             handleCreateHorseStallBookings={
               stallBookings.handleCreateHorseStallBookings
             }
-            handleOpenEquipmentMode={stallBookings.handleOpenEquipmentMode}
+            handleOpenTackMode={stallBookings.handleOpenTackMode}
             handleBackToHorseMode={stallBookings.handleBackToHorseMode}
-            handleSubmitEquipmentDraft={
-              stallBookings.handleSubmitEquipmentDraft
+            handleSubmitTackDraft={
+              stallBookings.handleSubmitTackDraft
             }
             isSaving={stallBookings.isSaving}
             formatHorseLabel={stallBookings.formatHorseLabel}
             formatPayerLabel={stallBookings.formatPayerLabel}
             formatStallTypeLabel={stallBookings.formatStallTypeLabel}
+            bookedHorseNamesSummary={stallBookings.bookedHorseNamesSummary}
+            existingTackBookingsCount={
+              stallBookings.existingTackBookingsCount
+            }
           />
         ) : null}
       </ScrollView>

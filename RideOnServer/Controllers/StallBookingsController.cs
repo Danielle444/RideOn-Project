@@ -192,8 +192,8 @@ namespace RideOnServer.Controllers
             }
         }
 
-        [HttpPost("equipment")]
-        public IActionResult CreateEquipmentStallBookings([FromBody] CreateEquipmentStallBookingsRequest request)
+        [HttpPost("tack")]
+        public IActionResult CreateTackStallBookings([FromBody] CreateTackStallBookingsRequest request)
         {
             try
             {
@@ -212,7 +212,7 @@ namespace RideOnServer.Controllers
                     return BadRequest("At least one payer is required.");
                 }
 
-                List<int> createdIds = StallBookingDAL.CreateEquipmentStallBookings(request);
+                List<int> createdIds = StallBookingDAL.CreateTackStallBookings(request);
                 return Ok(createdIds);
             }
             catch (Exception ex)

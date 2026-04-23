@@ -6,6 +6,10 @@ import CompetitionDateField from "./CompetitionDateField";
 import styles from "../../styles/adminCompetitionPaidTimesStyles";
 
 export default function CompetitionStallBookingFormCard(props) {
+  var hasSingleHorseStallType =
+    Array.isArray(props.horseStallTypeOptions) &&
+    props.horseStallTypeOptions.length === 1;
+
   return (
     <View style={styles.formCard}>
       <Text style={styles.cardTitle}>הזמנת תאי סוסים</Text>
@@ -16,18 +20,35 @@ export default function CompetitionStallBookingFormCard(props) {
         </Text>
       </View>
 
-      <CompetitionRegistrationDropdown
-        label="סוג תא"
-        placeholder="בחרי סוג תא"
-        searchPlaceholder="חיפוש סוג תא"
-        items={props.horseStallTypeOptions}
-        selectedItem={props.selectedHorseStallType}
-        getItemId={function (item) {
-          return item.priceCatalogId;
-        }}
-        getItemLabel={props.formatStallTypeLabel}
-        onSelect={props.setSelectedHorseStallType}
-      />
+      {hasSingleHorseStallType ? (
+        <View style={styles.fieldBlock}>
+          <Text style={styles.fieldLabel}>סוג תא</Text>
+          <View style={styles.textInput}>
+            <Text
+              style={{
+                textAlign: "right",
+                color: "#4F3B31",
+                fontSize: 14,
+              }}
+            >
+              {props.formatStallTypeLabel(props.horseStallTypeOptions[0])}
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <CompetitionRegistrationDropdown
+          label="סוג תא"
+          placeholder="בחרי סוג תא"
+          searchPlaceholder="חיפוש סוג תא"
+          items={props.horseStallTypeOptions}
+          selectedItem={props.selectedHorseStallType}
+          getItemId={function (item) {
+            return item.priceCatalogId;
+          }}
+          getItemLabel={props.formatStallTypeLabel}
+          onSelect={props.setSelectedHorseStallType}
+        />
+      )}
 
       <CompetitionDateField
         label="תאריך כניסה"
@@ -45,18 +66,26 @@ export default function CompetitionStallBookingFormCard(props) {
         maximumDate={props.maxCompetitionDate}
       />
 
-      <CompetitionRegistrationDropdown
-        label="הוספת סוס"
-        placeholder="בחרי סוס"
-        searchPlaceholder="חיפוש סוס"
-        items={props.availableHorseOptions}
-        selectedItem={props.selectedHorseToAdd}
-        getItemId={function (item) {
-          return item.horseId;
-        }}
-        getItemLabel={props.formatHorseLabel}
-        onSelect={props.setSelectedHorseToAdd}
-      />
+      {props.allEligibleHorsesAlreadyBooked ? (
+        <View style={styles.helperCard}>
+          <Text style={styles.helperText}>
+            לכל הסוסים שרשומים למקצים כבר הוזמן תא בתחרות הזו.
+          </Text>
+        </View>
+      ) : (
+        <CompetitionRegistrationDropdown
+          label="הוספת סוס"
+          placeholder="בחרי סוס"
+          searchPlaceholder="חיפוש סוס"
+          items={props.availableHorseOptions}
+          selectedItem={props.selectedHorseToAdd}
+          getItemId={function (item) {
+            return item.horseId;
+          }}
+          getItemLabel={props.formatHorseLabel}
+          onSelect={props.setSelectedHorseToAdd}
+        />
+      )}
 
       <View style={styles.fieldBlock}>
         {props.selectedHorseBookings.length === 0 ? (
@@ -95,6 +124,14 @@ export default function CompetitionStallBookingFormCard(props) {
         />
       </View>
 
+      {props.bookedHorseNamesSummary ? (
+        <View style={styles.helperCard}>
+          <Text style={styles.helperText}>
+            הוזמנו תאים ל: {props.bookedHorseNamesSummary}
+          </Text>
+        </View>
+      ) : null}
+
       <Pressable
         style={[
           styles.primaryButton,
@@ -110,13 +147,13 @@ export default function CompetitionStallBookingFormCard(props) {
         )}
       </Pressable>
 
-      {props.selectedHorseBookings.length > 0 ? (
+      {props.hasAnyHorseStallBookingsForCompetition ? (
         <Pressable
           style={[
             styles.primaryButton,
             { backgroundColor: "#5E7A74" },
           ]}
-          onPress={props.onOpenEquipmentMode}
+          onPress={props.onOpenTackMode}
         >
           <Text style={styles.primaryButtonText}>מעבר להזמנת תאי ציוד</Text>
         </Pressable>

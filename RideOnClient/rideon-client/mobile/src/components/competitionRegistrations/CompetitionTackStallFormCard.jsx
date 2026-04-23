@@ -11,11 +11,19 @@ import CompetitionMultiPayerSelector from "./CompetitionMultiPayerSelector";
 import CompetitionDateField from "./CompetitionDateField";
 import styles from "../../styles/adminCompetitionPaidTimesStyles";
 
-export default function CompetitionEquipmentStallFormCard(props) {
+export default function CompetitionTackStallFormCard(props) {
   var splitModeItems = [
     { id: "equal", name: "חלוקה שווה בין כל המשלמים של תאי הסוסים" },
     { id: "specific", name: "בחירת משלמים מסוימים" },
   ];
+
+  var selectedSplitModeItem = splitModeItems.find(function (item) {
+    return item.id === props.tackSplitMode;
+  }) || null;
+
+  var hasSingleTackType =
+    Array.isArray(props.allTackTypes) &&
+    props.allTackTypes.length === 1;
 
   return (
     <View style={styles.formCard}>
@@ -27,45 +35,90 @@ export default function CompetitionEquipmentStallFormCard(props) {
         </Text>
       </View>
 
-      <CompetitionRegistrationDropdown
-        label="סוג תא ציוד"
-        placeholder="בחרי סוג תא ציוד"
-        searchPlaceholder="חיפוש סוג תא ציוד"
-        items={props.equipmentStallTypeOptions}
-        selectedItem={props.selectedEquipmentStallType}
-        getItemId={function (item) {
-          return item.priceCatalogId;
-        }}
-        getItemLabel={props.formatStallTypeLabel}
-        onSelect={props.setSelectedEquipmentStallType}
-      />
+      {hasSingleTackType ? (
+        <View style={styles.fieldBlock}>
+          <Text style={styles.fieldLabel}>סוג תא ציוד</Text>
+          <View style={styles.textInput}>
+            <Text
+              style={{
+                textAlign: "right",
+                color: "#4F3B31",
+                fontSize: 14,
+              }}
+            >
+              {props.formatStallTypeLabel(props.allTackTypes[0])}
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <CompetitionRegistrationDropdown
+          label="סוג תא ציוד"
+          placeholder="בחרי סוג תא ציוד"
+          searchPlaceholder="חיפוש סוג תא ציוד"
+          items={props.tackStallTypeOptions}
+          selectedItem={props.selectedTackStallType}
+          getItemId={function (item) {
+            return item.priceCatalogId;
+          }}
+          getItemLabel={props.formatStallTypeLabel}
+          onSelect={props.setSelectedTackStallType}
+        />
+      )}
 
       <CompetitionDateField
         label="תאריך כניסה"
-        value={props.equipmentStartDate}
-        onChange={props.setEquipmentStartDate}
+        value={props.tackStartDate}
+        onChange={props.setTackStartDate}
         minimumDate={props.minCompetitionDate}
         maximumDate={props.maxCompetitionDate}
       />
 
       <CompetitionDateField
         label="תאריך יציאה"
-        value={props.equipmentEndDate}
-        onChange={props.setEquipmentEndDate}
+        value={props.tackEndDate}
+        onChange={props.setTackEndDate}
         minimumDate={props.minCompetitionDate}
         maximumDate={props.maxCompetitionDate}
       />
 
       <View style={styles.fieldBlock}>
         <Text style={styles.fieldLabel}>כמות תאי ציוד</Text>
-        <TextInput
-          value={props.equipmentQuantity}
-          onChangeText={props.setEquipmentQuantity}
-          placeholder="למשל 2"
-          style={styles.textInput}
-          keyboardType="numeric"
-          textAlign="right"
-        />
+
+        <View
+          style={{
+            flexDirection: "row-reverse",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderWidth: 1,
+            borderColor: "#D8C7BC",
+            borderRadius: 18,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            backgroundColor: "#FFFFFF",
+          }}
+        >
+          <Pressable
+            onPress={function () {
+              var nextValue = Math.max(1, Number(props.tackQuantity || 1) - 1);
+              props.setTackQuantity(String(nextValue));
+            }}
+          >
+            <Text style={{ fontSize: 26, color: "#7B5A4D", fontWeight: "700" }}>−</Text>
+          </Pressable>
+
+          <Text style={{ fontSize: 20, color: "#4F3B31", fontWeight: "700" }}>
+            {props.tackQuantity || "1"}
+          </Text>
+
+          <Pressable
+            onPress={function () {
+              var nextValue = Number(props.tackQuantity || 1) + 1;
+              props.setTackQuantity(String(nextValue));
+            }}
+          >
+            <Text style={{ fontSize: 26, color: "#7B5A4D", fontWeight: "700" }}>+</Text>
+          </Pressable>
+        </View>
       </View>
 
       <CompetitionRegistrationDropdown
@@ -73,11 +126,7 @@ export default function CompetitionEquipmentStallFormCard(props) {
         placeholder="בחרי אופן חלוקה"
         searchPlaceholder="חיפוש אופן חלוקה"
         items={splitModeItems}
-        selectedItem={
-          splitModeItems.find(function (item) {
-            return item.id === props.equipmentSplitMode;
-          }) || null
-        }
+        selectedItem={selectedSplitModeItem}
         getItemId={function (item) {
           return item.id;
         }}
@@ -85,41 +134,47 @@ export default function CompetitionEquipmentStallFormCard(props) {
           return item.name;
         }}
         onSelect={function (item) {
-          props.setEquipmentSplitMode(item.id);
+          props.setTackSplitMode(item.id);
         }}
       />
 
-      {props.equipmentSplitMode === "specific" ? (
+      {props.tackSplitMode === "specific" ? (
         <CompetitionMultiPayerSelector
           items={props.allSelectedHorsePayers}
-          selectedItems={props.selectedEquipmentPayers}
-          onToggleItem={props.toggleEquipmentPayerSelection}
+          selectedItems={props.selectedTackPayers}
+          onToggleItem={props.toggleTackPayerSelection}
           getItemLabel={props.formatPayerLabel}
         />
       ) : null}
 
       <View style={styles.helperCard}>
         <Text style={styles.helperText}>
-          עלות כוללת: {props.equipmentPricingSummary.totalPrice} ₪
+          עלות כוללת: {props.tackPricingSummary.totalPrice} ₪
         </Text>
         <Text style={styles.helperText}>
-          מספר משלמים: {props.equipmentPricingSummary.payerCount}
+          מספר משלמים: {props.tackPricingSummary.payerCount}
         </Text>
         <Text style={styles.helperText}>
-          לכל משלם: {props.equipmentPricingSummary.amountPerPayer} ₪
+          לכל משלם: {props.tackPricingSummary.amountPerPayer} ₪
         </Text>
       </View>
 
       <View style={styles.fieldBlock}>
         <Text style={styles.fieldLabel}>הערות</Text>
         <TextInput
-          value={props.equipmentNotes}
-          onChangeText={props.setEquipmentNotes}
+          value={props.tackNotes}
+          onChangeText={props.setTackNotes}
           placeholder="הערות לתאי ציוד"
           style={[styles.textInput, styles.notesInput]}
           multiline
           textAlign="right"
         />
+      </View>
+
+      <View style={styles.helperCard}>
+        <Text style={styles.helperText}>
+          הוזמנו {props.existingTackBookingsCount} תאי ציוד
+        </Text>
       </View>
 
       <View
