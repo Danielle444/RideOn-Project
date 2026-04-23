@@ -20,9 +20,7 @@ export default function CompetitionMultiPayerSelector(props) {
 
       <View style={styles.helperCard}>
         {items.length === 0 ? (
-          <Text style={styles.helperText}>
-            אין משלמים זמינים עבור הסוס שנבחר
-          </Text>
+          <Text style={styles.helperText}>אין משלמים זמינים</Text>
         ) : (
           items.map(function (item, index) {
             var selected = isSelected(item);
