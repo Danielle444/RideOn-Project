@@ -205,5 +205,53 @@ namespace RideOnServer.DAL
 
             return payers;
         }
+
+        public static List<int> CreateEquipmentStallBookings(CreateEquipmentStallBookingsRequest request)
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT * FROM usp_createequipmentstallbookings(" +
+                "@competitionId, " +
+                "@orderedBySystemUserId, " +
+                "@catalogItemId, " +
+                "@notes::text, " +
+                "@ranchId, " +
+                "@startDate::date, " +
+                "@endDate::date, " +
+                "@quantity, " +
+                "@payers::jsonb)",
+                conn);
+
+            cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
+            cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
+            cmd.Parameters.AddWithValue("@catalogItemId", request.CatalogItemId);
+            cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
+            cmd.Parameters.Add("@startDate", NpgsqlDbType.Date).Value = request.StartDate.Date;
+            cmd.Parameters.Add("@endDate", NpgsqlDbType.Date).Value = request.EndDate.Date;
+            cmd.Parameters.AddWithValue("@quantity", request.Quantity);
+
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+
+            string payersJson = JsonSerializer.Serialize(request.Payers, jsonOptions);
+            cmd.Parameters.Add("@payers", NpgsqlDbType.Jsonb).Value = payersJson;
+
+            List<int> createdIds = new List<int>();
+
+            using NpgsqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                createdIds.Add(Convert.ToInt32(reader["createdstallbookingid"]));
+            }
+
+            return createdIds;
+        }
+
+
     }
 }
