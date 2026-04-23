@@ -50,8 +50,17 @@ function normalizeManagedPayerItem(item) {
   }
 
   return {
-    paidByPersonId: item.personId || item.PersonId || null,
+    paidByPersonId:
+      item.paidByPersonId ||
+      item.PaidByPersonId ||
+      item.personId ||
+      item.PersonId ||
+      item.payerPersonId ||
+      item.PayerPersonId ||
+      null,
     payerFullName:
+      item.payerFullName ||
+      item.PayerFullName ||
       item.fullName ||
       item.FullName ||
       (
@@ -541,6 +550,23 @@ export default function useAdminCompetitionStallBookings(params) {
   async function handleCreateHorseStallBookings() {
     var validationMessage = validateHorseBookingsForm();
 
+    var invalidHorseBooking = selectedHorseBookings.find(function (booking) {
+      return (
+        !booking.payers ||
+        booking.payers.length === 0 ||
+        booking.payers.some(function (payer) {
+          return !payer || !payer.paidByPersonId;
+        })
+      );
+    });
+
+    if (invalidHorseBooking) {
+      Alert.alert(
+        "שגיאה",
+        "יש לפחות סוס אחד עם משלם לא תקין. פתחי עריכה ובחרי משלם מחדש.",
+      );
+      return;
+    }
     if (validationMessage) {
       Alert.alert("שגיאה", validationMessage);
       return;
@@ -549,7 +575,16 @@ export default function useAdminCompetitionStallBookings(params) {
     try {
       setIsSaving(true);
 
-      var requests = selectedHorseBookings.map(function (booking) {
+      var validBookings = selectedHorseBookings.filter(function (booking) {
+        return booking.payers && booking.payers.length > 0;
+      });
+
+      if (validBookings.length !== selectedHorseBookings.length) {
+        Alert.alert("שגיאה", "יש סוס ללא משלם. יש להוסיף משלם לפני שמירה.");
+        return;
+      }
+
+      var requests = validBookings.map(function (booking) {
         return createStallBooking({
           competitionId: competitionId,
           orderedBySystemUserId: user.personId,
@@ -560,11 +595,15 @@ export default function useAdminCompetitionStallBookings(params) {
           checkInDate: checkInDate,
           checkOutDate: checkOutDate,
           isForTack: false,
-          payers: booking.payers.map(function (payer) {
-            return {
-              payerPersonId: payer.paidByPersonId,
-            };
-          }),
+          payers: booking.payers
+            .filter(function (payer) {
+              return payer && payer.paidByPersonId;
+            })
+            .map(function (payer) {
+              return {
+                payerPersonId: payer.paidByPersonId,
+              };
+            }),
         });
       });
 

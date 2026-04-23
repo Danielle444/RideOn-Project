@@ -1,157 +1,232 @@
 import React, { useMemo, useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
-import { Calendar, LocaleConfig } from "react-native-calendars";
 import styles from "../../styles/adminCompetitionPaidTimesStyles";
 
-LocaleConfig.locales["he"] = {
-  monthNames: [
-    "ינואר",
-    "פברואר",
-    "מרץ",
-    "אפריל",
-    "מאי",
-    "יוני",
-    "יולי",
-    "אוגוסט",
-    "ספטמבר",
-    "אוקטובר",
-    "נובמבר",
-    "דצמבר",
-  ],
-  monthNamesShort: [
-    "ינו׳",
-    "פבר׳",
-    "מרץ",
-    "אפר׳",
-    "מאי",
-    "יוני",
-    "יולי",
-    "אוג׳",
-    "ספט׳",
-    "אוק׳",
-    "נוב׳",
-    "דצ׳",
-  ],
-  dayNames: [
-    "יום ראשון",
-    "יום שני",
-    "יום שלישי",
-    "יום רביעי",
-    "יום חמישי",
-    "יום שישי",
-    "יום שבת",
-  ],
-  dayNamesShort: ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"],
-  today: "היום",
-};
+var HEBREW_MONTHS = [
+  "ינואר",
+  "פברואר",
+  "מרץ",
+  "אפריל",
+  "מאי",
+  "יוני",
+  "יולי",
+  "אוגוסט",
+  "ספטמבר",
+  "אוקטובר",
+  "נובמבר",
+  "דצמבר",
+];
 
-LocaleConfig.defaultLocale = "he";
+var HEBREW_DAYS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 
-function parseInputDate(dateValue) {
-  if (!dateValue) {
+function parseDateString(dateString) {
+  if (!dateString) {
     return null;
   }
 
-  var parsed = new Date(dateValue);
-
-  if (Number.isNaN(parsed.getTime())) {
+  var parts = String(dateString).split("-");
+  if (parts.length !== 3) {
     return null;
   }
 
-  return parsed;
+  var year = Number(parts[0]);
+  var month = Number(parts[1]) - 1;
+  var day = Number(parts[2]);
+
+  var date = new Date(year, month, day);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date;
 }
 
-function formatDateForInput(dateValue) {
-  if (!dateValue) {
+function formatDateForInput(date) {
+  if (!date) {
     return "";
   }
 
-  try {
-    var date = new Date(dateValue);
+  var year = date.getFullYear();
+  var month = String(date.getMonth() + 1).padStart(2, "0");
+  var day = String(date.getDate()).padStart(2, "0");
 
-    if (Number.isNaN(date.getTime())) {
-      return "";
-    }
-
-    var year = date.getFullYear();
-    var month = String(date.getMonth() + 1).padStart(2, "0");
-    var day = String(date.getDate()).padStart(2, "0");
-
-    return year + "-" + month + "-" + day;
-  } catch (error) {
-    return "";
-  }
+  return year + "-" + month + "-" + day;
 }
 
-function formatDateForDisplay(dateValue) {
-  if (!dateValue) {
+function formatDateForDisplay(dateString) {
+  var date = parseDateString(dateString);
+  if (!date) {
     return "";
   }
 
-  try {
-    var date = new Date(dateValue);
+  return date.toLocaleDateString("he-IL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
 
-    if (Number.isNaN(date.getTime())) {
-      return "";
-    }
-
-    return date.toLocaleDateString("he-IL", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  } catch (error) {
-    return "";
+function isSameDay(a, b) {
+  if (!a || !b) {
+    return false;
   }
+
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function isDateBefore(a, b) {
+  if (!a || !b) {
+    return false;
+  }
+
+  return (
+    new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime() <
+    new Date(b.getFullYear(), b.getMonth(), b.getDate()).getTime()
+  );
+}
+
+function isDateAfter(a, b) {
+  if (!a || !b) {
+    return false;
+  }
+
+  return (
+    new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime() >
+    new Date(b.getFullYear(), b.getMonth(), b.getDate()).getTime()
+  );
+}
+
+function buildCalendarCells(monthDate) {
+  var year = monthDate.getFullYear();
+  var month = monthDate.getMonth();
+
+  var firstDayOfMonth = new Date(year, month, 1);
+  var lastDayOfMonth = new Date(year, month + 1, 0);
+
+  // JS: Sunday=0 ... Saturday=6
+  var firstDayIndex = firstDayOfMonth.getDay();
+  var daysInMonth = lastDayOfMonth.getDate();
+
+  var cells = [];
+
+  for (var i = 0; i < firstDayIndex; i++) {
+    cells.push(null);
+  }
+
+  for (var day = 1; day <= daysInMonth; day++) {
+    cells.push(new Date(year, month, day));
+  }
+
+  while (cells.length % 7 !== 0) {
+    cells.push(null);
+  }
+
+  return cells;
 }
 
 export default function CompetitionDateField(props) {
   var label = props.label;
   var value = props.value;
   var onChange = props.onChange;
-  var minimumDate = props.minimumDate || "";
-  var maximumDate = props.maximumDate || "";
+  var minimumDate = props.minimumDate;
+  var maximumDate = props.maximumDate;
 
-  var [showCalendar, setShowCalendar] = useState(false);
+  var [visible, setVisible] = useState(false);
 
-  var selectedDateString = useMemo(
+  var selectedDate = useMemo(
     function () {
-      return value || formatDateForInput(new Date());
+      return parseDateString(value) || new Date();
     },
     [value],
   );
 
-  var markedDates = useMemo(
+  var minDateObj = useMemo(
     function () {
-      if (!selectedDateString) {
-        return {};
-      }
-
-      return {
-        [selectedDateString]: {
-          selected: true,
-          selectedColor: "#7B5A4D",
-        },
-      };
+      return parseDateString(minimumDate);
     },
-    [selectedDateString],
+    [minimumDate],
   );
 
-  function handleDayPress(day) {
-    onChange(day.dateString);
-    setShowCalendar(false);
+  var maxDateObj = useMemo(
+    function () {
+      return parseDateString(maximumDate);
+    },
+    [maximumDate],
+  );
+
+  var [currentMonth, setCurrentMonth] = useState(
+    new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
+  );
+
+  function openCalendar() {
+    var baseDate =
+      parseDateString(value) || parseDateString(minimumDate) || new Date();
+    setCurrentMonth(new Date(baseDate.getFullYear(), baseDate.getMonth(), 1));
+    setVisible(true);
+  }
+
+  function goToPreviousMonth() {
+    setCurrentMonth(function (prev) {
+      return new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
+    });
+  }
+
+  function goToNextMonth() {
+    setCurrentMonth(function (prev) {
+      return new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
+    });
+  }
+
+  function handleSelectDate(date) {
+    if (!date) {
+      return;
+    }
+
+    if (minDateObj && isDateBefore(date, minDateObj)) {
+      return;
+    }
+
+    if (maxDateObj && isDateAfter(date, maxDateObj)) {
+      return;
+    }
+
+    onChange(formatDateForInput(date));
+    setVisible(false);
+  }
+
+  var cells = useMemo(
+    function () {
+      return buildCalendarCells(currentMonth);
+    },
+    [currentMonth],
+  );
+
+  function isDisabled(date) {
+    if (!date) {
+      return true;
+    }
+
+    if (minDateObj && isDateBefore(date, minDateObj)) {
+      return true;
+    }
+
+    if (maxDateObj && isDateAfter(date, maxDateObj)) {
+      return true;
+    }
+
+    return false;
   }
 
   return (
     <View style={styles.fieldBlock}>
       <Text style={styles.fieldLabel}>{label}</Text>
 
-      <Pressable
-        style={styles.textInput}
-        onPress={function () {
-          setShowCalendar(true);
-        }}
-      >
+      <Pressable style={styles.textInput} onPress={openCalendar}>
         <Text
           style={{
             textAlign: "right",
@@ -163,7 +238,7 @@ export default function CompetitionDateField(props) {
         </Text>
       </Pressable>
 
-      <Modal transparent animationType="fade" visible={showCalendar}>
+      <Modal visible={visible} transparent animationType="fade">
         <View
           style={{
             flex: 1,
@@ -175,7 +250,7 @@ export default function CompetitionDateField(props) {
           <View
             style={{
               backgroundColor: "#FFFFFF",
-              borderRadius: 18,
+              borderRadius: 20,
               padding: 16,
             }}
           >
@@ -184,35 +259,141 @@ export default function CompetitionDateField(props) {
                 textAlign: "right",
                 fontSize: 16,
                 fontWeight: "700",
+                marginBottom: 14,
                 color: "#4F3B31",
-                marginBottom: 12,
               }}
             >
               {label}
             </Text>
 
-            <View style={{ direction: "ltr" }}>
-              <Calendar
-                current={selectedDateString}
-                minDate={minimumDate || undefined}
-                maxDate={maximumDate || undefined}
-                onDayPress={handleDayPress}
-                markedDates={markedDates}
-                firstDay={0}
-                enableSwipeMonths={true}
-                theme={{
-                  textSectionTitleColor: "#5B4438",
-                  selectedDayBackgroundColor: "#7B5A4D",
-                  selectedDayTextColor: "#FFFFFF",
-                  todayTextColor: "#7B5A4D",
-                  dayTextColor: "#4F3B31",
-                  arrowColor: "#7B5A4D",
-                  monthTextColor: "#4F3B31",
-                  textDayFontSize: 16,
-                  textMonthFontSize: 16,
-                  textDayHeaderFontSize: 14,
+            <View
+              style={{
+                flexDirection: "row-reverse",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 16,
+              }}
+            >
+              <Pressable onPress={goToNextMonth}>
+                <Text style={{ fontSize: 24, color: "#7B5A4D" }}>‹</Text>
+              </Pressable>
+
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: "700",
+                  color: "#4F3B31",
                 }}
-              />
+              >
+                {HEBREW_MONTHS[currentMonth.getMonth()] +
+                  " " +
+                  currentMonth.getFullYear()}
+              </Text>
+
+              <Pressable onPress={goToPreviousMonth}>
+                <Text style={{ fontSize: 24, color: "#7B5A4D" }}>›</Text>
+              </Pressable>
+            </View>
+
+            {/* כותרות ימים - יום א מימין */}
+            <View
+              style={{
+                flexDirection: "row-reverse",
+                marginBottom: 8,
+              }}
+            >
+              {HEBREW_DAYS.map(function (dayName) {
+                return (
+                  <View
+                    key={dayName}
+                    style={{
+                      flex: 1,
+                      alignItems: "center",
+                      paddingVertical: 8,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        color: "#5B4438",
+                        fontWeight: "600",
+                      }}
+                    >
+                      {dayName}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* תאי החודש */}
+            <View>
+              {Array.from({ length: cells.length / 7 }).map(
+                function (_, rowIndex) {
+                  var row = cells.slice(rowIndex * 7, rowIndex * 7 + 7);
+
+                  return (
+                    <View
+                      key={rowIndex}
+                      style={{
+                        flexDirection: "row-reverse",
+                      }}
+                    >
+                      {row.map(function (date, colIndex) {
+                        var disabled = isDisabled(date);
+                        var selected = isSameDay(date, selectedDate);
+
+                        return (
+                          <Pressable
+                            key={rowIndex + "_" + colIndex}
+                            onPress={function () {
+                              if (!disabled) {
+                                handleSelectDate(date);
+                              }
+                            }}
+                            style={{
+                              flex: 1,
+                              aspectRatio: 1,
+                              justifyContent: "center",
+                              alignItems: "center",
+                              marginVertical: 2,
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: 18,
+                                justifyContent: "center",
+                                alignItems: "center",
+                                backgroundColor: selected
+                                  ? "#7B5A4D"
+                                  : "transparent",
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 16,
+                                  color: !date
+                                    ? "transparent"
+                                    : disabled
+                                      ? "#D0C7C1"
+                                      : selected
+                                        ? "#FFFFFF"
+                                        : "#4F3B31",
+                                  fontWeight: selected ? "700" : "400",
+                                }}
+                              >
+                                {date ? date.getDate() : ""}
+                              </Text>
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  );
+                },
+              )}
             </View>
 
             <Pressable
@@ -221,7 +402,7 @@ export default function CompetitionDateField(props) {
                 { marginTop: 14, backgroundColor: "#A79185" },
               ]}
               onPress={function () {
-                setShowCalendar(false);
+                setVisible(false);
               }}
             >
               <Text style={styles.primaryButtonText}>סגירה</Text>
