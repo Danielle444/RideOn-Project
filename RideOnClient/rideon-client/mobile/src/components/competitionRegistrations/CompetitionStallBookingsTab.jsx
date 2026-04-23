@@ -32,7 +32,6 @@ export default function CompetitionStallBookingsTab(props) {
         setEquipmentQuantity={props.setEquipmentQuantity}
         equipmentSplitMode={props.equipmentSplitMode}
         setEquipmentSplitMode={props.setEquipmentSplitMode}
-        allSelectedHorsePayers={props.allSelectedHorsePayers}
         selectedEquipmentPayers={props.selectedEquipmentPayers}
         toggleEquipmentPayerSelection={props.toggleEquipmentPayerSelection}
         equipmentNotes={props.equipmentNotes}
@@ -44,6 +43,8 @@ export default function CompetitionStallBookingsTab(props) {
         equipmentPricingSummary={props.equipmentPricingSummary}
         minCompetitionDate={props.minCompetitionDate}
         maxCompetitionDate={props.maxCompetitionDate}
+        allSelectedHorsePayers={props.allSelectedHorsePayers}
+        allHorseStallTypes={props.allHorseStallTypes}
         onBack={props.handleBackToHorseMode}
         onSubmit={props.handleSubmitEquipmentDraft}
         isSaving={props.isSaving}
@@ -68,6 +69,8 @@ export default function CompetitionStallBookingsTab(props) {
       setSelectedHorseToAdd={props.setSelectedHorseToAdd}
       availableHorseOptions={props.availableHorseOptions}
       selectedHorseBookings={props.selectedHorseBookings}
+      allEligibleHorsesAlreadyBooked={props.allEligibleHorsesAlreadyBooked}
+      hasAnyHorseStallBookingsForCompetition={props.hasAnyHorseStallBookingsForCompetition}
       handleRemoveHorseBooking={props.handleRemoveHorseBooking}
       getAvailablePayersForHorse={props.getAvailablePayersForHorse}
       toggleHorsePayerSelection={props.toggleHorsePayerSelection}

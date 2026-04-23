@@ -17,6 +17,10 @@ export default function CompetitionEquipmentStallFormCard(props) {
     { id: "specific", name: "בחירת משלמים מסוימים" },
   ];
 
+  var selectedSplitModeItem = splitModeItems.find(function (item) {
+    return item.id === props.equipmentSplitMode;
+  }) || null;
+
   return (
     <View style={styles.formCard}>
       <Text style={styles.cardTitle}>הזמנת תאי ציוד</Text>
@@ -38,6 +42,7 @@ export default function CompetitionEquipmentStallFormCard(props) {
         }}
         getItemLabel={props.formatStallTypeLabel}
         onSelect={props.setSelectedEquipmentStallType}
+        disabled={props.allHorseStallTypes.length === 1}
       />
 
       <CompetitionDateField
@@ -58,14 +63,42 @@ export default function CompetitionEquipmentStallFormCard(props) {
 
       <View style={styles.fieldBlock}>
         <Text style={styles.fieldLabel}>כמות תאי ציוד</Text>
-        <TextInput
-          value={props.equipmentQuantity}
-          onChangeText={props.setEquipmentQuantity}
-          placeholder="למשל 2"
-          style={styles.textInput}
-          keyboardType="numeric"
-          textAlign="right"
-        />
+
+        <View
+          style={{
+            flexDirection: "row-reverse",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderWidth: 1,
+            borderColor: "#D8C7BC",
+            borderRadius: 18,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            backgroundColor: "#FFFFFF",
+          }}
+        >
+          <Pressable
+            onPress={function () {
+              var nextValue = Math.max(1, Number(props.equipmentQuantity || 1) - 1);
+              props.setEquipmentQuantity(String(nextValue));
+            }}
+          >
+            <Text style={{ fontSize: 26, color: "#7B5A4D", fontWeight: "700" }}>−</Text>
+          </Pressable>
+
+          <Text style={{ fontSize: 20, color: "#4F3B31", fontWeight: "700" }}>
+            {props.equipmentQuantity || "1"}
+          </Text>
+
+          <Pressable
+            onPress={function () {
+              var nextValue = Number(props.equipmentQuantity || 1) + 1;
+              props.setEquipmentQuantity(String(nextValue));
+            }}
+          >
+            <Text style={{ fontSize: 26, color: "#7B5A4D", fontWeight: "700" }}>+</Text>
+          </Pressable>
+        </View>
       </View>
 
       <CompetitionRegistrationDropdown
@@ -73,11 +106,7 @@ export default function CompetitionEquipmentStallFormCard(props) {
         placeholder="בחרי אופן חלוקה"
         searchPlaceholder="חיפוש אופן חלוקה"
         items={splitModeItems}
-        selectedItem={
-          splitModeItems.find(function (item) {
-            return item.id === props.equipmentSplitMode;
-          }) || null
-        }
+        selectedItem={selectedSplitModeItem}
         getItemId={function (item) {
           return item.id;
         }}

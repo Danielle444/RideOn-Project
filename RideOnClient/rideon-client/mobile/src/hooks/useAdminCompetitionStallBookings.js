@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { getCompetitionInvitationDetails } from "../services/competitionService";
 import { getManagedPayers } from "../services/payerService";
 import {
   getHorsesForStallBooking,
   getHorsePayersForCompetition,
-  createStallBooking,
+  getStallBookingsForCompetitionAndRanch,
 } from "../services/stallBookingsService";
+import useAdminHorseStallBookings from "./useAdminHorseStallBookings";
+import useAdminEquipmentStallBookings from "./useAdminEquipmentStallBookings";
 
 function normalizeHorseItem(item) {
   if (!item) {
@@ -90,6 +91,69 @@ function normalizePriceCatalogItem(item) {
   };
 }
 
+function normalizeDateString(value) {
+  if (!value) {
+    return "";
+  }
+
+  var text = String(value).trim();
+
+  if (!text) {
+    return "";
+  }
+
+  if (text.includes("T")) {
+    return text.split("T")[0];
+  }
+
+  if (text.length >= 10) {
+    return text.slice(0, 10);
+  }
+
+  return text;
+}
+
+function normalizeExistingStallBooking(item) {
+  if (!item) {
+    return null;
+  }
+
+  return {
+    stallBookingId:
+      item.stallBookingId || item.StallBookingId || item.stallbookingid || null,
+    horseId: item.horseId || item.HorseId || item.horseid || null,
+    isForTack:
+      typeof item.isForTack === "boolean"
+        ? item.isForTack
+        : typeof item.IsForTack === "boolean"
+          ? item.IsForTack
+          : typeof item.isfortack === "boolean"
+            ? item.isfortack
+            : false,
+    catalogItemId:
+      item.catalogItemId ||
+      item.CatalogItemId ||
+      item.catalogitemid ||
+      item.priceCatalogId ||
+      item.PriceCatalogId ||
+      null,
+    startDate: normalizeDateString(
+      item.startDate ||
+        item.StartDate ||
+        item.startdate ||
+        item.checkInDate ||
+        item.CheckInDate,
+    ),
+    endDate: normalizeDateString(
+      item.endDate ||
+        item.EndDate ||
+        item.enddate ||
+        item.checkOutDate ||
+        item.CheckOutDate,
+    ),
+  };
+}
+
 function getServicePriceSectionsFromInvitation(invitationResponse) {
   return Array.isArray(invitationResponse?.data?.servicePriceSections)
     ? invitationResponse.data.servicePriceSections
@@ -105,15 +169,21 @@ function extractHorseStallPriceItems(sections) {
 
     items.forEach(function (item) {
       flatItems.push({
-        ...item,
         categoryName: categoryName,
+        item: item,
       });
     });
   });
 
   return flatItems
-    .map(function (item) {
-      return normalizePriceCatalogItem(item);
+    .map(function (entry) {
+      var normalized = normalizePriceCatalogItem(entry.item);
+      if (!normalized) {
+        return null;
+      }
+
+      normalized.categoryName = entry.categoryName;
+      return normalized;
     })
     .filter(Boolean)
     .filter(function (item) {
@@ -144,15 +214,21 @@ function extractEquipmentStallPriceItems(sections) {
 
     items.forEach(function (item) {
       flatItems.push({
-        ...item,
         categoryName: categoryName,
+        item: item,
       });
     });
   });
 
   return flatItems
-    .map(function (item) {
-      return normalizePriceCatalogItem(item);
+    .map(function (entry) {
+      var normalized = normalizePriceCatalogItem(entry.item);
+      if (!normalized) {
+        return null;
+      }
+
+      normalized.categoryName = entry.categoryName;
+      return normalized;
     })
     .filter(Boolean)
     .filter(function (item) {
@@ -236,18 +312,6 @@ function uniqByPersonId(items) {
   return Object.values(map);
 }
 
-function uniqByPriceCatalogId(items) {
-  var map = {};
-
-  items.forEach(function (item) {
-    if (item && item.priceCatalogId && !map[item.priceCatalogId]) {
-      map[item.priceCatalogId] = item;
-    }
-  });
-
-  return Object.values(map);
-}
-
 export default function useAdminCompetitionStallBookings(params) {
   var user = params.user;
   var activeRole = params.activeRole;
@@ -257,31 +321,16 @@ export default function useAdminCompetitionStallBookings(params) {
   var [horses, setHorses] = useState([]);
   var [horsePayers, setHorsePayers] = useState([]);
   var [managedPayers, setManagedPayers] = useState([]);
+  var [existingStallBookings, setExistingStallBookings] = useState([]);
   var [horseStallTypeOptions, setHorseStallTypeOptions] = useState([]);
   var [equipmentStallTypeOptions, setEquipmentStallTypeOptions] = useState([]);
 
-  var [selectedHorseToAdd, setSelectedHorseToAdd] = useState(null);
   var [selectedHorseStallType, setSelectedHorseStallType] = useState(null);
-
   var [checkInDate, setCheckInDate] = useState("");
   var [checkOutDate, setCheckOutDate] = useState("");
   var [notes, setNotes] = useState("");
-
-  var [selectedHorseBookings, setSelectedHorseBookings] = useState([]);
-  var [expandedHorseEditorId, setExpandedHorseEditorId] = useState(null);
-
   var [mode, setMode] = useState("horse");
-
-  var [selectedEquipmentStallType, setSelectedEquipmentStallType] = useState(null);
-  var [equipmentQuantity, setEquipmentQuantity] = useState("1");
-  var [equipmentSplitMode, setEquipmentSplitMode] = useState("equal");
-  var [selectedEquipmentPayers, setSelectedEquipmentPayers] = useState([]);
-  var [equipmentNotes, setEquipmentNotes] = useState("");
-  var [equipmentStartDate, setEquipmentStartDate] = useState("");
-  var [equipmentEndDate, setEquipmentEndDate] = useState("");
-
   var [loading, setLoading] = useState(false);
-  var [isSaving, setIsSaving] = useState(false);
   var [screenError, setScreenError] = useState("");
 
   useEffect(
@@ -337,12 +386,17 @@ export default function useAdminCompetitionStallBookings(params) {
         getHorsesForStallBooking(competitionId, activeRole.ranchId),
         getHorsePayersForCompetition(competitionId, activeRole.ranchId),
         getManagedPayers(activeRole.ranchId, null, null),
+        getStallBookingsForCompetitionAndRanch(
+          competitionId,
+          activeRole.ranchId,
+        ),
       ]);
 
       var invitationResponse = results[0];
       var horsesResponse = results[1];
       var horsePayersResponse = results[2];
       var managedPayersResponse = results[3];
+      var existingBookingsResponse = results[4];
 
       var sections = getServicePriceSectionsFromInvitation(invitationResponse);
 
@@ -378,6 +432,17 @@ export default function useAdminCompetitionStallBookings(params) {
           })
           .filter(Boolean),
       );
+
+      setExistingStallBookings(
+        (Array.isArray(existingBookingsResponse?.data)
+          ? existingBookingsResponse.data
+          : []
+        )
+          .map(function (item) {
+            return normalizeExistingStallBooking(item);
+          })
+          .filter(Boolean),
+      );
     } catch (error) {
       setScreenError(
         String(error?.response?.data || "אירעה שגיאה בטעינת נתוני התאים"),
@@ -387,328 +452,65 @@ export default function useAdminCompetitionStallBookings(params) {
     }
   }
 
-  var availableHorseOptions = useMemo(
-    function () {
-      return horses.filter(function (horse) {
-        return !selectedHorseBookings.some(function (booking) {
-          return booking.horse.horseId === horse.horseId;
-        });
-      });
-    },
-    [horses, selectedHorseBookings],
-  );
-
-  function getDefaultHorsePayers(horseId) {
-    return uniqByPersonId(
-      horsePayers.filter(function (payer) {
-        return payer.horseId === horseId;
-      }),
-    );
-  }
-
-  function getAvailablePayersForHorse(horseId) {
-    var defaultPayers = getDefaultHorsePayers(horseId);
-    return uniqByPersonId(defaultPayers.concat(managedPayers));
-  }
-
-  useEffect(
-    function () {
-      if (!selectedHorseToAdd || !selectedHorseToAdd.horseId) {
-        return;
-      }
-
-      setSelectedHorseBookings(function (prev) {
-        var exists = prev.some(function (booking) {
-          return booking.horse.horseId === selectedHorseToAdd.horseId;
-        });
-
-        if (exists) {
-          return prev;
-        }
-
-        return prev.concat([
-          {
-            horse: selectedHorseToAdd,
-            payers: getDefaultHorsePayers(selectedHorseToAdd.horseId),
-            stallType: selectedHorseStallType,
-          },
-        ]);
-      });
-
-      setSelectedHorseToAdd(null);
-    },
-    [selectedHorseToAdd],
-  );
-
-  function handleRemoveHorseBooking(horseId) {
-    setSelectedHorseBookings(function (prev) {
-      return prev.filter(function (booking) {
-        return booking.horse.horseId !== horseId;
-      });
-    });
-
-    setExpandedHorseEditorId(function (prev) {
-      return prev === horseId ? null : prev;
-    });
-  }
-
-  function toggleHorsePayerSelection(horseId, payerItem) {
-    if (!horseId || !payerItem || !payerItem.paidByPersonId) {
-      return;
-    }
-
-    setSelectedHorseBookings(function (prev) {
-      return prev.map(function (booking) {
-        if (booking.horse.horseId !== horseId) {
-          return booking;
-        }
-
-        var exists = booking.payers.some(function (payer) {
-          return payer.paidByPersonId === payerItem.paidByPersonId;
-        });
-
-        var updatedPayers = exists
-          ? booking.payers.filter(function (payer) {
-              return payer.paidByPersonId !== payerItem.paidByPersonId;
-            })
-          : uniqByPersonId(booking.payers.concat([payerItem]));
-
-        return {
-          ...booking,
-          payers: updatedPayers,
-        };
-      });
-    });
-  }
-
-  function toggleHorseEditor(horseId) {
-    setExpandedHorseEditorId(function (prev) {
-      return prev === horseId ? null : horseId;
-    });
-  }
+  var horseHook = useAdminHorseStallBookings({
+    user: user,
+    activeRole: activeRole,
+    competitionId: competitionId,
+    horses: horses,
+    horsePayers: horsePayers,
+    existingStallBookings: existingStallBookings,
+    selectedHorseStallType: selectedHorseStallType,
+    checkInDate: checkInDate,
+    checkOutDate: checkOutDate,
+    notes: notes,
+  });
 
   var allSelectedHorsePayers = useMemo(
     function () {
       var merged = [];
 
-      selectedHorseBookings.forEach(function (booking) {
+      horseHook.selectedHorseBookings.forEach(function (booking) {
         booking.payers.forEach(function (payer) {
           merged.push(payer);
         });
       });
 
-      return uniqByPersonId(merged);
-    },
-    [selectedHorseBookings],
-  );
-
-  var selectedHorseStallTypes = useMemo(
-    function () {
-      var types = selectedHorseBookings
-        .map(function (booking) {
-          return booking.stallType || selectedHorseStallType;
-        })
-        .filter(Boolean);
-
-      return uniqByPriceCatalogId(types);
-    },
-    [selectedHorseBookings, selectedHorseStallType],
-  );
-
-  useEffect(
-    function () {
-      if (!selectedHorseBookings.length) {
-        return;
-      }
-
-      if (!equipmentStartDate) {
-        setEquipmentStartDate(checkInDate);
-      }
-
-      if (!equipmentEndDate) {
-        setEquipmentEndDate(checkOutDate);
-      }
-    },
-    [selectedHorseBookings, checkInDate, checkOutDate],
-  );
-
-  useEffect(
-    function () {
-      if (selectedHorseStallTypes.length === 1) {
-        setSelectedEquipmentStallType(selectedHorseStallTypes[0]);
-      } else if (
-        selectedEquipmentStallType &&
-        !selectedHorseStallTypes.some(function (item) {
-          return item.priceCatalogId === selectedEquipmentStallType.priceCatalogId;
-        })
-      ) {
-        setSelectedEquipmentStallType(null);
-      }
-    },
-    [selectedHorseStallTypes],
-  );
-
-  function toggleEquipmentPayerSelection(payerItem) {
-    if (!payerItem || !payerItem.paidByPersonId) {
-      return;
-    }
-
-    setSelectedEquipmentPayers(function (prev) {
-      var exists = prev.some(function (item) {
-        return item.paidByPersonId === payerItem.paidByPersonId;
-      });
-
-      if (exists) {
-        return prev.filter(function (item) {
-          return item.paidByPersonId !== payerItem.paidByPersonId;
-        });
-      }
-
-      return uniqByPersonId(prev.concat([payerItem]));
-    });
-  }
-
-  var effectiveEquipmentPayers = useMemo(
-    function () {
-      if (equipmentSplitMode === "equal") {
-        return allSelectedHorsePayers;
-      }
-
-      return selectedEquipmentPayers;
-    },
-    [equipmentSplitMode, allSelectedHorsePayers, selectedEquipmentPayers],
-  );
-
-  var equipmentPricingSummary = useMemo(
-    function () {
-      var quantity = Number(equipmentQuantity || 0);
-      var unitPrice = Number(selectedEquipmentStallType?.itemPrice || 0);
-      var total = quantity * unitPrice;
-      var payerCount = effectiveEquipmentPayers.length;
-      var perPayer = payerCount > 0 ? Math.ceil(total / payerCount) : 0;
-
-      return {
-        quantity: quantity,
-        unitPrice: unitPrice,
-        totalPrice: total,
-        payerCount: payerCount,
-        amountPerPayer: perPayer,
-      };
-    },
-    [equipmentQuantity, selectedEquipmentStallType, effectiveEquipmentPayers],
-  );
-
-  function validateHorseBookingsForm() {
-    if (!selectedHorseStallType || !selectedHorseStallType.priceCatalogId) {
-      return "יש לבחור סוג תא";
-    }
-
-    if (!selectedHorseBookings.length) {
-      return "יש להוסיף לפחות סוס אחד";
-    }
-
-    if (!checkInDate || !checkOutDate) {
-      return "יש לבחור תאריכי כניסה ויציאה";
-    }
-
-    var hasHorseWithoutPayers = selectedHorseBookings.some(function (booking) {
-      return !booking.payers || booking.payers.length === 0;
-    });
-
-    if (hasHorseWithoutPayers) {
-      return "יש לבחור לפחות משלם אחד לכל סוס";
-    }
-
-    if (!user || !user.personId) {
-      return "לא נמצאו פרטי משתמש מחובר";
-    }
-
-    if (!activeRole || !activeRole.ranchId) {
-      return "לא נמצאה חווה פעילה";
-    }
-
-    return "";
-  }
-
-  async function handleCreateHorseStallBookings() {
-    var validationMessage = validateHorseBookingsForm();
-
-    var invalidHorseBooking = selectedHorseBookings.find(function (booking) {
-      return (
-        !booking.payers ||
-        booking.payers.length === 0 ||
-        booking.payers.some(function (payer) {
-          return !payer || !payer.paidByPersonId;
-        })
+      var existingPayersForExistingHorseBookings = horsePayers.filter(
+        function (payer) {
+          return existingStallBookings.some(function (booking) {
+            return (
+              booking &&
+              booking.isForTack === false &&
+              booking.horseId === payer.horseId
+            );
+          });
+        },
       );
-    });
 
-    if (invalidHorseBooking) {
-      Alert.alert(
-        "שגיאה",
-        "יש לפחות סוס אחד עם משלם לא תקין. פתחי עריכה ובחרי משלם מחדש.",
+      return uniqByPersonId(
+        merged.concat(existingPayersForExistingHorseBookings),
       );
-      return;
-    }
+    },
+    [horseHook.selectedHorseBookings, horsePayers, existingStallBookings],
+  );
 
-    if (validationMessage) {
-      Alert.alert("שגיאה", validationMessage);
-      return;
-    }
-
-    try {
-      setIsSaving(true);
-
-      var validBookings = selectedHorseBookings.filter(function (booking) {
-        return booking.payers && booking.payers.length > 0;
-      });
-
-      if (validBookings.length !== selectedHorseBookings.length) {
-        Alert.alert("שגיאה", "יש סוס ללא משלם. יש להוסיף משלם לפני שמירה.");
-        return;
-      }
-
-      var requests = validBookings.map(function (booking) {
-        var currentStallType = booking.stallType || selectedHorseStallType;
-
-        return createStallBooking({
-          competitionId: competitionId,
-          orderedBySystemUserId: user.personId,
-          catalogItemId: currentStallType.priceCatalogId,
-          notes: notes ? notes.trim() : null,
-          ranchId: activeRole.ranchId,
-          horseId: booking.horse.horseId,
-          checkInDate: checkInDate,
-          checkOutDate: checkOutDate,
-          isForTack: false,
-          payers: booking.payers
-            .filter(function (payer) {
-              return payer && payer.paidByPersonId;
-            })
-            .map(function (payer) {
-              return {
-                payerPersonId: payer.paidByPersonId,
-              };
-            }),
-        });
-      });
-
-      await Promise.all(requests);
-
-      Alert.alert("נשמר", "תאי הסוסים הוזמנו בהצלחה");
-    } catch (error) {
-      Alert.alert(
-        "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה בשמירת הזמנת התאים"),
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  }
+  var equipmentHook = useAdminEquipmentStallBookings({
+    user: user,
+    activeRole: activeRole,
+    competitionId: competitionId,
+    selectedHorseBookings: horseHook.selectedHorseBookings,
+    existingStallBookings: existingStallBookings,
+    horseStallTypeOptions: horseStallTypeOptions,
+    equipmentStallTypeOptions: equipmentStallTypeOptions,
+    selectedHorseStallType: selectedHorseStallType,
+    checkInDate: checkInDate,
+    checkOutDate: checkOutDate,
+    allSelectedHorsePayers: allSelectedHorsePayers,
+    activeCompetition: activeCompetition,
+  });
 
   function handleOpenEquipmentMode() {
-    if (!selectedHorseBookings.length) {
-      Alert.alert("שגיאה", "יש להוסיף לפחות סוס אחד לפני מעבר להזמנת תאי ציוד");
+    if (!horseHook.hasAnyHorseStallBookingsForCompetition) {
       return;
     }
 
@@ -719,79 +521,66 @@ export default function useAdminCompetitionStallBookings(params) {
     setMode("horse");
   }
 
-  function handleGoToEquipmentIfComplete() {
-    if (
-      horses.length > 0 &&
-      selectedHorseBookings.length > 0 &&
-      selectedHorseBookings.length === horses.length
-    ) {
-      setMode("equipment");
-    }
-  }
-
-  function handleSubmitEquipmentDraft() {
-    Alert.alert(
-      "עדיין לא מחובר",
-      "טופס תא ציוד מוכן בצד לקוח, אבל כדי לשמור אותו צריך להשלים תמיכה מתאימה בשרת.",
-    );
-  }
-
   return {
-    mode,
+    mode: mode,
+    loading: loading,
+    screenError: screenError,
 
-    horseStallTypeOptions,
-    equipmentStallTypeOptions,
-    selectedHorseStallTypes,
+    horseStallTypeOptions: horseStallTypeOptions,
+    equipmentStallTypeOptions: equipmentStallTypeOptions,
 
-    selectedHorseToAdd,
-    setSelectedHorseToAdd,
-    selectedHorseStallType,
-    setSelectedHorseStallType,
+    selectedHorseStallType: selectedHorseStallType,
+    setSelectedHorseStallType: setSelectedHorseStallType,
 
-    checkInDate,
-    setCheckInDate,
-    checkOutDate,
-    setCheckOutDate,
-    notes,
-    setNotes,
+    checkInDate: checkInDate,
+    setCheckInDate: setCheckInDate,
+    checkOutDate: checkOutDate,
+    setCheckOutDate: setCheckOutDate,
+    notes: notes,
+    setNotes: setNotes,
 
-    selectedHorseBookings,
-    availableHorseOptions,
-    getAvailablePayersForHorse,
-    handleRemoveHorseBooking,
-    toggleHorsePayerSelection,
-    expandedHorseEditorId,
-    toggleHorseEditor,
+    selectedHorseToAdd: horseHook.selectedHorseToAdd,
+    setSelectedHorseToAdd: horseHook.setSelectedHorseToAdd,
+    selectedHorseBookings: horseHook.selectedHorseBookings,
+    availableHorseOptions: horseHook.availableHorseOptions,
+    allEligibleHorsesAlreadyBooked: horseHook.allEligibleHorsesAlreadyBooked,
+    hasAnyHorseStallBookingsForCompetition:
+      horseHook.hasAnyHorseStallBookingsForCompetition,
+    getAvailablePayersForHorse: function (horseId) {
+      return horseHook.getAvailablePayersForHorse(horseId, managedPayers);
+    },
+    handleRemoveHorseBooking: horseHook.handleRemoveHorseBooking,
+    toggleHorsePayerSelection: horseHook.toggleHorsePayerSelection,
+    expandedHorseEditorId: horseHook.expandedHorseEditorId,
+    toggleHorseEditor: horseHook.toggleHorseEditor,
+    handleCreateHorseStallBookings: horseHook.handleCreateHorseStallBookings,
+    isSaving: horseHook.isSaving || equipmentHook.isSavingEquipment,
 
-    selectedEquipmentStallType,
-    setSelectedEquipmentStallType,
-    equipmentQuantity,
-    setEquipmentQuantity,
-    equipmentSplitMode,
-    setEquipmentSplitMode,
-    selectedEquipmentPayers,
-    toggleEquipmentPayerSelection,
-    equipmentNotes,
-    setEquipmentNotes,
-    equipmentStartDate,
-    setEquipmentStartDate,
-    equipmentEndDate,
-    setEquipmentEndDate,
-    effectiveEquipmentPayers,
-    equipmentPricingSummary,
+    selectedEquipmentStallType: equipmentHook.selectedEquipmentStallType,
+    setSelectedEquipmentStallType: equipmentHook.setSelectedEquipmentStallType,
+    equipmentQuantity: equipmentHook.equipmentQuantity,
+    setEquipmentQuantity: equipmentHook.setEquipmentQuantity,
+    equipmentSplitMode: equipmentHook.equipmentSplitMode,
+    setEquipmentSplitMode: equipmentHook.setEquipmentSplitMode,
+    selectedEquipmentPayers: equipmentHook.selectedEquipmentPayers,
+    toggleEquipmentPayerSelection: equipmentHook.toggleEquipmentPayerSelection,
+    equipmentNotes: equipmentHook.equipmentNotes,
+    setEquipmentNotes: equipmentHook.setEquipmentNotes,
+    equipmentStartDate: equipmentHook.equipmentStartDate,
+    setEquipmentStartDate: equipmentHook.setEquipmentStartDate,
+    equipmentEndDate: equipmentHook.equipmentEndDate,
+    setEquipmentEndDate: equipmentHook.setEquipmentEndDate,
+    effectiveEquipmentPayers: equipmentHook.effectiveEquipmentPayers,
+    equipmentPricingSummary: equipmentHook.equipmentPricingSummary,
+    allHorseStallTypes: equipmentHook.allHorseStallTypes,
+    allSelectedHorsePayers: allSelectedHorsePayers,
 
-    loading,
-    isSaving,
-    screenError,
+    handleOpenEquipmentMode: handleOpenEquipmentMode,
+    handleBackToHorseMode: handleBackToHorseMode,
+    handleSubmitEquipmentDraft: equipmentHook.handleSubmitEquipmentDraft,
 
-    handleCreateHorseStallBookings,
-    handleOpenEquipmentMode,
-    handleBackToHorseMode,
-    handleGoToEquipmentIfComplete,
-    handleSubmitEquipmentDraft,
-
-    formatHorseLabel,
-    formatPayerLabel,
-    formatStallTypeLabel,
+    formatHorseLabel: formatHorseLabel,
+    formatPayerLabel: formatPayerLabel,
+    formatStallTypeLabel: formatStallTypeLabel,
   };
 }

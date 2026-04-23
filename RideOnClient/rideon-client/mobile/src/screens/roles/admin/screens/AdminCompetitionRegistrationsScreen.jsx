@@ -257,6 +257,12 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             setNotes={stallBookings.setNotes}
             selectedHorseBookings={stallBookings.selectedHorseBookings}
             availableHorseOptions={stallBookings.availableHorseOptions}
+            allEligibleHorsesAlreadyBooked={
+              stallBookings.allEligibleHorsesAlreadyBooked
+            }
+            hasAnyHorseStallBookingsForCompetition={
+              stallBookings.hasAnyHorseStallBookingsForCompetition
+            }
             getAvailablePayersForHorse={
               stallBookings.getAvailablePayersForHorse
             }
@@ -284,8 +290,9 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             setEquipmentStartDate={stallBookings.setEquipmentStartDate}
             equipmentEndDate={stallBookings.equipmentEndDate}
             setEquipmentEndDate={stallBookings.setEquipmentEndDate}
-            allSelectedHorsePayers={stallBookings.allSelectedHorsePayers}
             equipmentPricingSummary={stallBookings.equipmentPricingSummary}
+            allSelectedHorsePayers={stallBookings.allSelectedHorsePayers}
+            allHorseStallTypes={stallBookings.allHorseStallTypes}
             handleCreateHorseStallBookings={
               stallBookings.handleCreateHorseStallBookings
             }
