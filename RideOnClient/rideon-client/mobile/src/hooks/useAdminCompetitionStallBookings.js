@@ -347,6 +347,16 @@ export default function useAdminCompetitionStallBookings(params) {
   var [mode, setMode] = useState("horse");
   var [loading, setLoading] = useState(false);
   var [screenError, setScreenError] = useState("");
+  var isActiveTab = params.isActiveTab;
+
+  useEffect(
+    function () {
+      if (isActiveTab) {
+        loadData();
+      }
+    },
+    [isActiveTab, loadData],
+  );
 
   useEffect(
     function () {

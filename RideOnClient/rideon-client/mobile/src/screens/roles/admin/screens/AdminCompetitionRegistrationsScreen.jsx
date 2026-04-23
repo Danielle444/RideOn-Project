@@ -120,6 +120,7 @@ export default function AdminCompetitionRegistrationsScreen(props) {
     activeRole: activeRole,
     competitionId: competitionId,
     activeCompetition: activeCompetition,
+    isActiveTab: activeTab === "stalls",
   });
 
   function handleCompetitionMenuPress(item) {
@@ -270,20 +271,14 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             toggleHorsePayerSelection={stallBookings.toggleHorsePayerSelection}
             expandedHorseEditorId={stallBookings.expandedHorseEditorId}
             toggleHorseEditor={stallBookings.toggleHorseEditor}
-            selectedTackStallType={
-              stallBookings.selectedTackStallType
-            }
-            setSelectedTackStallType={
-              stallBookings.setSelectedTackStallType
-            }
+            selectedTackStallType={stallBookings.selectedTackStallType}
+            setSelectedTackStallType={stallBookings.setSelectedTackStallType}
             tackQuantity={stallBookings.tackQuantity}
             setTackQuantity={stallBookings.setTackQuantity}
             tackSplitMode={stallBookings.tackSplitMode}
             setTackSplitMode={stallBookings.setTackSplitMode}
             selectedTackPayers={stallBookings.selectedTackPayers}
-            toggleTackPayerSelection={
-              stallBookings.toggleTackPayerSelection
-            }
+            toggleTackPayerSelection={stallBookings.toggleTackPayerSelection}
             tackNotes={stallBookings.tackNotes}
             setTackNotes={stallBookings.setTackNotes}
             tackStartDate={stallBookings.tackStartDate}
@@ -298,17 +293,13 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             }
             handleOpenTackMode={stallBookings.handleOpenTackMode}
             handleBackToHorseMode={stallBookings.handleBackToHorseMode}
-            handleSubmitTackDraft={
-              stallBookings.handleSubmitTackDraft
-            }
+            handleSubmitTackDraft={stallBookings.handleSubmitTackDraft}
             isSaving={stallBookings.isSaving}
             formatHorseLabel={stallBookings.formatHorseLabel}
             formatPayerLabel={stallBookings.formatPayerLabel}
             formatStallTypeLabel={stallBookings.formatStallTypeLabel}
             bookedHorseNamesSummary={stallBookings.bookedHorseNamesSummary}
-            existingTackBookingsCount={
-              stallBookings.existingTackBookingsCount
-            }
+            existingTackBookingsCount={stallBookings.existingTackBookingsCount}
           />
         ) : null}
       </ScrollView>
