@@ -42,7 +42,12 @@ namespace RideOnServer.DAL
 
             cmd.Parameters.AddWithValue("@isForTack", request.IsForTack);
 
-            string payersJson = JsonSerializer.Serialize(request.Payers);
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+
+            string payersJson = JsonSerializer.Serialize(request.Payers, jsonOptions);
             cmd.Parameters.Add("@payers", NpgsqlDbType.Jsonb).Value = payersJson;
 
             object? result = cmd.ExecuteScalar();
@@ -161,7 +166,7 @@ namespace RideOnServer.DAL
                 {
                     StallBookingId = Convert.ToInt32(reader["stallbookingid"]),
                     BillId = Convert.ToInt32(reader["billid"]),
-                    PaidByPersonId = Convert.ToInt32(reader["paidbypersonid"]),
+                    payerPersonId = Convert.ToInt32(reader["payerPersonId"]),
                     PayerFullName = reader["payerfullname"]?.ToString() ?? string.Empty,
                     AmountToPay = Convert.ToDecimal(reader["amounttopay"]),
                     DateOpened = Convert.ToDateTime(reader["dateopened"]),
@@ -190,7 +195,7 @@ namespace RideOnServer.DAL
                 {
                     StallBookingId = Convert.ToInt32(reader["stallbookingid"]),
                     BillId = Convert.ToInt32(reader["billid"]),
-                    PaidByPersonId = Convert.ToInt32(reader["paidbypersonid"]),
+                    payerPersonId = Convert.ToInt32(reader["payerPersonId"]),
                     PayerFullName = reader["payerfullname"]?.ToString() ?? string.Empty,
                     AmountToPay = Convert.ToDecimal(reader["amounttopay"]),
                     DateOpened = Convert.ToDateTime(reader["dateopened"]),
