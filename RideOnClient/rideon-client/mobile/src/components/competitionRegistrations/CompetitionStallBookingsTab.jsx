@@ -22,24 +22,30 @@ export default function CompetitionStallBookingsTab(props) {
     );
   }
 
-  if (props.mode === "tack") {
+  if (props.mode === "equipment") {
     return (
       <CompetitionEquipmentStallFormCard
-        tackStallTypeOptions={props.tackStallTypeOptions}
-        selectedTackStallType={props.selectedTackStallType}
-        setSelectedTackStallType={props.setSelectedTackStallType}
-        tackQuantity={props.tackQuantity}
-        setTackQuantity={props.setTackQuantity}
-        tackSplitMode={props.tackSplitMode}
-        setTackSplitMode={props.setTackSplitMode}
+        equipmentStallTypeOptions={props.equipmentStallTypeOptions}
+        selectedEquipmentStallType={props.selectedEquipmentStallType}
+        setSelectedEquipmentStallType={props.setSelectedEquipmentStallType}
+        equipmentQuantity={props.equipmentQuantity}
+        setEquipmentQuantity={props.setEquipmentQuantity}
+        equipmentSplitMode={props.equipmentSplitMode}
+        setEquipmentSplitMode={props.setEquipmentSplitMode}
         allSelectedHorsePayers={props.allSelectedHorsePayers}
-        selectedTackPayers={props.selectedTackPayers}
-        toggleTackPayerSelection={props.toggleTackPayerSelection}
-        tackNotes={props.tackNotes}
-        setTackNotes={props.setTackNotes}
-        derivedTackDates={props.derivedTackDates}
+        selectedEquipmentPayers={props.selectedEquipmentPayers}
+        toggleEquipmentPayerSelection={props.toggleEquipmentPayerSelection}
+        equipmentNotes={props.equipmentNotes}
+        setEquipmentNotes={props.setEquipmentNotes}
+        equipmentStartDate={props.equipmentStartDate}
+        setEquipmentStartDate={props.setEquipmentStartDate}
+        equipmentEndDate={props.equipmentEndDate}
+        setEquipmentEndDate={props.setEquipmentEndDate}
+        equipmentPricingSummary={props.equipmentPricingSummary}
+        minCompetitionDate={props.minCompetitionDate}
+        maxCompetitionDate={props.maxCompetitionDate}
         onBack={props.handleBackToHorseMode}
-        onSubmit={props.handleSubmitTackDraft}
+        onSubmit={props.handleSubmitEquipmentDraft}
         isSaving={props.isSaving}
         formatPayerLabel={props.formatPayerLabel}
         formatStallTypeLabel={props.formatStallTypeLabel}
@@ -71,7 +77,7 @@ export default function CompetitionStallBookingsTab(props) {
       setNotes={props.setNotes}
       isSaving={props.isSaving}
       onSubmit={props.handleCreateHorseStallBookings}
-      onOpenTackMode={props.handleOpenTackMode}
+      onOpenEquipmentMode={props.handleOpenEquipmentMode}
       formatHorseLabel={props.formatHorseLabel}
       formatPayerLabel={props.formatPayerLabel}
       formatStallTypeLabel={props.formatStallTypeLabel}

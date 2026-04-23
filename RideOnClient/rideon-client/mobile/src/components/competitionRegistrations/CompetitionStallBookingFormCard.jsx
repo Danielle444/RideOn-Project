@@ -12,7 +12,7 @@ export default function CompetitionStallBookingFormCard(props) {
 
       <View style={styles.helperCard}>
         <Text style={styles.helperText}>
-          בחרי סוג תא, תאריכים וסוסים. המשלמים ייבחרו אוטומטית לפי המיקצים של כל סוס, ותוכלי לערוך אותם אם צריך.
+          בחרי סוג תא, תאריכים וסוסים. המשלמים ייבחרו אוטומטית לפי מי שמשלם על המקצים של כל סוס, ואפשר לערוך אם צריך.
         </Text>
       </View>
 
@@ -116,9 +116,9 @@ export default function CompetitionStallBookingFormCard(props) {
             styles.primaryButton,
             { backgroundColor: "#5E7A74" },
           ]}
-          onPress={props.onOpenTackMode}
+          onPress={props.onOpenEquipmentMode}
         >
-          <Text style={styles.primaryButtonText}>המשך להזמנת תאי Tack</Text>
+          <Text style={styles.primaryButtonText}>מעבר להזמנת תאי ציוד</Text>
         </Pressable>
       ) : null}
     </View>

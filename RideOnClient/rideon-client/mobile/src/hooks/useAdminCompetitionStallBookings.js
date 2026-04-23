@@ -84,7 +84,7 @@ function normalizePriceCatalogItem(item) {
       item.CatalogItemId ||
       null,
     productId: item.productId || item.ProductId || null,
-    itemPrice: item.itemPrice || item.ItemPrice || null,
+    itemPrice: Number(item.itemPrice || item.ItemPrice || 0),
     productName: item.productName || item.ProductName || "",
     categoryName: item.categoryName || item.CategoryName || "",
   };
@@ -125,16 +125,17 @@ function extractHorseStallPriceItems(sections) {
         productName.includes("תא") ||
         productName.toLowerCase().includes("stall");
 
-      var mentionsTack =
+      var mentionsEquipment =
         categoryName.includes("ציוד") ||
         productName.includes("ציוד") ||
+        productName.toLowerCase().includes("equipment") ||
         productName.toLowerCase().includes("tack");
 
-      return mentionsStall && !mentionsTack;
+      return mentionsStall && !mentionsEquipment;
     });
 }
 
-function extractTackStallPriceItems(sections) {
+function extractEquipmentStallPriceItems(sections) {
   var flatItems = [];
 
   sections.forEach(function (section) {
@@ -161,6 +162,7 @@ function extractTackStallPriceItems(sections) {
       return (
         categoryName.includes("ציוד") ||
         productName.includes("ציוד") ||
+        productName.toLowerCase().includes("equipment") ||
         productName.toLowerCase().includes("tack")
       );
     });
@@ -234,6 +236,18 @@ function uniqByPersonId(items) {
   return Object.values(map);
 }
 
+function uniqByPriceCatalogId(items) {
+  var map = {};
+
+  items.forEach(function (item) {
+    if (item && item.priceCatalogId && !map[item.priceCatalogId]) {
+      map[item.priceCatalogId] = item;
+    }
+  });
+
+  return Object.values(map);
+}
+
 export default function useAdminCompetitionStallBookings(params) {
   var user = params.user;
   var activeRole = params.activeRole;
@@ -244,7 +258,7 @@ export default function useAdminCompetitionStallBookings(params) {
   var [horsePayers, setHorsePayers] = useState([]);
   var [managedPayers, setManagedPayers] = useState([]);
   var [horseStallTypeOptions, setHorseStallTypeOptions] = useState([]);
-  var [tackStallTypeOptions, setTackStallTypeOptions] = useState([]);
+  var [equipmentStallTypeOptions, setEquipmentStallTypeOptions] = useState([]);
 
   var [selectedHorseToAdd, setSelectedHorseToAdd] = useState(null);
   var [selectedHorseStallType, setSelectedHorseStallType] = useState(null);
@@ -258,11 +272,13 @@ export default function useAdminCompetitionStallBookings(params) {
 
   var [mode, setMode] = useState("horse");
 
-  var [selectedTackStallType, setSelectedTackStallType] = useState(null);
-  var [tackQuantity, setTackQuantity] = useState("");
-  var [tackSplitMode, setTackSplitMode] = useState("equal");
-  var [selectedTackPayers, setSelectedTackPayers] = useState([]);
-  var [tackNotes, setTackNotes] = useState("");
+  var [selectedEquipmentStallType, setSelectedEquipmentStallType] = useState(null);
+  var [equipmentQuantity, setEquipmentQuantity] = useState("1");
+  var [equipmentSplitMode, setEquipmentSplitMode] = useState("equal");
+  var [selectedEquipmentPayers, setSelectedEquipmentPayers] = useState([]);
+  var [equipmentNotes, setEquipmentNotes] = useState("");
+  var [equipmentStartDate, setEquipmentStartDate] = useState("");
+  var [equipmentEndDate, setEquipmentEndDate] = useState("");
 
   var [loading, setLoading] = useState(false);
   var [isSaving, setIsSaving] = useState(false);
@@ -331,7 +347,7 @@ export default function useAdminCompetitionStallBookings(params) {
       var sections = getServicePriceSectionsFromInvitation(invitationResponse);
 
       setHorseStallTypeOptions(extractHorseStallPriceItems(sections));
-      setTackStallTypeOptions(extractTackStallPriceItems(sections));
+      setEquipmentStallTypeOptions(extractEquipmentStallPriceItems(sections));
 
       setHorses(
         (Array.isArray(horsesResponse?.data) ? horsesResponse.data : [])
@@ -414,6 +430,7 @@ export default function useAdminCompetitionStallBookings(params) {
           {
             horse: selectedHorseToAdd,
             payers: getDefaultHorsePayers(selectedHorseToAdd.horseId),
+            stallType: selectedHorseStallType,
           },
         ]);
       });
@@ -485,12 +502,58 @@ export default function useAdminCompetitionStallBookings(params) {
     [selectedHorseBookings],
   );
 
-  function toggleTackPayerSelection(payerItem) {
+  var selectedHorseStallTypes = useMemo(
+    function () {
+      var types = selectedHorseBookings
+        .map(function (booking) {
+          return booking.stallType || selectedHorseStallType;
+        })
+        .filter(Boolean);
+
+      return uniqByPriceCatalogId(types);
+    },
+    [selectedHorseBookings, selectedHorseStallType],
+  );
+
+  useEffect(
+    function () {
+      if (!selectedHorseBookings.length) {
+        return;
+      }
+
+      if (!equipmentStartDate) {
+        setEquipmentStartDate(checkInDate);
+      }
+
+      if (!equipmentEndDate) {
+        setEquipmentEndDate(checkOutDate);
+      }
+    },
+    [selectedHorseBookings, checkInDate, checkOutDate],
+  );
+
+  useEffect(
+    function () {
+      if (selectedHorseStallTypes.length === 1) {
+        setSelectedEquipmentStallType(selectedHorseStallTypes[0]);
+      } else if (
+        selectedEquipmentStallType &&
+        !selectedHorseStallTypes.some(function (item) {
+          return item.priceCatalogId === selectedEquipmentStallType.priceCatalogId;
+        })
+      ) {
+        setSelectedEquipmentStallType(null);
+      }
+    },
+    [selectedHorseStallTypes],
+  );
+
+  function toggleEquipmentPayerSelection(payerItem) {
     if (!payerItem || !payerItem.paidByPersonId) {
       return;
     }
 
-    setSelectedTackPayers(function (prev) {
+    setSelectedEquipmentPayers(function (prev) {
       var exists = prev.some(function (item) {
         return item.paidByPersonId === payerItem.paidByPersonId;
       });
@@ -505,14 +568,34 @@ export default function useAdminCompetitionStallBookings(params) {
     });
   }
 
-  var derivedTackDates = useMemo(
+  var effectiveEquipmentPayers = useMemo(
     function () {
+      if (equipmentSplitMode === "equal") {
+        return allSelectedHorsePayers;
+      }
+
+      return selectedEquipmentPayers;
+    },
+    [equipmentSplitMode, allSelectedHorsePayers, selectedEquipmentPayers],
+  );
+
+  var equipmentPricingSummary = useMemo(
+    function () {
+      var quantity = Number(equipmentQuantity || 0);
+      var unitPrice = Number(selectedEquipmentStallType?.itemPrice || 0);
+      var total = quantity * unitPrice;
+      var payerCount = effectiveEquipmentPayers.length;
+      var perPayer = payerCount > 0 ? Math.ceil(total / payerCount) : 0;
+
       return {
-        startDate: checkInDate,
-        endDate: checkOutDate,
+        quantity: quantity,
+        unitPrice: unitPrice,
+        totalPrice: total,
+        payerCount: payerCount,
+        amountPerPayer: perPayer,
       };
     },
-    [checkInDate, checkOutDate],
+    [equipmentQuantity, selectedEquipmentStallType, effectiveEquipmentPayers],
   );
 
   function validateHorseBookingsForm() {
@@ -567,6 +650,7 @@ export default function useAdminCompetitionStallBookings(params) {
       );
       return;
     }
+
     if (validationMessage) {
       Alert.alert("שגיאה", validationMessage);
       return;
@@ -585,10 +669,12 @@ export default function useAdminCompetitionStallBookings(params) {
       }
 
       var requests = validBookings.map(function (booking) {
+        var currentStallType = booking.stallType || selectedHorseStallType;
+
         return createStallBooking({
           competitionId: competitionId,
           orderedBySystemUserId: user.personId,
-          catalogItemId: selectedHorseStallType.priceCatalogId,
+          catalogItemId: currentStallType.priceCatalogId,
           notes: notes ? notes.trim() : null,
           ranchId: activeRole.ranchId,
           horseId: booking.horse.horseId,
@@ -610,7 +696,6 @@ export default function useAdminCompetitionStallBookings(params) {
       await Promise.all(requests);
 
       Alert.alert("נשמר", "תאי הסוסים הוזמנו בהצלחה");
-      setMode("tack");
     } catch (error) {
       Alert.alert(
         "שגיאה",
@@ -621,23 +706,33 @@ export default function useAdminCompetitionStallBookings(params) {
     }
   }
 
-  function handleOpenTackMode() {
+  function handleOpenEquipmentMode() {
     if (!selectedHorseBookings.length) {
-      Alert.alert("שגיאה", "יש להוסיף לפחות סוס אחד לפני מעבר לתאי Tack");
+      Alert.alert("שגיאה", "יש להוסיף לפחות סוס אחד לפני מעבר להזמנת תאי ציוד");
       return;
     }
 
-    setMode("tack");
+    setMode("equipment");
   }
 
   function handleBackToHorseMode() {
     setMode("horse");
   }
 
-  function handleSubmitTackDraft() {
+  function handleGoToEquipmentIfComplete() {
+    if (
+      horses.length > 0 &&
+      selectedHorseBookings.length > 0 &&
+      selectedHorseBookings.length === horses.length
+    ) {
+      setMode("equipment");
+    }
+  }
+
+  function handleSubmitEquipmentDraft() {
     Alert.alert(
       "עדיין לא מחובר",
-      "טופס תא Tack מוכן בצד לקוח, אבל כדי לשמור אותו צריך להשלים תמיכה מתאימה בשרת.",
+      "טופס תא ציוד מוכן בצד לקוח, אבל כדי לשמור אותו צריך להשלים תמיכה מתאימה בשרת.",
     );
   }
 
@@ -645,7 +740,8 @@ export default function useAdminCompetitionStallBookings(params) {
     mode,
 
     horseStallTypeOptions,
-    tackStallTypeOptions,
+    equipmentStallTypeOptions,
+    selectedHorseStallTypes,
 
     selectedHorseToAdd,
     setSelectedHorseToAdd,
@@ -667,27 +763,32 @@ export default function useAdminCompetitionStallBookings(params) {
     expandedHorseEditorId,
     toggleHorseEditor,
 
-    allSelectedHorsePayers,
-    selectedTackStallType,
-    setSelectedTackStallType,
-    tackQuantity,
-    setTackQuantity,
-    tackSplitMode,
-    setTackSplitMode,
-    selectedTackPayers,
-    toggleTackPayerSelection,
-    tackNotes,
-    setTackNotes,
-    derivedTackDates,
+    selectedEquipmentStallType,
+    setSelectedEquipmentStallType,
+    equipmentQuantity,
+    setEquipmentQuantity,
+    equipmentSplitMode,
+    setEquipmentSplitMode,
+    selectedEquipmentPayers,
+    toggleEquipmentPayerSelection,
+    equipmentNotes,
+    setEquipmentNotes,
+    equipmentStartDate,
+    setEquipmentStartDate,
+    equipmentEndDate,
+    setEquipmentEndDate,
+    effectiveEquipmentPayers,
+    equipmentPricingSummary,
 
     loading,
     isSaving,
     screenError,
 
     handleCreateHorseStallBookings,
-    handleOpenTackMode,
+    handleOpenEquipmentMode,
     handleBackToHorseMode,
-    handleSubmitTackDraft,
+    handleGoToEquipmentIfComplete,
+    handleSubmitEquipmentDraft,
 
     formatHorseLabel,
     formatPayerLabel,
