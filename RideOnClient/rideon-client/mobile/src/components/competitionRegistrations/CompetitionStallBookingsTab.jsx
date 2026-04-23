@@ -26,6 +26,7 @@ export default function CompetitionStallBookingsTab(props) {
     return (
       <CompetitionTackStallFormCard
         tackStallTypeOptions={props.tackStallTypeOptions}
+        horseStallTypeOptions={props.horseStallTypeOptions}
         selectedTackStallType={props.selectedTackStallType}
         setSelectedTackStallType={props.setSelectedTackStallType}
         tackQuantity={props.tackQuantity}
@@ -44,7 +45,7 @@ export default function CompetitionStallBookingsTab(props) {
         minCompetitionDate={props.minCompetitionDate}
         maxCompetitionDate={props.maxCompetitionDate}
         allSelectedHorsePayers={props.allSelectedHorsePayers}
-        allHorseStallTypes={props.allHorseStallTypes}
+        allTackTypes={props.allTackTypes}
         existingTackBookingsCount={props.existingTackBookingsCount}
         onBack={props.handleBackToHorseMode}
         onSubmit={props.handleSubmitTackDraft}
@@ -71,7 +72,9 @@ export default function CompetitionStallBookingsTab(props) {
       availableHorseOptions={props.availableHorseOptions}
       selectedHorseBookings={props.selectedHorseBookings}
       allEligibleHorsesAlreadyBooked={props.allEligibleHorsesAlreadyBooked}
-      hasAnyHorseStallBookingsForCompetition={props.hasAnyHorseStallBookingsForCompetition}
+      hasAnyHorseStallBookingsForCompetition={
+        props.hasAnyHorseStallBookingsForCompetition
+      }
       handleRemoveHorseBooking={props.handleRemoveHorseBooking}
       getAvailablePayersForHorse={props.getAvailablePayersForHorse}
       toggleHorsePayerSelection={props.toggleHorsePayerSelection}

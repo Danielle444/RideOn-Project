@@ -17,13 +17,19 @@ export default function CompetitionTackStallFormCard(props) {
     { id: "specific", name: "בחירת משלמים מסוימים" },
   ];
 
-  var selectedSplitModeItem = splitModeItems.find(function (item) {
-    return item.id === props.tackSplitMode;
-  }) || null;
+  var selectedSplitModeItem =
+    splitModeItems.find(function (item) {
+      return item.id === props.tackSplitMode;
+    }) || null;
 
   var hasSingleTackType =
-    Array.isArray(props.allTackTypes) &&
-    props.allTackTypes.length === 1;
+    Array.isArray(props.allTackTypes) && props.allTackTypes.length === 1;
+
+  var pricingSummary = props.tackPricingSummary || {
+    totalPrice: 0,
+    payerCount: 0,
+    amountPerPayer: 0,
+  };
 
   return (
     <View style={styles.formCard}>
@@ -31,13 +37,15 @@ export default function CompetitionTackStallFormCard(props) {
 
       <View style={styles.helperCard}>
         <Text style={styles.helperText}>
-          תאריכי ברירת המחדל נלקחים מטווח התאריכים של תאי הסוסים, אבל אפשר לערוך אותם.
+          תאריכי ברירת המחדל נלקחים מטווח התאריכים של תאי הסוסים, אבל אפשר לערוך
+          אותם.
         </Text>
       </View>
 
-      {hasSingleTackType ? (
-        <View style={styles.fieldBlock}>
-          <Text style={styles.fieldLabel}>סוג תא ציוד</Text>
+      <View style={styles.fieldBlock}>
+        <Text style={styles.fieldLabel}>סוג תא ציוד</Text>
+
+        {hasSingleTackType ? (
           <View style={styles.textInput}>
             <Text
               style={{
@@ -49,21 +57,57 @@ export default function CompetitionTackStallFormCard(props) {
               {props.formatStallTypeLabel(props.allTackTypes[0])}
             </Text>
           </View>
-        </View>
-      ) : (
-        <CompetitionRegistrationDropdown
-          label="סוג תא ציוד"
-          placeholder="בחרי סוג תא ציוד"
-          searchPlaceholder="חיפוש סוג תא ציוד"
-          items={props.tackStallTypeOptions}
-          selectedItem={props.selectedTackStallType}
-          getItemId={function (item) {
-            return item.priceCatalogId;
-          }}
-          getItemLabel={props.formatStallTypeLabel}
-          onSelect={props.setSelectedTackStallType}
-        />
-      )}
+        ) : (
+          <View style={{ gap: 8 }}>
+            {(Array.isArray(props.allTackTypes) && props.allTackTypes.length > 0
+              ? props.allTackTypes
+              : props.horseStallTypeOptions || []
+            ).map(function (item) {
+              var isSelected =
+                props.selectedTackStallType &&
+                props.selectedTackStallType.priceCatalogId ===
+                  item.priceCatalogId;
+
+              return (
+                <Pressable
+                  key={String(item.priceCatalogId)}
+                  onPress={function () {
+                    props.setSelectedTackStallType(item);
+                  }}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: isSelected ? "#7B5A4D" : "#D8C7BC",
+                    backgroundColor: isSelected ? "#F3E7DF" : "#FFFFFF",
+                    borderRadius: 16,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                  }}
+                >
+                  <Text
+                    style={{
+                      textAlign: "right",
+                      color: "#4F3B31",
+                      fontSize: 14,
+                      fontWeight: isSelected ? "700" : "400",
+                    }}
+                  >
+                    {props.formatStallTypeLabel(item)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+
+            {(!Array.isArray(props.allTackTypes) ||
+              props.allTackTypes.length === 0) &&
+            (!Array.isArray(props.horseStallTypeOptions) ||
+              props.horseStallTypeOptions.length === 0) ? (
+              <View style={styles.helperCard}>
+                <Text style={styles.helperText}>לא נמצאו סוגי תאים לבחירה</Text>
+              </View>
+            ) : null}
+          </View>
+        )}
+      </View>
 
       <CompetitionDateField
         label="תאריך כניסה"
@@ -103,7 +147,9 @@ export default function CompetitionTackStallFormCard(props) {
               props.setTackQuantity(String(nextValue));
             }}
           >
-            <Text style={{ fontSize: 26, color: "#7B5A4D", fontWeight: "700" }}>−</Text>
+            <Text style={{ fontSize: 26, color: "#7B5A4D", fontWeight: "700" }}>
+              −
+            </Text>
           </Pressable>
 
           <Text style={{ fontSize: 20, color: "#4F3B31", fontWeight: "700" }}>
@@ -116,7 +162,9 @@ export default function CompetitionTackStallFormCard(props) {
               props.setTackQuantity(String(nextValue));
             }}
           >
-            <Text style={{ fontSize: 26, color: "#7B5A4D", fontWeight: "700" }}>+</Text>
+            <Text style={{ fontSize: 26, color: "#7B5A4D", fontWeight: "700" }}>
+              +
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -149,13 +197,13 @@ export default function CompetitionTackStallFormCard(props) {
 
       <View style={styles.helperCard}>
         <Text style={styles.helperText}>
-          עלות כוללת: {props.tackPricingSummary.totalPrice} ₪
+          עלות כוללת: {pricingSummary.totalPrice} ₪
         </Text>
         <Text style={styles.helperText}>
-          מספר משלמים: {props.tackPricingSummary.payerCount}
+          מספר משלמים: {pricingSummary.payerCount}
         </Text>
         <Text style={styles.helperText}>
-          לכל משלם: {props.tackPricingSummary.amountPerPayer} ₪
+          לכל משלם: {pricingSummary.amountPerPayer} ₪
         </Text>
       </View>
 
@@ -184,7 +232,10 @@ export default function CompetitionTackStallFormCard(props) {
         }}
       >
         <Pressable
-          style={[styles.primaryButton, { flex: 1, backgroundColor: "#A79185" }]}
+          style={[
+            styles.primaryButton,
+            { flex: 1, backgroundColor: "#A79185" },
+          ]}
           onPress={props.onBack}
         >
           <Text style={styles.primaryButtonText}>חזרה לתאי סוסים</Text>

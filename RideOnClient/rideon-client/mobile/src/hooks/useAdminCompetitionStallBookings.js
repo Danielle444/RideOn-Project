@@ -148,12 +148,14 @@ function normalizeExistingStallBooking(item) {
     isForTack: isForTack,
     isTackBooking: isForTack === true || horseId === null,
     catalogItemId:
-      item.catalogItemId ||
-      item.CatalogItemId ||
-      item.catalogitemid ||
-      item.priceCatalogId ||
-      item.PriceCatalogId ||
-      null,
+      Number(
+        item.catalogItemId ||
+          item.CatalogItemId ||
+          item.catalogitemid ||
+          item.priceCatalogId ||
+          item.PriceCatalogId ||
+          0,
+      ) || null,
     startDate: normalizeDateString(
       item.startDate ||
         item.StartDate ||
@@ -492,6 +494,7 @@ export default function useAdminCompetitionStallBookings(params) {
     checkInDate: checkInDate,
     checkOutDate: checkOutDate,
     notes: notes,
+    reloadStallBookings: loadData,
   });
 
   var allSelectedHorsePayers = useMemo(
@@ -636,7 +639,7 @@ export default function useAdminCompetitionStallBookings(params) {
     setTackEndDate: tackHook.setTackEndDate,
     effectiveTackPayers: tackHook.effectiveTackPayers,
     tackPricingSummary: tackHook.tackPricingSummary,
-    allHorseStallTypes: tackHook.allHorseStallTypes,
+    allTackTypes: tackHook.allTackTypes,
     allSelectedHorsePayers: allSelectedHorsePayers,
 
     handleOpenTackMode: handleOpenTackMode,
