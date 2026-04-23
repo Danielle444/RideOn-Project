@@ -192,6 +192,35 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("equipment")]
+        public IActionResult CreateEquipmentStallBookings([FromBody] CreateEquipmentStallBookingsRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Request body is required.");
+                }
+
+                if (request.Quantity <= 0)
+                {
+                    return BadRequest("Quantity must be greater than 0.");
+                }
+
+                if (request.Payers == null || request.Payers.Count == 0)
+                {
+                    return BadRequest("At least one payer is required.");
+                }
+
+                List<int> createdIds = StallBookingDAL.CreateEquipmentStallBookings(request);
+                return Ok(createdIds);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         private int GetPersonIdFromClaims()
         {
             string? personIdClaim = User.Claims.FirstOrDefault(c => c.Type == "PersonId")?.Value;

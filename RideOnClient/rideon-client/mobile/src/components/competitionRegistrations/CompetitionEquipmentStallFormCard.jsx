@@ -8,43 +8,59 @@ import {
 } from "react-native";
 import CompetitionRegistrationDropdown from "../competitions/CompetitionRegistrationDropdown";
 import CompetitionMultiPayerSelector from "./CompetitionMultiPayerSelector";
+import CompetitionDateField from "./CompetitionDateField";
 import styles from "../../styles/adminCompetitionPaidTimesStyles";
 
 export default function CompetitionEquipmentStallFormCard(props) {
+  var splitModeItems = [
+    { id: "equal", name: "חלוקה שווה בין כל המשלמים של תאי הסוסים" },
+    { id: "specific", name: "בחירת משלמים מסוימים" },
+  ];
+
   return (
     <View style={styles.formCard}>
-      <Text style={styles.cardTitle}>הזמנת תאי Tack</Text>
+      <Text style={styles.cardTitle}>הזמנת תאי ציוד</Text>
 
       <View style={styles.helperCard}>
         <Text style={styles.helperText}>
-          תאריכי ה־Tack נגזרים מתאי הסוסים שכבר הוזנו.
-        </Text>
-        <Text style={styles.helperText}>
-          כניסה: {props.derivedTackDates.startDate || "-"}
-        </Text>
-        <Text style={styles.helperText}>
-          יציאה: {props.derivedTackDates.endDate || "-"}
+          תאריכי ברירת המחדל נלקחים מטווח התאריכים של תאי הסוסים, אבל אפשר לערוך אותם.
         </Text>
       </View>
 
       <CompetitionRegistrationDropdown
-        label="סוג תא Tack"
-        placeholder="בחרי סוג תא Tack"
-        searchPlaceholder="חיפוש סוג תא Tack"
-        items={props.tackStallTypeOptions}
-        selectedItem={props.selectedTackStallType}
+        label="סוג תא ציוד"
+        placeholder="בחרי סוג תא ציוד"
+        searchPlaceholder="חיפוש סוג תא ציוד"
+        items={props.equipmentStallTypeOptions}
+        selectedItem={props.selectedEquipmentStallType}
         getItemId={function (item) {
           return item.priceCatalogId;
         }}
         getItemLabel={props.formatStallTypeLabel}
-        onSelect={props.setSelectedTackStallType}
+        onSelect={props.setSelectedEquipmentStallType}
+      />
+
+      <CompetitionDateField
+        label="תאריך כניסה"
+        value={props.equipmentStartDate}
+        onChange={props.setEquipmentStartDate}
+        minimumDate={props.minCompetitionDate}
+        maximumDate={props.maxCompetitionDate}
+      />
+
+      <CompetitionDateField
+        label="תאריך יציאה"
+        value={props.equipmentEndDate}
+        onChange={props.setEquipmentEndDate}
+        minimumDate={props.minCompetitionDate}
+        maximumDate={props.maxCompetitionDate}
       />
 
       <View style={styles.fieldBlock}>
-        <Text style={styles.fieldLabel}>כמות תאי Tack</Text>
+        <Text style={styles.fieldLabel}>כמות תאי ציוד</Text>
         <TextInput
-          value={props.tackQuantity}
-          onChangeText={props.setTackQuantity}
+          value={props.equipmentQuantity}
+          onChangeText={props.setEquipmentQuantity}
           placeholder="למשל 2"
           style={styles.textInput}
           keyboardType="numeric"
@@ -56,14 +72,11 @@ export default function CompetitionEquipmentStallFormCard(props) {
         label="אופן חלוקת תשלום"
         placeholder="בחרי אופן חלוקה"
         searchPlaceholder="חיפוש אופן חלוקה"
-        items={[
-          { id: "equal", name: "חלוקה שווה בין כל המשלמים של תאי הסוסים" },
-          { id: "specific", name: "בחירת משלמים מסוימים" },
-        ]}
+        items={splitModeItems}
         selectedItem={
-          props.tackSplitMode === "equal"
-            ? { id: "equal", name: "חלוקה שווה בין כל המשלמים של תאי הסוסים" }
-            : { id: "specific", name: "בחירת משלמים מסוימים" }
+          splitModeItems.find(function (item) {
+            return item.id === props.equipmentSplitMode;
+          }) || null
         }
         getItemId={function (item) {
           return item.id;
@@ -72,25 +85,37 @@ export default function CompetitionEquipmentStallFormCard(props) {
           return item.name;
         }}
         onSelect={function (item) {
-          props.setTackSplitMode(item.id);
+          props.setEquipmentSplitMode(item.id);
         }}
       />
 
-      {props.tackSplitMode === "specific" ? (
+      {props.equipmentSplitMode === "specific" ? (
         <CompetitionMultiPayerSelector
           items={props.allSelectedHorsePayers}
-          selectedItems={props.selectedTackPayers}
-          onToggleItem={props.toggleTackPayerSelection}
+          selectedItems={props.selectedEquipmentPayers}
+          onToggleItem={props.toggleEquipmentPayerSelection}
           getItemLabel={props.formatPayerLabel}
         />
       ) : null}
 
+      <View style={styles.helperCard}>
+        <Text style={styles.helperText}>
+          עלות כוללת: {props.equipmentPricingSummary.totalPrice} ₪
+        </Text>
+        <Text style={styles.helperText}>
+          מספר משלמים: {props.equipmentPricingSummary.payerCount}
+        </Text>
+        <Text style={styles.helperText}>
+          לכל משלם: {props.equipmentPricingSummary.amountPerPayer} ₪
+        </Text>
+      </View>
+
       <View style={styles.fieldBlock}>
         <Text style={styles.fieldLabel}>הערות</Text>
         <TextInput
-          value={props.tackNotes}
-          onChangeText={props.setTackNotes}
-          placeholder="הערות לתאי Tack"
+          value={props.equipmentNotes}
+          onChangeText={props.setEquipmentNotes}
+          placeholder="הערות לתאי ציוד"
           style={[styles.textInput, styles.notesInput]}
           multiline
           textAlign="right"
@@ -122,7 +147,7 @@ export default function CompetitionEquipmentStallFormCard(props) {
           {props.isSaving ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.primaryButtonText}>שמרי Tack</Text>
+            <Text style={styles.primaryButtonText}>שמרי תאי ציוד</Text>
           )}
         </Pressable>
       </View>
