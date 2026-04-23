@@ -48,9 +48,9 @@ export default function useAdminEquipmentStallBookings(params) {
   var checkInDate = params.checkInDate;
   var checkOutDate = params.checkOutDate;
   var allSelectedHorsePayers = params.allSelectedHorsePayers;
+  var reloadStallBookings = params.reloadStallBookings;
 
-  var [selectedEquipmentStallType, setSelectedEquipmentStallType] =
-    useState(null);
+  var [selectedEquipmentStallType, setSelectedEquipmentStallType] = useState(null);
   var [equipmentQuantity, setEquipmentQuantity] = useState("1");
   var [equipmentSplitMode, setEquipmentSplitMode] = useState("equal");
   var [selectedEquipmentPayers, setSelectedEquipmentPayers] = useState([]);
@@ -69,9 +69,7 @@ export default function useAdminEquipmentStallBookings(params) {
 
       var fromExisting = existingStallBookings
         .filter(function (booking) {
-          return (
-            booking && booking.isForTack === false && booking.catalogItemId
-          );
+          return booking && !booking.isEquipmentBooking && booking.catalogItemId;
         })
         .map(function (booking) {
           return horseStallTypeOptions.find(function (item) {
@@ -82,19 +80,14 @@ export default function useAdminEquipmentStallBookings(params) {
 
       return uniqByPriceCatalogId(fromSelected.concat(fromExisting));
     },
-    [
-      selectedHorseBookings,
-      selectedHorseStallType,
-      existingStallBookings,
-      horseStallTypeOptions,
-    ],
+    [selectedHorseBookings, selectedHorseStallType, existingStallBookings, horseStallTypeOptions]
   );
 
   var defaultEquipmentDateRange = useMemo(
     function () {
       var existingHorseBookingStartDates = existingStallBookings
         .filter(function (booking) {
-          return booking && booking.isForTack === false;
+          return booking && !booking.isEquipmentBooking;
         })
         .map(function (booking) {
           return booking.startDate;
@@ -102,7 +95,7 @@ export default function useAdminEquipmentStallBookings(params) {
 
       var existingHorseBookingEndDates = existingStallBookings
         .filter(function (booking) {
-          return booking && booking.isForTack === false;
+          return booking && !booking.isEquipmentBooking;
         })
         .map(function (booking) {
           return booking.endDate;
@@ -118,14 +111,14 @@ export default function useAdminEquipmentStallBookings(params) {
 
       return {
         startDate: getMinDateString(
-          existingHorseBookingStartDates.concat(selectedStartDates),
+          existingHorseBookingStartDates.concat(selectedStartDates)
         ),
         endDate: getMaxDateString(
-          existingHorseBookingEndDates.concat(selectedEndDates),
+          existingHorseBookingEndDates.concat(selectedEndDates)
         ),
       };
     },
-    [existingStallBookings, selectedHorseBookings, checkInDate, checkOutDate],
+    [existingStallBookings, selectedHorseBookings, checkInDate, checkOutDate]
   );
 
   useEffect(
@@ -133,7 +126,7 @@ export default function useAdminEquipmentStallBookings(params) {
       setEquipmentStartDate(defaultEquipmentDateRange.startDate || "");
       setEquipmentEndDate(defaultEquipmentDateRange.endDate || "");
     },
-    [defaultEquipmentDateRange.startDate, defaultEquipmentDateRange.endDate],
+    [defaultEquipmentDateRange.startDate, defaultEquipmentDateRange.endDate]
   );
 
   useEffect(
@@ -143,15 +136,13 @@ export default function useAdminEquipmentStallBookings(params) {
       } else if (
         selectedEquipmentStallType &&
         !allHorseStallTypes.some(function (item) {
-          return (
-            item.priceCatalogId === selectedEquipmentStallType.priceCatalogId
-          );
+          return item.priceCatalogId === selectedEquipmentStallType.priceCatalogId;
         })
       ) {
         setSelectedEquipmentStallType(null);
       }
     },
-    [allHorseStallTypes, selectedEquipmentStallType],
+    [allHorseStallTypes, selectedEquipmentStallType]
   );
 
   function toggleEquipmentPayerSelection(payerItem) {
@@ -182,7 +173,7 @@ export default function useAdminEquipmentStallBookings(params) {
 
       return selectedEquipmentPayers;
     },
-    [equipmentSplitMode, allSelectedHorsePayers, selectedEquipmentPayers],
+    [equipmentSplitMode, allSelectedHorsePayers, selectedEquipmentPayers]
   );
 
   var equipmentPricingSummary = useMemo(
@@ -201,14 +192,11 @@ export default function useAdminEquipmentStallBookings(params) {
         amountPerPayer: perPayer,
       };
     },
-    [equipmentQuantity, selectedEquipmentStallType, effectiveEquipmentPayers],
+    [equipmentQuantity, selectedEquipmentStallType, effectiveEquipmentPayers]
   );
 
   async function handleSubmitEquipmentDraft() {
-    if (
-      !selectedEquipmentStallType ||
-      !selectedEquipmentStallType.priceCatalogId
-    ) {
+    if (!selectedEquipmentStallType || !selectedEquipmentStallType.priceCatalogId) {
       Alert.alert("שגיאה", "יש לבחור סוג תא ציוד");
       return;
     }
@@ -259,6 +247,10 @@ export default function useAdminEquipmentStallBookings(params) {
         }),
       });
 
+      if (reloadStallBookings) {
+        await reloadStallBookings();
+      }
+
       Alert.alert("נשמר", "תאי הציוד הוזמנו בהצלחה");
       setEquipmentQuantity("1");
       setEquipmentSplitMode("equal");
@@ -267,7 +259,7 @@ export default function useAdminEquipmentStallBookings(params) {
     } catch (error) {
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה בשמירת תאי הציוד"),
+        String(error?.response?.data || "אירעה שגיאה בשמירת תאי הציוד")
       );
     } finally {
       setIsSavingEquipment(false);
@@ -295,4 +287,4 @@ export default function useAdminEquipmentStallBookings(params) {
     isSavingEquipment: isSavingEquipment,
     handleSubmitEquipmentDraft: handleSubmitEquipmentDraft,
   };
-}
+}0

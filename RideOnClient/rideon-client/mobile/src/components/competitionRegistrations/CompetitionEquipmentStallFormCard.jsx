@@ -21,6 +21,10 @@ export default function CompetitionEquipmentStallFormCard(props) {
     return item.id === props.equipmentSplitMode;
   }) || null;
 
+  var hasSingleEquipmentType =
+    Array.isArray(props.allHorseStallTypes) &&
+    props.allHorseStallTypes.length === 1;
+
   return (
     <View style={styles.formCard}>
       <Text style={styles.cardTitle}>הזמנת תאי ציוד</Text>
@@ -31,19 +35,35 @@ export default function CompetitionEquipmentStallFormCard(props) {
         </Text>
       </View>
 
-      <CompetitionRegistrationDropdown
-        label="סוג תא ציוד"
-        placeholder="בחרי סוג תא ציוד"
-        searchPlaceholder="חיפוש סוג תא ציוד"
-        items={props.equipmentStallTypeOptions}
-        selectedItem={props.selectedEquipmentStallType}
-        getItemId={function (item) {
-          return item.priceCatalogId;
-        }}
-        getItemLabel={props.formatStallTypeLabel}
-        onSelect={props.setSelectedEquipmentStallType}
-        disabled={props.allHorseStallTypes.length === 1}
-      />
+      {hasSingleEquipmentType ? (
+        <View style={styles.fieldBlock}>
+          <Text style={styles.fieldLabel}>סוג תא ציוד</Text>
+          <View style={styles.textInput}>
+            <Text
+              style={{
+                textAlign: "right",
+                color: "#4F3B31",
+                fontSize: 14,
+              }}
+            >
+              {props.formatStallTypeLabel(props.allHorseStallTypes[0])}
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <CompetitionRegistrationDropdown
+          label="סוג תא ציוד"
+          placeholder="בחרי סוג תא ציוד"
+          searchPlaceholder="חיפוש סוג תא ציוד"
+          items={props.equipmentStallTypeOptions}
+          selectedItem={props.selectedEquipmentStallType}
+          getItemId={function (item) {
+            return item.priceCatalogId;
+          }}
+          getItemLabel={props.formatStallTypeLabel}
+          onSelect={props.setSelectedEquipmentStallType}
+        />
+      )}
 
       <CompetitionDateField
         label="תאריך כניסה"
@@ -149,6 +169,12 @@ export default function CompetitionEquipmentStallFormCard(props) {
           multiline
           textAlign="right"
         />
+      </View>
+
+      <View style={styles.helperCard}>
+        <Text style={styles.helperText}>
+          הוזמנו {props.existingEquipmentBookingsCount} תאי ציוד
+        </Text>
       </View>
 
       <View

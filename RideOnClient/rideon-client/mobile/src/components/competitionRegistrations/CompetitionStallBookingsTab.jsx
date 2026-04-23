@@ -45,6 +45,7 @@ export default function CompetitionStallBookingsTab(props) {
         maxCompetitionDate={props.maxCompetitionDate}
         allSelectedHorsePayers={props.allSelectedHorsePayers}
         allHorseStallTypes={props.allHorseStallTypes}
+        existingEquipmentBookingsCount={props.existingEquipmentBookingsCount}
         onBack={props.handleBackToHorseMode}
         onSubmit={props.handleSubmitEquipmentDraft}
         isSaving={props.isSaving}
@@ -78,6 +79,7 @@ export default function CompetitionStallBookingsTab(props) {
       toggleHorseEditor={props.toggleHorseEditor}
       notes={props.notes}
       setNotes={props.setNotes}
+      bookedHorseNamesSummary={props.bookedHorseNamesSummary}
       isSaving={props.isSaving}
       onSubmit={props.handleCreateHorseStallBookings}
       onOpenEquipmentMode={props.handleOpenEquipmentMode}

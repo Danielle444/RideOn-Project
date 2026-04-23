@@ -113,23 +113,40 @@ function normalizeDateString(value) {
   return text;
 }
 
+function normalizeBoolean(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value === 1;
+  }
+
+  if (typeof value === "string") {
+    var normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "1";
+  }
+
+  return false;
+}
+
 function normalizeExistingStallBooking(item) {
   if (!item) {
     return null;
   }
 
+  var horseId = item.horseId || item.HorseId || item.horseid || null;
+
+  var isForTack = normalizeBoolean(
+    item.isForTack ?? item.IsForTack ?? item.isfortack,
+  );
+
   return {
     stallBookingId:
       item.stallBookingId || item.StallBookingId || item.stallbookingid || null,
-    horseId: item.horseId || item.HorseId || item.horseid || null,
-    isForTack:
-      typeof item.isForTack === "boolean"
-        ? item.isForTack
-        : typeof item.IsForTack === "boolean"
-          ? item.IsForTack
-          : typeof item.isfortack === "boolean"
-            ? item.isfortack
-            : false,
+    horseId: horseId,
+    isForTack: isForTack,
+    isEquipmentBooking: isForTack === true || horseId === null,
     catalogItemId:
       item.catalogItemId ||
       item.CatalogItemId ||
@@ -359,98 +376,102 @@ export default function useAdminCompetitionStallBookings(params) {
     [activeCompetition],
   );
 
+  var loadData = useCallback(
+    async function () {
+      if (!activeRole || !activeRole.ranchId || !competitionId) {
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setScreenError("");
+
+        var results = await Promise.all([
+          getCompetitionInvitationDetails(
+            competitionId,
+            activeRole.roleId,
+            activeRole.ranchId,
+          ),
+          getHorsesForStallBooking(competitionId, activeRole.ranchId),
+          getHorsePayersForCompetition(competitionId, activeRole.ranchId),
+          getManagedPayers(activeRole.ranchId, null, null),
+          getStallBookingsForCompetitionAndRanch(
+            competitionId,
+            activeRole.ranchId,
+          ),
+        ]);
+
+        var invitationResponse = results[0];
+        var horsesResponse = results[1];
+        var horsePayersResponse = results[2];
+        var managedPayersResponse = results[3];
+        var existingBookingsResponse = results[4];
+
+        var sections =
+          getServicePriceSectionsFromInvitation(invitationResponse);
+
+        setHorseStallTypeOptions(extractHorseStallPriceItems(sections));
+        setEquipmentStallTypeOptions(extractEquipmentStallPriceItems(sections));
+
+        setHorses(
+          (Array.isArray(horsesResponse?.data) ? horsesResponse.data : [])
+            .map(function (item) {
+              return normalizeHorseItem(item);
+            })
+            .filter(Boolean),
+        );
+
+        setHorsePayers(
+          (Array.isArray(horsePayersResponse?.data)
+            ? horsePayersResponse.data
+            : []
+          )
+            .map(function (item) {
+              return normalizeHorsePayerItem(item);
+            })
+            .filter(Boolean),
+        );
+
+        setManagedPayers(
+          (Array.isArray(managedPayersResponse?.data)
+            ? managedPayersResponse.data
+            : []
+          )
+            .map(function (item) {
+              return normalizeManagedPayerItem(item);
+            })
+            .filter(Boolean),
+        );
+
+        setExistingStallBookings(
+          (Array.isArray(existingBookingsResponse?.data)
+            ? existingBookingsResponse.data
+            : []
+          )
+            .map(function (item) {
+              return normalizeExistingStallBooking(item);
+            })
+            .filter(Boolean),
+        );
+      } catch (error) {
+        setScreenError(
+          String(error?.response?.data || "אירעה שגיאה בטעינת נתוני התאים"),
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [competitionId, activeRole],
+  );
+
   useFocusEffect(
     useCallback(
       function () {
-        if (!activeRole || !activeRole.ranchId || !competitionId) {
-          return;
-        }
-
         loadData();
       },
-      [activeRole, competitionId],
+      [loadData],
     ),
   );
-
-  async function loadData() {
-    try {
-      setLoading(true);
-      setScreenError("");
-
-      var results = await Promise.all([
-        getCompetitionInvitationDetails(
-          competitionId,
-          activeRole.roleId,
-          activeRole.ranchId,
-        ),
-        getHorsesForStallBooking(competitionId, activeRole.ranchId),
-        getHorsePayersForCompetition(competitionId, activeRole.ranchId),
-        getManagedPayers(activeRole.ranchId, null, null),
-        getStallBookingsForCompetitionAndRanch(
-          competitionId,
-          activeRole.ranchId,
-        ),
-      ]);
-
-      var invitationResponse = results[0];
-      var horsesResponse = results[1];
-      var horsePayersResponse = results[2];
-      var managedPayersResponse = results[3];
-      var existingBookingsResponse = results[4];
-
-      var sections = getServicePriceSectionsFromInvitation(invitationResponse);
-
-      setHorseStallTypeOptions(extractHorseStallPriceItems(sections));
-      setEquipmentStallTypeOptions(extractEquipmentStallPriceItems(sections));
-
-      setHorses(
-        (Array.isArray(horsesResponse?.data) ? horsesResponse.data : [])
-          .map(function (item) {
-            return normalizeHorseItem(item);
-          })
-          .filter(Boolean),
-      );
-
-      setHorsePayers(
-        (Array.isArray(horsePayersResponse?.data)
-          ? horsePayersResponse.data
-          : []
-        )
-          .map(function (item) {
-            return normalizeHorsePayerItem(item);
-          })
-          .filter(Boolean),
-      );
-
-      setManagedPayers(
-        (Array.isArray(managedPayersResponse?.data)
-          ? managedPayersResponse.data
-          : []
-        )
-          .map(function (item) {
-            return normalizeManagedPayerItem(item);
-          })
-          .filter(Boolean),
-      );
-
-      setExistingStallBookings(
-        (Array.isArray(existingBookingsResponse?.data)
-          ? existingBookingsResponse.data
-          : []
-        )
-          .map(function (item) {
-            return normalizeExistingStallBooking(item);
-          })
-          .filter(Boolean),
-      );
-    } catch (error) {
-      setScreenError(
-        String(error?.response?.data || "אירעה שגיאה בטעינת נתוני התאים"),
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
 
   var horseHook = useAdminHorseStallBookings({
     user: user,
@@ -480,7 +501,7 @@ export default function useAdminCompetitionStallBookings(params) {
           return existingStallBookings.some(function (booking) {
             return (
               booking &&
-              booking.isForTack === false &&
+              !booking.isEquipmentBooking &&
               booking.horseId === payer.horseId
             );
           });
@@ -506,7 +527,7 @@ export default function useAdminCompetitionStallBookings(params) {
     checkInDate: checkInDate,
     checkOutDate: checkOutDate,
     allSelectedHorsePayers: allSelectedHorsePayers,
-    activeCompetition: activeCompetition,
+    reloadStallBookings: loadData,
   });
 
   function handleOpenEquipmentMode() {
@@ -520,6 +541,41 @@ export default function useAdminCompetitionStallBookings(params) {
   function handleBackToHorseMode() {
     setMode("horse");
   }
+
+  var bookedHorseNamesSummary = useMemo(
+    function () {
+      var existingHorseNames = existingStallBookings
+        .filter(function (booking) {
+          return booking && !booking.isEquipmentBooking && booking.horseId;
+        })
+        .map(function (booking) {
+          var matchedHorse = horses.find(function (horse) {
+            return horse.horseId === booking.horseId;
+          });
+
+          return matchedHorse ? matchedHorse.horseName : "";
+        })
+        .filter(Boolean);
+
+      var uniqueNames = Array.from(new Set(existingHorseNames));
+
+      if (uniqueNames.length === 0) {
+        return "";
+      }
+
+      return uniqueNames.join(", ");
+    },
+    [existingStallBookings, horses],
+  );
+
+  var existingEquipmentBookingsCount = useMemo(
+    function () {
+      return existingStallBookings.filter(function (booking) {
+        return booking && booking.isEquipmentBooking;
+      }).length;
+    },
+    [existingStallBookings],
+  );
 
   return {
     mode: mode,
@@ -582,5 +638,8 @@ export default function useAdminCompetitionStallBookings(params) {
     formatHorseLabel: formatHorseLabel,
     formatPayerLabel: formatPayerLabel,
     formatStallTypeLabel: formatStallTypeLabel,
+
+    bookedHorseNamesSummary: bookedHorseNamesSummary,
+    existingEquipmentBookingsCount: existingEquipmentBookingsCount,
   };
 }

@@ -6,6 +6,10 @@ import CompetitionDateField from "./CompetitionDateField";
 import styles from "../../styles/adminCompetitionPaidTimesStyles";
 
 export default function CompetitionStallBookingFormCard(props) {
+  var hasSingleHorseStallType =
+    Array.isArray(props.horseStallTypeOptions) &&
+    props.horseStallTypeOptions.length === 1;
+
   return (
     <View style={styles.formCard}>
       <Text style={styles.cardTitle}>הזמנת תאי סוסים</Text>
@@ -16,18 +20,35 @@ export default function CompetitionStallBookingFormCard(props) {
         </Text>
       </View>
 
-      <CompetitionRegistrationDropdown
-        label="סוג תא"
-        placeholder="בחרי סוג תא"
-        searchPlaceholder="חיפוש סוג תא"
-        items={props.horseStallTypeOptions}
-        selectedItem={props.selectedHorseStallType}
-        getItemId={function (item) {
-          return item.priceCatalogId;
-        }}
-        getItemLabel={props.formatStallTypeLabel}
-        onSelect={props.setSelectedHorseStallType}
-      />
+      {hasSingleHorseStallType ? (
+        <View style={styles.fieldBlock}>
+          <Text style={styles.fieldLabel}>סוג תא</Text>
+          <View style={styles.textInput}>
+            <Text
+              style={{
+                textAlign: "right",
+                color: "#4F3B31",
+                fontSize: 14,
+              }}
+            >
+              {props.formatStallTypeLabel(props.horseStallTypeOptions[0])}
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <CompetitionRegistrationDropdown
+          label="סוג תא"
+          placeholder="בחרי סוג תא"
+          searchPlaceholder="חיפוש סוג תא"
+          items={props.horseStallTypeOptions}
+          selectedItem={props.selectedHorseStallType}
+          getItemId={function (item) {
+            return item.priceCatalogId;
+          }}
+          getItemLabel={props.formatStallTypeLabel}
+          onSelect={props.setSelectedHorseStallType}
+        />
+      )}
 
       <CompetitionDateField
         label="תאריך כניסה"
@@ -102,6 +123,14 @@ export default function CompetitionStallBookingFormCard(props) {
           textAlign="right"
         />
       </View>
+
+      {props.bookedHorseNamesSummary ? (
+        <View style={styles.helperCard}>
+          <Text style={styles.helperText}>
+            הוזמנו תאים ל: {props.bookedHorseNamesSummary}
+          </Text>
+        </View>
+      ) : null}
 
       <Pressable
         style={[

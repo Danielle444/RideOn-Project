@@ -305,6 +305,10 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             formatHorseLabel={stallBookings.formatHorseLabel}
             formatPayerLabel={stallBookings.formatPayerLabel}
             formatStallTypeLabel={stallBookings.formatStallTypeLabel}
+            bookedHorseNamesSummary={stallBookings.bookedHorseNamesSummary}
+            existingEquipmentBookingsCount={
+              stallBookings.existingEquipmentBookingsCount
+            }
           />
         ) : null}
       </ScrollView>

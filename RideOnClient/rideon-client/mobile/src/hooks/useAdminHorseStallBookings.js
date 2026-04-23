@@ -56,11 +56,7 @@ export default function useAdminHorseStallBookings(params) {
       return uniqByHorseId(
         existingStallBookings
           .filter(function (booking) {
-            return (
-              booking &&
-              booking.horseId &&
-              booking.isForTack === false
-            );
+            return booking && booking.horseId && !booking.isEquipmentBooking;
           })
           .map(function (booking) {
             return { horseId: booking.horseId };
@@ -96,11 +92,15 @@ export default function useAdminHorseStallBookings(params) {
 
   var hasAnyHorseStallBookingsForCompetition = useMemo(
     function () {
-      var existingHorseBookings = existingStallBookings.filter(function (booking) {
-        return booking && booking.isForTack === false;
-      });
+      var existingHorseBookings = existingStallBookings.filter(
+        function (booking) {
+          return booking && !booking.isEquipmentBooking;
+        },
+      );
 
-      return existingHorseBookings.length > 0 || selectedHorseBookings.length > 0;
+      return (
+        existingHorseBookings.length > 0 || selectedHorseBookings.length > 0
+      );
     },
     [existingStallBookings, selectedHorseBookings],
   );
@@ -294,7 +294,8 @@ export default function useAdminHorseStallBookings(params) {
     selectedHorseBookings: selectedHorseBookings,
     availableHorseOptions: availableHorseOptions,
     allEligibleHorsesAlreadyBooked: allEligibleHorsesAlreadyBooked,
-    hasAnyHorseStallBookingsForCompetition: hasAnyHorseStallBookingsForCompetition,
+    hasAnyHorseStallBookingsForCompetition:
+      hasAnyHorseStallBookingsForCompetition,
     getAvailablePayersForHorse: getAvailablePayersForHorse,
     handleRemoveHorseBooking: handleRemoveHorseBooking,
     toggleHorsePayerSelection: toggleHorsePayerSelection,
