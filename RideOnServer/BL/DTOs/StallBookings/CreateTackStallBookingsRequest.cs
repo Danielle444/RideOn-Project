@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace RideOnServer.BL.DTOs.StallBookings
 {
-    public class CreateEquipmentStallBookingsRequest
+    public class CreateTackStallBookingsRequest
     {
         public int CompetitionId { get; set; }
         public int OrderedBySystemUserId { get; set; }

@@ -56,7 +56,7 @@ export default function useAdminHorseStallBookings(params) {
       return uniqByHorseId(
         existingStallBookings
           .filter(function (booking) {
-            return booking && booking.horseId && !booking.isEquipmentBooking;
+            return booking && booking.horseId && !booking.isTackBooking;
           })
           .map(function (booking) {
             return { horseId: booking.horseId };
@@ -94,7 +94,7 @@ export default function useAdminHorseStallBookings(params) {
     function () {
       var existingHorseBookings = existingStallBookings.filter(
         function (booking) {
-          return booking && !booking.isEquipmentBooking;
+          return booking && !booking.isTackBooking;
         },
       );
 

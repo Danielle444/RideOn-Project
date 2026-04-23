@@ -206,13 +206,13 @@ namespace RideOnServer.DAL
             return payers;
         }
 
-        public static List<int> CreateEquipmentStallBookings(CreateEquipmentStallBookingsRequest request)
+        public static List<int> CreateTackStallBookings(CreateTackStallBookingsRequest request)
         {
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();
             conn.Open();
 
             using NpgsqlCommand cmd = new NpgsqlCommand(
-                "SELECT * FROM usp_createequipmentstallbookings(" +
+                "SELECT * FROM usp_createtackstallbookings(" +
                 "@competitionId, " +
                 "@orderedBySystemUserId, " +
                 "@catalogItemId, " +

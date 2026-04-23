@@ -1,7 +1,7 @@
 import React from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import CompetitionStallBookingFormCard from "./CompetitionStallBookingFormCard";
-import CompetitionEquipmentStallFormCard from "./CompetitionEquipmentStallFormCard";
+import CompetitionTackStallFormCard from "./CompetitionTackStallFormCard";
 import styles from "../../styles/adminCompetitionPaidTimesStyles";
 
 export default function CompetitionStallBookingsTab(props) {
@@ -22,32 +22,32 @@ export default function CompetitionStallBookingsTab(props) {
     );
   }
 
-  if (props.mode === "equipment") {
+  if (props.mode === "tack") {
     return (
-      <CompetitionEquipmentStallFormCard
-        equipmentStallTypeOptions={props.equipmentStallTypeOptions}
-        selectedEquipmentStallType={props.selectedEquipmentStallType}
-        setSelectedEquipmentStallType={props.setSelectedEquipmentStallType}
-        equipmentQuantity={props.equipmentQuantity}
-        setEquipmentQuantity={props.setEquipmentQuantity}
-        equipmentSplitMode={props.equipmentSplitMode}
-        setEquipmentSplitMode={props.setEquipmentSplitMode}
-        selectedEquipmentPayers={props.selectedEquipmentPayers}
-        toggleEquipmentPayerSelection={props.toggleEquipmentPayerSelection}
-        equipmentNotes={props.equipmentNotes}
-        setEquipmentNotes={props.setEquipmentNotes}
-        equipmentStartDate={props.equipmentStartDate}
-        setEquipmentStartDate={props.setEquipmentStartDate}
-        equipmentEndDate={props.equipmentEndDate}
-        setEquipmentEndDate={props.setEquipmentEndDate}
-        equipmentPricingSummary={props.equipmentPricingSummary}
+      <CompetitionTackStallFormCard
+        tackStallTypeOptions={props.tackStallTypeOptions}
+        selectedTackStallType={props.selectedTackStallType}
+        setSelectedTackStallType={props.setSelectedTackStallType}
+        tackQuantity={props.tackQuantity}
+        setTackQuantity={props.setTackQuantity}
+        tackSplitMode={props.tackSplitMode}
+        setTackSplitMode={props.setTackSplitMode}
+        selectedTackPayers={props.selectedTackPayers}
+        toggleTackPayerSelection={props.toggleTackPayerSelection}
+        tackNotes={props.tackNotes}
+        setTackNotes={props.setTackNotes}
+        tackStartDate={props.tackStartDate}
+        setTackStartDate={props.setTackStartDate}
+        tackEndDate={props.tackEndDate}
+        setTackEndDate={props.setTackEndDate}
+        tackPricingSummary={props.tackPricingSummary}
         minCompetitionDate={props.minCompetitionDate}
         maxCompetitionDate={props.maxCompetitionDate}
         allSelectedHorsePayers={props.allSelectedHorsePayers}
         allHorseStallTypes={props.allHorseStallTypes}
-        existingEquipmentBookingsCount={props.existingEquipmentBookingsCount}
+        existingTackBookingsCount={props.existingTackBookingsCount}
         onBack={props.handleBackToHorseMode}
-        onSubmit={props.handleSubmitEquipmentDraft}
+        onSubmit={props.handleSubmitTackDraft}
         isSaving={props.isSaving}
         formatPayerLabel={props.formatPayerLabel}
         formatStallTypeLabel={props.formatStallTypeLabel}
@@ -82,7 +82,7 @@ export default function CompetitionStallBookingsTab(props) {
       bookedHorseNamesSummary={props.bookedHorseNamesSummary}
       isSaving={props.isSaving}
       onSubmit={props.handleCreateHorseStallBookings}
-      onOpenEquipmentMode={props.handleOpenEquipmentMode}
+      onOpenTackMode={props.handleOpenTackMode}
       formatHorseLabel={props.formatHorseLabel}
       formatPayerLabel={props.formatPayerLabel}
       formatStallTypeLabel={props.formatStallTypeLabel}

@@ -153,7 +153,7 @@ export default function CompetitionStallBookingFormCard(props) {
             styles.primaryButton,
             { backgroundColor: "#5E7A74" },
           ]}
-          onPress={props.onOpenEquipmentMode}
+          onPress={props.onOpenTackMode}
         >
           <Text style={styles.primaryButtonText}>מעבר להזמנת תאי ציוד</Text>
         </Pressable>

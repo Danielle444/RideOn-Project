@@ -22,8 +22,8 @@ function createStallBooking(payload) {
   return axios.post("/StallBookings", payload);
 }
 
-function createEquipmentStallBookings(payload) {
-  return axios.post("/StallBookings/equipment", payload);
+function createTackStallBookings(payload) {
+  return axios.post("/StallBookings/tack", payload);
 }
 
 export {
@@ -31,5 +31,5 @@ export {
   getHorsePayersForCompetition,
   createStallBooking,
   getStallBookingsForCompetitionAndRanch,
-  createEquipmentStallBookings,
+  createTackStallBookings,
 };

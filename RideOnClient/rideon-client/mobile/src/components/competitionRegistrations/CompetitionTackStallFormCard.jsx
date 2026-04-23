@@ -11,19 +11,19 @@ import CompetitionMultiPayerSelector from "./CompetitionMultiPayerSelector";
 import CompetitionDateField from "./CompetitionDateField";
 import styles from "../../styles/adminCompetitionPaidTimesStyles";
 
-export default function CompetitionEquipmentStallFormCard(props) {
+export default function CompetitionTackStallFormCard(props) {
   var splitModeItems = [
     { id: "equal", name: "חלוקה שווה בין כל המשלמים של תאי הסוסים" },
     { id: "specific", name: "בחירת משלמים מסוימים" },
   ];
 
   var selectedSplitModeItem = splitModeItems.find(function (item) {
-    return item.id === props.equipmentSplitMode;
+    return item.id === props.tackSplitMode;
   }) || null;
 
-  var hasSingleEquipmentType =
-    Array.isArray(props.allHorseStallTypes) &&
-    props.allHorseStallTypes.length === 1;
+  var hasSingleTackType =
+    Array.isArray(props.allTackTypes) &&
+    props.allTackTypes.length === 1;
 
   return (
     <View style={styles.formCard}>
@@ -35,7 +35,7 @@ export default function CompetitionEquipmentStallFormCard(props) {
         </Text>
       </View>
 
-      {hasSingleEquipmentType ? (
+      {hasSingleTackType ? (
         <View style={styles.fieldBlock}>
           <Text style={styles.fieldLabel}>סוג תא ציוד</Text>
           <View style={styles.textInput}>
@@ -46,7 +46,7 @@ export default function CompetitionEquipmentStallFormCard(props) {
                 fontSize: 14,
               }}
             >
-              {props.formatStallTypeLabel(props.allHorseStallTypes[0])}
+              {props.formatStallTypeLabel(props.allTackTypes[0])}
             </Text>
           </View>
         </View>
@@ -55,28 +55,28 @@ export default function CompetitionEquipmentStallFormCard(props) {
           label="סוג תא ציוד"
           placeholder="בחרי סוג תא ציוד"
           searchPlaceholder="חיפוש סוג תא ציוד"
-          items={props.equipmentStallTypeOptions}
-          selectedItem={props.selectedEquipmentStallType}
+          items={props.tackStallTypeOptions}
+          selectedItem={props.selectedTackStallType}
           getItemId={function (item) {
             return item.priceCatalogId;
           }}
           getItemLabel={props.formatStallTypeLabel}
-          onSelect={props.setSelectedEquipmentStallType}
+          onSelect={props.setSelectedTackStallType}
         />
       )}
 
       <CompetitionDateField
         label="תאריך כניסה"
-        value={props.equipmentStartDate}
-        onChange={props.setEquipmentStartDate}
+        value={props.tackStartDate}
+        onChange={props.setTackStartDate}
         minimumDate={props.minCompetitionDate}
         maximumDate={props.maxCompetitionDate}
       />
 
       <CompetitionDateField
         label="תאריך יציאה"
-        value={props.equipmentEndDate}
-        onChange={props.setEquipmentEndDate}
+        value={props.tackEndDate}
+        onChange={props.setTackEndDate}
         minimumDate={props.minCompetitionDate}
         maximumDate={props.maxCompetitionDate}
       />
@@ -99,21 +99,21 @@ export default function CompetitionEquipmentStallFormCard(props) {
         >
           <Pressable
             onPress={function () {
-              var nextValue = Math.max(1, Number(props.equipmentQuantity || 1) - 1);
-              props.setEquipmentQuantity(String(nextValue));
+              var nextValue = Math.max(1, Number(props.tackQuantity || 1) - 1);
+              props.setTackQuantity(String(nextValue));
             }}
           >
             <Text style={{ fontSize: 26, color: "#7B5A4D", fontWeight: "700" }}>−</Text>
           </Pressable>
 
           <Text style={{ fontSize: 20, color: "#4F3B31", fontWeight: "700" }}>
-            {props.equipmentQuantity || "1"}
+            {props.tackQuantity || "1"}
           </Text>
 
           <Pressable
             onPress={function () {
-              var nextValue = Number(props.equipmentQuantity || 1) + 1;
-              props.setEquipmentQuantity(String(nextValue));
+              var nextValue = Number(props.tackQuantity || 1) + 1;
+              props.setTackQuantity(String(nextValue));
             }}
           >
             <Text style={{ fontSize: 26, color: "#7B5A4D", fontWeight: "700" }}>+</Text>
@@ -134,36 +134,36 @@ export default function CompetitionEquipmentStallFormCard(props) {
           return item.name;
         }}
         onSelect={function (item) {
-          props.setEquipmentSplitMode(item.id);
+          props.setTackSplitMode(item.id);
         }}
       />
 
-      {props.equipmentSplitMode === "specific" ? (
+      {props.tackSplitMode === "specific" ? (
         <CompetitionMultiPayerSelector
           items={props.allSelectedHorsePayers}
-          selectedItems={props.selectedEquipmentPayers}
-          onToggleItem={props.toggleEquipmentPayerSelection}
+          selectedItems={props.selectedTackPayers}
+          onToggleItem={props.toggleTackPayerSelection}
           getItemLabel={props.formatPayerLabel}
         />
       ) : null}
 
       <View style={styles.helperCard}>
         <Text style={styles.helperText}>
-          עלות כוללת: {props.equipmentPricingSummary.totalPrice} ₪
+          עלות כוללת: {props.tackPricingSummary.totalPrice} ₪
         </Text>
         <Text style={styles.helperText}>
-          מספר משלמים: {props.equipmentPricingSummary.payerCount}
+          מספר משלמים: {props.tackPricingSummary.payerCount}
         </Text>
         <Text style={styles.helperText}>
-          לכל משלם: {props.equipmentPricingSummary.amountPerPayer} ₪
+          לכל משלם: {props.tackPricingSummary.amountPerPayer} ₪
         </Text>
       </View>
 
       <View style={styles.fieldBlock}>
         <Text style={styles.fieldLabel}>הערות</Text>
         <TextInput
-          value={props.equipmentNotes}
-          onChangeText={props.setEquipmentNotes}
+          value={props.tackNotes}
+          onChangeText={props.setTackNotes}
           placeholder="הערות לתאי ציוד"
           style={[styles.textInput, styles.notesInput]}
           multiline
@@ -173,7 +173,7 @@ export default function CompetitionEquipmentStallFormCard(props) {
 
       <View style={styles.helperCard}>
         <Text style={styles.helperText}>
-          הוזמנו {props.existingEquipmentBookingsCount} תאי ציוד
+          הוזמנו {props.existingTackBookingsCount} תאי ציוד
         </Text>
       </View>
 

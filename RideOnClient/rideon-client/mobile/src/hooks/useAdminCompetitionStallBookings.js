@@ -8,7 +8,7 @@ import {
   getStallBookingsForCompetitionAndRanch,
 } from "../services/stallBookingsService";
 import useAdminHorseStallBookings from "./useAdminHorseStallBookings";
-import useAdminEquipmentStallBookings from "./useAdminEquipmentStallBookings";
+import useAdminTackStallBookings from "./useAdminTackStallBookings";
 
 function normalizeHorseItem(item) {
   if (!item) {
@@ -146,7 +146,7 @@ function normalizeExistingStallBooking(item) {
       item.stallBookingId || item.StallBookingId || item.stallbookingid || null,
     horseId: horseId,
     isForTack: isForTack,
-    isEquipmentBooking: isForTack === true || horseId === null,
+    isTackBooking: isForTack === true || horseId === null,
     catalogItemId:
       item.catalogItemId ||
       item.CatalogItemId ||
@@ -212,17 +212,16 @@ function extractHorseStallPriceItems(sections) {
         productName.includes("תא") ||
         productName.toLowerCase().includes("stall");
 
-      var mentionsEquipment =
+      var mentionsTack =
         categoryName.includes("ציוד") ||
         productName.includes("ציוד") ||
-        productName.toLowerCase().includes("equipment") ||
         productName.toLowerCase().includes("tack");
 
-      return mentionsStall && !mentionsEquipment;
+      return mentionsStall && !mentionsTack;
     });
 }
 
-function extractEquipmentStallPriceItems(sections) {
+function extractTackStallPriceItems(sections) {
   var flatItems = [];
 
   sections.forEach(function (section) {
@@ -255,7 +254,6 @@ function extractEquipmentStallPriceItems(sections) {
       return (
         categoryName.includes("ציוד") ||
         productName.includes("ציוד") ||
-        productName.toLowerCase().includes("equipment") ||
         productName.toLowerCase().includes("tack")
       );
     });
@@ -340,7 +338,7 @@ export default function useAdminCompetitionStallBookings(params) {
   var [managedPayers, setManagedPayers] = useState([]);
   var [existingStallBookings, setExistingStallBookings] = useState([]);
   var [horseStallTypeOptions, setHorseStallTypeOptions] = useState([]);
-  var [equipmentStallTypeOptions, setEquipmentStallTypeOptions] = useState([]);
+  var [tackStallTypeOptions, setTackStallTypeOptions] = useState([]);
 
   var [selectedHorseStallType, setSelectedHorseStallType] = useState(null);
   var [checkInDate, setCheckInDate] = useState("");
@@ -411,7 +409,7 @@ export default function useAdminCompetitionStallBookings(params) {
           getServicePriceSectionsFromInvitation(invitationResponse);
 
         setHorseStallTypeOptions(extractHorseStallPriceItems(sections));
-        setEquipmentStallTypeOptions(extractEquipmentStallPriceItems(sections));
+        setTackStallTypeOptions(extractTackStallPriceItems(sections));
 
         setHorses(
           (Array.isArray(horsesResponse?.data) ? horsesResponse.data : [])
@@ -501,7 +499,7 @@ export default function useAdminCompetitionStallBookings(params) {
           return existingStallBookings.some(function (booking) {
             return (
               booking &&
-              !booking.isEquipmentBooking &&
+              !booking.isTackBooking &&
               booking.horseId === payer.horseId
             );
           });
@@ -515,14 +513,14 @@ export default function useAdminCompetitionStallBookings(params) {
     [horseHook.selectedHorseBookings, horsePayers, existingStallBookings],
   );
 
-  var equipmentHook = useAdminEquipmentStallBookings({
+  var tackHook = useAdminTackStallBookings({
     user: user,
     activeRole: activeRole,
     competitionId: competitionId,
     selectedHorseBookings: horseHook.selectedHorseBookings,
     existingStallBookings: existingStallBookings,
     horseStallTypeOptions: horseStallTypeOptions,
-    equipmentStallTypeOptions: equipmentStallTypeOptions,
+    tackStallTypeOptions: tackStallTypeOptions,
     selectedHorseStallType: selectedHorseStallType,
     checkInDate: checkInDate,
     checkOutDate: checkOutDate,
@@ -530,12 +528,12 @@ export default function useAdminCompetitionStallBookings(params) {
     reloadStallBookings: loadData,
   });
 
-  function handleOpenEquipmentMode() {
+  function handleOpenTackMode() {
     if (!horseHook.hasAnyHorseStallBookingsForCompetition) {
       return;
     }
 
-    setMode("equipment");
+    setMode("tack");
   }
 
   function handleBackToHorseMode() {
@@ -546,7 +544,7 @@ export default function useAdminCompetitionStallBookings(params) {
     function () {
       var existingHorseNames = existingStallBookings
         .filter(function (booking) {
-          return booking && !booking.isEquipmentBooking && booking.horseId;
+          return booking && !booking.isTackBooking && booking.horseId;
         })
         .map(function (booking) {
           var matchedHorse = horses.find(function (horse) {
@@ -568,10 +566,10 @@ export default function useAdminCompetitionStallBookings(params) {
     [existingStallBookings, horses],
   );
 
-  var existingEquipmentBookingsCount = useMemo(
+  var existingTackBookingsCount = useMemo(
     function () {
       return existingStallBookings.filter(function (booking) {
-        return booking && booking.isEquipmentBooking;
+        return booking && booking.isTackBooking;
       }).length;
     },
     [existingStallBookings],
@@ -583,7 +581,7 @@ export default function useAdminCompetitionStallBookings(params) {
     screenError: screenError,
 
     horseStallTypeOptions: horseStallTypeOptions,
-    equipmentStallTypeOptions: equipmentStallTypeOptions,
+    tackStallTypeOptions: tackStallTypeOptions,
 
     selectedHorseStallType: selectedHorseStallType,
     setSelectedHorseStallType: setSelectedHorseStallType,
@@ -610,36 +608,36 @@ export default function useAdminCompetitionStallBookings(params) {
     expandedHorseEditorId: horseHook.expandedHorseEditorId,
     toggleHorseEditor: horseHook.toggleHorseEditor,
     handleCreateHorseStallBookings: horseHook.handleCreateHorseStallBookings,
-    isSaving: horseHook.isSaving || equipmentHook.isSavingEquipment,
+    isSaving: horseHook.isSaving || tackHook.isSavingTack,
 
-    selectedEquipmentStallType: equipmentHook.selectedEquipmentStallType,
-    setSelectedEquipmentStallType: equipmentHook.setSelectedEquipmentStallType,
-    equipmentQuantity: equipmentHook.equipmentQuantity,
-    setEquipmentQuantity: equipmentHook.setEquipmentQuantity,
-    equipmentSplitMode: equipmentHook.equipmentSplitMode,
-    setEquipmentSplitMode: equipmentHook.setEquipmentSplitMode,
-    selectedEquipmentPayers: equipmentHook.selectedEquipmentPayers,
-    toggleEquipmentPayerSelection: equipmentHook.toggleEquipmentPayerSelection,
-    equipmentNotes: equipmentHook.equipmentNotes,
-    setEquipmentNotes: equipmentHook.setEquipmentNotes,
-    equipmentStartDate: equipmentHook.equipmentStartDate,
-    setEquipmentStartDate: equipmentHook.setEquipmentStartDate,
-    equipmentEndDate: equipmentHook.equipmentEndDate,
-    setEquipmentEndDate: equipmentHook.setEquipmentEndDate,
-    effectiveEquipmentPayers: equipmentHook.effectiveEquipmentPayers,
-    equipmentPricingSummary: equipmentHook.equipmentPricingSummary,
-    allHorseStallTypes: equipmentHook.allHorseStallTypes,
+    selectedTackStallType: tackHook.selectedTackStallType,
+    setSelectedTackStallType: tackHook.setSelectedTackStallType,
+    tackQuantity: tackHook.tackQuantity,
+    setTackQuantity: tackHook.setTackQuantity,
+    tackSplitMode: tackHook.tackSplitMode,
+    setTackSplitMode: tackHook.setTackSplitMode,
+    selectedTackPayers: tackHook.selectedTackPayers,
+    toggleTackPayerSelection: tackHook.toggleTackPayerSelection,
+    tackNotes: tackHook.tackNotes,
+    setTackNotes: tackHook.setTackNotes,
+    tackStartDate: tackHook.tackStartDate,
+    setTackStartDate: tackHook.setTackStartDate,
+    tackEndDate: tackHook.tackEndDate,
+    setTackEndDate: tackHook.setTackEndDate,
+    effectiveTackPayers: tackHook.effectiveTackPayers,
+    tackPricingSummary: tackHook.tackPricingSummary,
+    allHorseStallTypes: tackHook.allHorseStallTypes,
     allSelectedHorsePayers: allSelectedHorsePayers,
 
-    handleOpenEquipmentMode: handleOpenEquipmentMode,
+    handleOpenTackMode: handleOpenTackMode,
     handleBackToHorseMode: handleBackToHorseMode,
-    handleSubmitEquipmentDraft: equipmentHook.handleSubmitEquipmentDraft,
+    handleSubmitTackDraft: tackHook.handleSubmitTackDraft,
 
     formatHorseLabel: formatHorseLabel,
     formatPayerLabel: formatPayerLabel,
     formatStallTypeLabel: formatStallTypeLabel,
 
     bookedHorseNamesSummary: bookedHorseNamesSummary,
-    existingEquipmentBookingsCount: existingEquipmentBookingsCount,
+    existingTackBookingsCount: existingTackBookingsCount,
   };
 }
