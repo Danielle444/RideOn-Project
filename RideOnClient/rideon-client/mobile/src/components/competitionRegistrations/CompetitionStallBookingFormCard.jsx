@@ -1,5 +1,11 @@
 import React from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import CompetitionRegistrationDropdown from "../competitions/CompetitionRegistrationDropdown";
 import CompetitionHorsePayersEditor from "./CompetitionHorsePayersEditor";
 import CompetitionDateField from "./CompetitionDateField";
@@ -16,7 +22,8 @@ export default function CompetitionStallBookingFormCard(props) {
 
       <View style={styles.helperCard}>
         <Text style={styles.helperText}>
-          בחרי סוג תא, תאריכים וסוסים. המשלמים ייבחרו אוטומטית לפי מי שמשלם על המקצים של כל סוס, ואפשר לערוך אם צריך.
+          בחרי סוג תא, תאריכים וסוסים. המשלמים ייבחרו אוטומטית לפי מי שמשלם על
+          המקצים של כל סוס, ואפשר לערוך אם צריך.
         </Text>
       </View>
 
@@ -88,11 +95,7 @@ export default function CompetitionStallBookingFormCard(props) {
       )}
 
       <View style={styles.fieldBlock}>
-        {props.selectedHorseBookings.length === 0 ? (
-          <View style={styles.helperCard}>
-            <Text style={styles.helperText}>עדיין לא נוספו סוסים</Text>
-          </View>
-        ) : (
+        {props.selectedHorseBookings.length > 0 ? (
           props.selectedHorseBookings.map(function (booking) {
             return (
               <CompetitionHorsePayersEditor
@@ -103,12 +106,18 @@ export default function CompetitionStallBookingFormCard(props) {
                 onTogglePayer={props.toggleHorsePayerSelection}
                 onRemoveHorse={props.handleRemoveHorseBooking}
                 onToggleEditor={props.toggleHorseEditor}
-                isExpanded={props.expandedHorseEditorId === booking.horse.horseId}
+                isExpanded={
+                  props.expandedHorseEditorId === booking.horse.horseId
+                }
                 formatHorseLabel={props.formatHorseLabel}
                 formatPayerLabel={props.formatPayerLabel}
               />
             );
           })
+        ) : props.allEligibleHorsesAlreadyBooked ? null : (
+          <View style={styles.helperCard}>
+            <Text style={styles.helperText}>עדיין לא נוספו סוסים</Text>
+          </View>
         )}
       </View>
 
@@ -149,10 +158,7 @@ export default function CompetitionStallBookingFormCard(props) {
 
       {props.hasAnyHorseStallBookingsForCompetition ? (
         <Pressable
-          style={[
-            styles.primaryButton,
-            { backgroundColor: "#5E7A74" },
-          ]}
+          style={[styles.primaryButton, { backgroundColor: "#5E7A74" }]}
           onPress={props.onOpenTackMode}
         >
           <Text style={styles.primaryButtonText}>מעבר להזמנת תאי ציוד</Text>

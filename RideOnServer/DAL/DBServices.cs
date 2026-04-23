@@ -50,7 +50,8 @@ namespace RideOnServer.DAL
                 foreach (var param in paramDic)
                 {
                     string parameterName = $"p{i}";
-                    paramList.Add($"@{parameterName}");
+                    string originalKey = param.Key.TrimStart('@');
+                    paramList.Add($"{originalKey} => @{parameterName}");
 
                     AddParameterWithType(cmd, parameterName, param.Key, param.Value);
                     i++;
