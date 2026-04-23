@@ -1,4 +1,5 @@
 ﻿using Npgsql;
+using NpgsqlTypes;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.StallBookings;
 using System.Data;
@@ -13,20 +14,36 @@ namespace RideOnServer.DAL
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();
             conn.Open();
 
-            using NpgsqlCommand cmd = new NpgsqlCommand("SELECT usp_createstallbooking(@competitionId, @orderedBySystemUserId, @catalogItemId, @notes, @ranchId, @horseId, @startDate, @endDate, @isForTack, @payers::jsonb)", conn);
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT usp_createstallbooking(" +
+                "@competitionId, " +
+                "@orderedBySystemUserId, " +
+                "@catalogItemId, " +
+                "@notes::text, " +               
+                "@ranchId, " +
+                "@horseId, " +
+                "@startDate::date, " +         
+                "@endDate::date, " +              
+                "@isForTack, " +
+                "@payers::jsonb)",
+                conn);
 
             cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
             cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
             cmd.Parameters.AddWithValue("@catalogItemId", request.CatalogItemId);
+
             cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
+
             cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
             cmd.Parameters.AddWithValue("@horseId", request.HorseId);
-            cmd.Parameters.AddWithValue("@startDate", request.CheckInDate.Date);
-            cmd.Parameters.AddWithValue("@endDate", request.CheckOutDate.Date);
+
+            cmd.Parameters.Add("@startDate", NpgsqlDbType.Date).Value = request.CheckInDate.Date;
+            cmd.Parameters.Add("@endDate", NpgsqlDbType.Date).Value = request.CheckOutDate.Date;
+
             cmd.Parameters.AddWithValue("@isForTack", request.IsForTack);
 
             string payersJson = JsonSerializer.Serialize(request.Payers);
-            cmd.Parameters.AddWithValue("@payers", NpgsqlTypes.NpgsqlDbType.Jsonb, payersJson);
+            cmd.Parameters.Add("@payers", NpgsqlDbType.Jsonb).Value = payersJson;
 
             object? result = cmd.ExecuteScalar();
 
@@ -37,6 +54,7 @@ namespace RideOnServer.DAL
 
             return Convert.ToInt32(result);
         }
+
 
         public static List<HorseForStallBookingItem> GetHorsesForStallBooking(int competitionId, int ranchId)
         {

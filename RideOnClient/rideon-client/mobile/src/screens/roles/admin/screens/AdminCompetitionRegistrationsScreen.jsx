@@ -54,9 +54,7 @@ function RegistrationsTabs(props) {
         <Text
           style={[
             styles.tabButtonText,
-            props.activeTab === "paidTimes"
-              ? styles.tabButtonTextActive
-              : null,
+            props.activeTab === "paidTimes" ? styles.tabButtonTextActive : null,
           ]}
         >
           פייד טיימים
@@ -121,6 +119,7 @@ export default function AdminCompetitionRegistrationsScreen(props) {
     user: user,
     activeRole: activeRole,
     competitionId: competitionId,
+    activeCompetition: activeCompetition,
   });
 
   function handleCompetitionMenuPress(item) {
@@ -157,10 +156,7 @@ export default function AdminCompetitionRegistrationsScreen(props) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.screenContent}
       >
-        <RegistrationsTabs
-          activeTab={activeTab}
-          onChangeTab={setActiveTab}
-        />
+        <RegistrationsTabs activeTab={activeTab} onChangeTab={setActiveTab} />
 
         {activeTab === "classes" ? (
           <CompetitionRegistrationsClassesTab
@@ -234,27 +230,60 @@ export default function AdminCompetitionRegistrationsScreen(props) {
 
         {activeTab === "stalls" ? (
           <CompetitionStallBookingsTab
+            mode={stallBookings.mode}
             loading={stallBookings.loading}
             screenError={stallBookings.screenError}
-            horses={stallBookings.horses}
-            stallTypeOptions={stallBookings.stallTypeOptions}
-            availablePayersForSelectedHorse={
-              stallBookings.availablePayersForSelectedHorse
+            horseStallTypeOptions={stallBookings.horseStallTypeOptions}
+            tackStallTypeOptions={stallBookings.tackStallTypeOptions}
+            selectedHorseToAdd={stallBookings.selectedHorseToAdd}
+            setSelectedHorseToAdd={stallBookings.setSelectedHorseToAdd}
+            selectedHorseStallType={stallBookings.selectedHorseStallType}
+            setSelectedHorseStallType={stallBookings.setSelectedHorseStallType}
+            minCompetitionDate={
+              activeCompetition?.competitionStartDate ||
+              activeCompetition?.CompetitionStartDate ||
+              ""
             }
-            selectedHorse={stallBookings.selectedHorse}
-            selectedPayers={stallBookings.selectedPayers}
-            selectedStallType={stallBookings.selectedStallType}
+            maxCompetitionDate={
+              activeCompetition?.competitionEndDate ||
+              activeCompetition?.CompetitionEndDate ||
+              ""
+            }
             checkInDate={stallBookings.checkInDate}
-            checkOutDate={stallBookings.checkOutDate}
-            notes={stallBookings.notes}
-            setSelectedHorse={stallBookings.setSelectedHorse}
-            setSelectedStallType={stallBookings.setSelectedStallType}
-            togglePayerSelection={stallBookings.togglePayerSelection}
             setCheckInDate={stallBookings.setCheckInDate}
+            checkOutDate={stallBookings.checkOutDate}
             setCheckOutDate={stallBookings.setCheckOutDate}
+            notes={stallBookings.notes}
             setNotes={stallBookings.setNotes}
+            selectedHorseBookings={stallBookings.selectedHorseBookings}
+            availableHorseOptions={stallBookings.availableHorseOptions}
+            getAvailablePayersForHorse={
+              stallBookings.getAvailablePayersForHorse
+            }
+            handleAddHorseBooking={stallBookings.handleAddHorseBooking}
+            handleRemoveHorseBooking={stallBookings.handleRemoveHorseBooking}
+            toggleHorsePayerSelection={stallBookings.toggleHorsePayerSelection}
+            expandedHorseEditorId={stallBookings.expandedHorseEditorId}
+            toggleHorseEditor={stallBookings.toggleHorseEditor}
+            allSelectedHorsePayers={stallBookings.allSelectedHorsePayers}
+            selectedTackStallType={stallBookings.selectedTackStallType}
+            setSelectedTackStallType={stallBookings.setSelectedTackStallType}
+            tackQuantity={stallBookings.tackQuantity}
+            setTackQuantity={stallBookings.setTackQuantity}
+            tackSplitMode={stallBookings.tackSplitMode}
+            setTackSplitMode={stallBookings.setTackSplitMode}
+            selectedTackPayers={stallBookings.selectedTackPayers}
+            toggleTackPayerSelection={stallBookings.toggleTackPayerSelection}
+            tackNotes={stallBookings.tackNotes}
+            setTackNotes={stallBookings.setTackNotes}
+            derivedTackDates={stallBookings.derivedTackDates}
+            handleCreateHorseStallBookings={
+              stallBookings.handleCreateHorseStallBookings
+            }
+            handleOpenTackMode={stallBookings.handleOpenTackMode}
+            handleBackToHorseMode={stallBookings.handleBackToHorseMode}
+            handleSubmitTackDraft={stallBookings.handleSubmitTackDraft}
             isSaving={stallBookings.isSaving}
-            onSubmit={stallBookings.handleCreateStallBooking}
             formatHorseLabel={stallBookings.formatHorseLabel}
             formatPayerLabel={stallBookings.formatPayerLabel}
             formatStallTypeLabel={stallBookings.formatStallTypeLabel}
