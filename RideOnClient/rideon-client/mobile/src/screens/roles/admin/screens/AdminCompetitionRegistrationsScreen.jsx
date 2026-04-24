@@ -20,6 +20,9 @@ import useAdminCompetitionRegistrations from "../../../../hooks/useAdminCompetit
 import useAdminCompetitionPaidTimes from "../../../../hooks/useAdminCompetitionPaidTimes";
 import useAdminCompetitionStallBookings from "../../../../hooks/useAdminCompetitionStallBookings";
 
+import CompetitionShavingsTab from "../../../../components/competitionRegistrations/CompetitionShavingsTab";
+import useAdminCompetitionShavings from "../../../../hooks/useAdminCompetitionShavings";
+
 function RegistrationsTabs(props) {
   return (
     <View style={styles.tabsWrapper}>
@@ -80,8 +83,23 @@ function RegistrationsTabs(props) {
         </Text>
       </Pressable>
 
-      <Pressable style={styles.tabButtonDisabled}>
-        <Text style={styles.tabButtonTextDisabled}>נסורת</Text>
+      <Pressable
+        style={[
+          styles.tabButton,
+          props.activeTab === "shavings" ? styles.tabButtonActive : null,
+        ]}
+        onPress={function () {
+          props.onChangeTab("shavings");
+        }}
+      >
+        <Text
+          style={[
+            styles.tabButtonText,
+            props.activeTab === "shavings" ? styles.tabButtonTextActive : null,
+          ]}
+        >
+          נסורת
+        </Text>
       </Pressable>
     </View>
   );
@@ -121,6 +139,13 @@ export default function AdminCompetitionRegistrationsScreen(props) {
     competitionId: competitionId,
     activeCompetition: activeCompetition,
     isActiveTab: activeTab === "stalls",
+  });
+
+  var shavings = useAdminCompetitionShavings({
+    user: user,
+    activeRole: activeRole,
+    competitionId: competitionId,
+    isActiveTab: activeTab === "shavings",
   });
 
   function handleCompetitionMenuPress(item) {
@@ -300,6 +325,41 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             formatStallTypeLabel={stallBookings.formatStallTypeLabel}
             bookedHorseNamesSummary={stallBookings.bookedHorseNamesSummary}
             existingTackBookingsCount={stallBookings.existingTackBookingsCount}
+          />
+        ) : null}
+
+        {activeTab === "shavings" ? (
+          <CompetitionShavingsTab
+            loading={shavings.loading}
+            screenError={shavings.screenError}
+            availableStalls={shavings.availableStalls}
+            existingOrders={shavings.existingOrders}
+            priceCatalogItems={shavings.priceCatalogItems}
+            selectedPriceCatalog={shavings.selectedPriceCatalog}
+            setSelectedPriceCatalog={shavings.setSelectedPriceCatalog}
+            deliveryMode={shavings.deliveryMode}
+            setDeliveryMode={shavings.setDeliveryMode}
+            deliveryDate={shavings.deliveryDate}
+            setDeliveryDate={shavings.setDeliveryDate}
+            deliveryTime={shavings.deliveryTime}
+            setDeliveryTime={shavings.setDeliveryTime}
+            quantityMode={shavings.quantityMode}
+            setQuantityMode={shavings.setQuantityMode}
+            equalBagQuantity={shavings.equalBagQuantity}
+            setEqualBagQuantity={shavings.setEqualBagQuantity}
+            selectedStalls={shavings.selectedStalls}
+            selectedStallIds={shavings.selectedStallIds}
+            toggleStallSelection={shavings.toggleStallSelection}
+            setStallBagQuantity={shavings.setStallBagQuantity}
+            notes={shavings.notes}
+            setNotes={shavings.setNotes}
+            totalBags={shavings.totalBags}
+            totalPrice={shavings.totalPrice}
+            getStallPrice={shavings.getStallPrice}
+            isSaving={shavings.isSaving}
+            onSubmit={shavings.handleCreateShavingsOrder}
+            formatStallLabel={shavings.formatStallLabel}
+            formatPriceCatalogLabel={shavings.formatPriceCatalogLabel}
           />
         ) : null}
       </ScrollView>

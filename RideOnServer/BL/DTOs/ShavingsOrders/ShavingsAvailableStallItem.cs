@@ -11,5 +11,6 @@ namespace RideOnServer.BL.DTOs.ShavingsOrders
         public DateTime CheckOutDate { get; set; }
         public short? StallCompoundId { get; set; }
         public short? StallId { get; set; }
+        public string? PayerNames { get; set; }
     }
 }
