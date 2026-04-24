@@ -171,7 +171,7 @@ namespace RideOnServer.DAL
                 @"SELECT usp_createshavingsorder(
                     @competitionId,
                     @orderedBySystemUserId,
-                    @catalogItemId,
+                    @priceCatalogId,
                     @ranchId,
                     @notes,
                     @requestedDeliveryTime,
@@ -182,7 +182,7 @@ namespace RideOnServer.DAL
 
             cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
             cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
-            cmd.Parameters.AddWithValue("@catalogItemId", request.CatalogItemId);
+            cmd.Parameters.AddWithValue("@priceCatalogId", request.PriceCatalogId);
             cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
             cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@requestedDeliveryTime", NpgsqlDbType.Timestamp, request.RequestedDeliveryTime);
@@ -223,9 +223,9 @@ namespace RideOnServer.DAL
                     StallBookingId = Convert.ToInt32(reader["stallbookingid"]),
                     HorseId = reader["horseid"] == DBNull.Value ? null : Convert.ToInt32(reader["horseid"]),
                     HorseName = reader["horsename"] == DBNull.Value ? null : reader["horsename"].ToString(),
-                    CheckInDate = Convert.ToDateTime(reader["startdate"]),
-                    CheckOutDate = Convert.ToDateTime(reader["enddate"]),
-                    StallCompoundId = reader["compoundid"] == DBNull.Value ? null : Convert.ToInt16(reader["compoundid"]),
+                    startDate = Convert.ToDateTime(reader["startdate"]),
+                    endDate = Convert.ToDateTime(reader["enddate"]),
+                    CompoundId = reader["compoundid"] == DBNull.Value ? null : Convert.ToInt16(reader["compoundid"]),
                     StallId = reader["stallid"] == DBNull.Value ? null : Convert.ToInt16(reader["stallid"]),
                     PayerNames = reader["payernames"] == DBNull.Value ? "" : reader["payernames"].ToString()
                 });

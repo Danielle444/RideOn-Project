@@ -76,8 +76,6 @@ function normalizePaidTimeSlotItem(item) {
 
   return {
     paidTimeSlotInCompId:
-      item.compSlotId ||
-      item.CompSlotId ||
       item.paidTimeSlotInCompId ||
       item.PaidTimeSlotInCompId ||
       null,
@@ -98,8 +96,6 @@ function normalizePriceCatalogItem(item) {
     priceCatalogId:
       item.priceCatalogId ||
       item.PriceCatalogId ||
-      item.catalogItemId ||
-      item.CatalogItemId ||
       null,
     productId: item.productId || item.ProductId || null,
     itemPrice: item.itemPrice || item.ItemPrice || null,

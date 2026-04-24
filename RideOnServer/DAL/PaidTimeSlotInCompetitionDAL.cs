@@ -27,7 +27,7 @@ namespace RideOnServer.DAL
                         {
                             list.Add(new PaidTimeSlotInCompetition
                             {
-                                CompSlotId = Convert.ToInt32(reader["CompSlotId"]),
+                                PaidTimeSlotInCompId = Convert.ToInt32(reader["PaidTimeSlotInCompId"]),
                                 CompetitionId = competitionId,
                                 PaidTimeSlotId = Convert.ToInt32(reader["PaidTimeSlotId"]),
                                 SlotDate = Convert.ToDateTime(reader["SlotDate"]),
@@ -90,7 +90,7 @@ namespace RideOnServer.DAL
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
-                { "@CompSlotId", item.CompSlotId },
+                { "@PaidTimeSlotInCompId", item.PaidTimeSlotInCompId },
                 { "@PaidTimeSlotId", item.PaidTimeSlotId },
                 { "@ArenaRanchId", item.ArenaRanchId },
                 { "@ArenaId", item.ArenaId },
@@ -119,11 +119,11 @@ namespace RideOnServer.DAL
             }
         }
 
-        public void DeletePaidTimeSlotInCompetition(int compSlotId, bool forceDelete)
+        public void DeletePaidTimeSlotInCompetition(int PaidTimeSlotInCompId, bool forceDelete)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
-                { "@CompSlotId", compSlotId },
+                { "@PaidTimeSlotInCompId", PaidTimeSlotInCompId },
                 { "@ForceDelete", forceDelete }
             };
 
@@ -178,11 +178,11 @@ namespace RideOnServer.DAL
             }
         }
 
-        public PaidTimeSlotInCompetition? GetById(int compSlotId)
+        public PaidTimeSlotInCompetition? GetById(int PaidTimeSlotInCompId)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
     {
-        { "@CompSlotId", compSlotId }
+        { "@PaidTimeSlotInCompId", PaidTimeSlotInCompId }
     };
 
             try
@@ -198,7 +198,7 @@ namespace RideOnServer.DAL
                         {
                             return new PaidTimeSlotInCompetition
                             {
-                                CompSlotId = Convert.ToInt32(reader["CompSlotId"]),
+                                PaidTimeSlotInCompId = Convert.ToInt32(reader["PaidTimeSlotInCompId"]),
                                 CompetitionId = Convert.ToInt32(reader["CompetitionId"]),
                                 PaidTimeSlotId = Convert.ToInt32(reader["PaidTimeSlotId"]),
                                 SlotDate = Convert.ToDateTime(reader["SlotDate"]),

@@ -8,11 +8,11 @@ namespace RideOnServer.BL.DTOs.StallBookings
         public int? HorseId { get; set; }
         public string? HorseName { get; set; }
         public bool IsForTack { get; set; }
-        public DateTime CheckInDate { get; set; }
-        public DateTime CheckOutDate { get; set; }
-        public short? StallCompoundId { get; set; }
+        public DateTime startDate { get; set; }
+        public DateTime endDate { get; set; }
+        public short? CompoundId { get; set; }
         public short? StallId { get; set; }
-        public int CatalogItemId { get; set; }
+        public int PriceCatalogId { get; set; }
         public decimal ItemPrice { get; set; }
         public string? Notes { get; set; }
         public DateTime? ApprovalDate { get; set; }

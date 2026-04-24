@@ -275,10 +275,10 @@ export default function AdminCompetitionRegistrationsScreen(props) {
               activeCompetition?.CompetitionEndDate ||
               ""
             }
-            checkInDate={stallBookings.checkInDate}
-            setCheckInDate={stallBookings.setCheckInDate}
-            checkOutDate={stallBookings.checkOutDate}
-            setCheckOutDate={stallBookings.setCheckOutDate}
+            startDate={stallBookings.startDate}
+            setstartDate={stallBookings.setstartDate}
+            endDate={stallBookings.endDate}
+            setendDate={stallBookings.setendDate}
             notes={stallBookings.notes}
             setNotes={stallBookings.setNotes}
             selectedHorseBookings={stallBookings.selectedHorseBookings}

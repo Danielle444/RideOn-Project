@@ -2,7 +2,7 @@
 {
     public class UpdatePaidTimeSlotInCompetitionRequest
     {
-        public int CompSlotId { get; set; }
+        public int PaidTimeSlotInCompId { get; set; }
         public int CompetitionId { get; set; }
         public int HostRanchId { get; set; }
 

@@ -6,7 +6,7 @@ namespace RideOnServer.BL
 {
     public class PaidTimeSlotInCompetition
     {
-        public int CompSlotId { get; set; }
+        public int PaidTimeSlotInCompId { get; set; }
         public int CompetitionId { get; set; }
         public int PaidTimeSlotId { get; set; }
         public int ArenaRanchId { get; set; }
@@ -62,9 +62,9 @@ namespace RideOnServer.BL
 
         internal static void UpdatePaidTimeSlotInCompetition(UpdatePaidTimeSlotInCompetitionRequest request)
         {
-            if (request.CompSlotId <= 0)
+            if (request.PaidTimeSlotInCompId <= 0)
             {
-                throw new Exception("CompSlotId is invalid");
+                throw new Exception("PaidTimeSlotInCompId is invalid");
             }
 
             ValidateRequest(
@@ -78,7 +78,7 @@ namespace RideOnServer.BL
 
             PaidTimeSlotInCompetition item = new PaidTimeSlotInCompetition
             {
-                CompSlotId = request.CompSlotId,
+                PaidTimeSlotInCompId = request.PaidTimeSlotInCompId,
                 CompetitionId = request.CompetitionId,
                 PaidTimeSlotId = request.PaidTimeSlotId,
                 ArenaRanchId = request.ArenaRanchId,
@@ -94,15 +94,15 @@ namespace RideOnServer.BL
             dal.UpdatePaidTimeSlotInCompetition(item);
         }
 
-        internal static void DeletePaidTimeSlotInCompetition(int compSlotId, bool forceDelete)
+        internal static void DeletePaidTimeSlotInCompetition(int PaidTimeSlotInCompId, bool forceDelete)
         {
-            if (compSlotId <= 0)
+            if (PaidTimeSlotInCompId <= 0)
             {
-                throw new Exception("CompSlotId is invalid");
+                throw new Exception("PaidTimeSlotInCompId is invalid");
             }
 
             PaidTimeSlotInCompetitionDAL dal = new PaidTimeSlotInCompetitionDAL();
-            dal.DeletePaidTimeSlotInCompetition(compSlotId, forceDelete);
+            dal.DeletePaidTimeSlotInCompetition(PaidTimeSlotInCompId, forceDelete);
         }
 
         private static void ValidateRequest(
@@ -139,15 +139,15 @@ namespace RideOnServer.BL
             }
         }
 
-        internal static PaidTimeSlotInCompetition? GetById(int compSlotId)
+        internal static PaidTimeSlotInCompetition? GetById(int PaidTimeSlotInCompId)
         {
-            if (compSlotId <= 0)
+            if (PaidTimeSlotInCompId <= 0)
             {
-                throw new Exception("CompSlotId is invalid");
+                throw new Exception("PaidTimeSlotInCompId is invalid");
             }
 
             PaidTimeSlotInCompetitionDAL dal = new PaidTimeSlotInCompetitionDAL();
-            return dal.GetById(compSlotId);
+            return dal.GetById(PaidTimeSlotInCompId);
         }
     }
 }

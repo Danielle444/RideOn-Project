@@ -38,14 +38,13 @@ function normalizeAvailableStall(item) {
       null,
     horseId: item.horseId ?? item.HorseId ?? item.horseid ?? null,
     horseName: item.horseName ?? item.HorseName ?? item.horsename ?? "",
-    checkInDate: normalizeDateString(
-      item.checkInDate ?? item.CheckInDate ?? item.startDate ?? item.startdate,
+    startDate: normalizeDateString(
+      item.startDate ?? item.startDate ?? item.startDate ?? item.startdate,
     ),
-    checkOutDate: normalizeDateString(
-      item.checkOutDate ?? item.CheckOutDate ?? item.endDate ?? item.enddate,
+    endDate: normalizeDateString(
+      item.endDate ?? item.endDate ?? item.endDate ?? item.enddate,
     ),
-    stallCompoundId:
-      item.stallCompoundId ?? item.StallCompoundId ?? item.compoundid ?? null,
+    compoundId: item.compoundId ?? item.compoundId ?? item.compoundid ?? null,
     stallId: item.stallId ?? item.StallId ?? item.stallid ?? null,
     payerNames: item.payerNames ?? item.PayerNames ?? item.payernames ?? "",
   };
@@ -77,12 +76,7 @@ function normalizePriceCatalogItem(item, categoryName) {
   }
 
   return {
-    priceCatalogId:
-      item.priceCatalogId ??
-      item.PriceCatalogId ??
-      item.catalogItemId ??
-      item.CatalogItemId ??
-      null,
+    priceCatalogId: item.priceCatalogId ?? item.PriceCatalogId ?? null,
     productName: item.productName ?? item.ProductName ?? "",
     itemPrice: Number(item.itemPrice ?? item.ItemPrice ?? 0),
     categoryName: categoryName || "",
@@ -324,7 +318,10 @@ export default function useAdminCompetitionShavings(params) {
   }
 
   function getStallPrice(stallBookingId) {
-    return getBagsForStall(stallBookingId) * Number(selectedPriceCatalog?.itemPrice || 0);
+    return (
+      getBagsForStall(stallBookingId) *
+      Number(selectedPriceCatalog?.itemPrice || 0)
+    );
   }
 
   var totalBags = useMemo(
@@ -370,12 +367,17 @@ export default function useAdminCompetitionShavings(params) {
     }
 
     if (quantityMode === "equal") {
-      if (!Number(equalBagQuantity || 0) || Number(equalBagQuantity || 0) <= 0) {
+      if (
+        !Number(equalBagQuantity || 0) ||
+        Number(equalBagQuantity || 0) <= 0
+      ) {
         return "יש להזין כמות שקים תקינה לכל סוס";
       }
     } else {
       var invalid = selectedStalls.some(function (item) {
-        return !Number(item.bagQuantity || 0) || Number(item.bagQuantity || 0) <= 0;
+        return (
+          !Number(item.bagQuantity || 0) || Number(item.bagQuantity || 0) <= 0
+        );
       });
 
       if (invalid) {
@@ -408,7 +410,7 @@ export default function useAdminCompetitionShavings(params) {
       var payload = {
         competitionId: competitionId,
         orderedBySystemUserId: user.personId,
-        catalogItemId: selectedPriceCatalog.priceCatalogId,
+        priceCatalogId: selectedPriceCatalog.priceCatalogId,
         ranchId: activeRole.ranchId,
         notes: notes ? notes.trim() : null,
         requestedDeliveryTime: getRequestedDeliveryTime(),
@@ -452,8 +454,10 @@ export default function useAdminCompetitionShavings(params) {
 
     var parts = [stall.horseName];
 
-    if (stall.stallCompoundId || stall.stallId) {
-      parts.push("תא " + (stall.stallCompoundId || "-") + "/" + (stall.stallId || "-"));
+    if (stall.compoundId || stall.stallId) {
+      parts.push(
+        "תא " + (stall.compoundId || "-") + "/" + (stall.stallId || "-"),
+      );
     }
 
     return parts.filter(Boolean).join(" • ");
