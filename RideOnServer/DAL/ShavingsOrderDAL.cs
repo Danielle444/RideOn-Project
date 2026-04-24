@@ -226,7 +226,8 @@ namespace RideOnServer.DAL
                     CheckInDate = Convert.ToDateTime(reader["startdate"]),
                     CheckOutDate = Convert.ToDateTime(reader["enddate"]),
                     StallCompoundId = reader["compoundid"] == DBNull.Value ? null : Convert.ToInt16(reader["compoundid"]),
-                    StallId = reader["stallid"] == DBNull.Value ? null : Convert.ToInt16(reader["stallid"])
+                    StallId = reader["stallid"] == DBNull.Value ? null : Convert.ToInt16(reader["stallid"]),
+                    PayerNames = reader["payernames"] == DBNull.Value ? "" : reader["payernames"].ToString()
                 });
             }
 
