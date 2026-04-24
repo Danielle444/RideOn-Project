@@ -170,8 +170,7 @@ export default function CompetitionShavingsTab(props) {
 
                   {selected ? (
                     <Text style={styles.helperText}>
-                      עלות לתא זה:{" "}
-                      {props.getStallPrice(stall.stallBookingId)} ₪
+                      עלות לתא זה: {props.getStallPrice(stall.stallBookingId)} ₪
                     </Text>
                   ) : null}
                 </Pressable>
@@ -216,16 +215,6 @@ export default function CompetitionShavingsTab(props) {
             keyboardType="numeric"
             textAlign="right"
           />
-
-          {props.selectedStalls.map(function (item) {
-            return (
-              <View key={String(item.stallBookingId)} style={styles.summaryLine}>
-                <Text style={styles.summaryText}>
-                  {item.horseName}: {props.getStallPrice(item.stallBookingId)} ₪
-                </Text>
-              </View>
-            );
-          })}
         </View>
       ) : null}
 
