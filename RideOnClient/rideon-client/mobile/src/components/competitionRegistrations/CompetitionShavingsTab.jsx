@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 
+import CompetitionDateField from "./CompetitionDateField";
 import styles from "../../styles/adminCompetitionRegistrationsStyles";
 
 function SectionButton(props) {
@@ -106,21 +107,18 @@ export default function CompetitionShavingsTab(props) {
         </View>
 
         {props.deliveryMode === "later" ? (
-          <View style={styles.twoInputsRow}>
-            <TextInput
-              style={styles.textInput}
+          <View style={styles.dateTimeFieldsColumn}>
+            <CompetitionDateField
+              label="תאריך אספקה"
               value={props.deliveryDate}
-              onChangeText={props.setDeliveryDate}
-              placeholder="YYYY-MM-DD"
-              textAlign="right"
+              onChange={props.setDeliveryDate}
             />
 
-            <TextInput
-              style={styles.textInput}
+            <CompetitionDateField
+              label="שעת אספקה"
               value={props.deliveryTime}
-              onChangeText={props.setDeliveryTime}
-              placeholder="HH:MM"
-              textAlign="right"
+              onChange={props.setDeliveryTime}
+              mode="time"
             />
           </View>
         ) : null}
@@ -207,6 +205,7 @@ export default function CompetitionShavingsTab(props) {
       {props.quantityMode === "equal" ? (
         <View style={styles.dropdownBlock}>
           <Text style={styles.fieldLabel}>שקים לסוס</Text>
+
           <TextInput
             style={styles.textInput}
             value={props.equalBagQuantity}
@@ -260,6 +259,7 @@ export default function CompetitionShavingsTab(props) {
 
       <View style={styles.dropdownBlock}>
         <Text style={styles.fieldLabel}>הערות</Text>
+
         <TextInput
           style={styles.textInput}
           value={props.notes}

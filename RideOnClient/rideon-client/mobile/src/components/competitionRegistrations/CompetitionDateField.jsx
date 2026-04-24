@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import styles from "../../styles/adminCompetitionPaidTimesStyles";
 
 var HEBREW_MONTHS = [
@@ -25,6 +25,7 @@ function parseDateString(dateString) {
   }
 
   var parts = String(dateString).split("-");
+
   if (parts.length !== 3) {
     return null;
   }
@@ -56,6 +57,7 @@ function formatDateForInput(date) {
 
 function formatDateForDisplay(dateString) {
   var date = parseDateString(dateString);
+
   if (!date) {
     return "";
   }
@@ -108,7 +110,6 @@ function buildCalendarCells(monthDate) {
   var firstDayOfMonth = new Date(year, month, 1);
   var lastDayOfMonth = new Date(year, month + 1, 0);
 
-  // JS: Sunday=0 ... Saturday=6
   var firstDayIndex = firstDayOfMonth.getDay();
   var daysInMonth = lastDayOfMonth.getDate();
 
@@ -129,12 +130,48 @@ function buildCalendarCells(monthDate) {
   return cells;
 }
 
+function formatTimeForDisplay(value) {
+  if (!value) {
+    return "";
+  }
+
+  return String(value).slice(0, 5);
+}
+
+function buildHourOptions() {
+  var hours = [];
+
+  for (var i = 0; i < 24; i++) {
+    hours.push(String(i).padStart(2, "0"));
+  }
+
+  return hours;
+}
+
+function buildMinuteOptions() {
+  return [
+    "00",
+    "05",
+    "10",
+    "15",
+    "20",
+    "25",
+    "30",
+    "35",
+    "40",
+    "45",
+    "50",
+    "55",
+  ];
+}
+
 export default function CompetitionDateField(props) {
   var label = props.label;
   var value = props.value;
   var onChange = props.onChange;
   var minimumDate = props.minimumDate;
   var maximumDate = props.maximumDate;
+  var mode = props.mode || "date";
 
   var [visible, setVisible] = useState(false);
 
@@ -163,10 +200,18 @@ export default function CompetitionDateField(props) {
     new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
   );
 
-  function openCalendar() {
-    var baseDate =
-      parseDateString(value) || parseDateString(minimumDate) || new Date();
-    setCurrentMonth(new Date(baseDate.getFullYear(), baseDate.getMonth(), 1));
+  var currentTimeParts = String(value || "12:00").split(":");
+  var selectedHour = currentTimeParts[0] || "12";
+  var selectedMinute = currentTimeParts[1] || "00";
+
+  function openPicker() {
+    if (mode === "date") {
+      var baseDate =
+        parseDateString(value) || parseDateString(minimumDate) || new Date();
+
+      setCurrentMonth(new Date(baseDate.getFullYear(), baseDate.getMonth(), 1));
+    }
+
     setVisible(true);
   }
 
@@ -199,6 +244,15 @@ export default function CompetitionDateField(props) {
     setVisible(false);
   }
 
+  function handleSelectHour(hour) {
+    onChange(hour + ":" + selectedMinute);
+  }
+
+  function handleSelectMinute(minute) {
+    onChange(selectedHour + ":" + minute);
+    setVisible(false);
+  }
+
   var cells = useMemo(
     function () {
       return buildCalendarCells(currentMonth);
@@ -222,11 +276,19 @@ export default function CompetitionDateField(props) {
     return false;
   }
 
+  function getDisplayValue() {
+    if (mode === "time") {
+      return value ? formatTimeForDisplay(value) : "בחרי שעה";
+    }
+
+    return value ? formatDateForDisplay(value) : "בחרי תאריך";
+  }
+
   return (
     <View style={styles.fieldBlock}>
       <Text style={styles.fieldLabel}>{label}</Text>
 
-      <Pressable style={styles.textInput} onPress={openCalendar}>
+      <Pressable style={styles.textInput} onPress={openPicker}>
         <Text
           style={{
             textAlign: "right",
@@ -234,7 +296,7 @@ export default function CompetitionDateField(props) {
             fontSize: 14,
           }}
         >
-          {value ? formatDateForDisplay(value) : "בחרי תאריך"}
+          {getDisplayValue()}
         </Text>
       </Pressable>
 
@@ -266,135 +328,233 @@ export default function CompetitionDateField(props) {
               {label}
             </Text>
 
-            <View
-              style={{
-                flexDirection: "row-reverse",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 16,
-              }}
-            >
-              <Pressable onPress={goToNextMonth}>
-                <Text style={{ fontSize: 24, color: "#7B5A4D" }}>‹</Text>
-              </Pressable>
+            {mode === "date" ? (
+              <>
+                <View
+                  style={{
+                    flexDirection: "row-reverse",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  <Pressable onPress={goToNextMonth}>
+                    <Text style={{ fontSize: 24, color: "#7B5A4D" }}>‹</Text>
+                  </Pressable>
 
-              <Text
-                style={{
-                  fontSize: 18,
-                  fontWeight: "700",
-                  color: "#4F3B31",
-                }}
-              >
-                {HEBREW_MONTHS[currentMonth.getMonth()] +
-                  " " +
-                  currentMonth.getFullYear()}
-              </Text>
-
-              <Pressable onPress={goToPreviousMonth}>
-                <Text style={{ fontSize: 24, color: "#7B5A4D" }}>›</Text>
-              </Pressable>
-            </View>
-
-            {/* כותרות ימים - יום א מימין */}
-            <View
-              style={{
-                flexDirection: "row-reverse",
-                marginBottom: 8,
-              }}
-            >
-              {HEBREW_DAYS.map(function (dayName) {
-                return (
-                  <View
-                    key={dayName}
+                  <Text
                     style={{
-                      flex: 1,
-                      alignItems: "center",
-                      paddingVertical: 8,
+                      fontSize: 18,
+                      fontWeight: "700",
+                      color: "#4F3B31",
                     }}
                   >
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        color: "#5B4438",
-                        fontWeight: "600",
-                      }}
-                    >
-                      {dayName}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
+                    {HEBREW_MONTHS[currentMonth.getMonth()] +
+                      " " +
+                      currentMonth.getFullYear()}
+                  </Text>
 
-            {/* תאי החודש */}
-            <View>
-              {Array.from({ length: cells.length / 7 }).map(
-                function (_, rowIndex) {
-                  var row = cells.slice(rowIndex * 7, rowIndex * 7 + 7);
+                  <Pressable onPress={goToPreviousMonth}>
+                    <Text style={{ fontSize: 24, color: "#7B5A4D" }}>›</Text>
+                  </Pressable>
+                </View>
 
-                  return (
-                    <View
-                      key={rowIndex}
-                      style={{
-                        flexDirection: "row-reverse",
-                      }}
-                    >
-                      {row.map(function (date, colIndex) {
-                        var disabled = isDisabled(date);
-                        var selected = isSameDay(date, selectedDate);
+                <View
+                  style={{
+                    flexDirection: "row-reverse",
+                    marginBottom: 8,
+                  }}
+                >
+                  {HEBREW_DAYS.map(function (dayName) {
+                    return (
+                      <View
+                        key={dayName}
+                        style={{
+                          flex: 1,
+                          alignItems: "center",
+                          paddingVertical: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            color: "#5B4438",
+                            fontWeight: "600",
+                          }}
+                        >
+                          {dayName}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
 
-                        return (
-                          <Pressable
-                            key={rowIndex + "_" + colIndex}
-                            onPress={function () {
-                              if (!disabled) {
-                                handleSelectDate(date);
-                              }
-                            }}
-                            style={{
-                              flex: 1,
-                              aspectRatio: 1,
-                              justifyContent: "center",
-                              alignItems: "center",
-                              marginVertical: 2,
-                            }}
-                          >
-                            <View
-                              style={{
-                                width: 36,
-                                height: 36,
-                                borderRadius: 18,
-                                justifyContent: "center",
-                                alignItems: "center",
-                                backgroundColor: selected
-                                  ? "#7B5A4D"
-                                  : "transparent",
-                              }}
-                            >
-                              <Text
+                <View>
+                  {Array.from({ length: cells.length / 7 }).map(
+                    function (_, rowIndex) {
+                      var row = cells.slice(rowIndex * 7, rowIndex * 7 + 7);
+
+                      return (
+                        <View
+                          key={rowIndex}
+                          style={{
+                            flexDirection: "row-reverse",
+                          }}
+                        >
+                          {row.map(function (date, colIndex) {
+                            var disabled = isDisabled(date);
+                            var selected = isSameDay(date, selectedDate);
+
+                            return (
+                              <Pressable
+                                key={rowIndex + "_" + colIndex}
+                                onPress={function () {
+                                  if (!disabled) {
+                                    handleSelectDate(date);
+                                  }
+                                }}
                                 style={{
-                                  fontSize: 16,
-                                  color: !date
-                                    ? "transparent"
-                                    : disabled
-                                      ? "#D0C7C1"
-                                      : selected
-                                        ? "#FFFFFF"
-                                        : "#4F3B31",
-                                  fontWeight: selected ? "700" : "400",
+                                  flex: 1,
+                                  aspectRatio: 1,
+                                  justifyContent: "center",
+                                  alignItems: "center",
+                                  marginVertical: 2,
                                 }}
                               >
-                                {date ? date.getDate() : ""}
-                              </Text>
-                            </View>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  );
-                },
-              )}
-            </View>
+                                <View
+                                  style={{
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 18,
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    backgroundColor: selected
+                                      ? "#7B5A4D"
+                                      : "transparent",
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 16,
+                                      color: !date
+                                        ? "transparent"
+                                        : disabled
+                                          ? "#D0C7C1"
+                                          : selected
+                                            ? "#FFFFFF"
+                                            : "#4F3B31",
+                                      fontWeight: selected ? "700" : "400",
+                                    }}
+                                  >
+                                    {date ? date.getDate() : ""}
+                                  </Text>
+                                </View>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      );
+                    },
+                  )}
+                </View>
+              </>
+            ) : (
+              <View
+                style={{
+                  flexDirection: "row-reverse",
+                  gap: 12,
+                  maxHeight: 260,
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      textAlign: "center",
+                      fontWeight: "700",
+                      color: "#4F3B31",
+                      marginBottom: 8,
+                    }}
+                  >
+                    דקות
+                  </Text>
+
+                  <ScrollView>
+                    {buildMinuteOptions().map(function (minute) {
+                      var active = selectedMinute === minute;
+
+                      return (
+                        <Pressable
+                          key={minute}
+                          onPress={function () {
+                            handleSelectMinute(minute);
+                          }}
+                          style={{
+                            padding: 10,
+                            borderRadius: 12,
+                            backgroundColor: active ? "#7B5A4D" : "#FFF8F3",
+                            marginBottom: 6,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              textAlign: "center",
+                              color: active ? "#FFFFFF" : "#4F3B31",
+                              fontWeight: "700",
+                            }}
+                          >
+                            {minute}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      textAlign: "center",
+                      fontWeight: "700",
+                      color: "#4F3B31",
+                      marginBottom: 8,
+                    }}
+                  >
+                    שעה
+                  </Text>
+
+                  <ScrollView>
+                    {buildHourOptions().map(function (hour) {
+                      var active = selectedHour === hour;
+
+                      return (
+                        <Pressable
+                          key={hour}
+                          onPress={function () {
+                            handleSelectHour(hour);
+                          }}
+                          style={{
+                            padding: 10,
+                            borderRadius: 12,
+                            backgroundColor: active ? "#7B5A4D" : "#FFF8F3",
+                            marginBottom: 6,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              textAlign: "center",
+                              color: active ? "#FFFFFF" : "#4F3B31",
+                              fontWeight: "700",
+                            }}
+                          >
+                            {hour}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              </View>
+            )}
 
             <Pressable
               style={[
