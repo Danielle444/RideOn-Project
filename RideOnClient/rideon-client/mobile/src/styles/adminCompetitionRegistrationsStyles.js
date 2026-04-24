@@ -382,6 +382,11 @@ var styles = StyleSheet.create({
     textAlign: "right",
     fontWeight: "700",
   },
+
+  dateTimeFieldsColumn: {
+    gap: 12,
+    width: "100%",
+  },
 });
 
 export default styles;
