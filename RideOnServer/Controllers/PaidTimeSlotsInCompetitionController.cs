@@ -126,17 +126,17 @@ namespace RideOnServer.Controllers
             }
         }
 
-        [HttpPut("{compSlotId}")]
-        public IActionResult UpdatePaidTimeSlotInCompetition(int compSlotId, [FromBody] UpdatePaidTimeSlotInCompetitionRequest request)
+        [HttpPut("{PaidTimeSlotInCompId}")]
+        public IActionResult UpdatePaidTimeSlotInCompetition(int PaidTimeSlotInCompId, [FromBody] UpdatePaidTimeSlotInCompetitionRequest request)
         {
             try
             {
                 if (request == null)
                     return BadRequest("Invalid request");
 
-                if (compSlotId != request.CompSlotId)
+                if (PaidTimeSlotInCompId != request.PaidTimeSlotInCompId)
                 {
-                    return BadRequest("CompSlotId in URL does not match body");
+                    return BadRequest("PaidTimeSlotInCompId in URL does not match body");
                 }
 
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
@@ -160,7 +160,7 @@ namespace RideOnServer.Controllers
                 }
 
                 PaidTimeSlotInCompetition.UpdatePaidTimeSlotInCompetition(request);
-                var updatedItem = PaidTimeSlotInCompetition.GetById(compSlotId);
+                var updatedItem = PaidTimeSlotInCompetition.GetById(PaidTimeSlotInCompId);
 
                 if (updatedItem == null)
                 {
@@ -180,9 +180,9 @@ namespace RideOnServer.Controllers
             }
         }
 
-        [HttpDelete("{compSlotId}")]
+        [HttpDelete("{PaidTimeSlotInCompId}")]
         public IActionResult DeletePaidTimeSlotInCompetition(
-            int compSlotId,
+            int PaidTimeSlotInCompId,
             [FromQuery] int competitionId,
             [FromQuery] int ranchId,
             [FromQuery] bool forceDelete = false)
@@ -209,7 +209,7 @@ namespace RideOnServer.Controllers
                     return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה למחוק פייד-טיים מתחרות זו");
                 }
 
-                PaidTimeSlotInCompetition.DeletePaidTimeSlotInCompetition(compSlotId, forceDelete);
+                PaidTimeSlotInCompetition.DeletePaidTimeSlotInCompetition(PaidTimeSlotInCompId, forceDelete);
                 return Ok("Paid time slot deleted successfully");
             }
             catch (UnauthorizedAccessException ex)

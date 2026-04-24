@@ -59,16 +59,16 @@ export default function CompetitionStallBookingFormCard(props) {
 
       <CompetitionDateField
         label="תאריך כניסה"
-        value={props.checkInDate}
-        onChange={props.setCheckInDate}
+        value={props.startDate}
+        onChange={props.setstartDate}
         minimumDate={props.minCompetitionDate}
         maximumDate={props.maxCompetitionDate}
       />
 
       <CompetitionDateField
         label="תאריך יציאה"
-        value={props.checkOutDate}
-        onChange={props.setCheckOutDate}
+        value={props.endDate}
+        onChange={props.setendDate}
         minimumDate={props.minCompetitionDate}
         maximumDate={props.maxCompetitionDate}
       />

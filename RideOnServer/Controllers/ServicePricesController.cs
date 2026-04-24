@@ -201,8 +201,8 @@ namespace RideOnServer.Controllers
             }
         }
 
-        [HttpPut("history/{catalogItemId}/activate")]
-        public IActionResult ActivateHistoryItem(int catalogItemId, [FromQuery] int ranchId)
+        [HttpPut("history/{priceCatalogId}/activate")]
+        public IActionResult ActivateHistoryItem(int PriceCatalogId, [FromQuery] int ranchId)
         {
             try
             {
@@ -214,7 +214,7 @@ namespace RideOnServer.Controllers
                     RoleNames.HostSecretary
                 );
 
-                ServicePriceManager.ActivateHistoryItem(catalogItemId, ranchId);
+                ServicePriceManager.ActivateHistoryItem(PriceCatalogId, ranchId);
                 return Ok();
             }
             catch (UnauthorizedAccessException ex)

@@ -5,7 +5,7 @@ namespace RideOnServer.BL
 {
     public class PaidTimeRequest : ServiceRequest
     {
-        public int CatalogItemId { get; set; }
+        public int PriceCatalogId { get; set; }
 
         public int RequestedCompSlotId { get; set; }
 
@@ -56,7 +56,7 @@ namespace RideOnServer.BL
 
             if (request.PriceCatalogId <= 0)
             {
-                throw new Exception("Invalid PriceCatalogId");
+                throw new Exception("Invalid priceCatalogId");
             }
 
             if (request.RequestedCompSlotId <= 0)

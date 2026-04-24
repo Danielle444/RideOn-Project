@@ -45,8 +45,8 @@ export default function useAdminTackStallBookings(params) {
   var horseStallTypeOptions = params.horseStallTypeOptions;
   var tackStallTypeOptions = params.tackStallTypeOptions;
   var selectedHorseStallType = params.selectedHorseStallType;
-  var checkInDate = params.checkInDate;
-  var checkOutDate = params.checkOutDate;
+  var startDate = params.startDate;
+  var endDate = params.endDate;
   var allSelectedHorsePayers = params.allSelectedHorsePayers;
   var reloadStallBookings = params.reloadStallBookings;
 
@@ -83,10 +83,10 @@ export default function useAdminTackStallBookings(params) {
 
       var existingIds = existingStallBookings
         .filter(function (booking) {
-          return booking && !booking.isTackBooking && booking.catalogItemId;
+          return booking && !booking.isTackBooking && booking.priceCatalogId;
         })
         .map(function (booking) {
-          return Number(booking.catalogItemId);
+          return Number(booking.priceCatalogId);
         })
         .filter(Boolean);
 
@@ -125,11 +125,11 @@ export default function useAdminTackStallBookings(params) {
         });
 
       var selectedStartDates = selectedHorseBookings.map(function () {
-        return checkInDate;
+        return startDate;
       });
 
       var selectedEndDates = selectedHorseBookings.map(function () {
-        return checkOutDate;
+        return endDate;
       });
 
       return {
@@ -141,7 +141,7 @@ export default function useAdminTackStallBookings(params) {
         ),
       };
     },
-    [existingStallBookings, selectedHorseBookings, checkInDate, checkOutDate],
+    [existingStallBookings, selectedHorseBookings, startDate, endDate],
   );
 
   useEffect(
@@ -257,7 +257,7 @@ export default function useAdminTackStallBookings(params) {
       await createTackStallBookings({
         competitionId: competitionId,
         orderedBySystemUserId: user.personId,
-        catalogItemId: selectedTackStallType.priceCatalogId,
+        priceCatalogId: selectedTackStallType.priceCatalogId,
         notes: tackNotes ? tackNotes.trim() : null,
         ranchId: activeRole.ranchId,
         startDate: tackStartDate,

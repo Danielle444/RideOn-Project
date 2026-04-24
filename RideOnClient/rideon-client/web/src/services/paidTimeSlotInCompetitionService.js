@@ -39,21 +39,21 @@ function createPaidTimeSlotInCompetition(data) {
   );
 }
 
-function updatePaidTimeSlotInCompetition(compSlotId, data) {
+function updatePaidTimeSlotInCompetition(PaidTimeSlotInCompId, data) {
   return axios.put(
-    `${API}/PaidTimeSlotsInCompetition/${compSlotId}`,
+    `${API}/PaidTimeSlotsInCompetition/${PaidTimeSlotInCompId}`,
     data,
     getAuthHeaders(),
   );
 }
 
 function deletePaidTimeSlotInCompetition(
-  compSlotId,
+  PaidTimeSlotInCompId,
   competitionId,
   ranchId,
   forceDelete = false,
 ) {
-  return axios.delete(`${API}/PaidTimeSlotsInCompetition/${compSlotId}`, {
+  return axios.delete(`${API}/PaidTimeSlotsInCompetition/${PaidTimeSlotInCompId}`, {
     params: {
       competitionId: competitionId,
       ranchId: ranchId,

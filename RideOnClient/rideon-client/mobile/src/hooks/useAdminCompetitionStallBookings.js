@@ -78,12 +78,7 @@ function normalizePriceCatalogItem(item) {
   }
 
   return {
-    priceCatalogId:
-      item.priceCatalogId ||
-      item.PriceCatalogId ||
-      item.catalogItemId ||
-      item.CatalogItemId ||
-      null,
+    priceCatalogId: item.priceCatalogId || item.PriceCatalogId || null,
     productId: item.productId || item.ProductId || null,
     itemPrice: Number(item.itemPrice || item.ItemPrice || 0),
     productName: item.productName || item.ProductName || "",
@@ -147,28 +142,21 @@ function normalizeExistingStallBooking(item) {
     horseId: horseId,
     isForTack: isForTack,
     isTackBooking: isForTack === true || horseId === null,
-    catalogItemId:
-      Number(
-        item.catalogItemId ||
-          item.CatalogItemId ||
-          item.catalogitemid ||
-          item.priceCatalogId ||
-          item.PriceCatalogId ||
-          0,
-      ) || null,
+    priceCatalogId:
+      Number(item.priceCatalogId || item.PriceCatalogId || 0) || null,
     startDate: normalizeDateString(
       item.startDate ||
         item.StartDate ||
         item.startdate ||
-        item.checkInDate ||
-        item.CheckInDate,
+        item.startDate ||
+        item.startDate,
     ),
     endDate: normalizeDateString(
       item.endDate ||
         item.EndDate ||
         item.enddate ||
-        item.checkOutDate ||
-        item.CheckOutDate,
+        item.endDate ||
+        item.endDate,
     ),
   };
 }
@@ -343,8 +331,8 @@ export default function useAdminCompetitionStallBookings(params) {
   var [tackStallTypeOptions, setTackStallTypeOptions] = useState([]);
 
   var [selectedHorseStallType, setSelectedHorseStallType] = useState(null);
-  var [checkInDate, setCheckInDate] = useState("");
-  var [checkOutDate, setCheckOutDate] = useState("");
+  var [startDate, setstartDate] = useState("");
+  var [endDate, setendDate] = useState("");
   var [notes, setNotes] = useState("");
   var [mode, setMode] = useState("horse");
   var [loading, setLoading] = useState(false);
@@ -375,12 +363,12 @@ export default function useAdminCompetitionStallBookings(params) {
         activeCompetition.CompetitionEndDate ||
         "";
 
-      if (!checkInDate && defaultStart) {
-        setCheckInDate(formatDateForInput(defaultStart));
+      if (!startDate && defaultStart) {
+        setstartDate(formatDateForInput(defaultStart));
       }
 
-      if (!checkOutDate && defaultEnd) {
-        setCheckOutDate(formatDateForInput(defaultEnd));
+      if (!endDate && defaultEnd) {
+        setendDate(formatDateForInput(defaultEnd));
       }
     },
     [activeCompetition],
@@ -491,8 +479,8 @@ export default function useAdminCompetitionStallBookings(params) {
     horsePayers: horsePayers,
     existingStallBookings: existingStallBookings,
     selectedHorseStallType: selectedHorseStallType,
-    checkInDate: checkInDate,
-    checkOutDate: checkOutDate,
+    startDate: startDate,
+    endDate: endDate,
     notes: notes,
     reloadStallBookings: loadData,
   });
@@ -535,8 +523,8 @@ export default function useAdminCompetitionStallBookings(params) {
     horseStallTypeOptions: horseStallTypeOptions,
     tackStallTypeOptions: tackStallTypeOptions,
     selectedHorseStallType: selectedHorseStallType,
-    checkInDate: checkInDate,
-    checkOutDate: checkOutDate,
+    startDate: startDate,
+    endDate: endDate,
     allSelectedHorsePayers: allSelectedHorsePayers,
     reloadStallBookings: loadData,
   });
@@ -599,10 +587,10 @@ export default function useAdminCompetitionStallBookings(params) {
     selectedHorseStallType: selectedHorseStallType,
     setSelectedHorseStallType: setSelectedHorseStallType,
 
-    checkInDate: checkInDate,
-    setCheckInDate: setCheckInDate,
-    checkOutDate: checkOutDate,
-    setCheckOutDate: setCheckOutDate,
+    startDate: startDate,
+    setstartDate: setstartDate,
+    endDate: endDate,
+    setendDate: setendDate,
     notes: notes,
     setNotes: setNotes,
 

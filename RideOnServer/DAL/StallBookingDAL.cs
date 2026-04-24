@@ -18,7 +18,7 @@ namespace RideOnServer.DAL
                 "SELECT usp_createstallbooking(" +
                 "@competitionId, " +
                 "@orderedBySystemUserId, " +
-                "@catalogItemId, " +
+                "@priceCatalogId, " +
                 "@notes::text, " +               
                 "@ranchId, " +
                 "@horseId, " +
@@ -30,15 +30,15 @@ namespace RideOnServer.DAL
 
             cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
             cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
-            cmd.Parameters.AddWithValue("@catalogItemId", request.CatalogItemId);
+            cmd.Parameters.AddWithValue("@priceCatalogId", request.PriceCatalogId);
 
             cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
 
             cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
             cmd.Parameters.AddWithValue("@horseId", request.HorseId);
 
-            cmd.Parameters.Add("@startDate", NpgsqlDbType.Date).Value = request.CheckInDate.Date;
-            cmd.Parameters.Add("@endDate", NpgsqlDbType.Date).Value = request.CheckOutDate.Date;
+            cmd.Parameters.Add("@startDate", NpgsqlDbType.Date).Value = request.startDate.Date;
+            cmd.Parameters.Add("@endDate", NpgsqlDbType.Date).Value = request.endDate.Date;
 
             cmd.Parameters.AddWithValue("@isForTack", request.IsForTack);
 
@@ -133,11 +133,11 @@ namespace RideOnServer.DAL
                     HorseId = reader["horseid"] == DBNull.Value ? null : Convert.ToInt32(reader["horseid"]),
                     HorseName = reader["horsename"] == DBNull.Value ? null : reader["horsename"].ToString(),
                     IsForTack = Convert.ToBoolean(reader["isfortack"]),
-                    CheckInDate = Convert.ToDateTime(reader["startdate"]),
-                    CheckOutDate = Convert.ToDateTime(reader["enddate"]),
-                    StallCompoundId = reader["compoundid"] == DBNull.Value ? null : Convert.ToInt16(reader["compoundid"]),
+                    startDate = Convert.ToDateTime(reader["startdate"]),
+                    endDate = Convert.ToDateTime(reader["enddate"]),
+                    CompoundId = reader["compoundid"] == DBNull.Value ? null : Convert.ToInt16(reader["compoundid"]),
                     StallId = reader["stallid"] == DBNull.Value ? null : Convert.ToInt16(reader["stallid"]),
-                    CatalogItemId = Convert.ToInt32(reader["catalogitemid"]),
+                    PriceCatalogId = Convert.ToInt32(reader["priceCatalogId"]),
                     ItemPrice = Convert.ToDecimal(reader["itemprice"]),
                     Notes = reader["notes"] == DBNull.Value ? null : reader["notes"].ToString(),
                     ApprovalDate = reader["approvaldate"] == DBNull.Value ? null : Convert.ToDateTime(reader["approvaldate"]),
@@ -215,7 +215,7 @@ namespace RideOnServer.DAL
                 "SELECT * FROM usp_createtackstallbookings(" +
                 "@competitionId, " +
                 "@orderedBySystemUserId, " +
-                "@catalogItemId, " +
+                "@priceCatalogId, " +
                 "@notes::text, " +
                 "@ranchId, " +
                 "@startDate::date, " +
@@ -226,7 +226,7 @@ namespace RideOnServer.DAL
 
             cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
             cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
-            cmd.Parameters.AddWithValue("@catalogItemId", request.CatalogItemId);
+            cmd.Parameters.AddWithValue("@priceCatalogId", request.PriceCatalogId);
             cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
             cmd.Parameters.Add("@startDate", NpgsqlDbType.Date).Value = request.StartDate.Date;

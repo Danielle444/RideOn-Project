@@ -34,8 +34,8 @@ export default function useAdminHorseStallBookings(params) {
   var horsePayers = params.horsePayers;
   var existingStallBookings = params.existingStallBookings;
   var selectedHorseStallType = params.selectedHorseStallType;
-  var checkInDate = params.checkInDate;
-  var checkOutDate = params.checkOutDate;
+  var startDate = params.startDate;
+  var endDate = params.endDate;
   var notes = params.notes;
   var reloadStallBookings = params.reloadStallBookings;
 
@@ -197,7 +197,7 @@ export default function useAdminHorseStallBookings(params) {
       return "יש להוסיף לפחות סוס אחד";
     }
 
-    if (!checkInDate || !checkOutDate) {
+    if (!startDate || !endDate) {
       return "יש לבחור תאריכי כניסה ויציאה";
     }
 
@@ -255,12 +255,12 @@ export default function useAdminHorseStallBookings(params) {
         return createStallBooking({
           competitionId: competitionId,
           orderedBySystemUserId: user.personId,
-          catalogItemId: currentStallType.priceCatalogId,
+          priceCatalogId: currentStallType.priceCatalogId,
           notes: notes ? notes.trim() : null,
           ranchId: activeRole.ranchId,
           horseId: booking.horse.horseId,
-          checkInDate: checkInDate,
-          checkOutDate: checkOutDate,
+          startDate: startDate,
+          endDate: endDate,
           isForTack: false,
           payers: booking.payers
             .filter(function (payer) {

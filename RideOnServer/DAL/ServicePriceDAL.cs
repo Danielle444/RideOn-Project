@@ -34,9 +34,9 @@ namespace RideOnServer.DAL
                                 DurationMinutes = reader["DurationMinutes"] == DBNull.Value
                                     ? null
                                     : Convert.ToInt32(reader["DurationMinutes"]),
-                                CatalogItemId = reader["CatalogItemId"] == DBNull.Value
+                                PriceCatalogId = reader["priceCatalogId"] == DBNull.Value
                                     ? null
-                                    : Convert.ToInt32(reader["CatalogItemId"]),
+                                    : Convert.ToInt32(reader["priceCatalogId"]),
                                 ItemPrice = reader["ItemPrice"] == DBNull.Value
                                     ? null
                                     : Convert.ToDecimal(reader["ItemPrice"]),
@@ -217,7 +217,7 @@ namespace RideOnServer.DAL
                         {
                             list.Add(new ServicePriceHistoryRow
                             {
-                                CatalogItemId = Convert.ToInt32(reader["CatalogItemId"]),
+                                PriceCatalogId = Convert.ToInt32(reader["priceCatalogId"]),
                                 CreationDate = reader["CreationDate"] == DBNull.Value
                                     ? null
                                     : Convert.ToDateTime(reader["CreationDate"]),
@@ -239,11 +239,11 @@ namespace RideOnServer.DAL
             }
         }
 
-        public void ActivateSpecificPriceHistoryItem(int catalogItemId, int ranchId)
+        public void ActivateSpecificPriceHistoryItem(int priceCatalogId, int ranchId)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
-                { "@PriceCatalogId", catalogItemId },
+                { "@priceCatalogId", PriceCatalogId },
                 { "@RanchId", ranchId }
             };
 

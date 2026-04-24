@@ -63,10 +63,10 @@ export default function CompetitionStallBookingsTab(props) {
       setSelectedHorseStallType={props.setSelectedHorseStallType}
       minCompetitionDate={props.minCompetitionDate}
       maxCompetitionDate={props.maxCompetitionDate}
-      checkInDate={props.checkInDate}
-      setCheckInDate={props.setCheckInDate}
-      checkOutDate={props.checkOutDate}
-      setCheckOutDate={props.setCheckOutDate}
+      startDate={props.startDate}
+      setstartDate={props.setstartDate}
+      endDate={props.endDate}
+      setendDate={props.setendDate}
       selectedHorseToAdd={props.selectedHorseToAdd}
       setSelectedHorseToAdd={props.setSelectedHorseToAdd}
       availableHorseOptions={props.availableHorseOptions}

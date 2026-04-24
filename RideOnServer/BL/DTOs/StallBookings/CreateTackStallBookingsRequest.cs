@@ -7,7 +7,7 @@ namespace RideOnServer.BL.DTOs.StallBookings
     {
         public int CompetitionId { get; set; }
         public int OrderedBySystemUserId { get; set; }
-        public int CatalogItemId { get; set; }
+        public int PriceCatalogId { get; set; }
         public string? Notes { get; set; }
         public int RanchId { get; set; }
         public DateTime StartDate { get; set; }
