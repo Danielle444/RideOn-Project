@@ -8,15 +8,20 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class StallBookingsController : ControllerBase
     {
-        [Authorize]
         [HttpPost]
         public ActionResult<int> CreateStallBooking([FromBody] CreateStallBookingRequest request)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                if (request == null)
+                {
+                    return BadRequest("Request body is required.");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
@@ -25,11 +30,7 @@ namespace RideOnServer.Controllers
                     RoleNames.HostSecretary
                 );
 
-                // חשוב מאוד – לא מאפשרים להזמין בשם מישהו אחר
-                if (request.OrderedBySystemUserId != personId)
-                {
-                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לבצע פעולה זו עבור משתמש אחר");
-                }
+                request.OrderedBySystemUserId = personId;
 
                 int id = StallBookingDAL.CreateStallBooking(request);
                 return Ok(id);
@@ -40,11 +41,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in CreateStallBooking: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת הזמנת התא");
             }
         }
 
-        [Authorize]
         [HttpGet("horses-for-booking")]
         public IActionResult GetHorsesForStallBooking(
             [FromQuery] int competitionId,
@@ -52,7 +53,7 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
@@ -70,11 +71,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetHorsesForStallBooking: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת סוסים להזמנת תאים");
             }
         }
 
-        [Authorize]
         [HttpGet("horse-payers")]
         public IActionResult GetHorsePayersForCompetition(
             [FromQuery] int competitionId,
@@ -82,7 +83,7 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
@@ -100,11 +101,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetHorsePayersForCompetition: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת משלמי הסוסים");
             }
         }
 
-        [Authorize]
         [HttpGet("by-competition-and-ranch")]
         public IActionResult GetStallBookingsForCompetitionAndRanch(
             [FromQuery] int competitionId,
@@ -112,7 +113,7 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
@@ -130,17 +131,19 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetStallBookingsForCompetitionAndRanch: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת הזמנות התאים");
             }
         }
 
-        [Authorize]
         [HttpGet("{stallBookingId}/payers")]
-        public IActionResult GetPayersForStallBooking(int stallBookingId, [FromQuery] int ranchId)
+        public IActionResult GetPayersForStallBooking(
+            int stallBookingId,
+            [FromQuery] int ranchId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
@@ -158,11 +161,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetPayersForStallBooking: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת משלמי הזמנת התא");
             }
         }
 
-        [Authorize]
         [HttpGet("payers/by-competition-and-ranch")]
         public IActionResult GetAllStallBookingPayersForCompetitionAndRanch(
             [FromQuery] int competitionId,
@@ -170,7 +173,7 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
@@ -188,7 +191,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetAllStallBookingPayersForCompetitionAndRanch: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת משלמי התאים");
             }
         }
 
@@ -202,6 +206,15 @@ namespace RideOnServer.Controllers
                     return BadRequest("Request body is required.");
                 }
 
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.RanchAdmin,
+                    RoleNames.HostSecretary
+                );
+
                 if (request.Quantity <= 0)
                 {
                     return BadRequest("Quantity must be greater than 0.");
@@ -212,25 +225,20 @@ namespace RideOnServer.Controllers
                     return BadRequest("At least one payer is required.");
                 }
 
+                request.OrderedBySystemUserId = personId;
+
                 List<int> createdIds = StallBookingDAL.CreateTackStallBookings(request);
                 return Ok(createdIds);
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in CreateTackStallBookings: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת תאי ציוד");
             }
-        }
-
-        private int GetPersonIdFromClaims()
-        {
-            string? personIdClaim = User.Claims.FirstOrDefault(c => c.Type == "PersonId")?.Value;
-
-            if (string.IsNullOrWhiteSpace(personIdClaim))
-            {
-                throw new UnauthorizedAccessException("PersonId claim is missing");
-            }
-
-            return int.Parse(personIdClaim);
         }
     }
 }

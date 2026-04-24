@@ -27,17 +27,29 @@ function updateHorseBarnName(horseId, ranchId, barnName) {
   });
 }
 
-function getHealthCertificates(competitionId) {
+function getHealthCertificates(competitionId, ranchId) {
   return axios.get("/Horses/health-certificates", {
-    params: { competitionId },
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
   });
 }
 
-function saveHealthCertificate(horseId, competitionId, hcPath) {
+function saveHealthCertificate(horseId, competitionId, ranchId, hcPath) {
   return axios.post("/Horses/health-certificates/save", {
-    horseId,
-    competitionId,
-    hcPath,
+    horseId: horseId,
+    competitionId: competitionId,
+    ranchId: ranchId,
+    hcPath: hcPath,
+  });
+}
+
+function approveHealthCertificate(horseId, competitionId, ranchId) {
+  return axios.post("/Horses/health-certificates/approve", {
+    horseId: horseId,
+    competitionId: competitionId,
+    ranchId: ranchId,
   });
 }
 
@@ -47,4 +59,5 @@ export {
   updateHorseBarnName,
   getHealthCertificates,
   saveHealthCertificate,
+  approveHealthCertificate,
 };

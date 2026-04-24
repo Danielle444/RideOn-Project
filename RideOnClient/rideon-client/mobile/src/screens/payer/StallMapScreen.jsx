@@ -1,41 +1,62 @@
 import { useState, useEffect } from "react";
 import {
-  View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, StyleSheet
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import { getCompounds, getAssignments } from "../../services/stallMapService";
 
 export default function StallMapScreen({ route }) {
   const { competitionId, ranchId } = route.params;
 
-  const [compounds,   setCompounds]   = useState([]);
+  const [compounds, setCompounds] = useState([]);
   const [assignments, setAssignments] = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState("");
-  const [activeId,    setActiveId]    = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [activeId, setActiveId] = useState(null);
 
-  useEffect(function () {
-    let isMounted = true;
-    Promise.all([getCompounds(ranchId), getAssignments(competitionId)])
-      .then(function ([compRes, assignRes]) {
-        if (!isMounted) return;
-        const compList = Array.isArray(compRes.data) ? compRes.data : [];
-        setCompounds(compList);
-        setAssignments(Array.isArray(assignRes.data) ? assignRes.data : []);
-        if (compList.length > 0) setActiveId(compList[0].compoundId);
-      })
-      .catch(function () {
-        if (!isMounted) return;
-        setError("שגיאה בטעינת מפת התאים");
-      })
-      .finally(function () {
-        if (!isMounted) return;
-        setLoading(false);
-      });
-    return function () { isMounted = false; };
-  }, [competitionId, ranchId]);
+  useEffect(
+    function () {
+      let isMounted = true;
 
-  const activeCompound = compounds.find(function (c) { return c.compoundId === activeId; });
+      Promise.all([
+        getCompounds(ranchId),
+        getAssignments(competitionId, ranchId),
+      ])
+        .then(function ([compRes, assignRes]) {
+          if (!isMounted) return;
+
+          const compList = Array.isArray(compRes.data) ? compRes.data : [];
+
+          setCompounds(compList);
+          setAssignments(Array.isArray(assignRes.data) ? assignRes.data : []);
+
+          if (compList.length > 0) {
+            setActiveId(compList[0].compoundId);
+          }
+        })
+        .catch(function () {
+          if (!isMounted) return;
+          setError("שגיאה בטעינת מפת התאים");
+        })
+        .finally(function () {
+          if (!isMounted) return;
+          setLoading(false);
+        });
+
+      return function () {
+        isMounted = false;
+      };
+    },
+    [competitionId, ranchId],
+  );
+
+  const activeCompound = compounds.find(function (c) {
+    return c.compoundId === activeId;
+  });
 
   const activeAssignments = assignments.filter(function (a) {
     return a.compoundId === activeId;
@@ -48,16 +69,15 @@ export default function StallMapScreen({ route }) {
 
   function renderGrid() {
     if (!activeCompound?.layout) {
-      return (
-        <Text style={styles.emptyText}>לא הועלתה פריסה עבור מתחם זה</Text>
-      );
+      return <Text style={styles.emptyText}>לא הועלתה פריסה עבור מתחם זה</Text>;
     }
 
     let layout;
     try {
-      layout = typeof activeCompound.layout === "string"
-        ? JSON.parse(activeCompound.layout)
-        : activeCompound.layout;
+      layout =
+        typeof activeCompound.layout === "string"
+          ? JSON.parse(activeCompound.layout)
+          : activeCompound.layout;
     } catch {
       return <Text style={styles.emptyText}>שגיאה בטעינת הפריסה</Text>;
     }
@@ -70,12 +90,23 @@ export default function StallMapScreen({ route }) {
     return (
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View>
-          {Array.from({ length: layout.rows }, function (_, r) { return r; }).map(function (r) {
+          {Array.from({ length: layout.rows }, function (_, r) {
+            return r;
+          }).map(function (r) {
             return (
               <View key={r} style={styles.gridRow}>
-                {Array.from({ length: layout.cols }, function (_, c) { return c; }).map(function (c) {
-                  const cell = cellMap[`${r}-${c}`] || { row: r, col: c, stallNumber: null, isEntrance: false };
-                  const assignment = cell.stallNumber ? assignmentMap[cell.stallNumber] : null;
+                {Array.from({ length: layout.cols }, function (_, c) {
+                  return c;
+                }).map(function (c) {
+                  const cell = cellMap[`${r}-${c}`] || {
+                    row: r,
+                    col: c,
+                    stallNumber: null,
+                    isEntrance: false,
+                  };
+                  const assignment = cell.stallNumber
+                    ? assignmentMap[cell.stallNumber]
+                    : null;
 
                   if (cell.isEntrance) {
                     return (
@@ -89,7 +120,13 @@ export default function StallMapScreen({ route }) {
                   }
 
                   return (
-                    <View key={c} style={[styles.cell, assignment ? styles.occupiedCell : styles.emptyCell]}>
+                    <View
+                      key={c}
+                      style={[
+                        styles.cell,
+                        assignment ? styles.occupiedCell : styles.emptyCell,
+                      ]}
+                    >
                       <Text style={styles.stallNumber}>{cell.stallNumber}</Text>
                       {assignment ? (
                         <Text style={styles.horseName} numberOfLines={2}>
@@ -123,15 +160,29 @@ export default function StallMapScreen({ route }) {
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabsRow}
+      >
         {compounds.map(function (c) {
           return (
             <TouchableOpacity
               key={c.compoundId}
-              onPress={function () { setActiveId(c.compoundId); }}
-              style={[styles.tab, activeId === c.compoundId && styles.activeTab]}
+              onPress={function () {
+                setActiveId(c.compoundId);
+              }}
+              style={[
+                styles.tab,
+                activeId === c.compoundId && styles.activeTab,
+              ]}
             >
-              <Text style={[styles.tabText, activeId === c.compoundId && styles.activeTabText]}>
+              <Text
+                style={[
+                  styles.tabText,
+                  activeId === c.compoundId && styles.activeTabText,
+                ]}
+              >
                 {c.compoundName}
               </Text>
             </TouchableOpacity>
@@ -145,24 +196,71 @@ export default function StallMapScreen({ route }) {
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: "#FBF7F4" },
-  content:      { padding: 16 },
-  center:       { flex: 1, alignItems: "center", justifyContent: "center" },
-  title:        { fontSize: 22, fontWeight: "700", color: "#3F312B", textAlign: "right", marginBottom: 12 },
-  errorText:    { color: "#B91C1C", textAlign: "right", marginBottom: 8 },
-  tabsRow:      { flexDirection: "row", marginBottom: 12 },
-  tab:          { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: "#D7CCC8", backgroundColor: "#fff", marginLeft: 8 },
-  activeTab:    { backgroundColor: "#7B5A4D", borderColor: "#7B5A4D" },
-  tabText:      { fontSize: 13, fontWeight: "600", color: "#5D4037" },
-  activeTabText:{ color: "#fff" },
-  gridRow:      { flexDirection: "row", marginBottom: 4 },
-  cell:         { width: 70, height: 70, marginHorizontal: 2, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  emptyCell:    { backgroundColor: "#fff", borderWidth: 1, borderColor: "#D7CCC8" },
-  occupiedCell: { backgroundColor: "#EFEBE9", borderWidth: 1.5, borderColor: "#A5836A" },
-  entranceCell: { backgroundColor: "#F3ECE8", borderWidth: 1, borderColor: "#BCAAA4" },
-  stallNumber:  { fontSize: 10, fontWeight: "700", color: "#8D6E63", position: "absolute", top: 4, right: 6 },
-  horseName:    { fontSize: 11, fontWeight: "600", color: "#3F312B", textAlign: "center", paddingHorizontal: 4, marginTop: 10 },
-  emptyLabel:   { fontSize: 10, color: "#BCAAA4", marginTop: 10 },
+  container: { flex: 1, backgroundColor: "#FBF7F4" },
+  content: { padding: 16 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  title: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#3F312B",
+    textAlign: "right",
+    marginBottom: 12,
+  },
+  errorText: { color: "#B91C1C", textAlign: "right", marginBottom: 8 },
+  tabsRow: { flexDirection: "row", marginBottom: 12 },
+  tab: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#D7CCC8",
+    backgroundColor: "#fff",
+    marginLeft: 8,
+  },
+  activeTab: { backgroundColor: "#7B5A4D", borderColor: "#7B5A4D" },
+  tabText: { fontSize: 13, fontWeight: "600", color: "#5D4037" },
+  activeTabText: { color: "#fff" },
+  gridRow: { flexDirection: "row", marginBottom: 4 },
+  cell: {
+    width: 70,
+    height: 70,
+    marginHorizontal: 2,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyCell: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#D7CCC8",
+  },
+  occupiedCell: {
+    backgroundColor: "#EFEBE9",
+    borderWidth: 1.5,
+    borderColor: "#A5836A",
+  },
+  entranceCell: {
+    backgroundColor: "#F3ECE8",
+    borderWidth: 1,
+    borderColor: "#BCAAA4",
+  },
+  stallNumber: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#8D6E63",
+    position: "absolute",
+    top: 4,
+    right: 6,
+  },
+  horseName: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#3F312B",
+    textAlign: "center",
+    paddingHorizontal: 4,
+    marginTop: 10,
+  },
+  emptyLabel: { fontSize: 10, color: "#BCAAA4", marginTop: 10 },
   entranceIcon: { fontSize: 20 },
-  emptyText:    { color: "#BCAAA4", textAlign: "center", padding: 32 },
+  emptyText: { color: "#BCAAA4", textAlign: "center", padding: 32 },
 });

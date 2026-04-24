@@ -11,26 +11,26 @@ namespace RideOnServer.Controllers
     public class WorkersController : ControllerBase
     {
         [HttpGet]
-        public IActionResult GetWorkersByRanch(
+        public IActionResult GetWorkers(
             [FromQuery] int ranchId,
-            [FromQuery] string? status,
-            [FromQuery] string? search)
+            [FromQuery] string? search,
+            [FromQuery] string? approvalStatus)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
-                    personId,
+                    currentPersonId,
                     ranchId,
                     RoleNames.HostSecretary
                 );
 
-                GetWorkersFiltersRequest filters = new GetWorkersFiltersRequest
+                var filters = new GetWorkersFiltersRequest
                 {
                     RanchId = ranchId,
-                    RoleStatus = status,
-                    SearchText = search
+                    SearchText = search,
+                    RoleStatus = approvalStatus
                 };
 
                 List<WorkerListItem> workers = Worker.GetWorkersByRanch(filters);
@@ -42,7 +42,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetWorkers: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת עובדים");
             }
         }
 
@@ -51,7 +52,7 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                int currentPersonId = GetPersonIdFromClaims();
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     currentPersonId,
@@ -68,7 +69,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetWorkerById: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת פרטי עובד");
             }
         }
 
@@ -77,12 +79,17 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 if (personId != request.PersonId)
                 {
                     return BadRequest("PersonId in URL does not match body");
                 }
 
-                int currentPersonId = GetPersonIdFromClaims();
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     currentPersonId,
@@ -99,7 +106,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in UpdateWorker: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון עובד");
             }
         }
 
@@ -108,7 +116,12 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                int currentPersonId = GetPersonIdFromClaims();
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     currentPersonId,
@@ -125,7 +138,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in UpdateWorkerRoleStatus: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון סטטוס עובד");
             }
         }
 
@@ -134,7 +148,12 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                int currentPersonId = GetPersonIdFromClaims();
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     currentPersonId,
@@ -143,7 +162,7 @@ namespace RideOnServer.Controllers
                 );
 
                 Worker.RemoveWorkerFromRanch(request);
-                return Ok("Worker assignment removed successfully");
+                return Ok("Worker removed from ranch successfully");
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -151,20 +170,9 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in RemoveWorkerFromRanch: {ex.Message}");
+                return BadRequest("אירעה שגיאה בהסרת עובד מהחווה");
             }
-        }
-
-        private int GetPersonIdFromClaims()
-        {
-            string? personIdClaim = User.Claims.FirstOrDefault(c => c.Type == "PersonId")?.Value;
-
-            if (string.IsNullOrWhiteSpace(personIdClaim))
-            {
-                throw new UnauthorizedAccessException("PersonId claim is missing");
-            }
-
-            return int.Parse(personIdClaim);
         }
     }
 }

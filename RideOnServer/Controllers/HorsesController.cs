@@ -11,9 +11,7 @@ namespace RideOnServer.Controllers
     public class HorsesController : ControllerBase
     {
         [HttpGet]
-        public IActionResult GetHorses(
-            [FromQuery] int ranchId,
-            [FromQuery] string? search)
+        public IActionResult GetHorses([FromQuery] int ranchId, [FromQuery] string? search)
         {
             try
             {
@@ -25,22 +23,23 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin
                 );
 
-                GetHorsesFiltersRequest filters = new GetHorsesFiltersRequest
+                var filters = new GetHorsesFiltersRequest
                 {
                     RanchId = ranchId,
                     SearchText = search
                 };
 
-                List<HorseListItem> horses = Horse.GetHorsesByRanch(filters);
+                var horses = Horse.GetHorsesByRanch(filters);
                 return Ok(horses);
             }
             catch (UnauthorizedAccessException ex)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+                return StatusCode(403, ex.Message);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetHorses: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת סוסים");
             }
         }
 
@@ -60,37 +59,37 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin
                 );
 
-                GetCompetitionHorsesFiltersRequest filters = new GetCompetitionHorsesFiltersRequest
+                var filters = new GetCompetitionHorsesFiltersRequest
                 {
                     CompetitionId = competitionId,
                     RanchId = ranchId,
                     SearchText = search
                 };
 
-                List<CompetitionHorseListItem> horses = Horse.GetHorsesForCompetition(filters);
+                var horses = Horse.GetHorsesForCompetition(filters);
                 return Ok(horses);
             }
             catch (UnauthorizedAccessException ex)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+                return StatusCode(403, ex.Message);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetCompetitionHorses: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת סוסים לתחרות");
             }
         }
 
         [HttpPut("{horseId}/barnname")]
-        public IActionResult UpdateHorseBarnName(
-            int horseId,
-            [FromBody] UpdateHorseBarnNameRequest request)
+        public IActionResult UpdateHorseBarnName(int horseId, [FromBody] UpdateHorseBarnNameRequest request)
         {
             try
             {
+                if (request == null)
+                    return BadRequest("Invalid request");
+
                 if (horseId != request.HorseId)
-                {
-                    return BadRequest("HorseId in URL does not match body");
-                }
+                    return BadRequest("HorseId mismatch");
 
                 int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
@@ -105,20 +104,33 @@ namespace RideOnServer.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+                return StatusCode(403, ex.Message);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in UpdateHorseBarnName: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון שם הסוס");
             }
         }
 
         [HttpGet("health-certificates")]
-        public IActionResult GetHealthCertificates([FromQuery] int competitionId)
+        public IActionResult GetHealthCertificates(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
         {
             try
             {
-                var certificates = HorseParticipationInCompetition.GetHealthCertificatesForCompetition(competitionId);
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                var certificates =
+                    HorseParticipationInCompetition.GetHealthCertificatesForCompetition(competitionId);
+
                 return Ok(new { data = certificates });
             }
             catch (Exception ex)
@@ -133,20 +145,21 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                if (request == null)
+                    return BadRequest("Invalid request");
+
                 int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
+                // ❗ צריך RanchId אמיתי בתוך request
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     currentPersonId,
-                    request.CompetitionId,
+                    request.RanchId,
                     RoleNames.RanchAdmin
                 );
 
                 HorseParticipationInCompetition.SaveHealthCertificate(request);
+
                 return Ok(new { message = "תעודת הבריאות נשמרה בהצלחה" });
-            }
-            catch (ArgumentException ex)
-            {
-                return BadRequest(ex.Message);
             }
             catch (Exception ex)
             {
@@ -160,14 +173,34 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                if (request == null)
+                    return BadRequest("Invalid request");
+
                 int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
+                Competition? competition = Competition.GetCompetitionById(request.CompetitionId);
+
+                if (competition == null)
+                    return NotFound("Competition not found");
+
+                if (competition.HostRanchId != request.RanchId)
+                {
+                    return StatusCode(403, "אין לך הרשאה לאשר תעודות בתחרות זו");
+                }
+
                 HorseParticipationInCompetition.ApproveHealthCertificate(request, currentPersonId);
+
                 return Ok(new { message = "תעודת הבריאות אושרה בהצלחה" });
             }
-            catch (ArgumentException ex)
+            catch (UnauthorizedAccessException ex)
             {
-                return BadRequest(ex.Message);
+                return StatusCode(403, ex.Message);
             }
             catch (Exception ex)
             {

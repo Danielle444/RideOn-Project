@@ -2,23 +2,39 @@ import { useEffect, useState } from "react";
 import { Check, FileText, ExternalLink } from "lucide-react";
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import { useActiveRole } from "../../context/ActiveRoleContext";
-import { getHealthCertificates, approveHealthCertificate } from "../../services/healthCertificateService";
+import {
+  getHealthCertificates,
+  approveHealthCertificate,
+} from "../../services/healthCertificateService";
 import ConfirmDialog from "../../components/superuser/ConfirmDialog";
 
 export default function CompetitionHealthCertificatesPage() {
   return (
     <CompetitionWorkspaceLayout activeItemKey="health-certificates">
       {function (layout) {
-        return <HealthCertificatesContent competitionId={layout.competitionId} />;
+        return (
+          <HealthCertificatesContent competitionId={layout.competitionId} />
+        );
       }}
     </CompetitionWorkspaceLayout>
   );
 }
 
 function getStatusLabel(status) {
-  if (status === "Approved") return { label: "מאושר", color: "text-green-600 bg-green-50 border-green-200" };
-  if (status === "Pending") return { label: "ממתין לאישור", color: "text-amber-600 bg-amber-50 border-amber-200" };
-  return { label: "לא הועלה", color: "text-[#8A7268] bg-[#F5F0ED] border-[#E6DCD5]" };
+  if (status === "Approved")
+    return {
+      label: "מאושר",
+      color: "text-green-600 bg-green-50 border-green-200",
+    };
+  if (status === "Pending")
+    return {
+      label: "ממתין לאישור",
+      color: "text-amber-600 bg-amber-50 border-amber-200",
+    };
+  return {
+    label: "לא הועלה",
+    color: "text-[#8A7268] bg-[#F5F0ED] border-[#E6DCD5]",
+  };
 }
 
 function HealthCertificatesContent({ competitionId }) {
@@ -26,7 +42,10 @@ function HealthCertificatesContent({ competitionId }) {
   const [loading, setLoading] = useState(false);
   const [actionLoadingKey, setActionLoadingKey] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false, title: "", message: "", onConfirm: null,
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: null,
   });
 
   useEffect(
@@ -40,7 +59,10 @@ function HealthCertificatesContent({ competitionId }) {
   async function loadCertificates() {
     try {
       setLoading(true);
-      const response = await getHealthCertificates(competitionId);
+      const response = await getHealthCertificates(
+        competitionId,
+        activeRole.ranchId,
+      );
       setCertificates(response.data?.data || []);
     } catch {
       setCertificates([]);
@@ -58,7 +80,11 @@ function HealthCertificatesContent({ competitionId }) {
         const key = `${cert.horseId}-${competitionId}`;
         try {
           setActionLoadingKey(key);
-          await approveHealthCertificate(cert.horseId, competitionId);
+          await approveHealthCertificate(
+            cert.horseId,
+            competitionId,
+            activeRole.ranchId,
+          );
           closeConfirmDialog();
           await loadCertificates();
         } catch {
@@ -71,7 +97,12 @@ function HealthCertificatesContent({ competitionId }) {
   }
 
   function closeConfirmDialog() {
-    setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: null });
+    setConfirmDialog({
+      isOpen: false,
+      title: "",
+      message: "",
+      onConfirm: null,
+    });
   }
 
   return (
@@ -79,9 +110,12 @@ function HealthCertificatesContent({ competitionId }) {
       <div className="mx-auto max-w-[1450px] space-y-6">
         <div className="rounded-[28px] border border-[#E6DCD5] bg-white shadow-sm overflow-hidden">
           <div className="border-b border-[#EFE5DF] px-8 py-7">
-            <h1 className="text-[2rem] font-bold text-[#3F312B]">תעודות בריאות</h1>
+            <h1 className="text-[2rem] font-bold text-[#3F312B]">
+              תעודות בריאות
+            </h1>
             <p className="mt-1 text-sm text-[#8A7268]">
-              תעודות הבריאות של הסוסים בתחרות — העלאה על ידי אדמין, אישור על ידי מזכירה
+              תעודות הבריאות של הסוסים בתחרות — העלאה על ידי אדמין, אישור על ידי
+              מזכירה
             </p>
           </div>
 
@@ -92,7 +126,9 @@ function HealthCertificatesContent({ competitionId }) {
 
             {!loading && certificates.length === 0 && (
               <div className="text-center py-16">
-                <p className="text-[#8A7268] text-sm">אין סוסים רשומים לתחרות זו</p>
+                <p className="text-[#8A7268] text-sm">
+                  אין סוסים רשומים לתחרות זו
+                </p>
               </div>
             )}
 
@@ -106,7 +142,9 @@ function HealthCertificatesContent({ competitionId }) {
                       <th className="px-5 py-4 font-bold">תאריך העלאה</th>
                       <th className="px-5 py-4 font-bold">סטטוס</th>
                       <th className="px-5 py-4 font-bold">קובץ</th>
-                      <th className="px-5 py-4 font-bold text-center">פעולות</th>
+                      <th className="px-5 py-4 font-bold text-center">
+                        פעולות
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -123,15 +161,23 @@ function HealthCertificatesContent({ competitionId }) {
                             (index % 2 === 0 ? "bg-white" : "bg-[#FFFEFD]")
                           }
                         >
-                          <td className="px-5 py-4 font-medium">{cert.horseName}</td>
-                          <td className="px-5 py-4 text-[#8A7268]">{cert.barnName || "—"}</td>
+                          <td className="px-5 py-4 font-medium">
+                            {cert.horseName}
+                          </td>
+                          <td className="px-5 py-4 text-[#8A7268]">
+                            {cert.barnName || "—"}
+                          </td>
                           <td className="px-5 py-4 text-sm">
                             {cert.hcUploadDate
-                              ? new Date(cert.hcUploadDate).toLocaleDateString("he-IL")
+                              ? new Date(cert.hcUploadDate).toLocaleDateString(
+                                  "he-IL",
+                                )
                               : "—"}
                           </td>
                           <td className="px-5 py-4">
-                            <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${status.color}`}>
+                            <span
+                              className={`text-xs font-semibold px-3 py-1 rounded-full border ${status.color}`}
+                            >
                               {status.label}
                             </span>
                           </td>
@@ -148,25 +194,34 @@ function HealthCertificatesContent({ competitionId }) {
                                 <ExternalLink size={12} />
                               </a>
                             ) : (
-                              <span className="text-sm text-[#8A7268]">לא הועלה</span>
+                              <span className="text-sm text-[#8A7268]">
+                                לא הועלה
+                              </span>
                             )}
                           </td>
                           <td className="px-5 py-4 text-center">
-                            {cert.hcApprovalStatus === "Pending" && cert.hcPath && (
-                              <button
-                                onClick={function () { handleApproveClick(cert); }}
-                                disabled={isLoading}
-                                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-[10px] bg-[#4CAF50] hover:bg-[#43A047] text-white text-sm font-semibold transition-colors disabled:opacity-60"
-                              >
-                                <Check size={14} />
-                                {isLoading ? "מאשר..." : "אשר"}
-                              </button>
-                            )}
+                            {cert.hcApprovalStatus === "Pending" &&
+                              cert.hcPath && (
+                                <button
+                                  onClick={function () {
+                                    handleApproveClick(cert);
+                                  }}
+                                  disabled={isLoading}
+                                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-[10px] bg-[#4CAF50] hover:bg-[#43A047] text-white text-sm font-semibold transition-colors disabled:opacity-60"
+                                >
+                                  <Check size={14} />
+                                  {isLoading ? "מאשר..." : "אשר"}
+                                </button>
+                              )}
                             {cert.hcApprovalStatus === "Approved" && (
-                              <span className="text-sm text-green-600 font-medium">אושר</span>
+                              <span className="text-sm text-green-600 font-medium">
+                                אושר
+                              </span>
                             )}
                             {!cert.hcPath && (
-                              <span className="text-sm text-[#8A7268]">ממתין להעלאה</span>
+                              <span className="text-sm text-[#8A7268]">
+                                ממתין להעלאה
+                              </span>
                             )}
                           </td>
                         </tr>

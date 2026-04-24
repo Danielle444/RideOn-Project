@@ -1,15 +1,21 @@
 import apiClient from "./axiosInstance";
 
 function getCompounds(ranchId) {
-  return apiClient.get("/StallAssignments/compounds", { params: { ranchId } });
+  return apiClient.get("/StallAssignments/compounds", {
+    params: { ranchId: ranchId },
+  });
 }
 
-function getAssignments(competitionId) {
-  return apiClient.get("/StallAssignments", { params: { competitionId } });
+function getAssignments(competitionId, ranchId) {
+  return apiClient.get("/StallAssignments", {
+    params: { competitionId: competitionId, ranchId: ranchId },
+  });
 }
 
-function getHorses(competitionId) {
-  return apiClient.get("/StallAssignments/horses", { params: { competitionId } });
+function getHorses(competitionId, ranchId) {
+  return apiClient.get("/StallAssignments/horses", {
+    params: { competitionId: competitionId, ranchId: ranchId },
+  });
 }
 
 export { getCompounds, getAssignments, getHorses };
