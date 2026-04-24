@@ -236,6 +236,152 @@ var styles = StyleSheet.create({
     fontWeight: "700",
     color: "#A79185",
   },
+
+  helperText: {
+    fontSize: 13,
+    color: "#8A7468",
+    textAlign: "right",
+    lineHeight: 20,
+  },
+
+  twoButtonsRow: {
+    flexDirection: "row-reverse",
+    gap: 10,
+  },
+
+  optionButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#D8C1B4",
+    backgroundColor: "#FFFDFB",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+
+  optionButtonActive: {
+    backgroundColor: "#7B5A4D",
+    borderColor: "#7B5A4D",
+  },
+
+  optionButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#6D564A",
+    textAlign: "center",
+  },
+
+  optionButtonTextActive: {
+    color: "#FFFFFF",
+  },
+
+  twoInputsRow: {
+    flexDirection: "row-reverse",
+    gap: 10,
+  },
+
+  textInput: {
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#D8C1B4",
+    backgroundColor: "#FFFDFB",
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: "#4F3B31",
+    flex: 1,
+  },
+
+  limitedListBox: {
+    maxHeight: 260,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E0CDC0",
+    backgroundColor: "#FFFFFF",
+    padding: 8,
+  },
+
+  selectableRow: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E0CDC0",
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+    marginBottom: 8,
+    gap: 4,
+  },
+
+  selectableRowActive: {
+    borderColor: "#7B5A4D",
+    backgroundColor: "#FFF8F3",
+  },
+
+  selectableRowText: {
+    fontSize: 14,
+    color: "#4F3B31",
+    textAlign: "right",
+    lineHeight: 22,
+    fontWeight: "700",
+  },
+
+  quantityRow: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E0CDC0",
+    backgroundColor: "#FFFFFF",
+    padding: 10,
+  },
+
+  quantityDetails: {
+    flex: 1,
+    gap: 3,
+  },
+
+  quantityHorseName: {
+    fontSize: 14,
+    color: "#4F3B31",
+    textAlign: "right",
+    fontWeight: "700",
+  },
+
+  quantityInput: {
+    width: 90,
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#D8C1B4",
+    backgroundColor: "#FFFDFB",
+    paddingHorizontal: 10,
+    fontSize: 14,
+    color: "#4F3B31",
+  },
+
+  summaryBox: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E7D6CA",
+    backgroundColor: "#FFF8F3",
+    padding: 12,
+    gap: 6,
+  },
+
+  summaryLine: {
+    borderRadius: 12,
+    backgroundColor: "#FFF8F3",
+    padding: 8,
+  },
+
+  summaryText: {
+    fontSize: 14,
+    color: "#4F3B31",
+    textAlign: "right",
+    fontWeight: "700",
+  },
 });
 
 export default styles;
