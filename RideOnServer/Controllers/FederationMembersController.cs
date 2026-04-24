@@ -7,9 +7,9 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class FederationMembersController : ControllerBase
     {
-        [Authorize]
         [HttpGet("competition/riders")]
         public IActionResult GetCompetitionRiders(
             [FromQuery] int ranchId,
@@ -26,30 +26,28 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin
                 );
 
-                GetCompetitionFederationMembersFiltersRequest filters =
-                    new GetCompetitionFederationMembersFiltersRequest
-                    {
-                        CompetitionId = competitionId,
-                        RanchId = ranchId,
-                        SearchText = search
-                    };
+                var filters = new GetCompetitionFederationMembersFiltersRequest
+                {
+                    CompetitionId = competitionId,
+                    RanchId = ranchId,
+                    SearchText = search
+                };
 
-                List<CompetitionFederationMemberListItem> riders =
-                    FederationMember.GetCompetitionRidersByRanch(filters);
+                var riders = FederationMember.GetCompetitionRidersByRanch(filters);
 
                 return Ok(riders);
             }
             catch (UnauthorizedAccessException ex)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+                return StatusCode(403, ex.Message);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetCompetitionRiders: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת רוכבים");
             }
         }
 
-        [Authorize]
         [HttpGet("competition/trainers")]
         public IActionResult GetCompetitionTrainers(
             [FromQuery] int ranchId,
@@ -66,30 +64,28 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin
                 );
 
-                GetCompetitionFederationMembersFiltersRequest filters =
-                    new GetCompetitionFederationMembersFiltersRequest
-                    {
-                        CompetitionId = competitionId,
-                        RanchId = ranchId,
-                        SearchText = search
-                    };
+                var filters = new GetCompetitionFederationMembersFiltersRequest
+                {
+                    CompetitionId = competitionId,
+                    RanchId = ranchId,
+                    SearchText = search
+                };
 
-                List<CompetitionFederationMemberListItem> trainers =
-                    FederationMember.GetCompetitionTrainersByRanch(filters);
+                var trainers = FederationMember.GetCompetitionTrainersByRanch(filters);
 
                 return Ok(trainers);
             }
             catch (UnauthorizedAccessException ex)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+                return StatusCode(403, ex.Message);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetCompetitionTrainers: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת מאמנים");
             }
         }
 
-        [Authorize]
         [HttpGet("ranch/riders")]
         public IActionResult GetRidersByRanch(
             [FromQuery] int ranchId,
@@ -105,29 +101,27 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin
                 );
 
-                GetRanchFederationMembersFiltersRequest filters =
-                    new GetRanchFederationMembersFiltersRequest
-                    {
-                        RanchId = ranchId,
-                        SearchText = search
-                    };
+                var filters = new GetRanchFederationMembersFiltersRequest
+                {
+                    RanchId = ranchId,
+                    SearchText = search
+                };
 
-                List<CompetitionFederationMemberListItem> riders =
-                    FederationMember.GetRidersByRanch(filters);
+                var riders = FederationMember.GetRidersByRanch(filters);
 
                 return Ok(riders);
             }
             catch (UnauthorizedAccessException ex)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+                return StatusCode(403, ex.Message);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetRidersByRanch: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת רוכבים");
             }
         }
 
-        [Authorize]
         [HttpGet("ranch/trainers")]
         public IActionResult GetTrainersByRanch(
             [FromQuery] int ranchId,
@@ -143,25 +137,24 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin
                 );
 
-                GetRanchFederationMembersFiltersRequest filters =
-                    new GetRanchFederationMembersFiltersRequest
-                    {
-                        RanchId = ranchId,
-                        SearchText = search
-                    };
+                var filters = new GetRanchFederationMembersFiltersRequest
+                {
+                    RanchId = ranchId,
+                    SearchText = search
+                };
 
-                List<CompetitionFederationMemberListItem> trainers =
-                    FederationMember.GetTrainersByRanch(filters);
+                var trainers = FederationMember.GetTrainersByRanch(filters);
 
                 return Ok(trainers);
             }
             catch (UnauthorizedAccessException ex)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+                return StatusCode(403, ex.Message);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetTrainersByRanch: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת מאמנים");
             }
         }
     }

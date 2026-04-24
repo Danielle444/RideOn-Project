@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
+using RideOnServer.BL.DTOs.StallAssignments;
 using RideOnServer.BL.DTOs.StallMap;
-using RideOnServer.DAL;
 
 namespace RideOnServer.Controllers
 {
@@ -12,95 +12,152 @@ namespace RideOnServer.Controllers
     public class StallAssignmentsController : ControllerBase
     {
         [HttpGet("compounds")]
-        public IActionResult GetCompounds([FromQuery] int ranchId)
+        public IActionResult GetCompoundsWithLayout([FromQuery] int ranchId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
-                UserAccessValidator.EnsureUserHasRoleInRanch(personId, ranchId, RoleNames.HostSecretary);
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                var dal = new StallAssignmentDAL();
-                return Ok(dal.GetCompoundsWithLayout(ranchId));
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                var result = StallAssignment.GetCompoundsWithLayout(ranchId);
+                return Ok(result);
             }
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
-            catch (Exception ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetCompoundsWithLayout: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת מתחמי התאים");
+            }
         }
 
         [HttpGet("horses")]
-        public IActionResult GetHorses([FromQuery] int competitionId)
+        public IActionResult GetHorsesForAssignment(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
         {
             try
             {
-                var dal = new StallAssignmentDAL();
-                return Ok(dal.GetHorsesForCompetition(competitionId));
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                var result = StallAssignment.GetHorsesForAssignment(competitionId);
+                return Ok(result);
             }
-            catch (Exception ex) { return BadRequest(ex.Message); }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetHorsesForAssignment: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת סוסים לשיבוץ");
+            }
         }
 
         [HttpGet]
-        public IActionResult GetAssignments([FromQuery] int competitionId)
+        public IActionResult GetAssignments(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
         {
             try
             {
-                var dal = new StallAssignmentDAL();
-                return Ok(dal.GetAssignments(competitionId));
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                var result = StallAssignment.GetAssignments(competitionId);
+                return Ok(result);
             }
-            catch (Exception ex) { return BadRequest(ex.Message); }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetAssignments: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת שיבוצי תאים");
+            }
         }
 
         [HttpPost]
-        public IActionResult Assign([FromBody] StallAssignmentRequest request)
+        public IActionResult AssignStall([FromBody] AssignStallRequest request)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
-                UserAccessValidator.EnsureUserHasRoleInRanch(personId, request.RanchId, RoleNames.HostSecretary);
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
 
-                var dal = new StallAssignmentDAL();
-                dal.AssignHorse(request.CompetitionId, request.RanchId,
-                                request.CompoundId, request.StallId, request.HorseId);
-                return Ok("Assigned");
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
+                StallAssignment.AssignStall(request);
+                return Ok("Stall assigned successfully");
             }
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
-            catch (Exception ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in AssignStall: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשיבוץ תא");
+            }
         }
 
         [HttpDelete]
-        public IActionResult Unassign([FromBody] UnassignStallRequest request)
+        public IActionResult UnassignStall([FromBody] UnassignStallRequest request)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
-                UserAccessValidator.EnsureUserHasRoleInRanch(personId, request.RanchId, RoleNames.HostSecretary);
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
 
-                var dal = new StallAssignmentDAL();
-                dal.UnassignHorse(request.CompetitionId, request.RanchId,
-                                  request.CompoundId, request.StallId);
-                return Ok("Unassigned");
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
+                StallAssignment.UnassignStall(request);
+                return Ok("Stall unassigned successfully");
             }
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
-            catch (Exception ex) { return BadRequest(ex.Message); }
-        }
-
-        private int GetPersonIdFromClaims()
-        {
-            string? personIdClaim = User.Claims.FirstOrDefault(c => c.Type == "PersonId")?.Value;
-
-            if (string.IsNullOrWhiteSpace(personIdClaim))
+            catch (Exception ex)
             {
-                throw new UnauthorizedAccessException("PersonId claim is missing");
+                Console.WriteLine($"Error in UnassignStall: {ex.Message}");
+                return BadRequest("אירעה שגיאה בהסרת שיבוץ תא");
             }
-
-            return int.Parse(personIdClaim);
         }
     }
 }

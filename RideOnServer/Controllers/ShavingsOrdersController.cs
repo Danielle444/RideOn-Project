@@ -17,8 +17,13 @@ namespace RideOnServer.Controllers
             try
             {
                 int workerSystemUserId = UserAccessValidator.GetPersonIdFromClaims(User);
+
                 var orders = ShavingsOrder.GetWorkerShavingsOrders(workerSystemUserId);
                 return Ok(new { data = orders });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -32,8 +37,20 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                // TODO:
+                // לחזק בהמשך:
+                // לוודא שה-currentPersonId הוא העובד שההזמנה משויכת אליו
+                // או שהוא עובד חווה מורשה להזמנה הזו.
+                // כרגע אין ב-request ranchId ואין כאן בדיקת שיוך להזמנה.
+
                 ShavingsOrder.SaveDeliveryPhoto(request);
                 return Ok(new { message = "התמונה נשמרה בהצלחה" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (ArgumentException ex)
             {
@@ -62,9 +79,9 @@ namespace RideOnServer.Controllers
                 var approvals = ShavingsOrder.GetPendingDeliveryApprovals(ranchId);
                 return Ok(new { data = approvals });
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
-                return Forbid();
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -79,10 +96,23 @@ namespace RideOnServer.Controllers
             try
             {
                 int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                // TODO חשוב:
+                // בשביל אבטחה מלאה צריך להוסיף RanchId ל-ApproveDeliveryRequest
+                // ואז לבצע:
+                // UserAccessValidator.EnsureUserHasRoleInRanch(currentPersonId, request.RanchId, RoleNames.HostSecretary);
+                //
+                // כרגע אין RanchId ב-DTO, לכן אי אפשר לבדוק כאן הרשאת חווה בלי SP נוסף
+                // שמחזיר את ranchId לפי shavingsOrderId.
+
                 request.ApprovedByPersonId = currentPersonId;
 
                 ShavingsOrder.ApproveDelivery(request);
                 return Ok(new { message = "המשלוח אושר בהצלחה" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (ArgumentException ex)
             {
@@ -102,11 +132,6 @@ namespace RideOnServer.Controllers
             {
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                if (request.OrderedBySystemUserId != personId)
-                {
-                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לבצע פעולה זו עבור משתמש אחר");
-                }
-
                 if (request.Stalls == null || request.Stalls.Count == 0)
                 {
                     return BadRequest("At least one stall is required.");
@@ -118,6 +143,10 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin,
                     RoleNames.HostSecretary
                 );
+
+                // לא סומכים על ה-client.
+                // גם אם הוא שלח OrderedBySystemUserId אחר, אנחנו דורסים אותו לפי הטוקן.
+                request.OrderedBySystemUserId = personId;
 
                 int id = ShavingsOrderDAL.CreateShavingsOrder(request);
                 return Ok(id);

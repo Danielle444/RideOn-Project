@@ -7,9 +7,9 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class PrizeTypesController : ControllerBase
     {
-        [Authorize]
         [HttpGet]
         public IActionResult GetAll()
         {
@@ -28,11 +28,18 @@ namespace RideOnServer.Controllers
 
                 bool hasSecretaryRole = approvedRoles.Any(item =>
                     !string.IsNullOrWhiteSpace(item.RoleName) &&
-                    item.RoleName.Trim().Equals(RoleNames.HostSecretary, StringComparison.OrdinalIgnoreCase));
+                    item.RoleName.Trim().Equals(
+                        RoleNames.HostSecretary,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
 
                 if (!hasSecretaryRole)
                 {
-                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לצפות בסוגי פרסים");
+                    return StatusCode(
+                        StatusCodes.Status403Forbidden,
+                        "אין לך הרשאה לצפות בסוגי פרסים"
+                    );
                 }
 
                 List<PrizeType> list = PrizeType.GetAllPrizeTypes();
@@ -44,16 +51,21 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetAll PrizeTypes: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת סוגי פרסים");
             }
         }
 
-        [Authorize]
         [HttpPost]
         public IActionResult Create([FromBody] PrizeType prizeType)
         {
             try
             {
+                if (prizeType == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 UserAccessValidator.EnsureSuperUser(User);
 
                 int id = PrizeType.CreatePrizeType(
@@ -69,16 +81,21 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Create PrizeType: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת סוג פרס");
             }
         }
 
-        [Authorize]
         [HttpPut]
         public IActionResult Update([FromBody] PrizeType prizeType)
         {
             try
             {
+                if (prizeType == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 UserAccessValidator.EnsureSuperUser(User);
 
                 PrizeType.UpdatePrizeType(
@@ -95,11 +112,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Update PrizeType: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון סוג פרס");
             }
         }
 
-        [Authorize]
         [HttpDelete("{id}")]
         public IActionResult Delete(byte id)
         {
@@ -116,7 +133,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Delete PrizeType: {ex.Message}");
+                return BadRequest("אירעה שגיאה במחיקת סוג פרס");
             }
         }
     }

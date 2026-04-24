@@ -7,26 +7,29 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class PaidTimeRequestsController : ControllerBase
     {
-        [Authorize]
         [HttpPost]
         public IActionResult CreatePaidTimeRequest([FromBody] CreatePaidTimeRequestRequest request)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
-
-                if (request.OrderedBySystemUserId != personId)
+                if (request == null)
                 {
-                    return StatusCode(StatusCodes.Status403Forbidden, "OrderedBySystemUserId does not match logged in user");
+                    return BadRequest("Invalid request");
                 }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
                     request.RanchId,
                     RoleNames.RanchAdmin
                 );
+
+                // לא סומכים על ה-client לגבי זהות המשתמש המזמין.
+                request.OrderedBySystemUserId = personId;
 
                 int newId = PaidTimeRequest.CreatePaidTimeRequest(request);
 
@@ -38,20 +41,9 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in CreatePaidTimeRequest: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת בקשת פייד־טיים");
             }
-        }
-
-        private int GetPersonIdFromClaims()
-        {
-            string? personIdClaim = User.Claims.FirstOrDefault(c => c.Type == "PersonId")?.Value;
-
-            if (string.IsNullOrWhiteSpace(personIdClaim))
-            {
-                throw new UnauthorizedAccessException("PersonId claim is missing");
-            }
-
-            return int.Parse(personIdClaim);
         }
     }
 }

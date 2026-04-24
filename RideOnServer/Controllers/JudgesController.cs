@@ -8,9 +8,9 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class JudgesController : ControllerBase
     {
-        [Authorize]
         [HttpGet]
         public IActionResult GetAll([FromQuery] byte? fieldId = null)
         {
@@ -29,7 +29,11 @@ namespace RideOnServer.Controllers
 
                 bool hasSecretaryRole = approvedRoles.Any(item =>
                     !string.IsNullOrWhiteSpace(item.RoleName) &&
-                    item.RoleName.Trim().Equals(RoleNames.HostSecretary, StringComparison.OrdinalIgnoreCase));
+                    item.RoleName.Trim().Equals(
+                        RoleNames.HostSecretary,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
 
                 if (!hasSecretaryRole)
                 {
@@ -45,16 +49,21 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetAll Judges: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת שופטים");
             }
         }
 
-        [Authorize]
         [HttpPost]
         public IActionResult Create([FromBody] UpsertJudgeRequest request)
         {
             try
             {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 if (!UserAccessValidator.IsSuperUser(User))
                 {
                     int personId = UserAccessValidator.GetPersonIdFromClaims(User);
@@ -64,7 +73,11 @@ namespace RideOnServer.Controllers
 
                     bool hasSecretaryRole = approvedRoles.Any(item =>
                         !string.IsNullOrWhiteSpace(item.RoleName) &&
-                        item.RoleName.Trim().Equals(RoleNames.HostSecretary, StringComparison.OrdinalIgnoreCase));
+                        item.RoleName.Trim().Equals(
+                            RoleNames.HostSecretary,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                    );
 
                     if (!hasSecretaryRole)
                     {
@@ -89,16 +102,21 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Create Judge: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת שופט");
             }
         }
 
-        [Authorize]
         [HttpPut]
         public IActionResult Update([FromBody] UpsertJudgeRequest request)
         {
             try
             {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 UserAccessValidator.EnsureSuperUser(User);
 
                 Judge.UpdateJudge(
@@ -119,11 +137,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Update Judge: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון שופט");
             }
         }
 
-        [Authorize]
         [HttpDelete("{id}")]
         public IActionResult Delete(int id)
         {
@@ -140,7 +158,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Delete Judge: {ex.Message}");
+                return BadRequest("אירעה שגיאה במחיקת שופט");
             }
         }
     }

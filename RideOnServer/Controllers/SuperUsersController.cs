@@ -44,7 +44,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in SuperUser Login: {ex.Message}");
+                return BadRequest("אירעה שגיאה בהתחברות מנהל מערכת");
             }
         }
 
@@ -70,7 +71,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in CreateSuperUser: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת מנהל מערכת");
             }
         }
 
@@ -94,7 +96,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in ChangePassword: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשינוי סיסמה");
             }
         }
 
@@ -129,13 +132,17 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetMe: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת פרטי מנהל מערכת");
             }
         }
 
         [Authorize]
         [HttpGet("role-requests")]
-        public IActionResult GetRoleRequests([FromQuery] byte roleId, [FromQuery] string? status, [FromQuery] string? search)
+        public IActionResult GetRoleRequests(
+            [FromQuery] byte roleId,
+            [FromQuery] string? status,
+            [FromQuery] string? search)
         {
             try
             {
@@ -150,13 +157,16 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetRoleRequests: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת בקשות תפקיד");
             }
         }
 
         [Authorize]
         [HttpGet("ranch-requests")]
-        public IActionResult GetNewRanchRequests([FromQuery] string? status, [FromQuery] string? search)
+        public IActionResult GetNewRanchRequests(
+            [FromQuery] string? status,
+            [FromQuery] string? search)
         {
             try
             {
@@ -171,7 +181,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetNewRanchRequests: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת בקשות חווה");
             }
         }
 
@@ -198,7 +209,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in UpdateRoleRequestStatus: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון סטטוס בקשת תפקיד");
             }
         }
 
@@ -231,7 +243,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in UpdateNewRanchRequestStatus: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון סטטוס בקשת חווה");
             }
         }
 
@@ -252,7 +265,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetAllSuperUsers: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת מנהלי מערכת");
             }
         }
     }

@@ -8,15 +8,15 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class PaidTimeSlotsInCompetitionController : ControllerBase
     {
-        [Authorize]
         [HttpGet("{competitionId}")]
         public IActionResult GetPaidTimeSlotsByCompetitionId(int competitionId, [FromQuery] int ranchId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -36,7 +36,7 @@ namespace RideOnServer.Controllers
                     return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לצפות בפייד-טיים של תחרות זו");
                 }
 
-                List<PaidTimeSlotInCompetition> list = PaidTimeSlotInCompetition.GetPaidTimeSlotsByCompetitionId(competitionId);
+                var list = PaidTimeSlotInCompetition.GetPaidTimeSlotsByCompetitionId(competitionId);
                 return Ok(list);
             }
             catch (UnauthorizedAccessException ex)
@@ -45,17 +45,17 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetPaidTimeSlotsByCompetitionId: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת פייד-טיים");
             }
         }
 
-        [Authorize]
         [HttpGet("base-slots")]
         public IActionResult GetAllPaidTimeBaseSlots([FromQuery] int ranchId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -63,7 +63,7 @@ namespace RideOnServer.Controllers
                     RoleNames.HostSecretary
                 );
 
-                List<PaidTimeSlot> list = PaidTimeSlot.GetAllPaidTimeBaseSlots();
+                var list = PaidTimeSlot.GetAllPaidTimeBaseSlots();
                 return Ok(list);
             }
             catch (UnauthorizedAccessException ex)
@@ -72,17 +72,20 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetAllPaidTimeBaseSlots: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת סלוטים בסיסיים");
             }
         }
 
-        [Authorize]
         [HttpPost]
         public IActionResult CreatePaidTimeSlotInCompetition([FromBody] CreatePaidTimeSlotInCompetitionRequest request)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                if (request == null)
+                    return BadRequest("Invalid request");
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -103,7 +106,7 @@ namespace RideOnServer.Controllers
                 }
 
                 int newId = PaidTimeSlotInCompetition.CreatePaidTimeSlotInCompetition(request);
-                PaidTimeSlotInCompetition? newItem = PaidTimeSlotInCompetition.GetById(newId);
+                var newItem = PaidTimeSlotInCompetition.GetById(newId);
 
                 if (newItem == null)
                 {
@@ -118,22 +121,25 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in CreatePaidTimeSlotInCompetition: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת פייד-טיים");
             }
         }
 
-        [Authorize]
         [HttpPut("{compSlotId}")]
         public IActionResult UpdatePaidTimeSlotInCompetition(int compSlotId, [FromBody] UpdatePaidTimeSlotInCompetitionRequest request)
         {
             try
             {
+                if (request == null)
+                    return BadRequest("Invalid request");
+
                 if (compSlotId != request.CompSlotId)
                 {
                     return BadRequest("CompSlotId in URL does not match body");
                 }
 
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -154,7 +160,7 @@ namespace RideOnServer.Controllers
                 }
 
                 PaidTimeSlotInCompetition.UpdatePaidTimeSlotInCompetition(request);
-                PaidTimeSlotInCompetition? updatedItem = PaidTimeSlotInCompetition.GetById(compSlotId);
+                var updatedItem = PaidTimeSlotInCompetition.GetById(compSlotId);
 
                 if (updatedItem == null)
                 {
@@ -169,11 +175,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in UpdatePaidTimeSlotInCompetition: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון פייד-טיים");
             }
         }
 
-        [Authorize]
         [HttpDelete("{compSlotId}")]
         public IActionResult DeletePaidTimeSlotInCompetition(
             int compSlotId,
@@ -183,7 +189,7 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -212,20 +218,9 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in DeletePaidTimeSlotInCompetition: {ex.Message}");
+                return BadRequest("אירעה שגיאה במחיקת פייד-טיים");
             }
-        }
-
-        private int GetPersonIdFromClaims()
-        {
-            string? personIdClaim = User.Claims.FirstOrDefault(c => c.Type == "PersonId")?.Value;
-
-            if (string.IsNullOrWhiteSpace(personIdClaim))
-            {
-                throw new UnauthorizedAccessException("PersonId claim is missing");
-            }
-
-            return int.Parse(personIdClaim);
         }
     }
 }

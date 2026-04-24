@@ -7,9 +7,9 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class ServicePricesController : ControllerBase
     {
-        [Authorize]
         [HttpGet]
         public IActionResult GetDashboard([FromQuery] int ranchId)
         {
@@ -34,11 +34,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetDashboard: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת מחירון השירותים");
             }
         }
 
-        [Authorize]
         [HttpPost("products")]
         public IActionResult CreateProduct([FromBody] CreateServiceProductRequest request)
         {
@@ -61,11 +61,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in CreateProduct: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת שירות");
             }
         }
 
-        [Authorize]
         [HttpPut("products")]
         public IActionResult UpdateProduct([FromBody] UpdateServiceProductRequest request)
         {
@@ -88,11 +88,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in UpdateProduct: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון שירות");
             }
         }
 
-        [Authorize]
         [HttpDelete("products/{id}")]
         public IActionResult DeleteProduct(short id, [FromQuery] int ranchId)
         {
@@ -115,11 +115,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in DeleteProduct: {ex.Message}");
+                return BadRequest("אירעה שגיאה במחיקת שירות");
             }
         }
 
-        [Authorize]
         [HttpPut("products/{id}/deactivate")]
         public IActionResult DeactivateProduct(short id, [FromQuery] int ranchId)
         {
@@ -142,11 +142,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in DeactivateProduct: {ex.Message}");
+                return BadRequest("אירעה שגיאה בכיבוי שירות");
             }
         }
 
-        [Authorize]
         [HttpPut("products/{id}/activate")]
         public IActionResult ActivateProduct(short id, [FromQuery] int ranchId)
         {
@@ -169,11 +169,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in ActivateProduct: {ex.Message}");
+                return BadRequest("אירעה שגיאה בהפעלת שירות");
             }
         }
 
-        [Authorize]
         [HttpGet("products/{id}/history")]
         public IActionResult GetPriceHistory(short id, [FromQuery] int ranchId)
         {
@@ -196,11 +196,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetPriceHistory: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת היסטוריית מחירים");
             }
         }
 
-        [Authorize]
         [HttpPut("history/{catalogItemId}/activate")]
         public IActionResult ActivateHistoryItem(int catalogItemId, [FromQuery] int ranchId)
         {
@@ -223,7 +223,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in ActivateHistoryItem: {ex.Message}");
+                return BadRequest("אירעה שגיאה בהפעלת מחיר היסטורי");
             }
         }
     }

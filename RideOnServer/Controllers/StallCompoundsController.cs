@@ -9,15 +9,15 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class StallCompoundsController : ControllerBase
     {
-        [Authorize]
         [HttpGet]
         public IActionResult GetByRanchId([FromQuery] int ranchId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -34,17 +34,20 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetByRanchId: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת מתחמי תאים");
             }
         }
 
-        [Authorize]
         [HttpPost]
         public IActionResult Create([FromBody] CreateCompoundWithStallsRequest request)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                if (request == null)
+                    return BadRequest("Invalid request");
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -61,17 +64,20 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Create: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת מתחם תאים");
             }
         }
 
-        [Authorize]
         [HttpPut]
-        public IActionResult UpdateName([FromQuery] int ranchId, [FromQuery] short compoundId, [FromQuery] string compoundName)
+        public IActionResult UpdateName(
+            [FromQuery] int ranchId,
+            [FromQuery] short compoundId,
+            [FromQuery] string compoundName)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -88,17 +94,17 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in UpdateName: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון שם המתחם");
             }
         }
 
-        [Authorize]
         [HttpDelete]
         public IActionResult Delete([FromQuery] int ranchId, [FromQuery] short compoundId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -115,17 +121,20 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Delete: {ex.Message}");
+                return BadRequest("אירעה שגיאה במחיקת מתחם תאים");
             }
         }
 
         [HttpPost("layout")]
-        [Authorize]
         public IActionResult SaveLayout([FromBody] SaveLayoutRequest request)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                if (request == null)
+                    return BadRequest("Invalid request");
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -135,6 +144,7 @@ namespace RideOnServer.Controllers
 
                 var dal = new StallAssignmentDAL();
                 dal.SaveCompoundLayout(request.RanchId, request.CompoundId, request.LayoutJson);
+
                 return Ok("Layout saved");
             }
             catch (UnauthorizedAccessException ex)
@@ -143,20 +153,9 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in SaveLayout: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשמירת פריסת המתחם");
             }
-        }
-
-        private int GetPersonIdFromClaims()
-        {
-            string? personIdClaim = User.Claims.FirstOrDefault(c => c.Type == "PersonId")?.Value;
-
-            if (string.IsNullOrWhiteSpace(personIdClaim))
-            {
-                throw new UnauthorizedAccessException("PersonId claim is missing");
-            }
-
-            return int.Parse(personIdClaim);
         }
     }
 }

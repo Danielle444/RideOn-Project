@@ -18,8 +18,10 @@ namespace RideOnServer.Controllers
                     return BadRequest("NationalId is required");
                 }
 
+                string normalizedNationalId = nationalId.Trim();
+
                 PersonRegistrationLookupResponse? person =
-                    Person.GetPersonByNationalIdForRegistration(nationalId);
+                    Person.GetPersonByNationalIdForRegistration(normalizedNationalId);
 
                 if (person == null)
                 {
@@ -30,7 +32,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetPersonByNationalIdForRegistration: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת פרטי אדם להרשמה");
             }
         }
     }

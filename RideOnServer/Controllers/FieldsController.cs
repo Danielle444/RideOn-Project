@@ -7,9 +7,9 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class FieldsController : ControllerBase
     {
-        [Authorize]
         [HttpGet]
         public IActionResult GetAll()
         {
@@ -28,7 +28,11 @@ namespace RideOnServer.Controllers
 
                 bool hasSecretaryRole = approvedRoles.Any(item =>
                     !string.IsNullOrWhiteSpace(item.RoleName) &&
-                    item.RoleName.Trim().Equals(RoleNames.HostSecretary, StringComparison.OrdinalIgnoreCase));
+                    item.RoleName.Trim().Equals(
+                        RoleNames.HostSecretary,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
 
                 if (!hasSecretaryRole)
                 {
@@ -44,16 +48,21 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetAll Fields: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת ענפים");
             }
         }
 
-        [Authorize]
         [HttpPost]
         public IActionResult Create([FromBody] Field field)
         {
             try
             {
+                if (field == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 UserAccessValidator.EnsureSuperUser(User);
 
                 int id = Field.CreateField(field.FieldName);
@@ -65,16 +74,21 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Create Field: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת ענף");
             }
         }
 
-        [Authorize]
         [HttpPut]
         public IActionResult Update([FromBody] Field field)
         {
             try
             {
+                if (field == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 UserAccessValidator.EnsureSuperUser(User);
 
                 Field.UpdateField(field.FieldId, field.FieldName);
@@ -86,11 +100,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Update Field: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון ענף");
             }
         }
 
-        [Authorize]
         [HttpDelete("{id}")]
         public IActionResult Delete(short id)
         {
@@ -107,7 +121,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Delete Field: {ex.Message}");
+                return BadRequest("אירעה שגיאה במחיקת ענף");
             }
         }
     }

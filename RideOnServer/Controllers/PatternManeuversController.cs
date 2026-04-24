@@ -7,9 +7,9 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class PatternManeuversController : ControllerBase
     {
-        [Authorize]
         [HttpGet("{patternNumber}")]
         public IActionResult GetByPattern(short patternNumber)
         {
@@ -26,11 +26,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetByPattern: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת תרגילי הפטרן");
             }
         }
 
-        [Authorize]
         [HttpPut("{patternNumber}")]
         public IActionResult Replace(short patternNumber, [FromBody] List<PatternManeuver> items)
         {
@@ -39,7 +39,11 @@ namespace RideOnServer.Controllers
                 UserAccessValidator.EnsureSuperUser(User);
 
                 PatternManeuverDAL dal = new PatternManeuverDAL();
-                dal.ReplacePatternManeuvers(patternNumber, items ?? new List<PatternManeuver>());
+                dal.ReplacePatternManeuvers(
+                    patternNumber,
+                    items ?? new List<PatternManeuver>()
+                );
+
                 return Ok();
             }
             catch (UnauthorizedAccessException ex)
@@ -48,7 +52,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Replace PatternManeuvers: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון תרגילי הפטרן");
             }
         }
     }
