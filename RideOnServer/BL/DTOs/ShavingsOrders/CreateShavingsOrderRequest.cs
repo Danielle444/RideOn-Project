@@ -12,6 +12,5 @@ namespace RideOnServer.BL.DTOs.ShavingsOrders
         public string? Notes { get; set; }
         public DateTime RequestedDeliveryTime { get; set; }
         public List<CreateShavingsOrderStallItem> Stalls { get; set; } = new();
-        public List<CreateShavingsOrderPayerItem> Payers { get; set; } = new();
     }
 }

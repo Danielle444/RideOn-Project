@@ -112,11 +112,6 @@ namespace RideOnServer.Controllers
                     return BadRequest("At least one stall is required.");
                 }
 
-                if (request.Payers == null || request.Payers.Count == 0)
-                {
-                    return BadRequest("At least one payer is required.");
-                }
-
                 UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
                     request.RanchId,

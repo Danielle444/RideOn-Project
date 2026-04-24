@@ -168,21 +168,27 @@ namespace RideOnServer.DAL
             conn.Open();
 
             using NpgsqlCommand cmd = new NpgsqlCommand(
-                "SELECT usp_createshavingsorder(@competitionId, @orderedBySystemUserId, @catalogItemId, @notes, @requestedDeliveryTime, @stalls::jsonb, @payers::jsonb)",
+                @"SELECT usp_createshavingsorder(
+                    @competitionId,
+                    @orderedBySystemUserId,
+                    @catalogItemId,
+                    @ranchId,
+                    @notes,
+                    @requestedDeliveryTime,
+                    @stalls::jsonb
+                )",
                 conn
             );
 
             cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
             cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
             cmd.Parameters.AddWithValue("@catalogItemId", request.CatalogItemId);
+            cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
             cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@requestedDeliveryTime", NpgsqlDbType.Timestamp, request.RequestedDeliveryTime);
 
             string stallsJson = JsonSerializer.Serialize(request.Stalls);
             cmd.Parameters.AddWithValue("@stalls", NpgsqlDbType.Jsonb, stallsJson);
-
-            string payersJson = JsonSerializer.Serialize(request.Payers);
-            cmd.Parameters.AddWithValue("@payers", NpgsqlDbType.Jsonb, payersJson);
 
             object? result = cmd.ExecuteScalar();
 
