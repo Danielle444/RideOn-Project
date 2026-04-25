@@ -27,8 +27,9 @@ function canAdminSeeCompetitionDetails(status) {
 }
 
 function canAdminRegisterCompetition(status) {
-  return status === "פעילה";
+  return status === "פעילה" || status ==="כעת";
 }
+
 
 function canAdminEnterCompetition(status) {
   return (
