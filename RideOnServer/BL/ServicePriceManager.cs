@@ -129,16 +129,16 @@ namespace RideOnServer.BL
             return dal.GetPriceHistoryForProduct(productId, ranchId);
         }
 
-        internal static void ActivateHistoryItem(int catalogItemId, int ranchId)
+        internal static void ActivateHistoryItem(int PriceCatalogId, int ranchId)
         {
-            if (catalogItemId <= 0)
-                throw new Exception("CatalogItemId is required");
+            if (PriceCatalogId <= 0)
+                throw new Exception("priceCatalogId is required");
 
             if (ranchId <= 0)
                 throw new Exception("RanchId is required");
 
             ServicePriceDAL dal = new ServicePriceDAL();
-            dal.ActivateSpecificPriceHistoryItem(catalogItemId, ranchId);
+            dal.ActivateSpecificPriceHistoryItem(PriceCatalogId, ranchId);
         }
 
 

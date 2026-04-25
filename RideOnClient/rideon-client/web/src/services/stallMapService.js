@@ -14,7 +14,7 @@ function getAuthHeaders() {
 
 function getCompounds(ranchId) {
   return axios.get(`${API}/StallAssignments/compounds`, {
-    params: { ranchId },
+    params: { ranchId: ranchId },
     ...getAuthHeaders(),
   });
 }
@@ -22,21 +22,21 @@ function getCompounds(ranchId) {
 function saveLayout(ranchId, compoundId, layoutJson) {
   return axios.post(
     `${API}/StallCompounds/layout`,
-    { ranchId, compoundId, layoutJson },
-    getAuthHeaders()
+    { ranchId: ranchId, compoundId: compoundId, layoutJson: layoutJson },
+    getAuthHeaders(),
   );
 }
 
-function getHorses(competitionId) {
+function getHorses(competitionId, ranchId) {
   return axios.get(`${API}/StallAssignments/horses`, {
-    params: { competitionId },
+    params: { competitionId: competitionId, ranchId: ranchId },
     ...getAuthHeaders(),
   });
 }
 
-function getAssignments(competitionId) {
+function getAssignments(competitionId, ranchId) {
   return axios.get(`${API}/StallAssignments`, {
-    params: { competitionId },
+    params: { competitionId: competitionId, ranchId: ranchId },
     ...getAuthHeaders(),
   });
 }
@@ -44,14 +44,25 @@ function getAssignments(competitionId) {
 function assignHorse(competitionId, ranchId, compoundId, stallId, horseId) {
   return axios.post(
     `${API}/StallAssignments`,
-    { competitionId, ranchId, compoundId, stallId, horseId },
-    getAuthHeaders()
+    {
+      competitionId: competitionId,
+      ranchId: ranchId,
+      compoundId: compoundId,
+      stallId: stallId,
+      horseId: horseId,
+    },
+    getAuthHeaders(),
   );
 }
 
 function unassignHorse(competitionId, ranchId, compoundId, stallId) {
   return axios.delete(`${API}/StallAssignments`, {
-    data: { competitionId, ranchId, compoundId, stallId },
+    data: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+      compoundId: compoundId,
+      stallId: stallId,
+    },
     ...getAuthHeaders(),
   });
 }

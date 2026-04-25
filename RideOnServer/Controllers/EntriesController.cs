@@ -7,14 +7,19 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class EntriesController : ControllerBase
     {
-        [Authorize]
         [HttpPost]
         public IActionResult CreateEntry([FromBody] CreateEntryRequest request)
         {
             try
             {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
@@ -22,6 +27,8 @@ namespace RideOnServer.Controllers
                     request.RanchId,
                     RoleNames.RanchAdmin
                 );
+
+                request.OrderedBySystemUserId = personId;
 
                 int entryId = Entry.CreateEntry(request);
 
@@ -37,7 +44,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in CreateEntry: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת הרשמה למקצה");
             }
         }
     }

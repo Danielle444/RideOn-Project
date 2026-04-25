@@ -8,9 +8,9 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class PatternsController : ControllerBase
     {
-        [Authorize]
         [HttpGet]
         public IActionResult GetAll()
         {
@@ -27,11 +27,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetAll Patterns: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת פטרנים");
             }
         }
 
-        [Authorize]
         [HttpGet("with-maneuvers")]
         public IActionResult GetAllWithManeuvers()
         {
@@ -50,7 +50,11 @@ namespace RideOnServer.Controllers
 
                 bool hasSecretaryRole = approvedRoles.Any(item =>
                     !string.IsNullOrWhiteSpace(item.RoleName) &&
-                    item.RoleName.Trim().Equals(RoleNames.HostSecretary, StringComparison.OrdinalIgnoreCase));
+                    item.RoleName.Trim().Equals(
+                        RoleNames.HostSecretary,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
 
                 if (!hasSecretaryRole)
                 {
@@ -66,20 +70,26 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetAllWithManeuvers: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת פטרנים עם תרגילים");
             }
         }
 
-        [Authorize]
         [HttpPost]
         public IActionResult Create([FromBody] Pattern pattern)
         {
             try
             {
+                if (pattern == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 UserAccessValidator.EnsureSuperUser(User);
 
                 PatternDAL dal = new PatternDAL();
                 dal.InsertPattern(pattern.PatternNumber);
+
                 return Ok();
             }
             catch (UnauthorizedAccessException ex)
@@ -88,20 +98,26 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Create Pattern: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת פטרן");
             }
         }
 
-        [Authorize]
         [HttpPut]
         public IActionResult Update([FromBody] PatternUpdateRequest request)
         {
             try
             {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 UserAccessValidator.EnsureSuperUser(User);
 
                 PatternDAL dal = new PatternDAL();
                 dal.UpdatePattern(request.OldPatternNumber, request.NewPatternNumber);
+
                 return Ok();
             }
             catch (UnauthorizedAccessException ex)
@@ -110,11 +126,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Update Pattern: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון פטרן");
             }
         }
 
-        [Authorize]
         [HttpDelete("{patternNumber}")]
         public IActionResult Delete(short patternNumber)
         {
@@ -124,6 +140,7 @@ namespace RideOnServer.Controllers
 
                 PatternDAL dal = new PatternDAL();
                 dal.DeletePattern(patternNumber);
+
                 return Ok();
             }
             catch (UnauthorizedAccessException ex)
@@ -132,7 +149,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Delete Pattern: {ex.Message}");
+                return BadRequest("אירעה שגיאה במחיקת פטרן");
             }
         }
     }

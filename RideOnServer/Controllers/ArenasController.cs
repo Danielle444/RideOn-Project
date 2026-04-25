@@ -7,15 +7,15 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class ArenasController : ControllerBase
     {
-        [Authorize]
         [HttpGet]
         public IActionResult GetByRanchId([FromQuery] int ranchId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -32,17 +32,22 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetByRanchId Arenas: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת מגרשים");
             }
         }
 
-        [Authorize]
         [HttpPost]
         public IActionResult Create([FromBody] UpsertArenaRequest request)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -59,17 +64,22 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Create Arena: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת מגרש");
             }
         }
 
-        [Authorize]
         [HttpPut]
         public IActionResult Update([FromBody] UpsertArenaRequest request)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -86,17 +96,17 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Update Arena: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון מגרש");
             }
         }
 
-        [Authorize]
         [HttpDelete]
         public IActionResult Delete([FromQuery] int ranchId, [FromQuery] short arenaId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -113,20 +123,9 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Delete Arena: {ex.Message}");
+                return BadRequest("אירעה שגיאה במחיקת מגרש");
             }
-        }
-
-        private int GetPersonIdFromClaims()
-        {
-            string? personIdClaim = User.Claims.FirstOrDefault(c => c.Type == "PersonId")?.Value;
-
-            if (string.IsNullOrWhiteSpace(personIdClaim))
-            {
-                throw new UnauthorizedAccessException("PersonId claim is missing");
-            }
-
-            return int.Parse(personIdClaim);
         }
     }
 }

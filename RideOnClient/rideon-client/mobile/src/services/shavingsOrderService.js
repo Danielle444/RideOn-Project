@@ -6,9 +6,37 @@ function getWorkerShavingsOrders() {
 
 function saveDeliveryPhoto(shavingsOrderId, deliveryPhotoUrl) {
   return axios.post("/ShavingsOrders/save-delivery-photo", {
-    shavingsOrderId,
-    deliveryPhotoUrl,
+    shavingsOrderId: shavingsOrderId,
+    deliveryPhotoUrl: deliveryPhotoUrl,
   });
 }
 
-export { getWorkerShavingsOrders, saveDeliveryPhoto };
+function getStallBookingsForShavings(competitionId, ranchId) {
+  return axios.get("/ShavingsOrders/stall-bookings-for-order", {
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
+  });
+}
+
+function getShavingsOrdersForCompetitionAndRanch(competitionId, ranchId) {
+  return axios.get("/ShavingsOrders/by-competition-and-ranch", {
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
+  });
+}
+
+function createShavingsOrder(payload) {
+  return axios.post("/ShavingsOrders", payload);
+}
+
+export {
+  getWorkerShavingsOrders,
+  saveDeliveryPhoto,
+  getStallBookingsForShavings,
+  getShavingsOrdersForCompetitionAndRanch,
+  createShavingsOrder,
+};

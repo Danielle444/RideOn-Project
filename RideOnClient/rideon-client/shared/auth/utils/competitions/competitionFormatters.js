@@ -15,6 +15,9 @@ function formatCompetitionDateRange(startDate, endDate) {
   var startMonth = start.getMonth();
   var startYear = start.getFullYear();
 
+  var startMonth = start.getMonth();
+  var startYear = start.getFullYear();
+
   var endDay = end.getDate();
   var endMonth = end.getMonth();
   var endYear = end.getFullYear();
@@ -50,7 +53,12 @@ function formatCompetitionDateRange(startDate, endDate) {
     return startDay + " " + monthYear;
   }
 
+  if (startDay === endDay) {
+    return startDay + " " + monthYear;
+  }
+
   return startDay + "-" + endDay + " " + monthYear;
 }
 
+export { formatCompetitionDateRange };
 export { formatCompetitionDateRange };

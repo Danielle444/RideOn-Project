@@ -74,7 +74,7 @@ namespace RideOnServer.BL
                 }).ToList(),
                 PaidTimeSlots = paidTimeSlots.Select(x => new CompetitionPaidTimeInvitationItemDto
                 {
-                    CompSlotId = x.CompSlotId,
+                    PaidTimeSlotInCompId = x.PaidTimeSlotInCompId,
                     SlotDate = x.SlotDate,
                     TimeOfDay = x.TimeOfDay,
                     StartTime = x.StartTime,

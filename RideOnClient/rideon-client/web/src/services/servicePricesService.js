@@ -68,9 +68,9 @@ function getServiceProductPriceHistory(productId, ranchId) {
   });
 }
 
-function activateServicePriceHistoryItem(catalogItemId, ranchId) {
+function activateServicePriceHistoryItem(priceCatalogId, ranchId) {
   return axios.put(
-    `${API}/ServicePrices/history/${catalogItemId}/activate`,
+    `${API}/ServicePrices/history/${priceCatalogId}/activate`,
     null,
     {
       params: { ranchId },

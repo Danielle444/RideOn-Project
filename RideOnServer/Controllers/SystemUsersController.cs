@@ -55,7 +55,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in SystemUser Login: {ex.Message}");
+                return BadRequest("אירעה שגיאה בהתחברות");
             }
         }
 
@@ -70,7 +71,9 @@ namespace RideOnServer.Controllers
             {
                 UserAccessValidator.EnsureCurrentUserIsPerson(User, personId);
 
-                ProfileSettingsResponse response = SystemUser.GetProfileSettings(personId, ranchId, roleId);
+                ProfileSettingsResponse response =
+                    SystemUser.GetProfileSettings(personId, ranchId, roleId);
+
                 return Ok(response);
             }
             catch (UnauthorizedAccessException ex)
@@ -79,7 +82,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetProfileSettings: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת הגדרות פרופיל");
             }
         }
 
@@ -89,6 +93,11 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 UserAccessValidator.EnsureCurrentUserIsPerson(User, request.PersonId);
 
                 SystemUser.UpdateUserProfile(request);
@@ -100,7 +109,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in UpdateUserProfile: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון פרופיל");
             }
         }
 
@@ -109,16 +119,25 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                if (registerRequest == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 OtpService otpService = new OtpService(_configuration);
+
                 if (!otpService.VerifyOtp(registerRequest.Email, registerRequest.OtpCode))
+                {
                     return BadRequest("קוד האימות אינו תקף או פג תוקפו");
+                }
 
                 RegisterResponse response = SystemUser.Register(registerRequest);
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Register: {ex.Message}");
+                return BadRequest("אירעה שגיאה בהרשמה");
             }
         }
 
@@ -126,13 +145,18 @@ namespace RideOnServer.Controllers
         [HttpPost("{personId}/roles")]
         public IActionResult AssignRoleToPerson(int personId, [FromBody] AssignRoleRequest request)
         {
-            if (personId != request.PersonId)
-            {
-                return BadRequest("PersonId in URL does not match body.");
-            }
-
             try
             {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                if (personId != request.PersonId)
+                {
+                    return BadRequest("PersonId in URL does not match body.");
+                }
+
                 UserAccessValidator.EnsureCurrentUserIsPerson(User, request.PersonId);
 
                 SystemUser.AssignRoleToExistingUser(request.PersonId, request.RanchId, request.RoleId);
@@ -144,7 +168,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in AssignRoleToPerson: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשיוך תפקיד");
             }
         }
 
@@ -154,6 +179,11 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 UserAccessValidator.EnsureSuperUser(User);
 
                 SystemUser.UpdatePersonRoleStatus(
@@ -171,7 +201,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in UpdatePersonRoleStatus: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון סטטוס תפקיד");
             }
         }
 
@@ -181,11 +212,19 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 if (request.PersonId != currentPersonId)
                 {
-                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לשנות סיסמה עבור משתמש אחר");
+                    return StatusCode(
+                        StatusCodes.Status403Forbidden,
+                        "אין לך הרשאה לשנות סיסמה עבור משתמש אחר"
+                    );
                 }
 
                 SystemUser.ChangePassword(request);
@@ -197,7 +236,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in ChangePassword: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשינוי סיסמה");
             }
         }
 
@@ -207,6 +247,11 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 UserAccessValidator.EnsureSuperUser(User);
 
                 SystemUser.SetMustChangePassword(request.SystemUserId, request.MustChangePassword);
@@ -218,7 +263,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in SetMustChangePassword: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון חובת שינוי סיסמה");
             }
         }
 
@@ -227,12 +273,18 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                bool exists = SystemUser.CheckUsernameExists(username);
+                if (string.IsNullOrWhiteSpace(username))
+                {
+                    return BadRequest("שם משתמש נדרש");
+                }
+
+                bool exists = SystemUser.CheckUsernameExists(username.Trim());
                 return Ok(new { exists });
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in CheckUsername: {ex.Message}");
+                return BadRequest("אירעה שגיאה בבדיקת שם משתמש");
             }
         }
 
@@ -241,6 +293,11 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 int requestId = SystemUser.CreatePendingRanchRequest(request);
 
                 return Ok(new
@@ -251,7 +308,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in CreateRanchRequest: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת בקשת חווה");
             }
         }
 
@@ -260,19 +318,27 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(request.Email))
+                if (request == null || string.IsNullOrWhiteSpace(request.Email))
+                {
                     return BadRequest("כתובת מייל נדרשת");
+                }
 
-                if (!request.Email.Contains("@") || !request.Email.Contains("."))
+                string email = request.Email.Trim();
+
+                if (!email.Contains("@") || !email.Contains("."))
+                {
                     return BadRequest("כתובת מייל אינה תקינה");
+                }
 
                 OtpService otpService = new OtpService(_configuration);
-                otpService.SendAndStoreOtp(request.Email);
+                otpService.SendAndStoreOtp(email);
+
                 return Ok(new { message = "קוד אימות נשלח למייל" });
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in SendOtp: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליחת קוד אימות");
             }
         }
 
@@ -281,16 +347,20 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(request.Email))
+                if (request == null || string.IsNullOrWhiteSpace(request.Email))
+                {
                     return BadRequest("כתובת מייל נדרשת");
+                }
 
                 PasswordResetService service = new PasswordResetService(_configuration);
-                service.RequestReset(request.Email);
+                service.RequestReset(request.Email.Trim());
+
                 return Ok(new { message = "אם המייל קיים במערכת, ישלח אליך קישור לאיפוס" });
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in ForgotPassword: {ex.Message}");
+                return BadRequest("אירעה שגיאה בבקשת איפוס סיסמה");
             }
         }
 
@@ -299,19 +369,25 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.NewPassword))
+                if (
+                    request == null ||
+                    string.IsNullOrWhiteSpace(request.Token) ||
+                    string.IsNullOrWhiteSpace(request.NewPassword)
+                )
+                {
                     return BadRequest("פרטים חסרים");
+                }
 
                 PasswordResetService service = new PasswordResetService(_configuration);
                 service.ResetPassword(request.Token, request.NewPassword);
+
                 return Ok(new { message = "הסיסמה אופסה בהצלחה" });
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in ResetPassword: {ex.Message}");
+                return BadRequest("אירעה שגיאה באיפוס סיסמה");
             }
         }
-
-
     }
 }

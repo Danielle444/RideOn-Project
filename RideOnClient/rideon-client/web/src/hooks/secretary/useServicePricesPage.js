@@ -303,7 +303,7 @@ export default function useServicePricesPage() {
       message: "האם להפעיל את המחיר שנבחר כמחיר הפעיל של המוצר?",
       onConfirm: async function () {
         try {
-          await activateServicePriceHistoryItem(historyItem.catalogItemId, ranchId);
+          await activateServicePriceHistoryItem(historyItem.priceCatalogId, ranchId);
           closeConfirmDialog();
           showToast("success", "המחיר הופעל בהצלחה");
           await loadDashboard();

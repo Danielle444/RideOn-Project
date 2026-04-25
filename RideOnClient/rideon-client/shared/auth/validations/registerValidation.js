@@ -41,9 +41,9 @@ function validateRegisterForm(form, existingSystemUserFound) {
     return "הסיסמאות אינן תואמות";
   }
 
-  if (!email.includes("@")) {
-    return "כתובת אימייל לא תקינה";
-  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  return "כתובת אימייל לא תקינה";
+}
 
   if (existingSystemUserFound) {
     return "לא ניתן להירשם עם תעודת זהות שכבר משויכת למשתמש קיים";

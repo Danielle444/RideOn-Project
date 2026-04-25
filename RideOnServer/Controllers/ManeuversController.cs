@@ -7,9 +7,9 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class ManeuversController : ControllerBase
     {
-        [Authorize]
         [HttpGet]
         public IActionResult GetAll()
         {
@@ -26,20 +26,29 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetAll Maneuvers: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת תרגילים");
             }
         }
 
-        [Authorize]
         [HttpPost]
         public IActionResult Create([FromBody] Maneuver maneuver)
         {
             try
             {
+                if (maneuver == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 UserAccessValidator.EnsureSuperUser(User);
 
                 ManeuverDAL dal = new ManeuverDAL();
-                short id = dal.InsertManeuver(maneuver.ManeuverName, maneuver.ManeuverDescription);
+                short id = dal.InsertManeuver(
+                    maneuver.ManeuverName,
+                    maneuver.ManeuverDescription
+                );
+
                 return Ok(id);
             }
             catch (UnauthorizedAccessException ex)
@@ -48,20 +57,30 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Create Maneuver: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת תרגיל");
             }
         }
 
-        [Authorize]
         [HttpPut]
         public IActionResult Update([FromBody] Maneuver maneuver)
         {
             try
             {
+                if (maneuver == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 UserAccessValidator.EnsureSuperUser(User);
 
                 ManeuverDAL dal = new ManeuverDAL();
-                dal.UpdateManeuver(maneuver.ManeuverId, maneuver.ManeuverName, maneuver.ManeuverDescription);
+                dal.UpdateManeuver(
+                    maneuver.ManeuverId,
+                    maneuver.ManeuverName,
+                    maneuver.ManeuverDescription
+                );
+
                 return Ok();
             }
             catch (UnauthorizedAccessException ex)
@@ -70,11 +89,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Update Maneuver: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון תרגיל");
             }
         }
 
-        [Authorize]
         [HttpDelete("{maneuverId}")]
         public IActionResult Delete(short maneuverId)
         {
@@ -84,6 +103,7 @@ namespace RideOnServer.Controllers
 
                 ManeuverDAL dal = new ManeuverDAL();
                 dal.DeleteManeuver(maneuverId);
+
                 return Ok();
             }
             catch (UnauthorizedAccessException ex)
@@ -92,7 +112,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Delete Maneuver: {ex.Message}");
+                return BadRequest("אירעה שגיאה במחיקת תרגיל");
             }
         }
     }

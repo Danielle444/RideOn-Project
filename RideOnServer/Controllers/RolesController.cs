@@ -17,7 +17,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetAllRoles: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת תפקידים");
             }
         }
     }

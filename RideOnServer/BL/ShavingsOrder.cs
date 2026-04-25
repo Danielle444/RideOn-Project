@@ -7,13 +7,23 @@ namespace RideOnServer.BL
     {
         public int? WorkerSystemUserId { get; set; }
 
-        public byte BagQuantity { get; set; }
+        public short? BagQuantity { get; set; }
 
         public DateTime? RequestedDeliveryTime { get; set; }
 
         public DateTime? ArrivalTime { get; set; }
 
         public DateTime? ResponseTime { get; set; }
+
+        public string DeliveryStatus { get; set; } = "Pending";
+
+        public string? DeliveryPhotoUrl { get; set; }
+
+        public DateTime? DeliveryPhotoDate { get; set; }
+
+        public int? ApprovedByPersonId { get; set; }
+
+        public DateTime? ApprovedAt { get; set; }
 
         public static List<WorkerShavingsOrderItem> GetWorkerShavingsOrders(int workerSystemUserId)
         {
