@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { Check, ImageOff } from "lucide-react";
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import { useActiveRole } from "../../context/ActiveRoleContext";
-import { getPendingDeliveryApprovals, approveDelivery } from "../../services/shavingsOrderService";
+import {
+  getPendingDeliveryApprovals,
+  approveDelivery,
+} from "../../services/shavingsOrderService";
 import ConfirmDialog from "../../components/superuser/ConfirmDialog";
 
 export default function CompetitionShavingsPage() {
@@ -75,7 +78,12 @@ function ShavingsContent({ ranchId }) {
   }
 
   function closeConfirmDialog() {
-    setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: null });
+    setConfirmDialog({
+      isOpen: false,
+      title: "",
+      message: "",
+      onConfirm: null,
+    });
   }
 
   return (
@@ -83,7 +91,9 @@ function ShavingsContent({ ranchId }) {
       <div className="mx-auto max-w-[1450px] space-y-6">
         <div className="rounded-[28px] border border-[#E6DCD5] bg-white shadow-sm overflow-hidden">
           <div className="border-b border-[#EFE5DF] px-8 py-7">
-            <h1 className="text-[2rem] font-bold text-[#3F312B]">הזמנות נסורת</h1>
+            <h1 className="text-[2rem] font-bold text-[#3F312B]">
+              הזמנות נסורת
+            </h1>
             <p className="mt-1 text-sm text-[#8A7268]">
               הזמנות שסופקו ומחכות לאישור מזכירה
             </p>
@@ -96,7 +106,9 @@ function ShavingsContent({ ranchId }) {
 
             {!loading && orders.length === 0 && (
               <div className="text-center py-16">
-                <p className="text-[#8A7268] text-sm">אין הזמנות הממתינות לאישור</p>
+                <p className="text-[#8A7268] text-sm">
+                  אין הזמנות הממתינות לאישור
+                </p>
               </div>
             )}
 
@@ -116,7 +128,9 @@ function ShavingsContent({ ranchId }) {
                         </span>
                         <span className="text-xs text-[#8A7268]">
                           {order.deliveryPhotoDate
-                            ? new Date(order.deliveryPhotoDate).toLocaleDateString("he-IL")
+                            ? new Date(
+                                order.deliveryPhotoDate,
+                              ).toLocaleDateString("he-IL")
                             : ""}
                         </span>
                       </div>
@@ -130,7 +144,7 @@ function ShavingsContent({ ranchId }) {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-[#8A7268]">תא:</span>
-                          <span>{order.stallName || "—"}</span>
+                          <span>{order.stallNumber || "—"}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-[#8A7268]">עובד:</span>
@@ -146,7 +160,9 @@ function ShavingsContent({ ranchId }) {
 
                       {order.deliveryPhotoUrl ? (
                         <button
-                          onClick={function () { setSelectedPhoto(order.deliveryPhotoUrl); }}
+                          onClick={function () {
+                            setSelectedPhoto(order.deliveryPhotoUrl);
+                          }}
                           className="w-full overflow-hidden rounded-[14px] border border-[#E6DCD5] cursor-pointer hover:opacity-90 transition-opacity"
                         >
                           <img
@@ -163,7 +179,9 @@ function ShavingsContent({ ranchId }) {
                       )}
 
                       <button
-                        onClick={function () { handleApproveClick(order); }}
+                        onClick={function () {
+                          handleApproveClick(order);
+                        }}
                         disabled={isLoading}
                         className="flex items-center justify-center gap-2 w-full rounded-[12px] bg-[#4CAF50] hover:bg-[#43A047] text-white text-sm font-semibold py-2.5 transition-colors disabled:opacity-60"
                       >
@@ -182,13 +200,17 @@ function ShavingsContent({ ranchId }) {
       {selectedPhoto && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
-          onClick={function () { setSelectedPhoto(null); }}
+          onClick={function () {
+            setSelectedPhoto(null);
+          }}
         >
           <img
             src={selectedPhoto}
             alt="תמונת אספקה מוגדלת"
             className="max-w-[90vw] max-h-[90vh] rounded-[16px] shadow-2xl"
-            onClick={function (e) { e.stopPropagation(); }}
+            onClick={function (e) {
+              e.stopPropagation();
+            }}
           />
         </div>
       )}

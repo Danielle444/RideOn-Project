@@ -10,7 +10,10 @@ import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate
 import { getWorkerMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
-import { getWorkerShavingsOrders, saveDeliveryPhoto } from "../../../../services/shavingsOrderService";
+import {
+  getWorkerShavingsOrders,
+  saveDeliveryPhoto,
+} from "../../../../services/shavingsOrderService";
 import { supabase } from "../../../../lib/supabaseClient";
 
 const DELIVERY_BUCKET = "delivery-photos";
@@ -136,7 +139,7 @@ export default function WorkerShavingsOrdersScreen(props) {
               deliveryStatus={order.deliveryStatus}
               ranchName={order.ranchName}
               competitionName={order.competitionName}
-              stallName={order.stallName}
+              stallNumber={order.stallNumber}
               bagQuantity={order.bagQuantity}
               payerFirstName={order.payerFirstName}
               payerLastName={order.payerLastName}
