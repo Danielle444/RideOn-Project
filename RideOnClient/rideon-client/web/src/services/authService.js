@@ -96,6 +96,14 @@ function resetPassword(token, newPassword) {
   return axios.post(`${API}/SystemUsers/reset-password`, { token, newPassword });
 }
 
+function superUserForgotPassword(email) {
+  return axios.post(`${API}/SuperUsers/forgot-password`, { email });
+}
+
+function superUserResetPassword(email, otpCode, newPassword) {
+  return axios.post(`${API}/SuperUsers/reset-password`, { email, otpCode, newPassword });
+}
+
 export {
   login,
   loginSuperUser,
@@ -110,4 +118,6 @@ export {
   sendOtp,
   forgotPassword,
   resetPassword,
+  superUserForgotPassword,
+  superUserResetPassword,
 };

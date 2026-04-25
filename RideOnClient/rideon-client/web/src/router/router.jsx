@@ -33,6 +33,7 @@ import UnauthorizedPage from "../pages/shared/UnauthorizedPage";
 const SECRETARY_ROLE = "מזכירת חווה מארחת";
 import ForgotPasswordScreen from "../pages/auth/ForgotPasswordScreen";
 import ResetPasswordScreen from "../pages/auth/ResetPasswordScreen";
+import SuperUserForgotPasswordScreen from "../pages/auth/SuperUserForgotPasswordScreen";
 import CompleteRegistrationPage from "../pages/auth/CompleteRegistrationPage";
 
 const router = createBrowserRouter([
@@ -71,6 +72,14 @@ const router = createBrowserRouter([
     element: (
       <PublicRoute>
         <ResetPasswordScreen />
+      </PublicRoute>
+    ),
+  },
+  {
+    path: "/superuser-forgot-password",
+    element: (
+      <PublicRoute>
+        <SuperUserForgotPasswordScreen />
       </PublicRoute>
     ),
   },
