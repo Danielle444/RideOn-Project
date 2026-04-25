@@ -37,16 +37,14 @@ function getCompetitionStatusOrderValue(status, statusOrder) {
 
 function sortCompetitionsByStatusAndDate(items, statusOrder) {
   var sourceItems = Array.isArray(items) ? items.slice() : [];
+  
+  // ORENNOTEFUTURE: Build the map exactly ONCE here!
+  var orderMap = buildCompetitionStatusOrderMap(statusOrder);
 
   sourceItems.sort(function (a, b) {
-    var statusOrderA = getCompetitionStatusOrderValue(
-      a?.competitionStatus,
-      statusOrder,
-    );
-    var statusOrderB = getCompetitionStatusOrderValue(
-      b?.competitionStatus,
-      statusOrder,
-    );
+    // Look up the value directly from the map, fallback to 999
+    var statusOrderA = orderMap[a?.competitionStatus] ?? 999;
+    var statusOrderB = orderMap[b?.competitionStatus] ?? 999;
 
     if (statusOrderA !== statusOrderB) {
       return statusOrderA - statusOrderB;
