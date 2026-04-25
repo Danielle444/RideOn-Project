@@ -54,7 +54,7 @@ namespace RideOnServer.Controllers
                 );
 
                 var dal = new StallAssignmentDAL();
-                return Ok(dal.GetHorsesForCompetition(competitionId));
+                return Ok(dal.GetHorsesForCompetition(competitionId, ranchId));
             }
             catch (UnauthorizedAccessException ex)
             {

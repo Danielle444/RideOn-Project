@@ -47,28 +47,40 @@ namespace RideOnServer.DAL
             catch (NpgsqlException ex) { throw new Exception($"Database error: {ex.Message}"); }
         }
 
-        public List<HorseForMapDto> GetHorsesForCompetition(int competitionId)
+        public List<HorseForMapDto> GetHorsesForCompetition(int competitionId, int ranchId)
         {
-            var paramDic = new Dictionary<string, object> { { "@CompetitionId", competitionId } };
+            var paramDic = new Dictionary<string, object>
+    {
+        { "@CompetitionId", competitionId },
+        { "@RanchId", ranchId }
+    };
+
             try
             {
                 using var connection = Connect("DefaultConnection");
                 connection.Open();
+
                 using var command = CreateCommandWithStoredProcedure("usp_GetHorsesForCompetition", connection, paramDic);
                 using var reader = command.ExecuteReader();
+
                 var list = new List<HorseForMapDto>();
+
                 while (reader.Read())
                 {
                     list.Add(new HorseForMapDto
                     {
-                        HorseId   = Convert.ToInt32(reader["HorseId"]),
+                        HorseId = Convert.ToInt32(reader["HorseId"]),
                         HorseName = reader["HorseName"].ToString()!,
-                        BarnName  = reader["BarnName"] == DBNull.Value ? null : reader["BarnName"].ToString()
+                        BarnName = reader["BarnName"] == DBNull.Value ? null : reader["BarnName"].ToString()
                     });
                 }
+
                 return list;
             }
-            catch (NpgsqlException ex) { throw new Exception($"Database error: {ex.Message}"); }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
         }
 
         public List<StallAssignmentDto> GetAssignments(int competitionId)
