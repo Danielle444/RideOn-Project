@@ -32,22 +32,30 @@ export default function WorkerShavingsOrderCard(props) {
       <View style={workerStyles.orderDetailsWrap}>
         <View style={workerStyles.orderDetailRow}>
           <Text style={workerStyles.orderDetailLabel}>שם חווה:</Text>
-          <Text style={workerStyles.orderDetailValue}>{props.ranchName || "-"}</Text>
+          <Text style={workerStyles.orderDetailValue}>
+            {props.ranchName || "-"}
+          </Text>
         </View>
 
         <View style={workerStyles.orderDetailRow}>
           <Text style={workerStyles.orderDetailLabel}>תחרות:</Text>
-          <Text style={workerStyles.orderDetailValue}>{props.competitionName || "-"}</Text>
+          <Text style={workerStyles.orderDetailValue}>
+            {props.competitionName || "-"}
+          </Text>
         </View>
 
         <View style={workerStyles.orderDetailRow}>
           <Text style={workerStyles.orderDetailLabel}>תא:</Text>
-          <Text style={workerStyles.orderDetailValue}>{props.stallName || "-"}</Text>
+          <Text style={workerStyles.orderDetailValue}>
+            {props.stallNumber || "-"}
+          </Text>
         </View>
 
         <View style={workerStyles.orderDetailRow}>
           <Text style={workerStyles.orderDetailLabel}>כמות שקים:</Text>
-          <Text style={workerStyles.orderDetailValue}>{props.bagQuantity} שקים</Text>
+          <Text style={workerStyles.orderDetailValue}>
+            {props.bagQuantity} שקים
+          </Text>
         </View>
 
         <View style={workerStyles.orderDetailRow}>
@@ -61,7 +69,10 @@ export default function WorkerShavingsOrderCard(props) {
       {props.deliveryStatus === "Pending" && (
         <View style={roleSharedStyles.buttonsRow}>
           <Pressable
-            style={[roleSharedStyles.primaryButton, { opacity: props.uploading ? 0.6 : 1 }]}
+            style={[
+              roleSharedStyles.primaryButton,
+              { opacity: props.uploading ? 0.6 : 1 },
+            ]}
             onPress={props.onCapturePhoto}
             disabled={props.uploading}
           >
@@ -69,8 +80,15 @@ export default function WorkerShavingsOrderCard(props) {
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <>
-                <Ionicons name="camera-outline" size={18} color="#fff" style={{ marginLeft: 6 }} />
-                <Text style={roleSharedStyles.primaryButtonText}>צלם ואשר אספקה</Text>
+                <Ionicons
+                  name="camera-outline"
+                  size={18}
+                  color="#fff"
+                  style={{ marginLeft: 6 }}
+                />
+                <Text style={roleSharedStyles.primaryButtonText}>
+                  צלם ואשר אספקה
+                </Text>
               </>
             )}
           </Pressable>
@@ -78,7 +96,9 @@ export default function WorkerShavingsOrderCard(props) {
       )}
 
       {props.deliveryStatus === "WaitingApproval" && (
-        <View style={[roleSharedStyles.buttonsRow, { justifyContent: "center" }]}>
+        <View
+          style={[roleSharedStyles.buttonsRow, { justifyContent: "center" }]}
+        >
           <Ionicons name="time-outline" size={16} color="#8B6352" />
           <Text style={[workerStyles.orderDetailLabel, { marginRight: 4 }]}>
             ממתין לאישור מזכירה
@@ -87,9 +107,16 @@ export default function WorkerShavingsOrderCard(props) {
       )}
 
       {props.deliveryStatus === "Closed" && (
-        <View style={[roleSharedStyles.buttonsRow, { justifyContent: "center" }]}>
+        <View
+          style={[roleSharedStyles.buttonsRow, { justifyContent: "center" }]}
+        >
           <Ionicons name="checkmark-circle-outline" size={16} color="#4CAF50" />
-          <Text style={[workerStyles.orderDetailLabel, { marginRight: 4, color: "#4CAF50" }]}>
+          <Text
+            style={[
+              workerStyles.orderDetailLabel,
+              { marginRight: 4, color: "#4CAF50" },
+            ]}
+          >
             הזמנה סגורה
           </Text>
         </View>

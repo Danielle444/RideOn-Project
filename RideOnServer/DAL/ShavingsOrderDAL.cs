@@ -41,7 +41,7 @@ namespace RideOnServer.DAL
                             DeliveryPhotoDate = reader["DeliveryPhotoDate"] as DateTime?,
                             PayerFirstName = reader["PayerFirstName"]?.ToString() ?? string.Empty,
                             PayerLastName = reader["PayerLastName"]?.ToString() ?? string.Empty,
-                            StallName = reader["StallName"] as string,
+                            StallNumber = reader["StallNumber"] as string,
                             RanchName = reader["RanchName"] as string,
                             CompetitionName = reader["CompetitionName"] as string,
                         });
@@ -117,7 +117,7 @@ namespace RideOnServer.DAL
                             DeliveryPhotoDate = reader["DeliveryPhotoDate"] as DateTime?,
                             PayerFirstName = reader["PayerFirstName"]?.ToString() ?? string.Empty,
                             PayerLastName = reader["PayerLastName"]?.ToString() ?? string.Empty,
-                            StallName = reader["StallName"] as string,
+                            StallNumber = reader["StallNumber"] as string,
                             WorkerFirstName = reader["WorkerFirstName"]?.ToString() ?? string.Empty,
                             WorkerLastName = reader["WorkerLastName"]?.ToString() ?? string.Empty,
                         });
