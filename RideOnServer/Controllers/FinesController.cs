@@ -7,9 +7,9 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class FinesController : ControllerBase
     {
-        [Authorize]
         [HttpGet]
         public IActionResult GetAll()
         {
@@ -28,7 +28,11 @@ namespace RideOnServer.Controllers
 
                 bool hasSecretaryRole = approvedRoles.Any(item =>
                     !string.IsNullOrWhiteSpace(item.RoleName) &&
-                    item.RoleName.Trim().Equals(RoleNames.HostSecretary, StringComparison.OrdinalIgnoreCase));
+                    item.RoleName.Trim().Equals(
+                        RoleNames.HostSecretary,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
 
                 if (!hasSecretaryRole)
                 {
@@ -44,16 +48,21 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetAll Fines: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת קנסות");
             }
         }
 
-        [Authorize]
         [HttpPost]
         public IActionResult Create([FromBody] Fine fine)
         {
             try
             {
+                if (fine == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 if (!UserAccessValidator.IsSuperUser(User))
                 {
                     int personId = UserAccessValidator.GetPersonIdFromClaims(User);
@@ -63,7 +72,11 @@ namespace RideOnServer.Controllers
 
                     bool hasSecretaryRole = approvedRoles.Any(item =>
                         !string.IsNullOrWhiteSpace(item.RoleName) &&
-                        item.RoleName.Trim().Equals(RoleNames.HostSecretary, StringComparison.OrdinalIgnoreCase));
+                        item.RoleName.Trim().Equals(
+                            RoleNames.HostSecretary,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                    );
 
                     if (!hasSecretaryRole)
                     {
@@ -85,16 +98,21 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Create Fine: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת קנס");
             }
         }
 
-        [Authorize]
         [HttpPut]
         public IActionResult Update([FromBody] Fine fine)
         {
             try
             {
+                if (fine == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 UserAccessValidator.EnsureSuperUser(User);
 
                 Fine.UpdateFine(
@@ -112,11 +130,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Update Fine: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון קנס");
             }
         }
 
-        [Authorize]
         [HttpDelete("{id}")]
         public IActionResult Delete(int id)
         {
@@ -133,7 +151,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Delete Fine: {ex.Message}");
+                return BadRequest("אירעה שגיאה במחיקת קנס");
             }
         }
     }

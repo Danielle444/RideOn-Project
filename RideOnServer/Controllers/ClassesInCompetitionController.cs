@@ -7,15 +7,15 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class ClassesInCompetitionController : ControllerBase
     {
-        [Authorize]
         [HttpGet("{competitionId}")]
         public IActionResult GetClassesByCompetitionId(int competitionId, [FromQuery] int ranchId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -26,35 +26,34 @@ namespace RideOnServer.Controllers
                 Competition? competition = Competition.GetCompetitionById(competitionId);
 
                 if (competition == null)
-                {
                     return NotFound("Competition not found");
-                }
 
                 if (competition.HostRanchId != ranchId)
-                {
-                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לצפות במקצים של תחרות זו");
-                }
+                    return StatusCode(403, "אין לך הרשאה לצפות במקצים של תחרות זו");
 
-                List<ClassInCompetition> list = ClassInCompetition.GetClassesByCompetitionId(competitionId);
+                var list = ClassInCompetition.GetClassesByCompetitionId(competitionId);
                 return Ok(list);
             }
             catch (UnauthorizedAccessException ex)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+                return StatusCode(403, ex.Message);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetClassesByCompetitionId: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת מקצים");
             }
         }
 
-        [Authorize]
         [HttpPost]
         public IActionResult CreateClassInCompetition([FromBody] CreateClassInCompetitionRequest request)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                if (request == null)
+                    return BadRequest("Invalid request");
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -65,47 +64,42 @@ namespace RideOnServer.Controllers
                 Competition? competition = Competition.GetCompetitionById(request.CompetitionId);
 
                 if (competition == null)
-                {
                     return NotFound("Competition not found");
-                }
 
                 if (competition.HostRanchId != request.HostRanchId)
-                {
-                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה להוסיף מקצים לתחרות זו");
-                }
+                    return StatusCode(403, "אין לך הרשאה להוסיף מקצים לתחרות זו");
 
                 int newId = ClassInCompetition.CreateClassInCompetition(request);
-                ClassInCompetition? newItem = ClassInCompetition.GetClassById(newId);
+                var newItem = ClassInCompetition.GetClassById(newId);
 
                 if (newItem == null)
-                {
                     return NotFound("Created class was not found");
-                }
 
                 return Ok(newItem);
             }
             catch (UnauthorizedAccessException ex)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+                return StatusCode(403, ex.Message);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in CreateClassInCompetition: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת מקצה");
             }
         }
 
-        [Authorize]
         [HttpPut("{classInCompId}")]
         public IActionResult UpdateClassInCompetition(int classInCompId, [FromBody] UpdateClassInCompetitionRequest request)
         {
             try
             {
-                if (classInCompId != request.ClassInCompId)
-                {
-                    return BadRequest("ClassInCompId in URL does not match body");
-                }
+                if (request == null)
+                    return BadRequest("Invalid request");
 
-                int personId = GetPersonIdFromClaims();
+                if (classInCompId != request.ClassInCompId)
+                    return BadRequest("ClassInCompId mismatch");
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -116,42 +110,39 @@ namespace RideOnServer.Controllers
                 Competition? competition = Competition.GetCompetitionById(request.CompetitionId);
 
                 if (competition == null)
-                {
                     return NotFound("Competition not found");
-                }
 
                 if (competition.HostRanchId != request.HostRanchId)
-                {
-                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לערוך מקצים בתחרות זו");
-                }
+                    return StatusCode(403, "אין לך הרשאה לערוך מקצים בתחרות זו");
 
                 ClassInCompetition.UpdateClassInCompetition(request);
-                ClassInCompetition? updatedItem = ClassInCompetition.GetClassById(classInCompId);
+                var updatedItem = ClassInCompetition.GetClassById(classInCompId);
 
                 if (updatedItem == null)
-                {
                     return NotFound("Updated class was not found");
-                }
 
                 return Ok(updatedItem);
             }
             catch (UnauthorizedAccessException ex)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+                return StatusCode(403, ex.Message);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in UpdateClassInCompetition: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון מקצה");
             }
         }
 
-        [Authorize]
         [HttpDelete("{classInCompId}")]
-        public IActionResult DeleteClassInCompetition(int classInCompId, [FromQuery] int competitionId, [FromQuery] int ranchId)
+        public IActionResult DeleteClassInCompetition(
+            int classInCompId,
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -162,38 +153,23 @@ namespace RideOnServer.Controllers
                 Competition? competition = Competition.GetCompetitionById(competitionId);
 
                 if (competition == null)
-                {
                     return NotFound("Competition not found");
-                }
 
                 if (competition.HostRanchId != ranchId)
-                {
-                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה למחוק מקצים מתחרות זו");
-                }
+                    return StatusCode(403, "אין לך הרשאה למחוק מקצים מתחרות זו");
 
                 ClassInCompetition.DeleteClassInCompetition(classInCompId);
                 return Ok("Class deleted successfully");
             }
             catch (UnauthorizedAccessException ex)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+                return StatusCode(403, ex.Message);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in DeleteClassInCompetition: {ex.Message}");
+                return BadRequest("אירעה שגיאה במחיקת מקצה");
             }
-        }
-
-        private int GetPersonIdFromClaims()
-        {
-            string? personIdClaim = User.Claims.FirstOrDefault(c => c.Type == "PersonId")?.Value;
-
-            if (string.IsNullOrWhiteSpace(personIdClaim))
-            {
-                throw new UnauthorizedAccessException("PersonId claim is missing");
-            }
-
-            return int.Parse(personIdClaim);
         }
     }
 }

@@ -54,7 +54,7 @@ export default function useCompetitionPaidTimeStep(options) {
         return aStart.localeCompare(bStart);
       }
 
-      return Number(a.compSlotId || 0) - Number(b.compSlotId || 0);
+      return Number(a.PaidTimeSlotInCompId || 0) - Number(b.PaidTimeSlotInCompId || 0);
     });
   }
 
@@ -115,9 +115,9 @@ export default function useCompetitionPaidTimeStep(options) {
 
       if (editPaidTimeItem) {
         var updateResponse = await updatePaidTimeSlotInCompetition(
-          editPaidTimeItem.compSlotId,
+          editPaidTimeItem.PaidTimeSlotInCompId,
           {
-            compSlotId: editPaidTimeItem.compSlotId,
+            PaidTimeSlotInCompId: editPaidTimeItem.PaidTimeSlotInCompId,
             competitionId: competitionId,
             hostRanchId: currentRanchId,
             paidTimeSlotId: formData.paidTimeSlotId,
@@ -135,7 +135,7 @@ export default function useCompetitionPaidTimeStep(options) {
 
         setPaidTimeSlotsInCompetition(function (prev) {
           var next = prev.map(function (item) {
-            if (item.compSlotId === updatedItem.compSlotId) {
+            if (item.PaidTimeSlotInCompId === updatedItem.PaidTimeSlotInCompId) {
               return updatedItem;
             }
 
@@ -195,7 +195,7 @@ export default function useCompetitionPaidTimeStep(options) {
 
     try {
       await deletePaidTimeSlotInCompetition(
-        item.compSlotId,
+        item.PaidTimeSlotInCompId,
         competitionId,
         currentRanchId,
         false,
@@ -203,7 +203,7 @@ export default function useCompetitionPaidTimeStep(options) {
 
       setPaidTimeSlotsInCompetition(function (prev) {
         return prev.filter(function (currentItem) {
-          return currentItem.compSlotId !== item.compSlotId;
+          return currentItem.PaidTimeSlotInCompId !== item.PaidTimeSlotInCompId;
         });
       });
 

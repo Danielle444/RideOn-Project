@@ -1,0 +1,644 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { getCompetitionInvitationDetails } from "../services/competitionService";
+import { getManagedPayers } from "../services/payerService";
+import {
+  getHorsesForStallBooking,
+  getHorsePayersForCompetition,
+  getStallBookingsForCompetitionAndRanch,
+} from "../services/stallBookingsService";
+import useAdminHorseStallBookings from "./useAdminHorseStallBookings";
+import useAdminTackStallBookings from "./useAdminTackStallBookings";
+
+function normalizeHorseItem(item) {
+  if (!item) {
+    return null;
+  }
+
+  return {
+    horseId: item.horseId || item.HorseId || null,
+    horseName: item.horseName || item.HorseName || "",
+    barnName: item.barnName || item.BarnName || "",
+    federationNumber: item.federationNumber || item.FederationNumber || "",
+  };
+}
+
+function normalizeHorsePayerItem(item) {
+  if (!item) {
+    return null;
+  }
+
+  return {
+    horseId: item.horseId || item.HorseId || null,
+    paidByPersonId: item.paidByPersonId || item.PaidByPersonId || null,
+    payerFullName:
+      item.payerFullName ||
+      item.PayerFullName ||
+      item.fullName ||
+      item.FullName ||
+      (
+        (item.firstName || item.FirstName || "") +
+        " " +
+        (item.lastName || item.LastName || "")
+      ).trim(),
+    billId: item.billId || item.BillId || null,
+  };
+}
+
+function normalizeManagedPayerItem(item) {
+  if (!item) {
+    return null;
+  }
+
+  return {
+    paidByPersonId:
+      item.paidByPersonId ||
+      item.PaidByPersonId ||
+      item.personId ||
+      item.PersonId ||
+      item.payerPersonId ||
+      item.PayerPersonId ||
+      null,
+    payerFullName:
+      item.payerFullName ||
+      item.PayerFullName ||
+      item.fullName ||
+      item.FullName ||
+      (
+        (item.firstName || item.FirstName || "") +
+        " " +
+        (item.lastName || item.LastName || "")
+      ).trim(),
+  };
+}
+
+function normalizePriceCatalogItem(item) {
+  if (!item) {
+    return null;
+  }
+
+  return {
+    priceCatalogId: item.priceCatalogId || item.PriceCatalogId || null,
+    productId: item.productId || item.ProductId || null,
+    itemPrice: Number(item.itemPrice || item.ItemPrice || 0),
+    productName: item.productName || item.ProductName || "",
+    categoryName: item.categoryName || item.CategoryName || "",
+  };
+}
+
+function normalizeDateString(value) {
+  if (!value) {
+    return "";
+  }
+
+  var text = String(value).trim();
+
+  if (!text) {
+    return "";
+  }
+
+  if (text.includes("T")) {
+    return text.split("T")[0];
+  }
+
+  if (text.length >= 10) {
+    return text.slice(0, 10);
+  }
+
+  return text;
+}
+
+function normalizeBoolean(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value === 1;
+  }
+
+  if (typeof value === "string") {
+    var normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "1";
+  }
+
+  return false;
+}
+
+function normalizeExistingStallBooking(item) {
+  if (!item) {
+    return null;
+  }
+
+  var horseId = item.horseId || item.HorseId || item.horseid || null;
+
+  var isForTack = normalizeBoolean(
+    item.isForTack ?? item.IsForTack ?? item.isfortack,
+  );
+
+  return {
+    stallBookingId:
+      item.stallBookingId || item.StallBookingId || item.stallbookingid || null,
+    horseId: horseId,
+    isForTack: isForTack,
+    isTackBooking: isForTack === true || horseId === null,
+    priceCatalogId:
+      Number(item.priceCatalogId || item.PriceCatalogId || 0) || null,
+    startDate: normalizeDateString(
+      item.startDate ||
+        item.StartDate ||
+        item.startdate ||
+        item.startDate ||
+        item.startDate,
+    ),
+    endDate: normalizeDateString(
+      item.endDate ||
+        item.EndDate ||
+        item.enddate ||
+        item.endDate ||
+        item.endDate,
+    ),
+  };
+}
+
+function getServicePriceSectionsFromInvitation(invitationResponse) {
+  return Array.isArray(invitationResponse?.data?.servicePriceSections)
+    ? invitationResponse.data.servicePriceSections
+    : [];
+}
+
+function extractHorseStallPriceItems(sections) {
+  var flatItems = [];
+
+  sections.forEach(function (section) {
+    var categoryName = String(section?.categoryName || "").trim();
+    var items = Array.isArray(section?.items) ? section.items : [];
+
+    items.forEach(function (item) {
+      flatItems.push({
+        categoryName: categoryName,
+        item: item,
+      });
+    });
+  });
+
+  return flatItems
+    .map(function (entry) {
+      var normalized = normalizePriceCatalogItem(entry.item);
+      if (!normalized) {
+        return null;
+      }
+
+      normalized.categoryName = entry.categoryName;
+      return normalized;
+    })
+    .filter(Boolean)
+    .filter(function (item) {
+      var categoryName = String(item.categoryName || "").trim();
+      var productName = String(item.productName || "").trim();
+
+      var mentionsStall =
+        categoryName.includes("תא") ||
+        productName.includes("תא") ||
+        productName.toLowerCase().includes("stall");
+
+      var mentionsTack =
+        categoryName.includes("ציוד") ||
+        productName.includes("ציוד") ||
+        productName.toLowerCase().includes("tack");
+
+      return mentionsStall && !mentionsTack;
+    });
+}
+
+function extractTackStallPriceItems(sections) {
+  var flatItems = [];
+
+  sections.forEach(function (section) {
+    var categoryName = String(section?.categoryName || "").trim();
+    var items = Array.isArray(section?.items) ? section.items : [];
+
+    items.forEach(function (item) {
+      flatItems.push({
+        categoryName: categoryName,
+        item: item,
+      });
+    });
+  });
+
+  return flatItems
+    .map(function (entry) {
+      var normalized = normalizePriceCatalogItem(entry.item);
+      if (!normalized) {
+        return null;
+      }
+
+      normalized.categoryName = entry.categoryName;
+      return normalized;
+    })
+    .filter(Boolean)
+    .filter(function (item) {
+      var categoryName = String(item.categoryName || "").trim();
+      var productName = String(item.productName || "").trim();
+
+      return (
+        categoryName.includes("ציוד") ||
+        productName.includes("ציוד") ||
+        productName.toLowerCase().includes("tack")
+      );
+    });
+}
+
+function formatDateForInput(dateValue) {
+  if (!dateValue) {
+    return "";
+  }
+
+  try {
+    var date = new Date(dateValue);
+
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+
+    var year = date.getFullYear();
+    var month = String(date.getMonth() + 1).padStart(2, "0");
+    var day = String(date.getDate()).padStart(2, "0");
+
+    return year + "-" + month + "-" + day;
+  } catch (error) {
+    return "";
+  }
+}
+
+function formatHorseLabel(item) {
+  if (!item) {
+    return "";
+  }
+
+  var horseName = String(item.horseName || "").trim();
+  var barnName = String(item.barnName || "").trim();
+
+  if (barnName) {
+    return horseName + " (" + barnName + ")";
+  }
+
+  return horseName;
+}
+
+function formatPayerLabel(item) {
+  if (!item) {
+    return "";
+  }
+
+  return String(item.payerFullName || "").trim();
+}
+
+function formatStallTypeLabel(item) {
+  if (!item) {
+    return "";
+  }
+
+  var productName = String(item.productName || "").trim();
+  var price = item.itemPrice ? String(item.itemPrice) + " ₪" : "";
+
+  return [productName, price].filter(Boolean).join(" • ");
+}
+
+function uniqByPersonId(items) {
+  var map = {};
+
+  items.forEach(function (item) {
+    if (item && item.paidByPersonId && !map[item.paidByPersonId]) {
+      map[item.paidByPersonId] = item;
+    }
+  });
+
+  return Object.values(map);
+}
+
+export default function useAdminCompetitionStallBookings(params) {
+  var user = params.user;
+  var activeRole = params.activeRole;
+  var competitionId = params.competitionId;
+  var activeCompetition = params.activeCompetition;
+
+  var [horses, setHorses] = useState([]);
+  var [horsePayers, setHorsePayers] = useState([]);
+  var [managedPayers, setManagedPayers] = useState([]);
+  var [existingStallBookings, setExistingStallBookings] = useState([]);
+  var [horseStallTypeOptions, setHorseStallTypeOptions] = useState([]);
+  var [tackStallTypeOptions, setTackStallTypeOptions] = useState([]);
+
+  var [selectedHorseStallType, setSelectedHorseStallType] = useState(null);
+  var [startDate, setstartDate] = useState("");
+  var [endDate, setendDate] = useState("");
+  var [notes, setNotes] = useState("");
+  var [mode, setMode] = useState("horse");
+  var [loading, setLoading] = useState(false);
+  var [screenError, setScreenError] = useState("");
+  var isActiveTab = params.isActiveTab;
+
+  useEffect(
+    function () {
+      if (isActiveTab) {
+        loadData();
+      }
+    },
+    [isActiveTab, loadData],
+  );
+
+  useEffect(
+    function () {
+      if (!activeCompetition) {
+        return;
+      }
+
+      var defaultStart =
+        activeCompetition.competitionStartDate ||
+        activeCompetition.CompetitionStartDate ||
+        "";
+      var defaultEnd =
+        activeCompetition.competitionEndDate ||
+        activeCompetition.CompetitionEndDate ||
+        "";
+
+      if (!startDate && defaultStart) {
+        setstartDate(formatDateForInput(defaultStart));
+      }
+
+      if (!endDate && defaultEnd) {
+        setendDate(formatDateForInput(defaultEnd));
+      }
+    },
+    [activeCompetition],
+  );
+
+  var loadData = useCallback(
+    async function () {
+      if (!activeRole || !activeRole.ranchId || !competitionId) {
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setScreenError("");
+
+        var results = await Promise.all([
+          getCompetitionInvitationDetails(
+            competitionId,
+            activeRole.roleId,
+            activeRole.ranchId,
+          ),
+          getHorsesForStallBooking(competitionId, activeRole.ranchId),
+          getHorsePayersForCompetition(competitionId, activeRole.ranchId),
+          getManagedPayers(activeRole.ranchId, null, null),
+          getStallBookingsForCompetitionAndRanch(
+            competitionId,
+            activeRole.ranchId,
+          ),
+        ]);
+
+        var invitationResponse = results[0];
+        var horsesResponse = results[1];
+        var horsePayersResponse = results[2];
+        var managedPayersResponse = results[3];
+        var existingBookingsResponse = results[4];
+
+        var sections =
+          getServicePriceSectionsFromInvitation(invitationResponse);
+
+        setHorseStallTypeOptions(extractHorseStallPriceItems(sections));
+        setTackStallTypeOptions(extractTackStallPriceItems(sections));
+
+        setHorses(
+          (Array.isArray(horsesResponse?.data) ? horsesResponse.data : [])
+            .map(function (item) {
+              return normalizeHorseItem(item);
+            })
+            .filter(Boolean),
+        );
+
+        setHorsePayers(
+          (Array.isArray(horsePayersResponse?.data)
+            ? horsePayersResponse.data
+            : []
+          )
+            .map(function (item) {
+              return normalizeHorsePayerItem(item);
+            })
+            .filter(Boolean),
+        );
+
+        setManagedPayers(
+          (Array.isArray(managedPayersResponse?.data)
+            ? managedPayersResponse.data
+            : []
+          )
+            .map(function (item) {
+              return normalizeManagedPayerItem(item);
+            })
+            .filter(Boolean),
+        );
+
+        setExistingStallBookings(
+          (Array.isArray(existingBookingsResponse?.data)
+            ? existingBookingsResponse.data
+            : []
+          )
+            .map(function (item) {
+              return normalizeExistingStallBooking(item);
+            })
+            .filter(Boolean),
+        );
+      } catch (error) {
+        setScreenError(
+          String(error?.response?.data || "אירעה שגיאה בטעינת נתוני התאים"),
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [competitionId, activeRole],
+  );
+
+  useFocusEffect(
+    useCallback(
+      function () {
+        loadData();
+      },
+      [loadData],
+    ),
+  );
+
+  var horseHook = useAdminHorseStallBookings({
+    user: user,
+    activeRole: activeRole,
+    competitionId: competitionId,
+    horses: horses,
+    horsePayers: horsePayers,
+    existingStallBookings: existingStallBookings,
+    selectedHorseStallType: selectedHorseStallType,
+    startDate: startDate,
+    endDate: endDate,
+    notes: notes,
+    reloadStallBookings: loadData,
+  });
+
+  var allSelectedHorsePayers = useMemo(
+    function () {
+      var merged = [];
+
+      horseHook.selectedHorseBookings.forEach(function (booking) {
+        booking.payers.forEach(function (payer) {
+          merged.push(payer);
+        });
+      });
+
+      var existingPayersForExistingHorseBookings = horsePayers.filter(
+        function (payer) {
+          return existingStallBookings.some(function (booking) {
+            return (
+              booking &&
+              !booking.isTackBooking &&
+              booking.horseId === payer.horseId
+            );
+          });
+        },
+      );
+
+      return uniqByPersonId(
+        merged.concat(existingPayersForExistingHorseBookings),
+      );
+    },
+    [horseHook.selectedHorseBookings, horsePayers, existingStallBookings],
+  );
+
+  var tackHook = useAdminTackStallBookings({
+    user: user,
+    activeRole: activeRole,
+    competitionId: competitionId,
+    selectedHorseBookings: horseHook.selectedHorseBookings,
+    existingStallBookings: existingStallBookings,
+    horseStallTypeOptions: horseStallTypeOptions,
+    tackStallTypeOptions: tackStallTypeOptions,
+    selectedHorseStallType: selectedHorseStallType,
+    startDate: startDate,
+    endDate: endDate,
+    allSelectedHorsePayers: allSelectedHorsePayers,
+    reloadStallBookings: loadData,
+  });
+
+  function handleOpenTackMode() {
+    if (!horseHook.hasAnyHorseStallBookingsForCompetition) {
+      return;
+    }
+
+    setMode("tack");
+  }
+
+  function handleBackToHorseMode() {
+    setMode("horse");
+  }
+
+  var bookedHorseNamesSummary = useMemo(
+    function () {
+      var existingHorseNames = existingStallBookings
+        .filter(function (booking) {
+          return booking && !booking.isTackBooking && booking.horseId;
+        })
+        .map(function (booking) {
+          var matchedHorse = horses.find(function (horse) {
+            return horse.horseId === booking.horseId;
+          });
+
+          return matchedHorse ? matchedHorse.horseName : "";
+        })
+        .filter(Boolean);
+
+      var uniqueNames = Array.from(new Set(existingHorseNames));
+
+      if (uniqueNames.length === 0) {
+        return "";
+      }
+
+      return uniqueNames.join(", ");
+    },
+    [existingStallBookings, horses],
+  );
+
+  var existingTackBookingsCount = useMemo(
+    function () {
+      return existingStallBookings.filter(function (booking) {
+        return booking && booking.isTackBooking;
+      }).length;
+    },
+    [existingStallBookings],
+  );
+
+  return {
+    mode: mode,
+    loading: loading,
+    screenError: screenError,
+
+    horseStallTypeOptions: horseStallTypeOptions,
+    tackStallTypeOptions: tackStallTypeOptions,
+
+    selectedHorseStallType: selectedHorseStallType,
+    setSelectedHorseStallType: setSelectedHorseStallType,
+
+    startDate: startDate,
+    setstartDate: setstartDate,
+    endDate: endDate,
+    setendDate: setendDate,
+    notes: notes,
+    setNotes: setNotes,
+
+    selectedHorseToAdd: horseHook.selectedHorseToAdd,
+    setSelectedHorseToAdd: horseHook.setSelectedHorseToAdd,
+    selectedHorseBookings: horseHook.selectedHorseBookings,
+    availableHorseOptions: horseHook.availableHorseOptions,
+    allEligibleHorsesAlreadyBooked: horseHook.allEligibleHorsesAlreadyBooked,
+    hasAnyHorseStallBookingsForCompetition:
+      horseHook.hasAnyHorseStallBookingsForCompetition,
+    getAvailablePayersForHorse: function (horseId) {
+      return horseHook.getAvailablePayersForHorse(horseId, managedPayers);
+    },
+    handleRemoveHorseBooking: horseHook.handleRemoveHorseBooking,
+    toggleHorsePayerSelection: horseHook.toggleHorsePayerSelection,
+    expandedHorseEditorId: horseHook.expandedHorseEditorId,
+    toggleHorseEditor: horseHook.toggleHorseEditor,
+    handleCreateHorseStallBookings: horseHook.handleCreateHorseStallBookings,
+    isSaving: horseHook.isSaving || tackHook.isSavingTack,
+
+    selectedTackStallType: tackHook.selectedTackStallType,
+    setSelectedTackStallType: tackHook.setSelectedTackStallType,
+    tackQuantity: tackHook.tackQuantity,
+    setTackQuantity: tackHook.setTackQuantity,
+    tackSplitMode: tackHook.tackSplitMode,
+    setTackSplitMode: tackHook.setTackSplitMode,
+    selectedTackPayers: tackHook.selectedTackPayers,
+    toggleTackPayerSelection: tackHook.toggleTackPayerSelection,
+    tackNotes: tackHook.tackNotes,
+    setTackNotes: tackHook.setTackNotes,
+    tackStartDate: tackHook.tackStartDate,
+    setTackStartDate: tackHook.setTackStartDate,
+    tackEndDate: tackHook.tackEndDate,
+    setTackEndDate: tackHook.setTackEndDate,
+    effectiveTackPayers: tackHook.effectiveTackPayers,
+    tackPricingSummary: tackHook.tackPricingSummary,
+    allTackTypes: tackHook.allTackTypes,
+    allSelectedHorsePayers: allSelectedHorsePayers,
+
+    handleOpenTackMode: handleOpenTackMode,
+    handleBackToHorseMode: handleBackToHorseMode,
+    handleSubmitTackDraft: tackHook.handleSubmitTackDraft,
+
+    formatHorseLabel: formatHorseLabel,
+    formatPayerLabel: formatPayerLabel,
+    formatStallTypeLabel: formatStallTypeLabel,
+
+    bookedHorseNamesSummary: bookedHorseNamesSummary,
+    existingTackBookingsCount: existingTackBookingsCount,
+  };
+}

@@ -8,7 +8,7 @@
 
         public int OrderedBySystemUserId { get; set; }
 
-        public int CatalogItemId { get; set; }
+        public int PriceCatalogId { get; set; }
 
         public DateTime PRequestDateTime { get; set; }
 

@@ -10,7 +10,7 @@
 
         public int? DurationMinutes { get; set; }
 
-        public int? CatalogItemId { get; set; }
+        public int? PriceCatalogId { get; set; }
         public decimal? ItemPrice { get; set; }
         public DateTime? CreationDate { get; set; }
 

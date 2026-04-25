@@ -8,10 +8,12 @@
 
         public int PaymentMethodId { get; set; }
 
-        public decimal PaymentAmount { get; set; }
+        public decimal AmountPaid { get; set; }  
 
         public DateTime PaymentDate { get; set; }
 
-        public string? Notes { get; set; }
+        public string? TransactionReference { get; set; }  
+
+        public int? EnteredBySystemUserId { get; set; }  
     }
 }

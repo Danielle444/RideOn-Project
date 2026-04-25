@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.ShavingsOrders;
+using RideOnServer.DAL;
 
 namespace RideOnServer.Controllers
 {
@@ -16,8 +17,13 @@ namespace RideOnServer.Controllers
             try
             {
                 int workerSystemUserId = UserAccessValidator.GetPersonIdFromClaims(User);
+
                 var orders = ShavingsOrder.GetWorkerShavingsOrders(workerSystemUserId);
                 return Ok(new { data = orders });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -31,8 +37,20 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                // TODO:
+                // לחזק בהמשך:
+                // לוודא שה-currentPersonId הוא העובד שההזמנה משויכת אליו
+                // או שהוא עובד חווה מורשה להזמנה הזו.
+                // כרגע אין ב-request ranchId ואין כאן בדיקת שיוך להזמנה.
+
                 ShavingsOrder.SaveDeliveryPhoto(request);
                 return Ok(new { message = "התמונה נשמרה בהצלחה" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (ArgumentException ex)
             {
@@ -63,7 +81,7 @@ namespace RideOnServer.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                return Forbid();
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (Exception ex)
             {
@@ -78,10 +96,23 @@ namespace RideOnServer.Controllers
             try
             {
                 int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                // TODO חשוב:
+                // בשביל אבטחה מלאה צריך להוסיף RanchId ל-ApproveDeliveryRequest
+                // ואז לבצע:
+                // UserAccessValidator.EnsureUserHasRoleInRanch(currentPersonId, request.RanchId, RoleNames.HostSecretary);
+                //
+                // כרגע אין RanchId ב-DTO, לכן אי אפשר לבדוק כאן הרשאת חווה בלי SP נוסף
+                // שמחזיר את ranchId לפי shavingsOrderId.
+
                 request.ApprovedByPersonId = currentPersonId;
 
                 ShavingsOrder.ApproveDelivery(request);
                 return Ok(new { message = "המשלוח אושר בהצלחה" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
             catch (ArgumentException ex)
             {
@@ -91,6 +122,183 @@ namespace RideOnServer.Controllers
             {
                 Console.WriteLine($"Error in ApproveDelivery: {ex.Message}");
                 return StatusCode(500, "שגיאה באישור המשלוח");
+            }
+        }
+
+        [HttpPost]
+        public ActionResult<int> CreateShavingsOrder([FromBody] CreateShavingsOrderRequest request)
+        {
+            try
+            {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                if (request.Stalls == null || request.Stalls.Count == 0)
+                {
+                    return BadRequest("At least one stall is required.");
+                }
+
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.RanchAdmin,
+                    RoleNames.HostSecretary
+                );
+
+                // לא סומכים על ה-client.
+                // גם אם הוא שלח OrderedBySystemUserId אחר, אנחנו דורסים אותו לפי הטוקן.
+                request.OrderedBySystemUserId = personId;
+
+                int id = ShavingsOrderDAL.CreateShavingsOrder(request);
+                return Ok(id);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("stall-bookings-for-order")]
+        public IActionResult GetStallBookingsForShavings(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin,
+                    RoleNames.HostSecretary
+                );
+
+                var result = ShavingsOrderDAL.GetStallBookingsForShavings(competitionId, ranchId);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("by-competition-and-ranch")]
+        public IActionResult GetShavingsOrdersForCompetitionAndRanch(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin,
+                    RoleNames.HostSecretary
+                );
+
+                var result = ShavingsOrderDAL.GetShavingsOrdersForCompetitionAndRanch(competitionId, ranchId);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("{shavingsOrderId}/details")]
+        public IActionResult GetShavingsOrderDetails(int shavingsOrderId, [FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin,
+                    RoleNames.HostSecretary
+                );
+
+                var result = ShavingsOrderDAL.GetShavingsOrderDetails(shavingsOrderId);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("{shavingsOrderId}/payers")]
+        public IActionResult GetPayersForShavingsOrder(int shavingsOrderId, [FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin,
+                    RoleNames.HostSecretary
+                );
+
+                var result = ShavingsOrderDAL.GetPayersForShavingsOrder(shavingsOrderId);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("payers/by-competition-and-ranch")]
+        public IActionResult GetAllShavingsOrderPayersForCompetitionAndRanch(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin,
+                    RoleNames.HostSecretary
+                );
+
+                var result = ShavingsOrderDAL.GetAllShavingsOrderPayersForCompetitionAndRanch(competitionId, ranchId);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
             }
         }
     }

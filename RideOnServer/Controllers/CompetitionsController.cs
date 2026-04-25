@@ -7,9 +7,9 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class CompetitionsController : ControllerBase
     {
-        [Authorize]
         [HttpGet("by-host-ranch")]
         public IActionResult GetCompetitionsByHostRanch(
             [FromQuery] int ranchId,
@@ -21,7 +21,7 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -48,17 +48,17 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetCompetitionsByHostRanch: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת תחרויות החווה המארחת");
             }
         }
 
-        [Authorize]
         [HttpGet("{competitionId}")]
         public IActionResult GetCompetitionById(int competitionId, [FromQuery] int ranchId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -86,17 +86,22 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetCompetitionById: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת פרטי התחרות");
             }
         }
 
-        [Authorize]
         [HttpPost]
         public IActionResult CreateCompetition([FromBody] CreateCompetitionRequest request)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -118,22 +123,27 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in CreateCompetition: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת תחרות");
             }
         }
 
-        [Authorize]
         [HttpPut("{competitionId}")]
         public IActionResult UpdateCompetition(int competitionId, [FromBody] UpdateCompetitionRequest request)
         {
             try
             {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 if (competitionId != request.CompetitionId)
                 {
                     return BadRequest("CompetitionId in URL does not match body");
                 }
 
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -159,17 +169,17 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in UpdateCompetition: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון תחרות");
             }
         }
 
-        [Authorize]
         [HttpGet("mobile/admin-board")]
         public IActionResult GetMobileAdminCompetitionsBoard([FromQuery] int ranchId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -186,17 +196,17 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetMobileAdminCompetitionsBoard: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת לוח התחרויות לאדמין");
             }
         }
 
-        [Authorize]
         [HttpGet("mobile/worker-board")]
         public IActionResult GetMobileWorkerCompetitionsBoard([FromQuery] int ranchId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -213,17 +223,17 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetMobileWorkerCompetitionsBoard: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת לוח התחרויות לעובד");
             }
         }
 
-        [Authorize]
         [HttpGet("mobile/payer-board")]
         public IActionResult GetMobilePayerCompetitionsBoard([FromQuery] int ranchId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -240,17 +250,17 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetMobilePayerCompetitionsBoard: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת לוח התחרויות למשלם");
             }
         }
 
-        [Authorize]
         [HttpGet("mobile/admin-home")]
         public IActionResult GetMobileAdminHomeCompetitions([FromQuery] int ranchId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
@@ -267,17 +277,17 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetMobileAdminHomeCompetitions: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת תחרויות הבית לאדמין");
             }
         }
 
-        [Authorize]
         [HttpGet("{competitionId}/invitation")]
         public IActionResult GetCompetitionInvitationDetails(int competitionId)
         {
             try
             {
-                int personId = GetPersonIdFromClaims();
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 Competition? competition = Competition.GetCompetitionById(competitionId);
 
@@ -338,20 +348,9 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetCompetitionInvitationDetails: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת פרטי הזמנת התחרות");
             }
-        }
-
-        private int GetPersonIdFromClaims()
-        {
-            string? personIdClaim = User.Claims.FirstOrDefault(c => c.Type == "PersonId")?.Value;
-
-            if (string.IsNullOrWhiteSpace(personIdClaim))
-            {
-                throw new UnauthorizedAccessException("PersonId claim is missing");
-            }
-
-            return int.Parse(personIdClaim);
         }
     }
 }

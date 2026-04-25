@@ -77,7 +77,7 @@ export default function ServicePriceHistoryModal(props) {
               rows.map(function (item, index) {
                 return (
                   <tr
-                    key={item.catalogItemId}
+                    key={item.priceCatalogId}
                     className={
                       "border-b border-[#F1E8E3] transition-colors " +
                       (item.isActive

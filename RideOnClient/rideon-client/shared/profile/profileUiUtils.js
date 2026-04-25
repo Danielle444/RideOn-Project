@@ -1,4 +1,5 @@
 function getMobileSupportedRoleType(roleName) {
+  //OrenNote -change to - if (["אדמין חווה", "משלם", "עובד חווה"].includes(roleName)) return "mobile";
   if (roleName === "אדמין חווה") {
     return "mobile";
   }
@@ -61,7 +62,7 @@ function buildMobileProfileRows(data) {
 
 function createUserForm(profileSettingsResponse) {
   return {
-    personId: profileSettingsResponse?.userProfile?.personId || 0,
+    personId: profileSettingsResponse?.userProfile?.personId || 0, //OrenNote change to - personId: profileSettingsResponse?.userProfile?.personId ?? 0
     firstName: profileSettingsResponse?.userProfile?.firstName || "",
     lastName: profileSettingsResponse?.userProfile?.lastName || "",
     gender: profileSettingsResponse?.userProfile?.gender || "",

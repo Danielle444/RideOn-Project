@@ -9,39 +9,47 @@ import {
 } from "../../services/stallMapService";
 
 export default function useCompetitionStallsPage(competitionId, ranchId) {
-  const [compounds,    setCompounds]    = useState([]);
-  const [horses,       setHorses]       = useState([]);
-  const [assignments,  setAssignments]  = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [saving,       setSaving]       = useState(false);
-  const [error,        setError]        = useState("");
+  const [compounds, setCompounds] = useState([]);
+  const [horses, setHorses] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [activeCompoundId, setActiveCompoundId] = useState(null);
 
-  const load = useCallback(async function () {
-    if (!competitionId || !ranchId) return;
-    setLoading(true);
-    setError("");
-    try {
-      const [compRes, horseRes, assignRes] = await Promise.all([
-        getCompounds(ranchId),
-        getHorses(competitionId),
-        getAssignments(competitionId),
-      ]);
-      const compoundList = Array.isArray(compRes.data) ? compRes.data : [];
-      setCompounds(compoundList);
-      setHorses(Array.isArray(horseRes.data) ? horseRes.data : []);
-      setAssignments(Array.isArray(assignRes.data) ? assignRes.data : []);
-      if (compoundList.length > 0 && !activeCompoundId) {
-        setActiveCompoundId(compoundList[0].compoundId);
+  const load = useCallback(
+    async function () {
+      if (!competitionId || !ranchId) return;
+      setLoading(true);
+      setError("");
+      try {
+        const [compRes, horseRes, assignRes] = await Promise.all([
+          getCompounds(ranchId),
+          getHorses(competitionId, ranchId),
+          getAssignments(competitionId, ranchId),
+        ]);
+        const compoundList = Array.isArray(compRes.data) ? compRes.data : [];
+        setCompounds(compoundList);
+        setHorses(Array.isArray(horseRes.data) ? horseRes.data : []);
+        setAssignments(Array.isArray(assignRes.data) ? assignRes.data : []);
+        if (compoundList.length > 0 && !activeCompoundId) {
+          setActiveCompoundId(compoundList[0].compoundId);
+        }
+      } catch {
+        setError("שגיאה בטעינת נתוני המפה");
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      setError("שגיאה בטעינת נתוני המפה");
-    } finally {
-      setLoading(false);
-    }
-  }, [competitionId, ranchId]);
+    },
+    [competitionId, ranchId],
+  );
 
-  useEffect(function () { load(); }, [load]);
+  useEffect(
+    function () {
+      load();
+    },
+    [load],
+  );
 
   async function handleLayoutParsed(compound, layout) {
     setSaving(true);
@@ -61,22 +69,39 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
   }
 
   async function handleAssign(cell, horse) {
-    const compound = compounds.find(function (c) { return c.compoundId === activeCompoundId; });
+    const compound = compounds.find(function (c) {
+      return c.compoundId === activeCompoundId;
+    });
     if (!compound) return;
     try {
-      await assignHorse(competitionId, ranchId, compound.compoundId, cell.stallId, horse.horseId);
+      await assignHorse(
+        competitionId,
+        ranchId,
+        compound.compoundId,
+        cell.stallId,
+        horse.horseId,
+      );
       setAssignments(function (prev) {
-        const filtered = prev.filter(function (a) {
-          return !(a.compoundId === compound.compoundId && a.stallId === cell.stallId);
-        }).filter(function (a) { return a.horseId !== horse.horseId; });
-        return [...filtered, {
-          compoundId:  compound.compoundId,
-          stallId:     cell.stallId,
-          stallNumber: cell.stallNumber,
-          horseId:     horse.horseId,
-          horseName:   horse.horseName,
-          barnName:    horse.barnName,
-        }];
+        const filtered = prev
+          .filter(function (a) {
+            return !(
+              a.compoundId === compound.compoundId && a.stallId === cell.stallId
+            );
+          })
+          .filter(function (a) {
+            return a.horseId !== horse.horseId;
+          });
+        return [
+          ...filtered,
+          {
+            compoundId: compound.compoundId,
+            stallId: cell.stallId,
+            stallNumber: cell.stallNumber,
+            horseId: horse.horseId,
+            horseName: horse.horseName,
+            barnName: horse.barnName,
+          },
+        ];
       });
     } catch {
       setError("שגיאה בשיבוץ הסוס");
@@ -84,13 +109,22 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
   }
 
   async function handleUnassign(cell) {
-    const compound = compounds.find(function (c) { return c.compoundId === activeCompoundId; });
+    const compound = compounds.find(function (c) {
+      return c.compoundId === activeCompoundId;
+    });
     if (!compound) return;
     try {
-      await unassignHorse(competitionId, ranchId, compound.compoundId, cell.stallId);
+      await unassignHorse(
+        competitionId,
+        ranchId,
+        compound.compoundId,
+        cell.stallId,
+      );
       setAssignments(function (prev) {
         return prev.filter(function (a) {
-          return !(a.compoundId === compound.compoundId && a.stallId === cell.stallId);
+          return !(
+            a.compoundId === compound.compoundId && a.stallId === cell.stallId
+          );
         });
       });
     } catch {
@@ -98,13 +132,26 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
     }
   }
 
-  const activeCompound = compounds.find(function (c) { return c.compoundId === activeCompoundId; });
-  const activeAssignments = assignments.filter(function (a) { return a.compoundId === activeCompoundId; });
+  const activeCompound = compounds.find(function (c) {
+    return c.compoundId === activeCompoundId;
+  });
+  const activeAssignments = assignments.filter(function (a) {
+    return a.compoundId === activeCompoundId;
+  });
 
   return {
-    compounds, horses, assignments, loading, saving, error,
-    activeCompoundId, setActiveCompoundId,
-    activeCompound, activeAssignments,
-    handleLayoutParsed, handleAssign, handleUnassign,
+    compounds,
+    horses,
+    assignments,
+    loading,
+    saving,
+    error,
+    activeCompoundId,
+    setActiveCompoundId,
+    activeCompound,
+    activeAssignments,
+    handleLayoutParsed,
+    handleAssign,
+    handleUnassign,
   };
 }

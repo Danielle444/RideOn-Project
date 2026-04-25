@@ -19,7 +19,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetAllRanchesNames: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת חוות");
             }
         }
 
@@ -33,7 +34,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetRanchesForRegistration: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת חוות להרשמה");
             }
         }
 
@@ -62,7 +64,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetRanchById: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת פרטי החווה");
             }
         }
 
@@ -70,13 +73,18 @@ namespace RideOnServer.Controllers
         [HttpPut("{ranchId}")]
         public IActionResult UpdateRanchProfile(int ranchId, [FromBody] UpdateRanchProfileRequest request)
         {
-            if (ranchId != request.RanchId)
-            {
-                return BadRequest("RanchId in URL does not match body.");
-            }
-
             try
             {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                if (ranchId != request.RanchId)
+                {
+                    return BadRequest("RanchId in URL does not match body.");
+                }
+
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasAnyRoleInRanch(
@@ -95,7 +103,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in UpdateRanchProfile: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון פרטי החווה");
             }
         }
     }

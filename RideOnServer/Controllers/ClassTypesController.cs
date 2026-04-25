@@ -7,9 +7,9 @@ namespace RideOnServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class ClassTypesController : ControllerBase
     {
-        [Authorize]
         [HttpGet]
         public IActionResult GetAll([FromQuery] byte? fieldId = null)
         {
@@ -28,7 +28,11 @@ namespace RideOnServer.Controllers
 
                 bool hasSecretaryRole = approvedRoles.Any(item =>
                     !string.IsNullOrWhiteSpace(item.RoleName) &&
-                    item.RoleName.Trim().Equals(RoleNames.HostSecretary, StringComparison.OrdinalIgnoreCase));
+                    item.RoleName.Trim().Equals(
+                        RoleNames.HostSecretary,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
 
                 if (!hasSecretaryRole)
                 {
@@ -44,16 +48,21 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetAll ClassTypes: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת סוגי מקצים");
             }
         }
 
-        [Authorize]
         [HttpPost]
         public IActionResult Create([FromBody] ClassType classType)
         {
             try
             {
+                if (classType == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 if (!UserAccessValidator.IsSuperUser(User))
                 {
                     int personId = UserAccessValidator.GetPersonIdFromClaims(User);
@@ -63,7 +72,11 @@ namespace RideOnServer.Controllers
 
                     bool hasSecretaryRole = approvedRoles.Any(item =>
                         !string.IsNullOrWhiteSpace(item.RoleName) &&
-                        item.RoleName.Trim().Equals(RoleNames.HostSecretary, StringComparison.OrdinalIgnoreCase));
+                        item.RoleName.Trim().Equals(
+                            RoleNames.HostSecretary,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                    );
 
                     if (!hasSecretaryRole)
                     {
@@ -86,16 +99,21 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Create ClassType: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת סוג מקצה");
             }
         }
 
-        [Authorize]
         [HttpPut]
         public IActionResult Update([FromBody] ClassType classType)
         {
             try
             {
+                if (classType == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 UserAccessValidator.EnsureSuperUser(User);
 
                 ClassType.UpdateClassType(
@@ -114,11 +132,11 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Update ClassType: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון סוג מקצה");
             }
         }
 
-        [Authorize]
         [HttpDelete("{id}")]
         public IActionResult Delete(short id)
         {
@@ -135,7 +153,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in Delete ClassType: {ex.Message}");
+                return BadRequest("אירעה שגיאה במחיקת סוג מקצה");
             }
         }
     }

@@ -30,7 +30,6 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin
                 );
 
-                // שליפת שם החווה לשימוש במייל
                 string ranchName = UserAccessValidator.GetRanchNameFromClaims(User, request.RanchId);
 
                 int newPersonId = Payer.CreatePayerWithCredentials(request, ranchName, _configuration);
@@ -47,7 +46,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in CreatePayerWithCredentials: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת משלם");
             }
         }
 
@@ -56,12 +56,19 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 var list = Payer.GetPendingPayerRegistrations();
                 return Ok(list);
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetPendingPayerRegistrations: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת הרשמות משלמים ממתינות");
             }
         }
 
@@ -70,12 +77,19 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 Payer.ApprovePendingPayer(request);
                 return Ok(new { message = "המשלם אושר בהצלחה" });
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in ApprovePayerRegistration: {ex.Message}");
+                return BadRequest("אירעה שגיאה באישור המשלם");
             }
         }
 
@@ -84,12 +98,19 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                UserAccessValidator.EnsureSuperUser(User);
+
                 Payer.RejectPendingPayer(request);
                 return Ok(new { message = "המשלם נדחה" });
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in RejectPayerRegistration: {ex.Message}");
+                return BadRequest("אירעה שגיאה בדחיית המשלם");
             }
         }
 
@@ -127,15 +148,16 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetManagedPayers: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת משלמים");
             }
         }
 
         [HttpGet("lookup")]
         public IActionResult FindPotentialPayerByContact(
-    [FromQuery] int ranchId,
-    [FromQuery] string? email,
-    [FromQuery] string? cellPhone)
+            [FromQuery] int ranchId,
+            [FromQuery] string? email,
+            [FromQuery] string? cellPhone)
         {
             try
             {
@@ -158,7 +180,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in FindPotentialPayerByContact: {ex.Message}");
+                return BadRequest("אירעה שגיאה בחיפוש משלם");
             }
         }
 
@@ -189,7 +212,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in RequestManagedPayer: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת בקשת ניהול משלם");
             }
         }
 
@@ -220,7 +244,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in UpdateManagedPayer: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון משלם");
             }
         }
 
@@ -246,16 +271,16 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in RemoveManagedPayer: {ex.Message}");
+                return BadRequest("אירעה שגיאה בהסרת משלם מנוהל");
             }
         }
 
-
         [HttpGet("competition")]
         public IActionResult GetCompetitionPayers(
-                [FromQuery] int ranchId,
-                [FromQuery] int competitionId,
-                [FromQuery] string? search)
+            [FromQuery] int ranchId,
+            [FromQuery] int competitionId,
+            [FromQuery] string? search)
         {
             try
             {
@@ -267,9 +292,10 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin
                 );
 
-                GetCompetitionPayersFiltersRequest filters = new GetCompetitionPayersFiltersRequest
+                var filters = new GetCompetitionPayersFiltersRequest
                 {
                     CompetitionId = competitionId,
+                    RanchId = ranchId,
                     SearchText = search
                 };
 
@@ -284,10 +310,10 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetCompetitionPayers: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת משלמי התחרות");
             }
         }
-
 
         [HttpGet("{personId}/managers")]
         public IActionResult GetPayerManagers(int personId)
@@ -310,7 +336,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetPayerManagers: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת מנהלי המשלם");
             }
         }
 
@@ -337,7 +364,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in GetAvailablePayerManagers: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת מנהלים זמינים");
             }
         }
 
@@ -353,6 +381,11 @@ namespace RideOnServer.Controllers
 
                 int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
+                if (currentPersonId != personId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה להוסיף מנהל עבור משלם אחר");
+                }
+
                 Payer.AddPayerManager(currentPersonId, request);
                 return Ok("Managing admin added successfully");
             }
@@ -362,7 +395,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in AddPayerManager: {ex.Message}");
+                return BadRequest("אירעה שגיאה בהוספת מנהל למשלם");
             }
         }
 
@@ -378,6 +412,11 @@ namespace RideOnServer.Controllers
 
                 int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
+                if (currentPersonId != personId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה להסיר מנהל עבור משלם אחר");
+                }
+
                 Payer.RemovePayerManager(currentPersonId, request);
                 return Ok("Managing admin removed successfully");
             }
@@ -387,10 +426,9 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"Error in RemovePayerManager: {ex.Message}");
+                return BadRequest("אירעה שגיאה בהסרת מנהל ממשלם");
             }
         }
-
-
     }
 }

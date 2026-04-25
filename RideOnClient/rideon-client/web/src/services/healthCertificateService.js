@@ -8,17 +8,20 @@ function getAuthHeaders() {
   return { headers: { Authorization: `Bearer ${token}` } };
 }
 
-function getHealthCertificates(competitionId) {
+function getHealthCertificates(competitionId, ranchId) {
   return axios.get(`${API}/Horses/health-certificates`, {
     ...getAuthHeaders(),
-    params: { competitionId },
+    params: {
+      competitionId,
+      ranchId,
+    },
   });
 }
 
-function approveHealthCertificate(horseId, competitionId) {
+function approveHealthCertificate(horseId, competitionId, ranchId) {
   return axios.post(
     `${API}/Horses/health-certificates/approve`,
-    { horseId, competitionId },
+    { horseId, competitionId, ranchId },
     getAuthHeaders()
   );
 }
