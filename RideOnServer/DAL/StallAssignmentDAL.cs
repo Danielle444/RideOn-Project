@@ -32,6 +32,13 @@ namespace RideOnServer.DAL
 
         public void SaveCompoundLayout(int ranchId, short compoundId, string layoutJson)
         {
+            var paramDic = new Dictionary<string, object?>
+            {
+                { "@RanchId", ranchId },
+                { "@CompoundId", compoundId },
+                { "@LayoutJson", layoutJson }
+            };
+
             try
             {
                 using var connection = Connect("DefaultConnection");
@@ -40,12 +47,8 @@ namespace RideOnServer.DAL
                 using var command = CreateCommandWithStoredProcedure(
                     "usp_SaveCompoundLayout",
                     connection,
-                    null
+                    paramDic
                 );
-
-                command.Parameters.AddWithValue("@RanchId", ranchId);
-                command.Parameters.AddWithValue("@CompoundId", compoundId);
-                command.Parameters.AddWithValue("@Layout", NpgsqlDbType.Jsonb, layoutJson);
 
                 command.ExecuteNonQuery();
             }
