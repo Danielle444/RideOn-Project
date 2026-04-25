@@ -7,13 +7,13 @@ export default function StallCell({ cell, assignment, onUnassign }) {
   const { setNodeRef, isOver } = useDroppable({
     id: droppableId,
     data: { cell },
-    disabled: cell.isEntrance || cell.stallNumber === null,
+    disabled: cell.isEntrance || cell.stallNumber === null || !cell.stallId,
   });
 
   if (cell.isEntrance) {
     return (
-      <div className="flex items-center justify-center rounded-lg bg-[#F3ECE8] border border-dashed border-[#BCAAA4] h-full">
-        <DoorOpen size={16} className="text-[#8D6E63]" />
+      <div className="flex h-full items-center justify-center rounded-md border border-dashed border-[#BCAAA4] bg-[#F3ECE8]">
+        <DoorOpen size={13} className="text-[#8D6E63]" />
       </div>
     );
   }
@@ -28,33 +28,38 @@ export default function StallCell({ cell, assignment, onUnassign }) {
     <div
       ref={setNodeRef}
       className={[
-        "relative flex flex-col items-center justify-center rounded-xl border-2 h-full min-h-[60px] transition-all select-none",
+        "relative flex h-full min-h-[42px] select-none flex-col items-center justify-center rounded-lg border transition-all",
         isOver
-          ? "border-[#795548] bg-[#F5EDE8] scale-105"
+          ? "scale-105 border-[#795548] bg-[#F5EDE8]"
           : isOccupied
-          ? "border-[#A5836A] bg-[#EFEBE9]"
-          : "border-[#D7CCC8] bg-white hover:border-[#BCAAA4]",
+            ? "border-[#A5836A] bg-[#EFEBE9]"
+            : cell.stallId
+              ? "border-[#D7CCC8] bg-white hover:border-[#BCAAA4]"
+              : "border-red-200 bg-red-50",
       ].join(" ")}
     >
-      <span className="text-[10px] font-bold text-[#8D6E63] absolute top-1 right-2">
+      <span className="absolute right-1 top-0.5 text-[9px] font-bold text-[#8D6E63]">
         {cell.stallNumber}
       </span>
 
       {isOccupied ? (
         <>
-          <span className="text-xs font-semibold text-[#3F312B] text-center px-1 leading-tight mt-2">
+          <span className="mt-2 max-w-full truncate px-0.5 text-center text-[9px] font-semibold leading-tight text-[#3F312B]">
             {assignment.barnName || assignment.horseName}
           </span>
+
           <button
             type="button"
-            onClick={function () { onUnassign && onUnassign(cell); }}
-            className="absolute top-1 left-1 w-4 h-4 rounded-full bg-red-100 text-red-400 hover:bg-red-200 flex items-center justify-center"
+            onClick={function () {
+              if (onUnassign) onUnassign(cell);
+            }}
+            className="absolute left-0.5 top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-100 text-red-400 hover:bg-red-200"
           >
-            <X size={10} />
+            <X size={9} />
           </button>
         </>
       ) : (
-        <span className="text-[10px] text-[#BCAAA4] mt-2">ריק</span>
+        <span className="mt-2 text-[9px] text-[#BCAAA4]">ריק</span>
       )}
     </div>
   );
