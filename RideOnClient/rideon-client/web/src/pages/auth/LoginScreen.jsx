@@ -26,6 +26,7 @@ export default function LoginScreen() {
 
     return "/superuser/requests";
   }
+  //OrenNoteToFix - This is the third time we have seen this exact function! As discussed in the previous file, you should definitely pull this out into shared/auth/utils/authNavigation.js and import it here.
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -187,14 +188,14 @@ export default function LoginScreen() {
         {!isSuperUserMode && (
           <p className="mt-6 text-center text-sm text-[#6D4C41]">
             אין לך חשבון?{" "}
-            <span
+            <Link
               onClick={function () {
                 navigate("/register");
               }}
               className="cursor-pointer font-semibold text-[#795548] hover:underline"
             >
               להרשמה
-            </span>
+            </Link>
           </p>
         )}
 
