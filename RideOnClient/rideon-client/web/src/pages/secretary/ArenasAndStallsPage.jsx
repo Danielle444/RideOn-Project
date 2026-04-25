@@ -138,9 +138,9 @@ export default function ArenasAndStallsPage() {
       />
 
       <ToastMessage
-        isOpen={page.toast.isOpen}
-        type={page.toast.type}
-        message={page.toast.message}
+        isOpen={page.toast?.isOpen || false}
+        type={page.toast?.type || "success"}
+        message={page.toast?.message || ""}
         onClose={page.closeToast}
       />
     </SecretaryLayout>

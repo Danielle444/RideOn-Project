@@ -17,7 +17,13 @@ export default function StallMapGrid({
   const layout = compound.layout;
 
   const cellMap = {};
-  layout.cells.forEach(function (cell) {
+  const safeCells = Array.isArray(layout.cells)
+    ? layout.cells.filter(function (cell) {
+        return cell && cell.row !== undefined && cell.col !== undefined;
+      })
+    : [];
+
+  safeCells.forEach(function (cell) {
     cellMap[`${cell.row}-${cell.col}`] = cell;
   });
 
@@ -37,7 +43,7 @@ export default function StallMapGrid({
   const occupiedCols = new Set();
   const occupiedRows = new Set();
 
-  layout.cells.forEach(function (cell) {
+  safeCells.forEach(function (cell) {
     if (cell.stallNumber || cell.isEntrance) {
       occupiedCols.add(cell.col);
       occupiedRows.add(cell.row);
