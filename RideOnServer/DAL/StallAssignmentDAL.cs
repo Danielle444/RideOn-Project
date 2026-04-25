@@ -1,4 +1,5 @@
 using Npgsql;
+using NpgsqlTypes;
 using RideOnServer.BL.DTOs.StallMap;
 
 namespace RideOnServer.DAL
@@ -31,29 +32,36 @@ namespace RideOnServer.DAL
 
         public void SaveCompoundLayout(int ranchId, short compoundId, string layoutJson)
         {
-            var paramDic = new Dictionary<string, object>
-            {
-                { "@RanchId",    ranchId    },
-                { "@CompoundId", compoundId },
-                { "@Layout",     layoutJson }
-            };
             try
             {
                 using var connection = Connect("DefaultConnection");
                 connection.Open();
-                using var command = CreateCommandWithStoredProcedure("usp_SaveCompoundLayout", connection, paramDic);
+
+                using var command = CreateCommandWithStoredProcedure(
+                    "usp_SaveCompoundLayout",
+                    connection,
+                    null
+                );
+
+                command.Parameters.AddWithValue("@RanchId", ranchId);
+                command.Parameters.AddWithValue("@CompoundId", compoundId);
+                command.Parameters.AddWithValue("@Layout", NpgsqlDbType.Jsonb, layoutJson);
+
                 command.ExecuteNonQuery();
             }
-            catch (NpgsqlException ex) { throw new Exception($"Database error: {ex.Message}"); }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
         }
 
         public List<HorseForMapDto> GetHorsesForCompetition(int competitionId, int ranchId)
         {
             var paramDic = new Dictionary<string, object>
-    {
-        { "@CompetitionId", competitionId },
-        { "@RanchId", ranchId }
-    };
+            {
+                { "@CompetitionId", competitionId },
+                { "@RanchId", ranchId }
+            };
 
             try
             {
