@@ -1,8 +1,9 @@
-import { Pencil, Trash2, Upload } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import DataTableShell from "../../common/table/DataTableShell";
 import DataTableEmptyState from "../../common/table/DataTableEmptyState";
 import DataTableLoadingState from "../../common/table/DataTableLoadingState";
 import TableActionButton from "../../common/table/TableActionButton";
+import StallMapUploader from "../stall-map/StallMapUploader";
 
 export default function StallCompoundsTable(props) {
   const rows = Array.isArray(props.items) ? props.items : [];
@@ -23,11 +24,11 @@ export default function StallCompoundsTable(props) {
       <DataTableShell widthMode="full">
         <thead className="bg-[#FAF7F5]">
           <tr className="border-b border-[#E8DDD6] text-sm text-[#6A5248]">
-            <th className="px-5 py-4 font-bold text-right">שם מתחם</th>
-            <th className="px-5 py-4 font-bold text-center">סוג תאים</th>
-            <th className="px-5 py-4 font-bold text-center">כמות</th>
-            <th className="px-5 py-4 font-bold text-center">קובץ אקסל</th>
-            <th className="px-5 py-4 font-bold text-center">פעולות</th>
+            <th className="px-5 py-4 text-right font-bold">שם מתחם</th>
+            <th className="px-5 py-4 text-center font-bold">סוג תאים</th>
+            <th className="px-5 py-4 text-center font-bold">כמות</th>
+            <th className="px-5 py-4 text-center font-bold">פריסה</th>
+            <th className="px-5 py-4 text-center font-bold">פעולות</th>
           </tr>
         </thead>
 
@@ -59,16 +60,27 @@ export default function StallCompoundsTable(props) {
                   <td className="px-5 py-5 text-center">{item.stallCount}</td>
 
                   <td className="px-5 py-5 text-center">
-                    <button
-                      type="button"
-                      onClick={function () {
-                        props.onExcelPlaceholder(item);
-                      }}
-                      className="inline-flex items-center gap-2 text-[#8B6352] hover:text-[#704D40]"
-                    >
-                      <Upload size={16} />
-                      העלאת קובץ
-                    </button>
+                    <div className="flex flex-col items-center gap-1">
+                      <StallMapUploader
+                        compound={item}
+                        buttonLabel={
+                          item.layoutJson ? "החלפת פריסה" : "העלאת פריסה"
+                        }
+                        onLayoutParsed={function (layout) {
+                          props.onLayoutParsed(item, layout);
+                        }}
+                      />
+
+                      {item.layoutJson ? (
+                        <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
+                          פריסה קיימת
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-[#F3EEEA] px-2 py-0.5 text-xs font-semibold text-[#8A7268]">
+                          אין פריסה
+                        </span>
+                      )}
+                    </div>
                   </td>
 
                   <td className="px-5 py-5">

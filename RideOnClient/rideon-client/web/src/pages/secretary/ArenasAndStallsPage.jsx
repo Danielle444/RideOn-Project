@@ -100,15 +100,10 @@ export default function ArenasAndStallsPage() {
               <StallCompoundsTable
                 items={page.compounds}
                 loading={page.loadingCompounds}
-                onCreate={page.openCreateCompound}
-                onEdit={page.openEditCompound}
-                onDelete={page.handleCompoundDelete}
-                onExcelPlaceholder={function () {
-                  page.closeToast();
-                  setTimeout(function () {
-                    page.closeToast();
-                  }, 0);
-                }}
+                onCreate={function () {}}
+                onEdit={function () {}}
+                onDelete={function () {}}
+                onLayoutParsed={page.handleCompoundLayoutParsed}
               />
             )}
           </div>
