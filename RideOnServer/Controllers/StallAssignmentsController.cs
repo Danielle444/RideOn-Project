@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
-using RideOnServer.BL.DTOs.StallAssignments;
 using RideOnServer.BL.DTOs.StallMap;
+using RideOnServer.DAL;
 
 namespace RideOnServer.Controllers
 {
@@ -12,7 +12,7 @@ namespace RideOnServer.Controllers
     public class StallAssignmentsController : ControllerBase
     {
         [HttpGet("compounds")]
-        public IActionResult GetCompoundsWithLayout([FromQuery] int ranchId)
+        public IActionResult GetCompounds([FromQuery] int ranchId)
         {
             try
             {
@@ -24,8 +24,8 @@ namespace RideOnServer.Controllers
                     RoleNames.HostSecretary
                 );
 
-                var result = StallAssignment.GetCompoundsWithLayout(ranchId);
-                return Ok(result);
+                var dal = new StallAssignmentDAL();
+                return Ok(dal.GetCompoundsWithLayout(ranchId));
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -33,13 +33,13 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in GetCompoundsWithLayout: {ex.Message}");
+                Console.WriteLine($"Error in GetCompounds: {ex.Message}");
                 return BadRequest("אירעה שגיאה בשליפת מתחמי התאים");
             }
         }
 
         [HttpGet("horses")]
-        public IActionResult GetHorsesForAssignment(
+        public IActionResult GetHorses(
             [FromQuery] int competitionId,
             [FromQuery] int ranchId)
         {
@@ -53,8 +53,8 @@ namespace RideOnServer.Controllers
                     RoleNames.HostSecretary
                 );
 
-                var result = StallAssignment.GetHorsesForAssignment(competitionId);
-                return Ok(result);
+                var dal = new StallAssignmentDAL();
+                return Ok(dal.GetHorsesForCompetition(competitionId));
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -62,8 +62,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in GetHorsesForAssignment: {ex.Message}");
-                return BadRequest("אירעה שגיאה בשליפת סוסים לשיבוץ");
+                Console.WriteLine($"Error in GetHorses: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת הסוסים לתחרות");
             }
         }
 
@@ -82,8 +82,8 @@ namespace RideOnServer.Controllers
                     RoleNames.HostSecretary
                 );
 
-                var result = StallAssignment.GetAssignments(competitionId);
-                return Ok(result);
+                var dal = new StallAssignmentDAL();
+                return Ok(dal.GetAssignments(competitionId));
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -92,12 +92,12 @@ namespace RideOnServer.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in GetAssignments: {ex.Message}");
-                return BadRequest("אירעה שגיאה בשליפת שיבוצי תאים");
+                return BadRequest("אירעה שגיאה בשליפת שיבוצי התאים");
             }
         }
 
         [HttpPost]
-        public IActionResult AssignStall([FromBody] AssignStallRequest request)
+        public IActionResult Assign([FromBody] StallAssignmentRequest request)
         {
             try
             {
@@ -114,8 +114,17 @@ namespace RideOnServer.Controllers
                     RoleNames.HostSecretary
                 );
 
-                StallAssignment.AssignStall(request);
-                return Ok("Stall assigned successfully");
+                var dal = new StallAssignmentDAL();
+
+                dal.AssignHorse(
+                    request.CompetitionId,
+                    request.RanchId,
+                    request.CompoundId,
+                    request.StallId,
+                    request.HorseId
+                );
+
+                return Ok("Assigned");
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -123,13 +132,13 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in AssignStall: {ex.Message}");
-                return BadRequest("אירעה שגיאה בשיבוץ תא");
+                Console.WriteLine($"Error in Assign: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשיבוץ הסוס לתא");
             }
         }
 
         [HttpDelete]
-        public IActionResult UnassignStall([FromBody] UnassignStallRequest request)
+        public IActionResult Unassign([FromBody] UnassignStallRequest request)
         {
             try
             {
@@ -146,8 +155,16 @@ namespace RideOnServer.Controllers
                     RoleNames.HostSecretary
                 );
 
-                StallAssignment.UnassignStall(request);
-                return Ok("Stall unassigned successfully");
+                var dal = new StallAssignmentDAL();
+
+                dal.UnassignHorse(
+                    request.CompetitionId,
+                    request.RanchId,
+                    request.CompoundId,
+                    request.StallId
+                );
+
+                return Ok("Unassigned");
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -155,8 +172,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in UnassignStall: {ex.Message}");
-                return BadRequest("אירעה שגיאה בהסרת שיבוץ תא");
+                Console.WriteLine($"Error in Unassign: {ex.Message}");
+                return BadRequest("אירעה שגיאה בביטול שיבוץ התא");
             }
         }
     }
