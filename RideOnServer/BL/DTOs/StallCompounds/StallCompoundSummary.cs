@@ -8,5 +8,6 @@
         public short StallTypeProductId { get; set; }
         public string StallTypeName { get; set; } = string.Empty;
         public int StallCount { get; set; }
+        public string? LayoutJson { get; set; }
     }
 }

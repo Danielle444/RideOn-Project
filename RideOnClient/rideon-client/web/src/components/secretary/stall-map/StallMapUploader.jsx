@@ -5,12 +5,18 @@ import { Upload } from "lucide-react";
 function cellAddressToRowCol(address) {
   const match = address.match(/^([A-Z]+)(\d+)$/);
   if (!match) return null;
-  const col = match[1].split("").reduce((acc, c) => acc * 26 + c.charCodeAt(0) - 64, 0) - 1;
+  const col =
+    match[1].split("").reduce((acc, c) => acc * 26 + c.charCodeAt(0) - 64, 0) -
+    1;
   const row = parseInt(match[2], 10) - 1;
   return { row, col };
 }
 
-export default function StallMapUploader({ compound, onLayoutParsed }) {
+export default function StallMapUploader({
+  compound,
+  onLayoutParsed,
+  buttonLabel,
+}) {
   const inputRef = useRef(null);
 
   function handleFile(e) {
@@ -38,7 +44,8 @@ export default function StallMapUploader({ compound, onLayoutParsed }) {
           const value = cell.v != null ? String(cell.v).trim() : "";
           if (!value) return;
 
-          const isEntrance = value === "X" || value === "כניסה" || value === "entrance";
+          const isEntrance =
+            value === "X" || value === "כניסה" || value === "entrance";
           const isStall = !isEntrance && value !== "";
 
           cells.push({
@@ -80,11 +87,13 @@ export default function StallMapUploader({ compound, onLayoutParsed }) {
       />
       <button
         type="button"
-        onClick={function () { inputRef.current.click(); }}
+        onClick={function () {
+          inputRef.current.click();
+        }}
         className="inline-flex items-center gap-2 rounded-2xl border border-[#D7CCC8] bg-white px-4 py-2 text-sm font-semibold text-[#5D4037] hover:bg-[#FAF5F1] transition-colors"
       >
         <Upload size={15} />
-        העלאת פריסת Excel
+        {buttonLabel || "העלאת פריסת Excel"}
       </button>
     </div>
   );

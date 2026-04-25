@@ -32,7 +32,8 @@ namespace RideOnServer.DAL
                                 CompoundName = reader["CompoundName"].ToString() ?? string.Empty,
                                 StallTypeProductId = Convert.ToInt16(reader["StallTypeProductId"]),
                                 StallTypeName = reader["StallTypeName"].ToString() ?? string.Empty,
-                                StallCount = Convert.ToInt32(reader["StallCount"])
+                                StallCount = Convert.ToInt32(reader["StallCount"]),
+                                LayoutJson = reader["layout"] == DBNull.Value ? null : reader["layout"].ToString()
                             });
                         }
 
