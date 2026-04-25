@@ -115,6 +115,7 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
+  //OrenNoteFuture - Refactor Competition Pages to React Router Nested Routes
   {
     path: "/competitions/:competitionId",
     element: <Navigate to="summary" replace />,
@@ -306,6 +307,10 @@ const router = createBrowserRouter([
     path: "/unauthorized",
     element: <UnauthorizedPage />,
   },
+  {
+  path: "*",
+  element: <div>Page Not Found</div> // Or a custom NotFoundPage component
+  }
 ]);
 
 export default router;
