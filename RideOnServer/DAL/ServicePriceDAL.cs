@@ -243,7 +243,7 @@ namespace RideOnServer.DAL
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
-                { "@priceCatalogId", PriceCatalogId },
+                { "@priceCatalogId", priceCatalogId },
                 { "@RanchId", ranchId }
             };
 
