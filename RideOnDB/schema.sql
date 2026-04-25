@@ -5,8 +5,8 @@ CREATE TABLE public.arena (
   ranchid integer NOT NULL,
   arenaid smallint NOT NULL,
   arenaname character varying NOT NULL,
-  arenalength smallint,
-  arenawidth smallint,
+  arenalength smallint CHECK (arenalength > 0),
+  arenawidth smallint CHECK (arenawidth > 0),
   iscovered boolean,
   CONSTRAINT arena_pkey PRIMARY KEY (ranchid, arenaid),
   CONSTRAINT fk_arena_ranch FOREIGN KEY (ranchid) REFERENCES public.ranch(ranchid)
@@ -14,7 +14,7 @@ CREATE TABLE public.arena (
 CREATE TABLE public.bill (
   billid integer GENERATED ALWAYS AS IDENTITY NOT NULL,
   paidbypersonid integer NOT NULL,
-  amounttopay numeric NOT NULL,
+  amounttopay numeric NOT NULL CHECK (amounttopay >= 0::numeric),
   dateopened timestamp with time zone NOT NULL,
   dateclosed timestamp with time zone,
   CONSTRAINT bill_pkey PRIMARY KEY (billid),
@@ -24,9 +24,22 @@ CREATE TABLE public.billproductrequest (
   billid integer NOT NULL,
   prequestid integer NOT NULL,
   paymentid integer,
+  amounttopay numeric NOT NULL CHECK (amounttopay >= 0::numeric),
   CONSTRAINT billproductrequest_pkey PRIMARY KEY (billid, prequestid),
   CONSTRAINT billproductrequest_billid_fkey FOREIGN KEY (billid) REFERENCES public.bill(billid),
-  CONSTRAINT billproductrequest_prequestid_fkey FOREIGN KEY (prequestid) REFERENCES public.productrequest(prequestid)
+  CONSTRAINT billproductrequest_prequestid_fkey FOREIGN KEY (prequestid) REFERENCES public.productrequest(prequestid),
+  CONSTRAINT fk_billproductrequest_payment FOREIGN KEY (paymentid) REFERENCES public.payment(paymentid)
+);
+CREATE TABLE public.changeentryrequest (
+  changeentryrequestid integer NOT NULL DEFAULT nextval('changeentryrequest_changeentryrequestid_seq'::regclass),
+  originalentryid integer NOT NULL,
+  newentryid integer,
+  requestdatetime timestamp with time zone NOT NULL,
+  status character varying NOT NULL DEFAULT 'Pending'::character varying CHECK (status::text = ANY (ARRAY['Pending'::character varying, 'Approved'::character varying, 'Rejected'::character varying]::text[])),
+  iscancelled boolean NOT NULL DEFAULT false,
+  CONSTRAINT changeentryrequest_pkey PRIMARY KEY (changeentryrequestid),
+  CONSTRAINT fk_changeentryrequest_originalentry FOREIGN KEY (originalentryid) REFERENCES public.entry(entryid),
+  CONSTRAINT fk_changeentryrequest_newentry FOREIGN KEY (newentryid) REFERENCES public.entry(entryid)
 );
 CREATE TABLE public.classincompetition (
   classincompid integer GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -35,13 +48,18 @@ CREATE TABLE public.classincompetition (
   arenaranchid integer NOT NULL,
   arenaid smallint NOT NULL,
   classdatetime timestamp with time zone,
-  organizercost numeric,
-  federationcost numeric,
+  organizercost numeric CHECK (organizercost IS NULL OR organizercost >= 0::numeric),
+  federationcost numeric CHECK (federationcost IS NULL OR federationcost >= 0::numeric),
   classnotes character varying,
   starttime time without time zone,
   orderinday smallint,
   CONSTRAINT classincompetition_pkey PRIMARY KEY (classincompid),
-  CONSTRAINT fk_classincompetition_competition FOREIGN KEY (competitionid) REFERENCES public.competition(competitionid)
+  CONSTRAINT fk_classincompetition_competition FOREIGN KEY (competitionid) REFERENCES public.competition(competitionid),
+  CONSTRAINT fk_classincompetition_classtype FOREIGN KEY (classtypeid) REFERENCES public.classtype(classtypeid),
+  CONSTRAINT fk_classincompetition_arena FOREIGN KEY (arenaranchid) REFERENCES public.arena(ranchid),
+  CONSTRAINT fk_classincompetition_arena FOREIGN KEY (arenaid) REFERENCES public.arena(ranchid),
+  CONSTRAINT fk_classincompetition_arena FOREIGN KEY (arenaranchid) REFERENCES public.arena(arenaid),
+  CONSTRAINT fk_classincompetition_arena FOREIGN KEY (arenaid) REFERENCES public.arena(arenaid)
 );
 CREATE TABLE public.classjudge (
   classincompid integer NOT NULL,
@@ -53,7 +71,7 @@ CREATE TABLE public.classjudge (
 CREATE TABLE public.classprize (
   classincompid integer NOT NULL,
   prizetypeid smallint NOT NULL,
-  prizeamount numeric NOT NULL,
+  prizeamount numeric NOT NULL CHECK (prizeamount IS NULL OR prizeamount >= 0::numeric),
   CONSTRAINT classprize_pkey PRIMARY KEY (classincompid, prizetypeid),
   CONSTRAINT fk_classprize_classincompetition FOREIGN KEY (classincompid) REFERENCES public.classincompetition(classincompid),
   CONSTRAINT fk_classprize_prizetype FOREIGN KEY (prizetypeid) REFERENCES public.prizetype(prizetypeid)
@@ -84,7 +102,24 @@ CREATE TABLE public.competition (
   stallmapurl character varying,
   CONSTRAINT competition_pkey PRIMARY KEY (competitionid),
   CONSTRAINT fk_competition_ranch FOREIGN KEY (hostranchid) REFERENCES public.ranch(ranchid),
-  CONSTRAINT fk_competition_field FOREIGN KEY (fieldid) REFERENCES public.field(fieldid)
+  CONSTRAINT fk_competition_field FOREIGN KEY (fieldid) REFERENCES public.field(fieldid),
+  CONSTRAINT fk_competition_createdbysystemuser FOREIGN KEY (createdbysystemuserid) REFERENCES public.systemuser(systemuserid)
+);
+CREATE TABLE public.competitionmessage (
+  competitionid integer NOT NULL,
+  messageid integer NOT NULL,
+  CONSTRAINT competitionmessage_pkey PRIMARY KEY (competitionid, messageid),
+  CONSTRAINT fk_competitionmessage_competition FOREIGN KEY (competitionid) REFERENCES public.competition(competitionid),
+  CONSTRAINT fk_competitionmessage_message FOREIGN KEY (messageid) REFERENCES public.messageforcompetition(messageid)
+);
+CREATE TABLE public.emailotp (
+  otpid integer GENERATED ALWAYS AS IDENTITY NOT NULL,
+  email character varying NOT NULL,
+  otphash character varying NOT NULL,
+  createdat timestamp with time zone NOT NULL DEFAULT now(),
+  expiresat timestamp with time zone NOT NULL,
+  isused boolean NOT NULL DEFAULT false,
+  CONSTRAINT emailotp_pkey PRIMARY KEY (otpid)
 );
 CREATE TABLE public.entry (
   entryid integer NOT NULL,
@@ -95,7 +130,9 @@ CREATE TABLE public.entry (
   riderfederationmemberid integer,
   CONSTRAINT entry_pkey PRIMARY KEY (entryid),
   CONSTRAINT fk_entry_classincompetition FOREIGN KEY (classincompid) REFERENCES public.classincompetition(classincompid),
-  CONSTRAINT entry_riderfederationmemberid_fkey FOREIGN KEY (riderfederationmemberid) REFERENCES public.federationmember(federationmemberid)
+  CONSTRAINT entry_riderfederationmemberid_fkey FOREIGN KEY (riderfederationmemberid) REFERENCES public.federationmember(federationmemberid),
+  CONSTRAINT fk_entry_servicerequest FOREIGN KEY (entryid) REFERENCES public.servicerequest(srequestid),
+  CONSTRAINT fk_entry_fine FOREIGN KEY (fineid) REFERENCES public.fine(fineid)
 );
 CREATE TABLE public.federationmember (
   federationmemberid integer NOT NULL,
@@ -114,7 +151,7 @@ CREATE TABLE public.fine (
   fineid integer GENERATED ALWAYS AS IDENTITY NOT NULL,
   finename character varying NOT NULL,
   finedescription character varying,
-  fineamount numeric NOT NULL,
+  fineamount numeric NOT NULL CHECK (fineamount >= 0::numeric),
   CONSTRAINT fine_pkey PRIMARY KEY (fineid)
 );
 CREATE TABLE public.horse (
@@ -129,10 +166,17 @@ CREATE TABLE public.horse (
   CONSTRAINT horse_pkey PRIMARY KEY (horseid),
   CONSTRAINT fk_horse_ranch FOREIGN KEY (ranchid) REFERENCES public.ranch(ranchid)
 );
+CREATE TABLE public.horseowner (
+  horseid integer NOT NULL,
+  federationmemberid integer NOT NULL,
+  CONSTRAINT horseowner_pkey PRIMARY KEY (horseid, federationmemberid),
+  CONSTRAINT fk_horseowner_horse FOREIGN KEY (horseid) REFERENCES public.horse(horseid),
+  CONSTRAINT fk_horseowner_federationmember FOREIGN KEY (federationmemberid) REFERENCES public.federationmember(federationmemberid)
+);
 CREATE TABLE public.horseparticipationincompetition (
   horseid integer NOT NULL,
   competitionid integer NOT NULL,
-  hcapprovalstatus character varying,
+  hcapprovalstatus character varying CHECK (hcapprovalstatus IS NULL OR (hcapprovalstatus::text = ANY (ARRAY['Pending'::character varying, 'Approved'::character varying, 'Rejected'::character varying]::text[]))),
   hcapprovaldate date,
   hcpath character varying,
   hcuploaddate timestamp with time zone,
@@ -184,6 +228,16 @@ CREATE TABLE public.newranchrequest (
   CONSTRAINT fk_newranchrequest_systemuser FOREIGN KEY (submittedbysystemuserid) REFERENCES public.systemuser(systemuserid),
   CONSTRAINT fk_newranchrequest_superuser FOREIGN KEY (resolvedbysuperuserid) REFERENCES public.superuser(superuserid)
 );
+CREATE TABLE public.notification (
+  notificationid integer NOT NULL DEFAULT nextval('notification_notificationid_seq'::regclass),
+  notificationtypeid integer NOT NULL,
+  notificationcontent character varying NOT NULL,
+  senddate timestamp with time zone,
+  createddatetime timestamp with time zone NOT NULL,
+  status character varying,
+  CONSTRAINT notification_pkey PRIMARY KEY (notificationid),
+  CONSTRAINT fk_notification_notificationtype FOREIGN KEY (notificationtypeid) REFERENCES public.notificationtype(notificationtypeid)
+);
 CREATE TABLE public.notificationtype (
   notificationtypeid integer GENERATED ALWAYS AS IDENTITY NOT NULL,
   notificationtypename character varying NOT NULL,
@@ -192,15 +246,23 @@ CREATE TABLE public.notificationtype (
 );
 CREATE TABLE public.paidtimeproduct (
   productid smallint NOT NULL,
-  durationminutes integer NOT NULL,
+  durationminutes integer NOT NULL CHECK (durationminutes > 0),
   CONSTRAINT paidtimeproduct_pkey PRIMARY KEY (productid),
   CONSTRAINT paidtimeproduct_productid_fkey FOREIGN KEY (productid) REFERENCES public.product(productid)
 );
 CREATE TABLE public.paidtimerequest (
-  prequestid integer NOT NULL,
-  paidtimeslotincompid integer NOT NULL,
-  CONSTRAINT paidtimerequest_pkey PRIMARY KEY (prequestid),
-  CONSTRAINT paidtimerequest_prequestid_fkey FOREIGN KEY (prequestid) REFERENCES public.productrequest(prequestid)
+  paidtimerequestid integer NOT NULL,
+  pricecatalogid integer NOT NULL,
+  requestedcompslotid integer NOT NULL,
+  assignedcompslotid integer,
+  assignedstarttime timestamp with time zone,
+  status character varying NOT NULL CHECK (status::text = ANY (ARRAY['Pending'::character varying, 'Assigned'::character varying, 'Cancelled'::character varying]::text[])),
+  notes character varying,
+  CONSTRAINT paidtimerequest_pkey PRIMARY KEY (paidtimerequestid),
+  CONSTRAINT fk_paidtimerequest_servicerequest FOREIGN KEY (paidtimerequestid) REFERENCES public.servicerequest(srequestid),
+  CONSTRAINT fk_paidtimerequest_pricecatalog FOREIGN KEY (pricecatalogid) REFERENCES public.pricecatalog(pricecatalogid),
+  CONSTRAINT fk_paidtimerequest_requestedslot FOREIGN KEY (requestedcompslotid) REFERENCES public.paidtimeslotincompetition(paidtimeslotincompid),
+  CONSTRAINT fk_paidtimerequest_assignedslot FOREIGN KEY (assignedcompslotid) REFERENCES public.paidtimeslotincompetition(paidtimeslotincompid)
 );
 CREATE TABLE public.paidtimeslot (
   paidtimeslotid integer GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -220,7 +282,22 @@ CREATE TABLE public.paidtimeslotincompetition (
   slotstatus character varying,
   slotnotes character varying,
   CONSTRAINT paidtimeslotincompetition_pkey PRIMARY KEY (paidtimeslotincompid),
-  CONSTRAINT fk_paidtimeslotincomp_comp FOREIGN KEY (competitionid) REFERENCES public.competition(competitionid)
+  CONSTRAINT fk_paidtimeslotincomp_comp FOREIGN KEY (competitionid) REFERENCES public.competition(competitionid),
+  CONSTRAINT fk_paidtimeslotincompetition_paidtimeslot FOREIGN KEY (paidtimeslotid) REFERENCES public.paidtimeslot(paidtimeslotid),
+  CONSTRAINT fk_paidtimeslotincompetition_arena FOREIGN KEY (arenaranchid) REFERENCES public.arena(ranchid),
+  CONSTRAINT fk_paidtimeslotincompetition_arena FOREIGN KEY (arenaid) REFERENCES public.arena(ranchid),
+  CONSTRAINT fk_paidtimeslotincompetition_arena FOREIGN KEY (arenaranchid) REFERENCES public.arena(arenaid),
+  CONSTRAINT fk_paidtimeslotincompetition_arena FOREIGN KEY (arenaid) REFERENCES public.arena(arenaid)
+);
+CREATE TABLE public.passwordresettoken (
+  tokenid integer GENERATED ALWAYS AS IDENTITY NOT NULL,
+  systemuserid integer NOT NULL,
+  tokenhash character varying NOT NULL,
+  createdat timestamp with time zone NOT NULL DEFAULT now(),
+  expiresat timestamp with time zone NOT NULL,
+  isused boolean NOT NULL DEFAULT false,
+  CONSTRAINT passwordresettoken_pkey PRIMARY KEY (tokenid),
+  CONSTRAINT fk_passwordresettoken_systemuser FOREIGN KEY (systemuserid) REFERENCES public.systemuser(systemuserid)
 );
 CREATE TABLE public.pattern (
   patternnumber smallint NOT NULL,
@@ -229,7 +306,7 @@ CREATE TABLE public.pattern (
 CREATE TABLE public.patternmaneuver (
   patternnumber smallint NOT NULL,
   maneuverid smallint,
-  maneuverorder smallint NOT NULL,
+  maneuverorder smallint NOT NULL CHECK (maneuverorder > 0),
   CONSTRAINT patternmaneuver_pkey PRIMARY KEY (patternnumber, maneuverorder),
   CONSTRAINT patternmaneuver_patternnumber_fkey FOREIGN KEY (patternnumber) REFERENCES public.pattern(patternnumber),
   CONSTRAINT patternmaneuver_maneuverid_fkey FOREIGN KEY (maneuverid) REFERENCES public.maneuver(maneuverid)
@@ -238,12 +315,14 @@ CREATE TABLE public.payment (
   paymentid integer GENERATED ALWAYS AS IDENTITY NOT NULL,
   billid integer NOT NULL,
   paymentmethodid integer NOT NULL,
-  amountpaid numeric NOT NULL,
-  paymentdate timestamp with time zone DEFAULT now(),
+  amountpaid numeric NOT NULL CHECK (amountpaid > 0::numeric),
+  paymentdate timestamp with time zone NOT NULL DEFAULT now(),
   transactionreference character varying,
+  enteredbysystemuserid integer,
   CONSTRAINT payment_pkey PRIMARY KEY (paymentid),
   CONSTRAINT payment_billid_fkey FOREIGN KEY (billid) REFERENCES public.bill(billid),
-  CONSTRAINT payment_paymentmethodid_fkey FOREIGN KEY (paymentmethodid) REFERENCES public.paymentmethod(paymentmethodid)
+  CONSTRAINT payment_paymentmethodid_fkey FOREIGN KEY (paymentmethodid) REFERENCES public.paymentmethod(paymentmethodid),
+  CONSTRAINT fk_payment_enteredbysystemuser FOREIGN KEY (enteredbysystemuserid) REFERENCES public.systemuser(systemuserid)
 );
 CREATE TABLE public.paymentmethod (
   paymentmethodid integer GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -295,7 +374,7 @@ CREATE TABLE public.pricecatalog (
   productid smallint NOT NULL,
   ranchid integer NOT NULL,
   creationdate timestamp with time zone NOT NULL,
-  itemprice numeric NOT NULL,
+  itemprice numeric NOT NULL CHECK (itemprice >= 0::numeric),
   isactive boolean DEFAULT true,
   CONSTRAINT pricecatalog_pkey PRIMARY KEY (pricecatalogid),
   CONSTRAINT fk_pricecatalog_product FOREIGN KEY (productid) REFERENCES public.product(productid),
@@ -319,15 +398,31 @@ CREATE TABLE public.productcategory (
   categoryname character varying NOT NULL UNIQUE,
   CONSTRAINT productcategory_pkey PRIMARY KEY (categoryid)
 );
+CREATE TABLE public.productchangerequest (
+  productchangerequestid integer NOT NULL DEFAULT nextval('productchangerequest_productchangerequestid_seq'::regclass),
+  originalprequestid integer NOT NULL UNIQUE,
+  newprequestid integer,
+  answeredbysystemuserid integer,
+  status character varying,
+  requestdate timestamp with time zone NOT NULL,
+  iscancelled boolean NOT NULL DEFAULT false,
+  CONSTRAINT productchangerequest_pkey PRIMARY KEY (productchangerequestid),
+  CONSTRAINT fk_productchangerequest_original FOREIGN KEY (originalprequestid) REFERENCES public.productrequest(prequestid),
+  CONSTRAINT fk_productchangerequest_new FOREIGN KEY (newprequestid) REFERENCES public.productrequest(prequestid),
+  CONSTRAINT fk_productchangerequest_answeredbysystemuser FOREIGN KEY (answeredbysystemuserid) REFERENCES public.systemuser(systemuserid)
+);
 CREATE TABLE public.productrequest (
   prequestid integer GENERATED ALWAYS AS IDENTITY NOT NULL,
   competitionid integer NOT NULL,
-  productid smallint NOT NULL,
-  quantity smallint NOT NULL DEFAULT 1,
-  requestdatetime timestamp with time zone DEFAULT now(),
+  prequestdatetime timestamp with time zone NOT NULL DEFAULT now(),
+  orderedbysystemuserid integer NOT NULL,
+  pricecatalogid integer NOT NULL,
+  notes text,
+  approvaldate timestamp without time zone,
   CONSTRAINT productrequest_pkey PRIMARY KEY (prequestid),
   CONSTRAINT productrequest_competitionid_fkey FOREIGN KEY (competitionid) REFERENCES public.competition(competitionid),
-  CONSTRAINT productrequest_productid_fkey FOREIGN KEY (productid) REFERENCES public.product(productid)
+  CONSTRAINT fk_productrequest_pricecatalog FOREIGN KEY (pricecatalogid) REFERENCES public.pricecatalog(pricecatalogid),
+  CONSTRAINT productrequest_orderedbysystemuserid_fkey FOREIGN KEY (orderedbysystemuserid) REFERENCES public.systemuser(systemuserid)
 );
 CREATE TABLE public.ranch (
   ranchid integer GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -337,13 +432,16 @@ CREATE TABLE public.ranch (
   websiteurl character varying,
   location USER-DEFINED,
   ranchstatus character varying NOT NULL DEFAULT 'Pending'::character varying,
+  latitude double precision,
+  longitude double precision,
   CONSTRAINT ranch_pkey PRIMARY KEY (ranchid)
 );
 CREATE TABLE public.reiningtype (
   reiningclassincompid integer NOT NULL,
   patternnumber smallint NOT NULL,
   CONSTRAINT reiningtype_pkey PRIMARY KEY (reiningclassincompid),
-  CONSTRAINT fk_reiningtype_class FOREIGN KEY (reiningclassincompid) REFERENCES public.classincompetition(classincompid)
+  CONSTRAINT fk_reiningtype_class FOREIGN KEY (reiningclassincompid) REFERENCES public.classincompetition(classincompid),
+  CONSTRAINT fk_reiningtype_pattern FOREIGN KEY (patternnumber) REFERENCES public.pattern(patternnumber)
 );
 CREATE TABLE public.role (
   roleid smallint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -356,7 +454,7 @@ CREATE TABLE public.servicerequest (
   horseid integer NOT NULL,
   riderfederationmemberid integer NOT NULL,
   coachfederationmemberid integer,
-  billid integer,
+  billid integer NOT NULL,
   paymentid integer,
   srequestdatetime timestamp with time zone DEFAULT now(),
   CONSTRAINT servicerequest_pkey PRIMARY KEY (srequestid),
@@ -364,19 +462,33 @@ CREATE TABLE public.servicerequest (
   CONSTRAINT servicerequest_horseid_fkey FOREIGN KEY (horseid) REFERENCES public.horse(horseid),
   CONSTRAINT servicerequest_riderfederationmemberid_fkey FOREIGN KEY (riderfederationmemberid) REFERENCES public.federationmember(federationmemberid),
   CONSTRAINT servicerequest_coachfederationmemberid_fkey FOREIGN KEY (coachfederationmemberid) REFERENCES public.federationmember(federationmemberid),
-  CONSTRAINT servicerequest_billid_fkey FOREIGN KEY (billid) REFERENCES public.bill(billid)
+  CONSTRAINT servicerequest_billid_fkey FOREIGN KEY (billid) REFERENCES public.bill(billid),
+  CONSTRAINT fk_servicerequest_payment FOREIGN KEY (paymentid) REFERENCES public.payment(paymentid)
 );
 CREATE TABLE public.shavingsorder (
   shavingsorderid integer NOT NULL,
   notes character varying,
+  workersystemuserid integer,
+  bagquantity smallint CHECK (bagquantity > 0),
+  requesteddeliverytime timestamp without time zone,
+  arrivaltime timestamp without time zone,
+  responsetime timestamp without time zone,
+  deliverystatus character varying NOT NULL DEFAULT 'Pending'::character varying,
+  deliveryphotourl text,
+  deliveryphotodate timestamp with time zone,
+  approvedbypersonid integer,
+  approvedat timestamp with time zone,
   CONSTRAINT shavingsorder_pkey PRIMARY KEY (shavingsorderid),
-  CONSTRAINT shavingsorder_shavingsorderid_fkey FOREIGN KEY (shavingsorderid) REFERENCES public.productrequest(prequestid)
+  CONSTRAINT shavingsorder_shavingsorderid_fkey FOREIGN KEY (shavingsorderid) REFERENCES public.productrequest(prequestid),
+  CONSTRAINT shavingsorder_approvedbypersonid_fkey FOREIGN KEY (approvedbypersonid) REFERENCES public.person(personid)
 );
 CREATE TABLE public.shavingsorderforstallbooking (
   shavingsorderid integer NOT NULL,
   stallbookingid integer NOT NULL,
+  bagquantityperstall smallint NOT NULL DEFAULT 1 CHECK (bagquantityperstall > 0),
   CONSTRAINT shavingsorderforstallbooking_pkey PRIMARY KEY (shavingsorderid, stallbookingid),
-  CONSTRAINT shavingsorderforstallbooking_shavingsorderid_fkey FOREIGN KEY (shavingsorderid) REFERENCES public.shavingsorder(shavingsorderid)
+  CONSTRAINT shavingsorderforstallbooking_shavingsorderid_fkey FOREIGN KEY (shavingsorderid) REFERENCES public.shavingsorder(shavingsorderid),
+  CONSTRAINT fk_shavingsorderforstallbooking_stallbooking FOREIGN KEY (stallbookingid) REFERENCES public.stallbooking(stallbookingid)
 );
 CREATE TABLE public.spatial_ref_sys (
   srid integer NOT NULL CHECK (srid > 0 AND srid <= 998999),
@@ -396,15 +508,36 @@ CREATE TABLE public.stall (
   CONSTRAINT stall_pkey PRIMARY KEY (ranchid, compoundid, stallid),
   CONSTRAINT fk_stall_product FOREIGN KEY (stalltype) REFERENCES public.product(productid)
 );
-CREATE TABLE public.stallbooking (
-  stallbookingid integer NOT NULL,
+CREATE TABLE public.stallassignment (
+  assignmentid integer GENERATED ALWAYS AS IDENTITY NOT NULL,
+  competitionid integer NOT NULL,
   ranchid integer NOT NULL,
   compoundid smallint NOT NULL,
   stallid smallint NOT NULL,
+  horseid integer NOT NULL,
+  CONSTRAINT stallassignment_pkey PRIMARY KEY (assignmentid),
+  CONSTRAINT stallassignment_competitionid_fkey FOREIGN KEY (competitionid) REFERENCES public.competition(competitionid),
+  CONSTRAINT stallassignment_horseid_fkey FOREIGN KEY (horseid) REFERENCES public.horse(horseid),
+  CONSTRAINT stallassignment_ranchid_compoundid_stallid_fkey FOREIGN KEY (ranchid) REFERENCES public.stall(ranchid),
+  CONSTRAINT stallassignment_ranchid_compoundid_stallid_fkey FOREIGN KEY (compoundid) REFERENCES public.stall(ranchid),
+  CONSTRAINT stallassignment_ranchid_compoundid_stallid_fkey FOREIGN KEY (stallid) REFERENCES public.stall(ranchid),
+  CONSTRAINT stallassignment_ranchid_compoundid_stallid_fkey FOREIGN KEY (ranchid) REFERENCES public.stall(compoundid),
+  CONSTRAINT stallassignment_ranchid_compoundid_stallid_fkey FOREIGN KEY (compoundid) REFERENCES public.stall(compoundid),
+  CONSTRAINT stallassignment_ranchid_compoundid_stallid_fkey FOREIGN KEY (stallid) REFERENCES public.stall(compoundid),
+  CONSTRAINT stallassignment_ranchid_compoundid_stallid_fkey FOREIGN KEY (ranchid) REFERENCES public.stall(stallid),
+  CONSTRAINT stallassignment_ranchid_compoundid_stallid_fkey FOREIGN KEY (compoundid) REFERENCES public.stall(stallid),
+  CONSTRAINT stallassignment_ranchid_compoundid_stallid_fkey FOREIGN KEY (stallid) REFERENCES public.stall(stallid)
+);
+CREATE TABLE public.stallbooking (
+  stallbookingid integer NOT NULL,
+  ranchid integer NOT NULL,
+  compoundid smallint,
+  stallid smallint,
   startdate date NOT NULL,
   enddate date NOT NULL,
+  horseid integer,
+  isfortack boolean NOT NULL DEFAULT false,
   CONSTRAINT stallbooking_pkey PRIMARY KEY (stallbookingid),
-  CONSTRAINT stallbooking_stallbookingid_fkey FOREIGN KEY (stallbookingid) REFERENCES public.servicerequest(srequestid),
   CONSTRAINT stallbooking_ranchid_compoundid_stallid_fkey FOREIGN KEY (ranchid) REFERENCES public.stall(ranchid),
   CONSTRAINT stallbooking_ranchid_compoundid_stallid_fkey FOREIGN KEY (compoundid) REFERENCES public.stall(ranchid),
   CONSTRAINT stallbooking_ranchid_compoundid_stallid_fkey FOREIGN KEY (stallid) REFERENCES public.stall(ranchid),
@@ -413,12 +546,15 @@ CREATE TABLE public.stallbooking (
   CONSTRAINT stallbooking_ranchid_compoundid_stallid_fkey FOREIGN KEY (stallid) REFERENCES public.stall(compoundid),
   CONSTRAINT stallbooking_ranchid_compoundid_stallid_fkey FOREIGN KEY (ranchid) REFERENCES public.stall(stallid),
   CONSTRAINT stallbooking_ranchid_compoundid_stallid_fkey FOREIGN KEY (compoundid) REFERENCES public.stall(stallid),
-  CONSTRAINT stallbooking_ranchid_compoundid_stallid_fkey FOREIGN KEY (stallid) REFERENCES public.stall(stallid)
+  CONSTRAINT stallbooking_ranchid_compoundid_stallid_fkey FOREIGN KEY (stallid) REFERENCES public.stall(stallid),
+  CONSTRAINT fk_stallbooking_horse FOREIGN KEY (horseid) REFERENCES public.horse(horseid),
+  CONSTRAINT stallbooking_stallbookingid_fkey FOREIGN KEY (stallbookingid) REFERENCES public.productrequest(prequestid)
 );
 CREATE TABLE public.stallcompound (
   ranchid integer NOT NULL,
   compoundid smallint NOT NULL,
   compoundname character varying NOT NULL,
+  layout jsonb,
   CONSTRAINT stallcompound_pkey PRIMARY KEY (ranchid, compoundid),
   CONSTRAINT fk_stallcompound_ranch FOREIGN KEY (ranchid) REFERENCES public.ranch(ranchid)
 );

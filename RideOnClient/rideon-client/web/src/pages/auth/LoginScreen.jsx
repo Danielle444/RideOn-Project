@@ -26,6 +26,7 @@ export default function LoginScreen() {
 
     return "/superuser/requests";
   }
+  //OrenNoteToFix - This is the third time we have seen this exact function! As discussed in the previous file, you should definitely pull this out into shared/auth/utils/authNavigation.js and import it here.
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -152,17 +153,15 @@ export default function LoginScreen() {
               זכור אותי
             </label>
 
-            {!isSuperUserMode && (
-              <button
-                type="button"
-                onClick={function () {
-                  setShowForgotPopup(true);
-                }}
-                className="text-[#795548] hover:underline"
-              >
-                שכחתי סיסמה
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={function () {
+                setShowForgotPopup(true);
+              }}
+              className="text-[#795548] hover:underline"
+            >
+              שכחתי סיסמה
+            </button>
           </div>
 
           {errorMessage && (
@@ -187,14 +186,14 @@ export default function LoginScreen() {
         {!isSuperUserMode && (
           <p className="mt-6 text-center text-sm text-[#6D4C41]">
             אין לך חשבון?{" "}
-            <span
+            <Link
               onClick={function () {
                 navigate("/register");
               }}
               className="cursor-pointer font-semibold text-[#795548] hover:underline"
             >
               להרשמה
-            </span>
+            </Link>
           </p>
         )}
 
@@ -226,11 +225,11 @@ export default function LoginScreen() {
               <button
                 onClick={function () {
                   setShowForgotPopup(false);
-                  navigate("/forgot-password");
+                  navigate(isSuperUserMode ? "/superuser-forgot-password" : "/forgot-password");
                 }}
                 className="rounded-xl bg-[#795548] px-4 py-2 text-sm text-white hover:bg-[#6D4C41]"
               >
-                כן, שלח לי קישור
+                {isSuperUserMode ? "כן, שלח לי קוד" : "כן, שלח לי קישור"}
               </button>
             </div>
           </div>

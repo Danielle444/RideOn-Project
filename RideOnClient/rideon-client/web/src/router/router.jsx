@@ -33,6 +33,7 @@ import UnauthorizedPage from "../pages/shared/UnauthorizedPage";
 const SECRETARY_ROLE = "מזכירת חווה מארחת";
 import ForgotPasswordScreen from "../pages/auth/ForgotPasswordScreen";
 import ResetPasswordScreen from "../pages/auth/ResetPasswordScreen";
+import SuperUserForgotPasswordScreen from "../pages/auth/SuperUserForgotPasswordScreen";
 import CompleteRegistrationPage from "../pages/auth/CompleteRegistrationPage";
 
 const router = createBrowserRouter([
@@ -71,6 +72,14 @@ const router = createBrowserRouter([
     element: (
       <PublicRoute>
         <ResetPasswordScreen />
+      </PublicRoute>
+    ),
+  },
+  {
+    path: "/superuser-forgot-password",
+    element: (
+      <PublicRoute>
+        <SuperUserForgotPasswordScreen />
       </PublicRoute>
     ),
   },
@@ -115,6 +124,7 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
+  //OrenNoteFuture - Refactor Competition Pages to React Router Nested Routes
   {
     path: "/competitions/:competitionId",
     element: <Navigate to="summary" replace />,
@@ -306,6 +316,10 @@ const router = createBrowserRouter([
     path: "/unauthorized",
     element: <UnauthorizedPage />,
   },
+  {
+  path: "*",
+  element: <div>Page Not Found</div> // Or a custom NotFoundPage component
+  }
 ]);
 
 export default router;

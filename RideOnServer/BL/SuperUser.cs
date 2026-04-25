@@ -157,6 +157,26 @@ namespace RideOnServer.BL
             return dal.GetAllSuperUsers();
         }
 
+        internal static void ResetPasswordWithOtp(string email, string otpCode, string newPassword, IConfiguration configuration)
+        {
+            SuperUser? superUser = GetSuperUserForLogin(email);
 
+            if (superUser == null || !superUser.IsActive)
+                throw new Exception("הקוד אינו תקף או פג תוקפו");
+
+            OtpService otpService = new OtpService(configuration);
+            bool valid = otpService.VerifyOtp(email, otpCode);
+
+            if (!valid)
+                throw new Exception("הקוד אינו תקף או פג תוקפו");
+
+            PasswordPolicyValidator.ValidateOrThrow(newPassword);
+
+            string newSalt = PasswordHelper.GenerateSalt();
+            string newHash = PasswordHelper.HashPassword(newPassword, newSalt);
+
+            SuperUserDAL dal = new SuperUserDAL();
+            dal.UpdateSuperUserPassword(superUser.SuperUserId, newHash, newSalt);
+        }
     }
 }

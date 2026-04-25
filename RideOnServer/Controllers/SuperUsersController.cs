@@ -248,6 +248,55 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("forgot-password")]
+        public IActionResult ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            try
+            {
+                if (request == null || string.IsNullOrWhiteSpace(request.Email))
+                    return BadRequest("כתובת מייל נדרשת");
+
+                string email = request.Email.Trim();
+
+                SuperUser? superUser = SuperUser.GetSuperUserForLogin(email);
+
+                if (superUser != null && superUser.IsActive)
+                {
+                    OtpService otpService = new OtpService(_configuration);
+                    otpService.SendAndStoreOtp(email);
+                }
+
+                return Ok(new { message = "אם המייל קיים במערכת, ישלח אליך קוד לאיפוס הסיסמה" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in SuperUser ForgotPassword: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליחת קוד האיפוס");
+            }
+        }
+
+        [HttpPost("reset-password")]
+        public IActionResult ResetPassword([FromBody] SuperUserResetPasswordRequest request)
+        {
+            try
+            {
+                if (request == null ||
+                    string.IsNullOrWhiteSpace(request.Email) ||
+                    string.IsNullOrWhiteSpace(request.OtpCode) ||
+                    string.IsNullOrWhiteSpace(request.NewPassword))
+                    return BadRequest("פרטים חסרים");
+
+                SuperUser.ResetPasswordWithOtp(request.Email.Trim(), request.OtpCode.Trim(), request.NewPassword, _configuration);
+
+                return Ok(new { message = "הסיסמה אופסה בהצלחה" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in SuperUser ResetPassword: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
         [Authorize]
         [HttpGet]
         public IActionResult GetAllSuperUsers()

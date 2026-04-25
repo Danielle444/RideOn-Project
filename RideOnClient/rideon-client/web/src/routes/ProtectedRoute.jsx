@@ -23,7 +23,7 @@ export default function ProtectedRoute({
   }
 
   if (isLoading) {
-    return null;
+    return <LoadingSpinner text="LOADING" />;
   }
 
   if (!isAuthenticated || !user) {
@@ -42,6 +42,7 @@ export default function ProtectedRoute({
     ) {
       return <Navigate to="/superuser-change-password" replace />;
     }
+    //OrenNoteToFix - add a superuser change request (either on the reguler one or as a new page)
 
     return children;
   }
