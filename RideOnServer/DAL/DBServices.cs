@@ -230,7 +230,6 @@ namespace RideOnServer.DAL
 
             if (value is DateTime dateTimeValue)
             {
-                // Safe fallback for DateTime values שלא זוהו לפי שם
                 cmd.Parameters.Add(parameterName, NpgsqlDbType.TimestampTz).Value = dateTimeValue;
                 return;
             }
