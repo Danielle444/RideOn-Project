@@ -153,17 +153,15 @@ export default function LoginScreen() {
               זכור אותי
             </label>
 
-            {!isSuperUserMode && (
-              <button
-                type="button"
-                onClick={function () {
-                  setShowForgotPopup(true);
-                }}
-                className="text-[#795548] hover:underline"
-              >
-                שכחתי סיסמה
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={function () {
+                setShowForgotPopup(true);
+              }}
+              className="text-[#795548] hover:underline"
+            >
+              שכחתי סיסמה
+            </button>
           </div>
 
           {errorMessage && (
@@ -227,11 +225,11 @@ export default function LoginScreen() {
               <button
                 onClick={function () {
                   setShowForgotPopup(false);
-                  navigate("/forgot-password");
+                  navigate(isSuperUserMode ? "/superuser-forgot-password" : "/forgot-password");
                 }}
                 className="rounded-xl bg-[#795548] px-4 py-2 text-sm text-white hover:bg-[#6D4C41]"
               >
-                כן, שלח לי קישור
+                {isSuperUserMode ? "כן, שלח לי קוד" : "כן, שלח לי קישור"}
               </button>
             </div>
           </div>
