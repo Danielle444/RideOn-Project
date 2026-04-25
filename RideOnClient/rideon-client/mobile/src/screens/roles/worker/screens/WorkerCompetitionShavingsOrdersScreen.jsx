@@ -1,5 +1,5 @@
-import GenericPlaceholderScreen from "../../../common/GenericPlaceholderScreen";
+import WorkerShavingsOrdersScreen from "./WorkerShavingsOrdersScreen";
 
 export default function WorkerCompetitionShavingsOrdersScreen(props) {
-  return <GenericPlaceholderScreen {...props} title="הזמנות נסורת" />;
+  return <WorkerShavingsOrdersScreen {...props} />;
 }
