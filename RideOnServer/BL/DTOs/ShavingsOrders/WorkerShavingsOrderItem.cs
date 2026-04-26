@@ -15,5 +15,8 @@ namespace RideOnServer.BL.DTOs.ShavingsOrders
         public string? StallNumber { get; set; }
         public string? RanchName { get; set; }
         public string? CompetitionName { get; set; }
+        public int? WorkerSystemUserId { get; set; }
+        public string? WorkerFirstName { get; set; }
+        public string? WorkerLastName { get; set; }
     }
 }
