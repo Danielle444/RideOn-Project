@@ -170,7 +170,7 @@ namespace RideOnServer.DAL
             conn.Open();
 
             using NpgsqlCommand cmd = new NpgsqlCommand(
-                "SELECT * FROM usp_getshavingsordersforworkersbycompetition(@competitionId, @ranchId)",
+                "SELECT * FROM usp_getshavingsordersforworkerbycompetition(@competitionId, @ranchId)",
                 conn
             );
 
