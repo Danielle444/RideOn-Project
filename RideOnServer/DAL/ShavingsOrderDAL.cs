@@ -162,6 +162,64 @@ namespace RideOnServer.DAL
             }
         }
 
+        public static List<WorkerShavingsOrderItem> GetShavingsOrdersByCompetitionForWorker(int competitionId, int ranchId)
+        {
+            List<WorkerShavingsOrderItem> orders = new List<WorkerShavingsOrderItem>();
+
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT * FROM usp_getshavingsordersforworkersbycompetition(@competitionId, @ranchId)",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@competitionId", competitionId);
+            cmd.Parameters.AddWithValue("@ranchId", ranchId);
+
+            using NpgsqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                orders.Add(new WorkerShavingsOrderItem
+                {
+                    ShavingsOrderId = Convert.ToInt32(reader["ShavingsOrderId"]),
+                    BagQuantity = Convert.ToInt32(reader["BagQuantity"]),
+                    Notes = reader["Notes"] as string,
+                    RequestedDeliveryTime = reader["RequestedDeliveryTime"] as DateTime?,
+                    ArrivalTime = reader["ArrivalTime"] as DateTime?,
+                    DeliveryStatus = reader["DeliveryStatus"]?.ToString() ?? string.Empty,
+                    DeliveryPhotoUrl = reader["DeliveryPhotoUrl"] as string,
+                    DeliveryPhotoDate = reader["DeliveryPhotoDate"] as DateTime?,
+                    PayerFirstName = reader["PayerFirstName"]?.ToString() ?? string.Empty,
+                    PayerLastName = reader["PayerLastName"]?.ToString() ?? string.Empty,
+                    StallNumber = reader["StallNumber"] as string,
+                    WorkerSystemUserId = reader["WorkerSystemUserId"] == DBNull.Value ? null : Convert.ToInt32(reader["WorkerSystemUserId"]),
+                    WorkerFirstName = reader["WorkerFirstName"] as string,
+                    WorkerLastName = reader["WorkerLastName"] as string,
+                });
+            }
+
+            return orders;
+        }
+
+        public static bool ClaimShavingsOrder(int shavingsOrderId, int workerSystemUserId)
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT usp_claimshavingsorder(@shavingsOrderId, @workerSystemUserId)",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@shavingsOrderId", shavingsOrderId);
+            cmd.Parameters.AddWithValue("@workerSystemUserId", workerSystemUserId);
+
+            object? result = cmd.ExecuteScalar();
+            int rowsAffected = result == null || result == DBNull.Value ? 0 : Convert.ToInt32(result);
+            return rowsAffected > 0;
+        }
+
         public static int CreateShavingsOrder(CreateShavingsOrderRequest request)
         {
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();

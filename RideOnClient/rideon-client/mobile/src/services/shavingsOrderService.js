@@ -4,6 +4,16 @@ function getWorkerShavingsOrders() {
   return axios.get("/ShavingsOrders/worker-orders");
 }
 
+function getWorkerShavingsOrdersByCompetition(competitionId, ranchId) {
+  return axios.get("/ShavingsOrders/worker-by-competition", {
+    params: { competitionId, ranchId },
+  });
+}
+
+function claimShavingsOrder(shavingsOrderId) {
+  return axios.post("/ShavingsOrders/claim", { shavingsOrderId });
+}
+
 function saveDeliveryPhoto(shavingsOrderId, deliveryPhotoUrl) {
   return axios.post("/ShavingsOrders/save-delivery-photo", {
     shavingsOrderId: shavingsOrderId,
@@ -35,6 +45,8 @@ function createShavingsOrder(payload) {
 
 export {
   getWorkerShavingsOrders,
+  getWorkerShavingsOrdersByCompetition,
+  claimShavingsOrder,
   saveDeliveryPhoto,
   getStallBookingsForShavings,
   getShavingsOrdersForCompetitionAndRanch,
