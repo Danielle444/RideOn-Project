@@ -31,20 +31,6 @@ export default function WorkerShavingsOrderCard(props) {
 
       <View style={workerStyles.orderDetailsWrap}>
         <View style={workerStyles.orderDetailRow}>
-          <Text style={workerStyles.orderDetailLabel}>שם חווה:</Text>
-          <Text style={workerStyles.orderDetailValue}>
-            {props.ranchName || "-"}
-          </Text>
-        </View>
-
-        <View style={workerStyles.orderDetailRow}>
-          <Text style={workerStyles.orderDetailLabel}>תחרות:</Text>
-          <Text style={workerStyles.orderDetailValue}>
-            {props.competitionName || "-"}
-          </Text>
-        </View>
-
-        <View style={workerStyles.orderDetailRow}>
           <Text style={workerStyles.orderDetailLabel}>תא:</Text>
           <Text style={workerStyles.orderDetailValue}>
             {props.stallNumber || "-"}
@@ -66,7 +52,38 @@ export default function WorkerShavingsOrderCard(props) {
         </View>
       </View>
 
-      {props.deliveryStatus === "Pending" && (
+      {/* Unclaimed — show claim button */}
+      {props.isUnclaimed && props.deliveryStatus === "Pending" && (
+        <View style={roleSharedStyles.buttonsRow}>
+          <Pressable
+            style={[
+              roleSharedStyles.primaryButton,
+              { opacity: props.claiming ? 0.6 : 1, backgroundColor: "#5D4037" },
+            ]}
+            onPress={props.onClaim}
+            disabled={props.claiming}
+          >
+            {props.claiming ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Ionicons
+                  name="hand-left-outline"
+                  size={18}
+                  color="#fff"
+                  style={{ marginLeft: 6 }}
+                />
+                <Text style={roleSharedStyles.primaryButtonText}>
+                  קח טיפול
+                </Text>
+              </>
+            )}
+          </Pressable>
+        </View>
+      )}
+
+      {/* My order + Pending — show camera button */}
+      {props.isMyOrder && props.deliveryStatus === "Pending" && (
         <View style={roleSharedStyles.buttonsRow}>
           <Pressable
             style={[
@@ -92,6 +109,18 @@ export default function WorkerShavingsOrderCard(props) {
               </>
             )}
           </Pressable>
+        </View>
+      )}
+
+      {/* Taken by another worker */}
+      {props.isTakenByOther && props.deliveryStatus === "Pending" && (
+        <View
+          style={[roleSharedStyles.buttonsRow, { justifyContent: "center" }]}
+        >
+          <Ionicons name="person-outline" size={16} color="#8B6352" />
+          <Text style={[workerStyles.orderDetailLabel, { marginRight: 4 }]}>
+            בטיפול: {props.workerFirstName} {props.workerLastName}
+          </Text>
         </View>
       )}
 

@@ -1,5 +1,6 @@
-CREATE OR REPLACE FUNCTION usp_GetWorkerShavingsOrders(
-    p_WorkerSystemUserId INTEGER
+CREATE OR REPLACE FUNCTION usp_GetShavingsOrdersForWorkerByCompetition(
+    p_CompetitionId INTEGER,
+    p_RanchId       INTEGER
 )
 RETURNS TABLE(
     "ShavingsOrderId"       INTEGER,
@@ -13,8 +14,9 @@ RETURNS TABLE(
     "PayerFirstName"        CHARACTER VARYING,
     "PayerLastName"         CHARACTER VARYING,
     "StallNumber"           CHARACTER VARYING,
-    "RanchName"             CHARACTER VARYING,
-    "CompetitionName"       CHARACTER VARYING
+    "WorkerSystemUserId"    INTEGER,
+    "WorkerFirstName"       CHARACTER VARYING,
+    "WorkerLastName"        CHARACTER VARYING
 )
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -28,22 +30,24 @@ BEGIN
         so.deliverystatus,
         so.deliveryphotourl,
         so.deliveryphotodate,
-        p.firstname,
-        p.lastname,
+        payer.firstname,
+        payer.lastname,
         s.stallnumber,
-        r.ranchname,
-        c.competitionname
+        so.workersystemuserid,
+        worker.firstname,
+        worker.lastname
     FROM public.shavingsorder so
     INNER JOIN public.productrequest pr ON pr.prequestid = so.shavingsorderid
-    INNER JOIN public.person p ON p.personid = pr.orderedbysystemuserid
+    INNER JOIN public.person payer ON payer.personid = pr.orderedbysystemuserid
     INNER JOIN public.competition c ON c.competitionid = pr.competitionid
-    INNER JOIN public.ranch r ON r.ranchid = c.hostranchid
+    LEFT JOIN public.person worker ON worker.personid = so.workersystemuserid
     LEFT JOIN public.shavingsorderforstallbooking sofb ON sofb.shavingsorderid = so.shavingsorderid
     LEFT JOIN public.stallbooking sb ON sb.stallbookingid = sofb.stallbookingid
     LEFT JOIN public.stall s ON s.ranchid = sb.ranchid
                              AND s.compoundid = sb.compoundid
                              AND s.stallid = sb.stallid
-    WHERE so.workersystemuserid = p_WorkerSystemUserId
+    WHERE pr.competitionid = p_CompetitionId
+      AND c.hostranchid = p_RanchId
     ORDER BY so.shavingsorderid, so.requesteddeliverytime DESC NULLS LAST;
 END;
 $$;

@@ -32,6 +32,60 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("worker-by-competition")]
+        public IActionResult GetWorkerOrdersByCompetition([FromQuery] int competitionId, [FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchWorker
+                );
+
+                var orders = ShavingsOrderDAL.GetShavingsOrdersByCompetitionForWorker(competitionId, ranchId);
+                return Ok(new { data = orders });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetWorkerOrdersByCompetition: {ex.Message}");
+                return StatusCode(500, "שגיאה בשליפת ההזמנות");
+            }
+        }
+
+        [HttpPost("claim")]
+        public IActionResult ClaimOrder([FromBody] ClaimShavingsOrderRequest request)
+        {
+            try
+            {
+                int workerSystemUserId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                bool claimed = ShavingsOrderDAL.ClaimShavingsOrder(request.ShavingsOrderId, workerSystemUserId);
+
+                if (!claimed)
+                {
+                    return Conflict("ההזמנה כבר נלקחה לטיפול על ידי עובד אחר");
+                }
+
+                return Ok(new { message = "ההזמנה נלקחה לטיפולך בהצלחה" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in ClaimOrder: {ex.Message}");
+                return StatusCode(500, "שגיאה בלקיחת ההזמנה לטיפול");
+            }
+        }
+
         [HttpPost("save-delivery-photo")]
         public IActionResult SaveDeliveryPhoto([FromBody] SaveDeliveryPhotoRequest request)
         {
