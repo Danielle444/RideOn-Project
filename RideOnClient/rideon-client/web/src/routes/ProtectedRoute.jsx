@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useUser } from "../context/UserContext";
 import { useActiveRole } from "../context/ActiveRoleContext";
 import { getPostLoginRoute } from "../../../shared/auth/utils/authNavigation";
+import LoadingSpinner from "../components/common/LoadingSpinner";
 
 export default function ProtectedRoute({
   children,
