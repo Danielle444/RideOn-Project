@@ -95,7 +95,7 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       quality: 0.7,
       allowsEditing: false,
     });
@@ -110,15 +110,22 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       const fileName = `order_${order.shavingsOrderId}_${Date.now()}.jpg`;
       const filePath = `orders/${fileName}`;
 
-      const response = await fetch(imageAsset.uri);
-      const blob = await response.blob();
+      const formData = new FormData();
+      formData.append("file", {
+        uri: imageAsset.uri,
+        type: "image/jpeg",
+        name: fileName,
+      });
 
       const { error: uploadError } = await supabase.storage
         .from(DELIVERY_BUCKET)
-        .upload(filePath, blob, { contentType: "image/jpeg", upsert: false });
+        .upload(filePath, formData, {
+          contentType: "image/jpeg",
+          upsert: false,
+        });
 
       if (uploadError) {
-        throw new Error(uploadError.message);
+        throw uploadError;
       }
 
       const { data: urlData } = supabase.storage
@@ -130,7 +137,10 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       Alert.alert("בוצע", "התמונה נשמרה וההזמנה ממתינה לאישור מזכירה");
       await loadOrders(selectedCompetition);
     } catch (err) {
-      Alert.alert("שגיאה", "לא ניתן להעלות את התמונה. נסה שוב.");
+      console.error("Photo upload error:", err);
+      const message =
+        err?.message || err?.error || "לא ניתן להעלות את התמונה. נסה שוב.";
+      Alert.alert("שגיאה", message);
     } finally {
       setUploadingOrderId(null);
     }
