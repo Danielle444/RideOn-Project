@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { getPostLoginRoute } from "../../../../shared/auth/utils/authNavigation";
 import { validateLoginForm } from "../../../../shared/auth/validations/loginValidation";
