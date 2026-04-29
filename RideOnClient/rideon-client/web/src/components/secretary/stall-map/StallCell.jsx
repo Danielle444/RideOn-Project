@@ -1,14 +1,8 @@
-import { useDroppable } from "@dnd-kit/core";
 import { DoorOpen, X } from "lucide-react";
+import DroppableBox from "../../common/dnd/DroppableBox";
 
 export default function StallCell({ cell, assignment, onUnassign }) {
   const droppableId = `stall-${cell.col}-${cell.row}`;
-
-  const { setNodeRef, isOver } = useDroppable({
-    id: droppableId,
-    data: { cell },
-    disabled: cell.isEntrance || cell.stallNumber === null || !cell.stallId,
-  });
 
   if (cell.isEntrance) {
     return (
@@ -23,20 +17,22 @@ export default function StallCell({ cell, assignment, onUnassign }) {
   }
 
   const isOccupied = !!assignment;
+  const isDisabled = cell.isEntrance || cell.stallNumber === null || !cell.stallId;
 
   return (
-    <div
-      ref={setNodeRef}
+    <DroppableBox
+      id={droppableId}
+      data={{ cell }}
+      disabled={isDisabled}
       className={[
         "relative flex h-full min-h-[42px] select-none flex-col items-center justify-center rounded-lg border transition-all",
-        isOver
-          ? "scale-105 border-[#795548] bg-[#F5EDE8]"
-          : isOccupied
-            ? "border-[#A5836A] bg-[#EFEBE9]"
-            : cell.stallId
-              ? "border-[#D7CCC8] bg-white hover:border-[#BCAAA4]"
-              : "border-red-200 bg-red-50",
+        isOccupied
+          ? "border-[#A5836A] bg-[#EFEBE9]"
+          : cell.stallId
+            ? "border-[#D7CCC8] bg-white hover:border-[#BCAAA4]"
+            : "border-red-200 bg-red-50",
       ].join(" ")}
+      overClassName="scale-105 border-[#795548] bg-[#F5EDE8]"
     >
       <span className="absolute right-1 top-0.5 text-[9px] font-bold text-[#8D6E63]">
         {cell.stallNumber}
@@ -51,7 +47,9 @@ export default function StallCell({ cell, assignment, onUnassign }) {
           <button
             type="button"
             onClick={function () {
-              if (onUnassign) onUnassign(cell);
+              if (onUnassign) {
+                onUnassign(cell);
+              }
             }}
             className="absolute left-0.5 top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-100 text-red-400 hover:bg-red-200"
           >
@@ -61,6 +59,6 @@ export default function StallCell({ cell, assignment, onUnassign }) {
       ) : (
         <span className="mt-2 text-[9px] text-[#BCAAA4]">ריק</span>
       )}
-    </div>
+    </DroppableBox>
   );
 }
