@@ -63,11 +63,13 @@ function getAssignedCount(slot) {
 }
 
 function getAvailablePlaces(slot) {
-  return Number(slot.estimatedAvailablePlaces || slot.EstimatedAvailablePlaces || 0);
+  return Number(
+    slot.estimatedAvailablePlaces || slot.EstimatedAvailablePlaces || 0,
+  );
 }
 
-function getRemainingMinutes(slot) {
-  return Number(slot.remainingCapacityMinutes || slot.RemainingCapacityMinutes || 0);
+function getPendingRequestsCount(slot) {
+  return Number(slot.pendingRequestsCount || slot.PendingRequestsCount || 0);
 }
 
 function formatDate(value) {
@@ -144,6 +146,10 @@ export default function CompetitionPaidTimePage() {
           return getAssignedCount(b) - getAssignedCount(a);
         }
 
+        if (sortBy === "pending") {
+          return getPendingRequestsCount(b) - getPendingRequestsCount(a);
+        }
+
         if (sortBy === "time") {
           var aTime = String(getSlotStartTime(a) || "");
           var bTime = String(getSlotStartTime(b) || "");
@@ -152,7 +158,9 @@ export default function CompetitionPaidTimePage() {
             return aTime.localeCompare(bTime);
           }
 
-          return String(getSlotDate(a) || "").localeCompare(String(getSlotDate(b) || ""));
+          return String(getSlotDate(a) || "").localeCompare(
+            String(getSlotDate(b) || ""),
+          );
         }
 
         var aDate = String(getSlotDate(a) || "");
@@ -188,9 +196,8 @@ export default function CompetitionPaidTimePage() {
   }
 
   function renderCapacityBadge(slot) {
-    var assignedCount = getAssignedCount(slot);
     var availablePlaces = getAvailablePlaces(slot);
-    var remainingMinutes = getRemainingMinutes(slot);
+    var pendingRequestsCount = getPendingRequestsCount(slot);
 
     return (
       <div className="flex flex-col gap-1">
@@ -199,7 +206,7 @@ export default function CompetitionPaidTimePage() {
         </span>
 
         <span className="text-xs text-[#8D6E63]">
-          {assignedCount} משובצים • {remainingMinutes} דק׳ נותרו
+          {pendingRequestsCount} בקשות ממתינות
         </span>
       </div>
     );
@@ -270,7 +277,7 @@ export default function CompetitionPaidTimePage() {
                 label="צפה בשיבוץ"
                 icon={<Eye size={15} />}
                 onClick={function () {
-                  page.enterAssignmentMode(slotId);
+                  page.openAssignmentForSlot(slotId);
                 }}
               />
 
@@ -342,6 +349,7 @@ export default function CompetitionPaidTimePage() {
               <option value="date">מיון לפי תאריך</option>
               <option value="time">מיון לפי שעה</option>
               <option value="free">מיון לפי פנויים</option>
+              <option value="pending">מיון לפי ממתינות</option>
               <option value="assigned">מיון לפי משובצים</option>
             </select>
 

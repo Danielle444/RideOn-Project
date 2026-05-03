@@ -44,6 +44,9 @@ namespace RideOnServer.DAL
                                 RemainingCapacityMinutes = reader["RemainingCapacityMinutes"] != DBNull.Value ? Convert.ToInt32(reader["RemainingCapacityMinutes"]) : 0,
                                 EstimatedAvailablePlaces = reader["EstimatedAvailablePlaces"] != DBNull.Value ? Convert.ToInt32(reader["EstimatedAvailablePlaces"]) : 0,
                                 AssignedCount = reader["AssignedCount"] != DBNull.Value ? Convert.ToInt32(reader["AssignedCount"]) : 0,
+                                PendingRequestsCount = reader["PendingRequestsCount"] != DBNull.Value
+                                    ? Convert.ToInt32(reader["PendingRequestsCount"])
+                                    : 0,
                             });
                         }
 
