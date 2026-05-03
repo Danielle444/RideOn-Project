@@ -23,6 +23,7 @@ namespace RideOnServer.BL
         public int RemainingCapacityMinutes { get; set; }
         public int EstimatedAvailablePlaces { get; set; }
         public int AssignedCount { get; set; }
+        public int PendingRequestsCount { get; set; }
 
         internal static List<PaidTimeSlotInCompetition> GetPaidTimeSlotsByCompetitionId(int competitionId)
         {

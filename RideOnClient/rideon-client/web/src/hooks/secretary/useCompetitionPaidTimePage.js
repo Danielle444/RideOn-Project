@@ -224,15 +224,33 @@ export default function useCompetitionPaidTimePage(options) {
   }
 
   async function handleDeletePaidTimeSlot(slot) {
-    if (!window.confirm("למחוק את הסלוט?")) return;
+    if (!window.confirm("למחוק את הסלוט?")) {
+      return;
+    }
 
-    await deletePaidTimeSlotInCompetition(
-      getSlotId(slot),
-      competitionId,
-      ranchId,
-    );
+    try {
+      await deletePaidTimeSlotInCompetition(
+        getSlotId(slot),
+        competitionId,
+        ranchId,
+        false,
+      );
 
-    await loadSlots();
+      await loadSlots();
+
+      if (onShowToast) {
+        onShowToast("success", "הסלוט נמחק בהצלחה");
+      }
+    } catch (err) {
+      console.error("Delete paid time slot error:", err.response?.data || err);
+
+      if (onShowToast) {
+        onShowToast(
+          "error",
+          err.response?.data || "שגיאה במחיקת סלוט פייד־טיים",
+        );
+      }
+    }
   }
 
   /* =======================
@@ -249,6 +267,32 @@ export default function useCompetitionPaidTimePage(options) {
       setSelectedSlotIds([slotId]);
     } else {
       setSelectedSlotIds([]);
+    }
+  }
+
+  async function openAssignmentForSlot(slotId) {
+    setAssignmentMode(true);
+    setAssignmentViewOpen(false);
+    setRequests([]);
+    setIncludeAllPending(false);
+    setSelectedSlotIds([slotId]);
+
+    try {
+      setLoadingRequests(true);
+
+      var res = await getPaidTimeRequestsForAssignment(
+        competitionId,
+        ranchId,
+        [slotId],
+        false,
+      );
+
+      setRequests(res.data || []);
+      setAssignmentViewOpen(true);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoadingRequests(false);
     }
   }
 
@@ -332,6 +376,7 @@ export default function useCompetitionPaidTimePage(options) {
     var start = parseTimeToMinutes(getSlotStartTime(slot));
     var end = parseTimeToMinutes(getSlotEndTime(slot));
 
+    var effectiveEnd = end - 10;
     var cells = [];
     var current = start;
     var order = 1;
@@ -350,7 +395,7 @@ export default function useCompetitionPaidTimePage(options) {
       order++;
     });
 
-    while (current + 11 <= end) {
+    while (current + 11 <= effectiveEnd) {
       cells.push({
         slotId: getSlotId(slot),
         label: formatMinutesToTime(current).substring(0, 5),
@@ -399,6 +444,8 @@ export default function useCompetitionPaidTimePage(options) {
     });
 
     await loadRequests();
+    await loadSlots();
+
     onShowToast?.("success", "שובץ בהצלחה");
   }
 
@@ -409,6 +456,9 @@ export default function useCompetitionPaidTimePage(options) {
     });
 
     await loadRequests();
+    await loadSlots(); 
+
+    onShowToast?.("success", "הוסר שיבוץ");
   }
 
   /* =======================
@@ -461,5 +511,6 @@ export default function useCompetitionPaidTimePage(options) {
     handleDragEnd,
     handleAssignRequest,
     handleUnassignRequest,
+    openAssignmentForSlot,
   };
 }
