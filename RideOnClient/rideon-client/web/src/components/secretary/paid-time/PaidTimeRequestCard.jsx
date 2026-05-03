@@ -1,14 +1,43 @@
 import DraggableItem from "../../common/dnd/DraggableItem";
 
+function formatDate(value) {
+  if (!value) return "-";
+  return new Date(value).toLocaleDateString("he-IL");
+}
+
+function formatTime(value) {
+  if (!value) return "-";
+  return String(value).substring(0, 5);
+}
+
+function getPaidTimeType(productName) {
+  if (!productName) return "פייד־טיים";
+
+  if (productName.includes("ארוך")) {
+    return "ארוך";
+  }
+
+  if (productName.includes("קצר")) {
+    return "קצר";
+  }
+
+  return productName;
+}
+
 export default function PaidTimeRequestCard({ request, disabled }) {
   var id = request.paidTimeRequestId || request.PaidTimeRequestId;
-  var horseName = request.barnName || request.BarnName || request.horseName || request.HorseName;
+  var horseName =
+    request.barnName || request.BarnName || request.horseName || request.HorseName;
   var riderName = request.riderName || request.RiderName;
   var coachName = request.coachName || request.CoachName;
   var payerName = request.payerName || request.PayerName;
   var productName = request.productName || request.ProductName;
-  var duration = request.effectiveDurationMinutes || request.EffectiveDurationMinutes;
   var notes = request.notes || request.Notes;
+
+  var requestedDate = request.requestedSlotDate || request.RequestedSlotDate;
+  var requestedStart = request.requestedStartTime || request.RequestedStartTime;
+  var requestedEnd = request.requestedEndTime || request.RequestedEndTime;
+  var requestedArena = request.requestedArenaName || request.RequestedArenaName;
 
   return (
     <DraggableItem
@@ -30,14 +59,22 @@ export default function PaidTimeRequestCard({ request, disabled }) {
         </div>
 
         <span className="rounded-full bg-[#F5EDE8] px-2 py-1 text-[11px] font-semibold text-[#7B5A4D]">
-          {duration} דק׳
+          {getPaidTimeType(productName)}
         </span>
       </div>
 
       <div className="mt-2 space-y-1 text-xs text-[#7A655C]">
         <p>מאמן/ת: {coachName || "לא צוין"}</p>
         <p>משלם: {payerName}</p>
-        <p>סוג: {productName}</p>
+      </div>
+
+      <div className="mt-2 rounded-xl bg-[#F8F5F2] px-2 py-1.5 text-xs text-[#6B574F]">
+        <p className="font-semibold text-[#3F312B]">סשן מבוקש:</p>
+        <p>
+          {formatDate(requestedDate)} | {formatTime(requestedStart)}–
+          {formatTime(requestedEnd)}
+        </p>
+        <p>{requestedArena}</p>
       </div>
 
       {notes ? (
