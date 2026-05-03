@@ -38,7 +38,12 @@ namespace RideOnServer.DAL
                                 ArenaId = Convert.ToByte(reader["ArenaId"]),
                                 ArenaName = reader["ArenaName"] == DBNull.Value ? null : reader["ArenaName"].ToString(),
                                 SlotStatus = reader["SlotStatus"] == DBNull.Value ? null : reader["SlotStatus"].ToString(),
-                                SlotNotes = reader["SlotNotes"] == DBNull.Value ? null : reader["SlotNotes"].ToString()
+                                SlotNotes = reader["SlotNotes"] == DBNull.Value ? null : reader["SlotNotes"].ToString(),
+                                TotalCapacityMinutes = reader["TotalCapacityMinutes"] != DBNull.Value ? Convert.ToInt32(reader["TotalCapacityMinutes"]) : 0,
+                                UsedCapacityMinutes = reader["UsedCapacityMinutes"] != DBNull.Value ? Convert.ToInt32(reader["UsedCapacityMinutes"]) : 0,
+                                RemainingCapacityMinutes = reader["RemainingCapacityMinutes"] != DBNull.Value ? Convert.ToInt32(reader["RemainingCapacityMinutes"]) : 0,
+                                EstimatedAvailablePlaces = reader["EstimatedAvailablePlaces"] != DBNull.Value ? Convert.ToInt32(reader["EstimatedAvailablePlaces"]) : 0,
+                                AssignedCount = reader["AssignedCount"] != DBNull.Value ? Convert.ToInt32(reader["AssignedCount"]) : 0,
                             });
                         }
 

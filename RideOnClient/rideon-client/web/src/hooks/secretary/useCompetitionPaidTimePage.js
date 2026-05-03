@@ -1,11 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
-import { getPaidTimeSlotsByCompetitionId } from "../../services/paidTimeSlotInCompetitionService";
+
 import {
   getPaidTimeRequestsForAssignment,
   assignPaidTimeRequest,
   unassignPaidTimeRequest,
 } from "../../services/paidTimeRequestService";
+
+import {
+  getPaidTimeSlotsByCompetitionId,
+  getAllPaidTimeBaseSlots,
+  createPaidTimeSlotInCompetition,
+  updatePaidTimeSlotInCompetition,
+  deletePaidTimeSlotInCompetition,
+} from "../../services/paidTimeSlotInCompetitionService";
+
+import { getArenasByRanchId } from "../../services/arenaService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
+
+/* =======================
+   helpers
+======================= */
 
 function sortSlots(items) {
   return [...items].sort(function (a, b) {
@@ -40,15 +54,10 @@ function getSlotEndTime(slot) {
 }
 
 function parseTimeToMinutes(timeValue) {
-  if (!timeValue) {
-    return 0;
-  }
+  if (!timeValue) return 0;
 
   var parts = String(timeValue).split(":");
-  var hours = Number(parts[0] || 0);
-  var minutes = Number(parts[1] || 0);
-
-  return hours * 60 + minutes;
+  return Number(parts[0]) * 60 + Number(parts[1]);
 }
 
 function formatMinutesToTime(totalMinutes) {
@@ -73,11 +82,13 @@ function getAssignedOrder(request) {
 
 function getEffectiveDuration(request) {
   return Number(
-    request.effectiveDurationMinutes ||
-      request.EffectiveDurationMinutes ||
-      11,
+    request.effectiveDurationMinutes || request.EffectiveDurationMinutes || 11,
   );
 }
+
+/* =======================
+   HOOK
+======================= */
 
 export default function useCompetitionPaidTimePage(options) {
   var competitionId = options.competitionId;
@@ -87,44 +98,146 @@ export default function useCompetitionPaidTimePage(options) {
   var [slots, setSlots] = useState([]);
   var [requests, setRequests] = useState([]);
 
+  var [arenas, setArenas] = useState([]);
+  var [baseSlots, setBaseSlots] = useState([]);
+
   var [loadingSlots, setLoadingSlots] = useState(false);
   var [loadingRequests, setLoadingRequests] = useState(false);
   var [savingAssignment, setSavingAssignment] = useState(false);
 
   var [error, setError] = useState("");
+
   var [assignmentMode, setAssignmentMode] = useState(false);
   var [assignmentViewOpen, setAssignmentViewOpen] = useState(false);
+
   var [selectedSlotIds, setSelectedSlotIds] = useState([]);
   var [includeAllPending, setIncludeAllPending] = useState(false);
+
   var [activeRequest, setActiveRequest] = useState(null);
+
+  /* ===== MODAL STATE ===== */
+  var [paidTimeSlotModalOpen, setPaidTimeSlotModalOpen] = useState(false);
+  var [editPaidTimeSlotItem, setEditPaidTimeSlotItem] = useState(null);
+  var [savingPaidTimeSlot, setSavingPaidTimeSlot] = useState(false);
+  var [paidTimeSlotModalError, setPaidTimeSlotModalError] = useState("");
+
+  /* =======================
+     LOAD
+  ======================= */
 
   useEffect(
     function () {
       loadSlots();
+      loadArenas();
+      loadBaseSlots();
     },
     [competitionId, ranchId],
   );
 
   async function loadSlots() {
-    if (!competitionId || !ranchId) {
-      return;
-    }
+    if (!competitionId || !ranchId) return;
 
     try {
       setLoadingSlots(true);
       setError("");
 
-      var response = await getPaidTimeSlotsByCompetitionId(competitionId, ranchId);
+      var response = await getPaidTimeSlotsByCompetitionId(
+        competitionId,
+        ranchId,
+      );
+
       var items = Array.isArray(response.data) ? response.data : [];
 
       setSlots(sortSlots(items));
     } catch (error) {
-      console.error(error);
-      setError(getErrorMessage(error, "שגיאה בטעינת סלוטי פייד־טיים"));
+      setError(getErrorMessage(error, "שגיאה בטעינת סלוטים"));
     } finally {
       setLoadingSlots(false);
     }
   }
+
+  async function loadArenas() {
+    try {
+      var res = await getArenasByRanchId(ranchId);
+      setArenas(res.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function loadBaseSlots() {
+    if (!ranchId) {
+      return;
+    }
+
+    try {
+      var response = await getAllPaidTimeBaseSlots(ranchId);
+      setBaseSlots(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  /* =======================
+     CRUD SLOTS
+  ======================= */
+
+  function openCreatePaidTimeSlotModal() {
+    setEditPaidTimeSlotItem(null);
+    setPaidTimeSlotModalOpen(true);
+  }
+
+  function openEditPaidTimeSlotModal(slot) {
+    setEditPaidTimeSlotItem(slot);
+    setPaidTimeSlotModalOpen(true);
+  }
+
+  function closePaidTimeSlotModal() {
+    setPaidTimeSlotModalOpen(false);
+    setEditPaidTimeSlotItem(null);
+    setPaidTimeSlotModalError("");
+  }
+
+  async function handleSubmitPaidTimeSlot(data) {
+    try {
+      setSavingPaidTimeSlot(true);
+      setPaidTimeSlotModalError("");
+
+      if (editPaidTimeSlotItem) {
+        await updatePaidTimeSlotInCompetition(
+          getSlotId(editPaidTimeSlotItem),
+          data,
+        );
+      } else {
+        await createPaidTimeSlotInCompetition(data);
+      }
+
+      closePaidTimeSlotModal();
+      await loadSlots();
+
+      onShowToast?.("success", "הסלוט נשמר בהצלחה");
+    } catch (err) {
+      setPaidTimeSlotModalError(getErrorMessage(err));
+    } finally {
+      setSavingPaidTimeSlot(false);
+    }
+  }
+
+  async function handleDeletePaidTimeSlot(slot) {
+    if (!window.confirm("למחוק את הסלוט?")) return;
+
+    await deletePaidTimeSlotInCompetition(
+      getSlotId(slot),
+      competitionId,
+      ranchId,
+    );
+
+    await loadSlots();
+  }
+
+  /* =======================
+     ASSIGNMENT
+  ======================= */
 
   function enterAssignmentMode(slotId) {
     setAssignmentMode(true);
@@ -144,54 +257,41 @@ export default function useCompetitionPaidTimePage(options) {
     setAssignmentViewOpen(false);
     setSelectedSlotIds([]);
     setRequests([]);
-    setIncludeAllPending(false);
     setActiveRequest(null);
   }
 
   function toggleSlotSelection(slotId) {
-    setSelectedSlotIds(function (prev) {
-      if (prev.includes(slotId)) {
-        return prev.filter(function (id) {
-          return id !== slotId;
-        });
-      }
-
-      return [...prev, slotId];
-    });
+    setSelectedSlotIds((prev) =>
+      prev.includes(slotId)
+        ? prev.filter((id) => id !== slotId)
+        : [...prev, slotId],
+    );
   }
 
   async function loadRequests() {
-    if (!competitionId || !ranchId || selectedSlotIds.length === 0) {
-      return;
-    }
+    if (!competitionId || selectedSlotIds.length === 0) return;
 
     try {
       setLoadingRequests(true);
-      setError("");
 
-      var response = await getPaidTimeRequestsForAssignment(
+      var res = await getPaidTimeRequestsForAssignment(
         competitionId,
         ranchId,
         selectedSlotIds,
         includeAllPending,
       );
 
-      setRequests(Array.isArray(response.data) ? response.data : []);
+      setRequests(res.data || []);
       setAssignmentViewOpen(true);
-    } catch (error) {
-      console.error(error);
-      setError(getErrorMessage(error, "שגיאה בטעינת בקשות פייד־טיים"));
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setLoadingRequests(false);
     }
   }
 
   var selectedSlots = useMemo(
-    function () {
-      return slots.filter(function (slot) {
-        return selectedSlotIds.includes(getSlotId(slot));
-      });
-    },
+    () => slots.filter((s) => selectedSlotIds.includes(getSlotId(s))),
     [slots, selectedSlotIds],
   );
 
@@ -216,68 +316,50 @@ export default function useCompetitionPaidTimePage(options) {
   function getAssignedRequestsForSlot(slotId) {
     return assignedRequests
       .filter(function (request) {
-        return (
-          Number(request.assignedCompSlotId || request.AssignedCompSlotId) ===
-          Number(slotId)
-        );
+        var assignedSlotId =
+          request.assignedCompSlotId ?? request.AssignedCompSlotId;
+
+        return Number(assignedSlotId) === Number(slotId);
       })
       .sort(function (a, b) {
-        return Number(getAssignedOrder(a) || 0) - Number(getAssignedOrder(b) || 0);
+        return (
+          Number(getAssignedOrder(a) || 0) - Number(getAssignedOrder(b) || 0)
+        );
       });
   }
 
-  function buildTimeCellsForSlot(slot, assignedRequestsForSlot) {
-    var slotStart = parseTimeToMinutes(getSlotStartTime(slot));
-    var slotEnd = parseTimeToMinutes(getSlotEndTime(slot));
-    var defaultDuration = 11;
-
-    var assignedByOrder = {};
-    var assignedItems = Array.isArray(assignedRequestsForSlot)
-      ? assignedRequestsForSlot
-      : [];
-
-    assignedItems.forEach(function (request) {
-      var order = Number(getAssignedOrder(request));
-
-      if (order > 0) {
-        assignedByOrder[order] = request;
-      }
-    });
-
-    var activeDuration = activeRequest
-      ? getEffectiveDuration(activeRequest)
-      : defaultDuration;
+  function buildTimeCellsForSlot(slot, assigned) {
+    var start = parseTimeToMinutes(getSlotStartTime(slot));
+    var end = parseTimeToMinutes(getSlotEndTime(slot));
 
     var cells = [];
-    var current = slotStart;
+    var current = start;
     var order = 1;
-    var maxAssignedOrder = assignedItems.length + 1;
 
-    while (current < slotEnd) {
-      var assignment = assignedByOrder[order] || null;
-      var duration = assignment ? getEffectiveDuration(assignment) : activeDuration;
-
-      if (current + duration > slotEnd) {
-        break;
-      }
-
-      var timeValue = formatMinutesToTime(current);
+    assigned.forEach(function (req) {
+      var duration = getEffectiveDuration(req);
 
       cells.push({
         slotId: getSlotId(slot),
-        slotDate: getSlotDate(slot),
-        timeValue: timeValue,
-        label: timeValue.substring(0, 5),
+        label: formatMinutesToTime(current).substring(0, 5),
         assignedOrder: order,
-        assignment: assignment,
+        assignment: req,
       });
 
       current += duration;
-      order += 1;
+      order++;
+    });
 
-      if (order > maxAssignedOrder + 20) {
-        break;
-      }
+    while (current + 11 <= end) {
+      cells.push({
+        slotId: getSlotId(slot),
+        label: formatMinutesToTime(current).substring(0, 5),
+        assignedOrder: order,
+        assignment: null,
+      });
+
+      current += 11;
+      order++;
     }
 
     return cells;
@@ -308,63 +390,30 @@ export default function useCompetitionPaidTimePage(options) {
     );
   }
 
-  async function handleAssignRequest(requestId, slotId, assignedOrder) {
-    try {
-      setSavingAssignment(true);
+  async function handleAssignRequest(requestId, slotId, order) {
+    await assignPaidTimeRequest({
+      ranchId,
+      paidTimeRequestId: requestId,
+      assignedCompSlotId: slotId,
+      assignedOrder: order,
+    });
 
-      await assignPaidTimeRequest({
-        ranchId: ranchId,
-        paidTimeRequestId: requestId,
-        assignedCompSlotId: slotId,
-        assignedOrder: assignedOrder,
-      });
-
-      if (onShowToast) {
-        onShowToast("success", "השיבוץ בוצע בהצלחה");
-      }
-
-      await loadRequests();
-    } catch (error) {
-      console.error(error);
-
-      if (onShowToast) {
-        onShowToast(
-          "error",
-          getErrorMessage(error, "אירעה שגיאה בשיבוץ בקשת פייד־טיים"),
-        );
-      }
-    } finally {
-      setSavingAssignment(false);
-    }
+    await loadRequests();
+    onShowToast?.("success", "שובץ בהצלחה");
   }
 
   async function handleUnassignRequest(requestId) {
-    try {
-      setSavingAssignment(true);
+    await unassignPaidTimeRequest({
+      ranchId,
+      paidTimeRequestId: requestId,
+    });
 
-      await unassignPaidTimeRequest({
-        ranchId: ranchId,
-        paidTimeRequestId: requestId,
-      });
-
-      if (onShowToast) {
-        onShowToast("success", "השיבוץ בוטל בהצלחה");
-      }
-
-      await loadRequests();
-    } catch (error) {
-      console.error(error);
-
-      if (onShowToast) {
-        onShowToast(
-          "error",
-          getErrorMessage(error, "שגיאה בביטול שיבוץ פייד־טיים"),
-        );
-      }
-    } finally {
-      setSavingAssignment(false);
-    }
+    await loadRequests();
   }
+
+  /* =======================
+     RETURN
+  ======================= */
 
   return {
     slots,
@@ -372,9 +421,14 @@ export default function useCompetitionPaidTimePage(options) {
     selectedSlots,
     pendingRequests,
     assignedRequests,
+
+    arenas,
+    baseSlots,
+
     loadingSlots,
     loadingRequests,
     savingAssignment,
+
     error,
     assignmentMode,
     assignmentViewOpen,
@@ -382,6 +436,19 @@ export default function useCompetitionPaidTimePage(options) {
     includeAllPending,
     activeRequest,
 
+    /* modal */
+    paidTimeSlotModalOpen,
+    editPaidTimeSlotItem,
+    savingPaidTimeSlot,
+    paidTimeSlotModalError,
+
+    openCreatePaidTimeSlotModal,
+    openEditPaidTimeSlotModal,
+    closePaidTimeSlotModal,
+    handleSubmitPaidTimeSlot,
+    handleDeletePaidTimeSlot,
+
+    /* assignment */
     setIncludeAllPending,
     enterAssignmentMode,
     exitAssignmentMode,
@@ -392,6 +459,7 @@ export default function useCompetitionPaidTimePage(options) {
     buildTimeCellsForSlot,
     handleDragStart,
     handleDragEnd,
+    handleAssignRequest,
     handleUnassignRequest,
   };
 }

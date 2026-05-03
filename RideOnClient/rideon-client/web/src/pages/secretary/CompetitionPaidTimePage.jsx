@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   DndContext,
@@ -7,7 +7,16 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { CheckSquare, Eye, RefreshCw, Square, X } from "lucide-react";
+import {
+  CheckSquare,
+  Eye,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Square,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import DataTableShell from "../../components/common/table/DataTableShell";
@@ -17,6 +26,7 @@ import TableActionButton from "../../components/common/table/TableActionButton";
 import ToastMessage from "../../components/common/ToastMessage";
 import PaidTimeRequestCard from "../../components/secretary/paid-time/PaidTimeRequestCard";
 import PaidTimeScheduleCell from "../../components/secretary/paid-time/PaidTimeScheduleCell";
+import PaidTimeSlotInCompetitionModal from "../../components/secretary/PaidTimeSlotInCompetitionModal";
 import useCompetitionPaidTimePage from "../../hooks/secretary/useCompetitionPaidTimePage";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 
@@ -48,6 +58,18 @@ function getSlotStatus(slot) {
   return slot.slotStatus || slot.SlotStatus || "לא פורסם";
 }
 
+function getAssignedCount(slot) {
+  return Number(slot.assignedCount || slot.AssignedCount || 0);
+}
+
+function getAvailablePlaces(slot) {
+  return Number(slot.estimatedAvailablePlaces || slot.EstimatedAvailablePlaces || 0);
+}
+
+function getRemainingMinutes(slot) {
+  return Number(slot.remainingCapacityMinutes || slot.RemainingCapacityMinutes || 0);
+}
+
 function formatDate(value) {
   if (!value) {
     return "-";
@@ -64,7 +86,6 @@ function formatTime(value) {
   return String(value).substring(0, 5);
 }
 
-
 export default function CompetitionPaidTimePage() {
   const { competitionId } = useParams();
   const { activeRole } = useActiveRole();
@@ -76,6 +97,9 @@ export default function CompetitionPaidTimePage() {
     message: "",
   });
 
+  const [selectedDate, setSelectedDate] = useState("");
+  const [sortBy, setSortBy] = useState("date");
+
   const page = useCompetitionPaidTimePage({
     competitionId: Number(competitionId),
     ranchId: ranchId,
@@ -86,6 +110,64 @@ export default function CompetitionPaidTimePage() {
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
     }),
+  );
+
+  const uniqueDates = useMemo(
+    function () {
+      var dates = [];
+
+      page.slots.forEach(function (slot) {
+        var date = getSlotDate(slot);
+
+        if (date && !dates.includes(date)) {
+          dates.push(date);
+        }
+      });
+
+      return dates.sort();
+    },
+    [page.slots],
+  );
+
+  const visibleSlots = useMemo(
+    function () {
+      var filtered = page.slots.filter(function (slot) {
+        return !selectedDate || getSlotDate(slot) === selectedDate;
+      });
+
+      return [...filtered].sort(function (a, b) {
+        if (sortBy === "free") {
+          return getAvailablePlaces(b) - getAvailablePlaces(a);
+        }
+
+        if (sortBy === "assigned") {
+          return getAssignedCount(b) - getAssignedCount(a);
+        }
+
+        if (sortBy === "time") {
+          var aTime = String(getSlotStartTime(a) || "");
+          var bTime = String(getSlotStartTime(b) || "");
+
+          if (aTime !== bTime) {
+            return aTime.localeCompare(bTime);
+          }
+
+          return String(getSlotDate(a) || "").localeCompare(String(getSlotDate(b) || ""));
+        }
+
+        var aDate = String(getSlotDate(a) || "");
+        var bDate = String(getSlotDate(b) || "");
+
+        if (aDate !== bDate) {
+          return aDate.localeCompare(bDate);
+        }
+
+        return String(getSlotStartTime(a) || "").localeCompare(
+          String(getSlotStartTime(b) || ""),
+        );
+      });
+    },
+    [page.slots, selectedDate, sortBy],
   );
 
   function showToast(type, message) {
@@ -105,26 +187,44 @@ export default function CompetitionPaidTimePage() {
     });
   }
 
+  function renderCapacityBadge(slot) {
+    var assignedCount = getAssignedCount(slot);
+    var availablePlaces = getAvailablePlaces(slot);
+    var remainingMinutes = getRemainingMinutes(slot);
+
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="w-fit rounded-full bg-[#EEF8F0] px-3 py-1 text-xs font-semibold text-[#2F6B3B]">
+          {availablePlaces} מקומות פנויים
+        </span>
+
+        <span className="text-xs text-[#8D6E63]">
+          {assignedCount} משובצים • {remainingMinutes} דק׳ נותרו
+        </span>
+      </div>
+    );
+  }
+
   function renderSlotRows() {
     if (page.loadingSlots) {
       return (
         <DataTableLoadingState
-          colSpan={page.assignmentMode ? 8 : 7}
+          colSpan={page.assignmentMode ? 10 : 9}
           message="טוען סלוטי פייד־טיים..."
         />
       );
     }
 
-    if (!page.slots || page.slots.length === 0) {
+    if (!visibleSlots || visibleSlots.length === 0) {
       return (
         <DataTableEmptyState
-          colSpan={page.assignmentMode ? 8 : 7}
-          message="לא הוגדרו סלוטים לפייד־טיים בתחרות זו"
+          colSpan={page.assignmentMode ? 10 : 9}
+          message="לא נמצאו סלוטים להצגה"
         />
       );
     }
 
-    return page.slots.map(function (slot) {
+    return visibleSlots.map(function (slot) {
       var slotId = getSlotId(slot);
       var isSelected = page.selectedSlotIds.includes(slotId);
 
@@ -150,10 +250,13 @@ export default function CompetitionPaidTimePage() {
           <td className="px-4 py-3 font-semibold">
             {formatDate(getSlotDate(slot))}
           </td>
+
           <td className="px-4 py-3">{getSlotTimeOfDay(slot)}</td>
           <td className="px-4 py-3">{formatTime(getSlotStartTime(slot))}</td>
           <td className="px-4 py-3">{formatTime(getSlotEndTime(slot))}</td>
           <td className="px-4 py-3">{getSlotArenaName(slot)}</td>
+
+          <td className="px-4 py-3">{renderCapacityBadge(slot)}</td>
 
           <td className="px-4 py-3">
             <span className="rounded-full bg-[#F5EDE8] px-3 py-1 text-xs font-semibold text-[#7B5A4D]">
@@ -162,13 +265,38 @@ export default function CompetitionPaidTimePage() {
           </td>
 
           <td className="px-4 py-3">
-            <TableActionButton
-              label="צפה בשיבוץ"
-              icon={<Eye size={15} />}
-              onClick={function () {
-                page.enterAssignmentMode(slotId);
-              }}
-            />
+            <div className="flex flex-wrap justify-end gap-2">
+              <TableActionButton
+                label="צפה בשיבוץ"
+                icon={<Eye size={15} />}
+                onClick={function () {
+                  page.enterAssignmentMode(slotId);
+                }}
+              />
+
+              {!page.assignmentMode ? (
+                <>
+                  <TableActionButton
+                    icon={<Pencil size={15} />}
+                    iconOnly
+                    title="עריכת סלוט"
+                    onClick={function () {
+                      page.openEditPaidTimeSlotModal(slot);
+                    }}
+                  />
+
+                  <TableActionButton
+                    icon={<Trash2 size={15} />}
+                    iconOnly
+                    title="מחיקת סלוט"
+                    variant="danger"
+                    onClick={function () {
+                      page.handleDeletePaidTimeSlot(slot);
+                    }}
+                  />
+                </>
+              ) : null}
+            </div>
           </td>
         </tr>
       );
@@ -186,15 +314,56 @@ export default function CompetitionPaidTimePage() {
             </p>
           </div>
 
-          {page.assignmentMode ? (
-            <TableActionButton
-              label="פתח שיבוץ לסלוטים שנבחרו"
-              icon={<CheckSquare size={15} />}
-              onClick={page.loadRequests}
-              disabled={page.selectedSlotIds.length === 0}
-              loading={page.loadingRequests}
-            />
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={selectedDate}
+              onChange={function (event) {
+                setSelectedDate(event.target.value);
+              }}
+              className="h-10 rounded-xl border border-[#D7CCC8] bg-white px-3 text-sm text-[#5D4037]"
+            >
+              <option value="">כל הימים</option>
+              {uniqueDates.map(function (date) {
+                return (
+                  <option key={date} value={date}>
+                    {formatDate(date)}
+                  </option>
+                );
+              })}
+            </select>
+
+            <select
+              value={sortBy}
+              onChange={function (event) {
+                setSortBy(event.target.value);
+              }}
+              className="h-10 rounded-xl border border-[#D7CCC8] bg-white px-3 text-sm text-[#5D4037]"
+            >
+              <option value="date">מיון לפי תאריך</option>
+              <option value="time">מיון לפי שעה</option>
+              <option value="free">מיון לפי פנויים</option>
+              <option value="assigned">מיון לפי משובצים</option>
+            </select>
+
+            {!page.assignmentMode ? (
+              <TableActionButton
+                label="הוספת סלוט"
+                icon={<Plus size={15} />}
+                variant="success"
+                onClick={page.openCreatePaidTimeSlotModal}
+              />
+            ) : null}
+
+            {page.assignmentMode ? (
+              <TableActionButton
+                label="פתח שיבוץ לסלוטים שנבחרו"
+                icon={<CheckSquare size={15} />}
+                onClick={page.loadRequests}
+                disabled={page.selectedSlotIds.length === 0}
+                loading={page.loadingRequests}
+              />
+            ) : null}
+          </div>
         </div>
 
         <DataTableShell>
@@ -208,6 +377,7 @@ export default function CompetitionPaidTimePage() {
               <th className="px-4 py-3">התחלה</th>
               <th className="px-4 py-3">סיום</th>
               <th className="px-4 py-3">מגרש</th>
+              <th className="px-4 py-3">קיבולת</th>
               <th className="px-4 py-3">סטטוס</th>
               <th className="px-4 py-3">פעולות</th>
             </tr>
@@ -307,7 +477,7 @@ export default function CompetitionPaidTimePage() {
                     </div>
 
                     <span className="rounded-full bg-[#F5EDE8] px-3 py-1 text-xs font-semibold text-[#7B5A4D]">
-                      {page.getAssignedRequestsForSlot(slotId).length} משובצים
+                      {assignedForSlot.length} משובצים
                     </span>
                   </div>
 
@@ -317,7 +487,7 @@ export default function CompetitionPaidTimePage() {
 
                       return (
                         <div
-                          key={timeCell.slotId + "-" + timeCell.timeValue}
+                          key={timeCell.slotId + "-" + timeCell.assignedOrder}
                           className="grid grid-cols-[88px_1fr] border-b border-[#F3EAE4] last:border-b-0"
                         >
                           <div className="flex items-center justify-center bg-[#FAF5F1] text-sm font-bold text-[#7B5A4D]">
@@ -405,6 +575,17 @@ export default function CompetitionPaidTimePage() {
           renderSlotsView()
         )}
       </div>
+
+      <PaidTimeSlotInCompetitionModal
+        isOpen={page.paidTimeSlotModalOpen}
+        initialValue={page.editPaidTimeSlotItem}
+        baseSlots={page.baseSlots || []}
+        arenas={page.arenas || []}
+        saving={page.savingPaidTimeSlot}
+        error={page.paidTimeSlotModalError}
+        onClose={page.closePaidTimeSlotModal}
+        onSubmit={page.handleSubmitPaidTimeSlot}
+      />
 
       <ToastMessage
         isOpen={toast.isOpen}
