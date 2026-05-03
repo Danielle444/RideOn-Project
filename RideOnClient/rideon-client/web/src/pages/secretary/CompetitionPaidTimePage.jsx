@@ -29,6 +29,7 @@ import PaidTimeScheduleCell from "../../components/secretary/paid-time/PaidTimeS
 import PaidTimeSlotInCompetitionModal from "../../components/secretary/PaidTimeSlotInCompetitionModal";
 import useCompetitionPaidTimePage from "../../hooks/secretary/useCompetitionPaidTimePage";
 import { useActiveRole } from "../../context/ActiveRoleContext";
+import CustomDropdown from "../../components/common/CustomDropdown";
 
 function getSlotId(slot) {
   return slot.paidTimeSlotInCompId || slot.PaidTimeSlotInCompId;
@@ -72,12 +73,24 @@ function getPendingRequestsCount(slot) {
   return Number(slot.pendingRequestsCount || slot.PendingRequestsCount || 0);
 }
 
+function getCoachName(request) {
+  return request.coachName || request.CoachName || "";
+}
+
 function formatDate(value) {
   if (!value) {
     return "-";
   }
 
   return new Date(value).toLocaleDateString("he-IL");
+}
+
+function getDayName(value) {
+  if (!value) return "-";
+
+  return new Date(value).toLocaleDateString("he-IL", {
+    weekday: "long",
+  });
 }
 
 function formatTime(value) {
@@ -101,6 +114,8 @@ export default function CompetitionPaidTimePage() {
 
   const [selectedDate, setSelectedDate] = useState("");
   const [sortBy, setSortBy] = useState("date");
+  const [selectedCoach, setSelectedCoach] = useState("");
+  const [openDropdownKey, setOpenDropdownKey] = useState("");
 
   const page = useCompetitionPaidTimePage({
     competitionId: Number(competitionId),
@@ -176,6 +191,36 @@ export default function CompetitionPaidTimePage() {
       });
     },
     [page.slots, selectedDate, sortBy],
+  );
+
+  const coachOptions = useMemo(
+    function () {
+      var names = [];
+
+      page.requests.forEach(function (request) {
+        var coachName = getCoachName(request);
+
+        if (coachName && !names.includes(coachName)) {
+          names.push(coachName);
+        }
+      });
+
+      return names.sort();
+    },
+    [page.requests],
+  );
+
+  const filteredPendingRequests = useMemo(
+    function () {
+      if (!selectedCoach) {
+        return page.pendingRequests;
+      }
+
+      return page.pendingRequests.filter(function (request) {
+        return getCoachName(request) === selectedCoach;
+      });
+    },
+    [page.pendingRequests, selectedCoach],
   );
 
   function showToast(type, message) {
@@ -277,6 +322,7 @@ export default function CompetitionPaidTimePage() {
                 label="צפה בשיבוץ"
                 icon={<Eye size={15} />}
                 onClick={function () {
+                  setSelectedCoach("");
                   page.openAssignmentForSlot(slotId);
                 }}
               />
@@ -322,36 +368,61 @@ export default function CompetitionPaidTimePage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={selectedDate}
-              onChange={function (event) {
-                setSelectedDate(event.target.value);
-              }}
-              className="h-10 rounded-xl border border-[#D7CCC8] bg-white px-3 text-sm text-[#5D4037]"
-            >
-              <option value="">כל הימים</option>
-              {uniqueDates.map(function (date) {
-                return (
-                  <option key={date} value={date}>
-                    {formatDate(date)}
-                  </option>
-                );
-              })}
-            </select>
+            <div className="w-40">
+              <CustomDropdown
+                dropdownKey="date-filter"
+                openDropdownKey={openDropdownKey}
+                setOpenDropdownKey={setOpenDropdownKey}
+                value={selectedDate}
+                onChange={function (event) {
+                  setSelectedDate(event.target.value);
+                }}
+                options={[
+                  { value: "", label: "כל הימים" },
+                  ...uniqueDates.map(function (date) {
+                    return {
+                      value: date,
+                      label: getDayName(date) + " (" + formatDate(date) + ")",
+                    };
+                  }),
+                ]}
+                getOptionValue={function (option) {
+                  return option.value;
+                }}
+                getOptionLabel={function (option) {
+                  return option.label;
+                }}
+                placeholder="כל הימים"
+                searchable={false}
+              />
+            </div>
 
-            <select
-              value={sortBy}
-              onChange={function (event) {
-                setSortBy(event.target.value);
-              }}
-              className="h-10 rounded-xl border border-[#D7CCC8] bg-white px-3 text-sm text-[#5D4037]"
-            >
-              <option value="date">מיון לפי תאריך</option>
-              <option value="time">מיון לפי שעה</option>
-              <option value="free">מיון לפי פנויים</option>
-              <option value="pending">מיון לפי ממתינות</option>
-              <option value="assigned">מיון לפי משובצים</option>
-            </select>
+            <div className="w-44">
+              <CustomDropdown
+                dropdownKey="slot-sort"
+                openDropdownKey={openDropdownKey}
+                setOpenDropdownKey={setOpenDropdownKey}
+                value={sortBy}
+                onChange={function (event) {
+                  setSortBy(event.target.value);
+                }}
+                options={[
+                  { value: "date", label: "מיון לפי תאריך" },
+                  { value: "time", label: "מיון לפי שעה" },
+                  { value: "free", label: "מיון לפי פנויים" },
+                  { value: "pending", label: "מיון לפי ממתינות" },
+                  { value: "assigned", label: "מיון לפי משובצים" },
+                ]}
+                getOptionValue={function (option) {
+                  return option.value;
+                }}
+                getOptionLabel={function (option) {
+                  return option.label;
+                }}
+                placeholder="מיון לפי"
+                searchable={false}
+              />
+            </div>
 
             {!page.assignmentMode ? (
               <TableActionButton
@@ -412,7 +483,7 @@ export default function CompetitionPaidTimePage() {
                   בקשות ממתינות
                 </h2>
                 <p className="text-xs text-[#8D6E63]">
-                  {page.pendingRequests.length} בקשות לגרירה
+                  {filteredPendingRequests.length} בקשות לגרירה
                 </p>
               </div>
 
@@ -430,11 +501,35 @@ export default function CompetitionPaidTimePage() {
                 type="checkbox"
                 checked={page.includeAllPending}
                 onChange={function (event) {
-                  page.setIncludeAllPending(event.target.checked);
+                  page.handleIncludeAllPendingChange(event.target.checked);
                 }}
               />
-              הצג את כל הבקשות הממתינות בתחרות
+              הצג את כל הבקשות הממתינות באותו יום
             </label>
+
+            <CustomDropdown
+              dropdownKey="coach-filter"
+              openDropdownKey={openDropdownKey}
+              setOpenDropdownKey={setOpenDropdownKey}
+              value={selectedCoach}
+              onChange={function (event) {
+                setSelectedCoach(event.target.value);
+              }}
+              options={[
+                { value: "", label: "כל המאמנים" },
+                ...coachOptions.map(function (coachName) {
+                  return { value: coachName, label: coachName };
+                }),
+              ]}
+              getOptionValue={function (option) {
+                return option.value;
+              }}
+              getOptionLabel={function (option) {
+                return option.label;
+              }}
+              placeholder="סינון לפי מאמן"
+              searchable={true}
+            />
 
             <div className="max-h-[62vh] space-y-3 overflow-y-auto pr-1">
               {page.loadingRequests ? (
@@ -443,13 +538,13 @@ export default function CompetitionPaidTimePage() {
                 </p>
               ) : null}
 
-              {!page.loadingRequests && page.pendingRequests.length === 0 ? (
+              {!page.loadingRequests && filteredPendingRequests.length === 0 ? (
                 <p className="py-6 text-center text-sm text-[#BCAAA4]">
                   אין בקשות ממתינות להצגה
                 </p>
               ) : null}
 
-              {page.pendingRequests.map(function (request) {
+              {filteredPendingRequests.map(function (request) {
                 return (
                   <PaidTimeRequestCard
                     key={request.paidTimeRequestId || request.PaidTimeRequestId}
@@ -477,7 +572,7 @@ export default function CompetitionPaidTimePage() {
                       <h3 className="text-lg font-bold text-[#3F312B]">
                         {formatTime(getSlotStartTime(slot))}–
                         {formatTime(getSlotEndTime(slot))} |{" "}
-                        {formatDate(getSlotDate(slot))}
+                        {getDayName(getSlotDate(slot))}
                       </h3>
                       <p className="text-xs text-[#8D6E63]">
                         {getSlotArenaName(slot)} • {getSlotTimeOfDay(slot)}
@@ -506,6 +601,7 @@ export default function CompetitionPaidTimePage() {
                             timeCell={timeCell}
                             assignment={assignment}
                             onUnassign={page.handleUnassignRequest}
+                            selectedCoach={selectedCoach}
                           />
                         </div>
                       );
@@ -557,6 +653,7 @@ export default function CompetitionPaidTimePage() {
                 label="מצב שיבוץ"
                 icon={<CheckSquare size={15} />}
                 onClick={function () {
+                  setSelectedCoach("");
                   page.enterAssignmentMode();
                 }}
               />

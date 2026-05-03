@@ -86,6 +86,20 @@ function getEffectiveDuration(request) {
   );
 }
 
+function normalizeDateOnly(value) {
+  if (!value) {
+    return "";
+  }
+
+  return String(value).substring(0, 10);
+}
+
+function getRequestRequestedDate(request) {
+  return normalizeDateOnly(
+    request.requestedSlotDate || request.RequestedSlotDate,
+  );
+}
+
 /* =======================
    HOOK
 ======================= */
@@ -203,13 +217,31 @@ export default function useCompetitionPaidTimePage(options) {
       setSavingPaidTimeSlot(true);
       setPaidTimeSlotModalError("");
 
+      var payload = {
+        CompetitionId: Number(competitionId),
+        HostRanchId: Number(ranchId),
+        ArenaRanchId: Number(ranchId),
+
+        PaidTimeSlotId: Number(data.paidTimeSlotId),
+        ArenaId: Number(data.arenaId),
+
+        SlotDate: data.slotDate,
+        StartTime: data.startTime,
+        EndTime: data.endTime,
+
+        SlotStatus: data.slotStatus,
+        SlotNotes: data.slotNotes,
+      };
+
       if (editPaidTimeSlotItem) {
-        await updatePaidTimeSlotInCompetition(
-          getSlotId(editPaidTimeSlotItem),
-          data,
-        );
+        var id = getSlotId(editPaidTimeSlotItem);
+
+        await updatePaidTimeSlotInCompetition(id, {
+          ...payload,
+          PaidTimeSlotInCompId: id,
+        });
       } else {
-        await createPaidTimeSlotInCompetition(data);
+        await createPaidTimeSlotInCompetition(payload);
       }
 
       closePaidTimeSlotModal();
@@ -287,7 +319,8 @@ export default function useCompetitionPaidTimePage(options) {
         false,
       );
 
-      setRequests(res.data || []);
+      var items = Array.isArray(res.data) ? res.data : [];
+      setRequests(items);
       setAssignmentViewOpen(true);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -325,8 +358,65 @@ export default function useCompetitionPaidTimePage(options) {
         includeAllPending,
       );
 
-      setRequests(res.data || []);
+      var items = Array.isArray(res.data) ? res.data : [];
+
+      if (includeAllPending) {
+        var selectedDates = slots
+          .filter(function (slot) {
+            return selectedSlotIds.includes(getSlotId(slot));
+          })
+          .map(function (slot) {
+            return normalizeDateOnly(getSlotDate(slot));
+          });
+
+        items = items.filter(function (request) {
+          return selectedDates.includes(getRequestRequestedDate(request));
+        });
+      }
+
+      setRequests(items);
       setAssignmentViewOpen(true);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoadingRequests(false);
+    }
+  }
+
+  async function handleIncludeAllPendingChange(value) {
+    setIncludeAllPending(value);
+
+    if (!assignmentViewOpen || selectedSlotIds.length === 0) {
+      return;
+    }
+
+    try {
+      setLoadingRequests(true);
+
+      var res = await getPaidTimeRequestsForAssignment(
+        competitionId,
+        ranchId,
+        selectedSlotIds,
+        value,
+      );
+
+      var items = Array.isArray(res.data) ? res.data : [];
+
+      if (value) {
+        var selectedDates = slots
+          .filter(function (slot) {
+            return selectedSlotIds.includes(getSlotId(slot));
+          })
+          .map(function (slot) {
+            return normalizeDateOnly(getSlotDate(slot));
+          });
+
+        items = items.filter(function (request) {
+          return selectedDates.includes(getRequestRequestedDate(request));
+        });
+      }
+
+      setRequests(items);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -375,35 +465,38 @@ export default function useCompetitionPaidTimePage(options) {
   function buildTimeCellsForSlot(slot, assigned) {
     var start = parseTimeToMinutes(getSlotStartTime(slot));
     var end = parseTimeToMinutes(getSlotEndTime(slot));
-
     var effectiveEnd = end - 10;
+
+    var assignedMap = {};
+
+    assigned.forEach(function (request) {
+      var order = Number(getAssignedOrder(request));
+
+      if (order > 0) {
+        assignedMap[order] = request;
+      }
+    });
+
     var cells = [];
     var current = start;
     var order = 1;
 
-    assigned.forEach(function (req) {
-      var duration = getEffectiveDuration(req);
+    while (current + 11 <= effectiveEnd || assignedMap[order]) {
+      var assignment = assignedMap[order] || null;
+      var duration = assignment ? getEffectiveDuration(assignment) : 11;
+
+      if (current + duration > effectiveEnd && !assignment) {
+        break;
+      }
 
       cells.push({
         slotId: getSlotId(slot),
         label: formatMinutesToTime(current).substring(0, 5),
         assignedOrder: order,
-        assignment: req,
+        assignment: assignment,
       });
 
       current += duration;
-      order++;
-    });
-
-    while (current + 11 <= effectiveEnd) {
-      cells.push({
-        slotId: getSlotId(slot),
-        label: formatMinutesToTime(current).substring(0, 5),
-        assignedOrder: order,
-        assignment: null,
-      });
-
-      current += 11;
       order++;
     }
 
@@ -456,7 +549,7 @@ export default function useCompetitionPaidTimePage(options) {
     });
 
     await loadRequests();
-    await loadSlots(); 
+    await loadSlots();
 
     onShowToast?.("success", "הוסר שיבוץ");
   }
@@ -500,6 +593,7 @@ export default function useCompetitionPaidTimePage(options) {
 
     /* assignment */
     setIncludeAllPending,
+    handleIncludeAllPendingChange,
     enterAssignmentMode,
     exitAssignmentMode,
     toggleSlotSelection,
