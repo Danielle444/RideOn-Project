@@ -16,10 +16,13 @@ namespace RideOnServer.BL
         public TimeSpan EndTime { get; set; }
         public string? SlotStatus { get; set; }
         public string? SlotNotes { get; set; }
-
-        // UI helpers
         public string? TimeOfDay { get; set; }
         public string? ArenaName { get; set; }
+        public int TotalCapacityMinutes { get; set; }
+        public int UsedCapacityMinutes { get; set; }
+        public int RemainingCapacityMinutes { get; set; }
+        public int EstimatedAvailablePlaces { get; set; }
+        public int AssignedCount { get; set; }
 
         internal static List<PaidTimeSlotInCompetition> GetPaidTimeSlotsByCompetitionId(int competitionId)
         {
