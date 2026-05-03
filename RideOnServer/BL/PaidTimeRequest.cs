@@ -65,9 +65,9 @@ namespace RideOnServer.BL
                 throw new Exception("Invalid AssignedCompSlotId");
             }
 
-            if (request.AssignedStartTime == default)
+            if (request.AssignedOrder <= 0)
             {
-                throw new Exception("Invalid AssignedStartTime");
+                throw new Exception("Invalid AssignedOrder");
             }
 
             PaidTimeRequestDAL dal = new PaidTimeRequestDAL();

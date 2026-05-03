@@ -90,6 +90,7 @@ namespace RideOnServer.DAL
                                     RequestedCompSlotId = Convert.ToInt32(reader["RequestedCompSlotId"]),
                                     AssignedCompSlotId = reader["AssignedCompSlotId"] == DBNull.Value ? null : Convert.ToInt32(reader["AssignedCompSlotId"]),
                                     AssignedStartTime = reader["AssignedStartTime"] == DBNull.Value ? null : Convert.ToDateTime(reader["AssignedStartTime"]),
+                                    AssignedOrder = reader["AssignedOrder"] == DBNull.Value ? null : Convert.ToInt32(reader["AssignedOrder"]),
                                     Status = reader["Status"]?.ToString() ?? string.Empty,
                                     Notes = reader["Notes"] == DBNull.Value ? null : reader["Notes"].ToString(),
 
@@ -146,17 +147,17 @@ namespace RideOnServer.DAL
                     connection.Open();
 
                     using (NpgsqlCommand command = new NpgsqlCommand(@"
-                        SELECT public.usp_assignpaidtimerequest(
-                            p_ranchid := @ranchId,
-                            p_paidtimerequestid := @paidTimeRequestId,
-                            p_assignedcompslotid := @assignedCompSlotId,
-                            p_assignedstarttime := @assignedStartTime
-                        );", connection))
+                SELECT public.usp_assignpaidtimerequest(
+                    p_ranchid := @ranchId,
+                    p_paidtimerequestid := @paidTimeRequestId,
+                    p_assignedcompslotid := @assignedCompSlotId,
+                    p_assignedorder := @assignedOrder
+                );", connection))
                     {
                         command.Parameters.Add("@ranchId", NpgsqlDbType.Integer).Value = request.RanchId;
                         command.Parameters.Add("@paidTimeRequestId", NpgsqlDbType.Integer).Value = request.PaidTimeRequestId;
                         command.Parameters.Add("@assignedCompSlotId", NpgsqlDbType.Integer).Value = request.AssignedCompSlotId;
-                        command.Parameters.Add("@assignedStartTime", NpgsqlDbType.TimestampTz).Value = request.AssignedStartTime;
+                        command.Parameters.Add("@assignedOrder", NpgsqlDbType.Integer).Value = request.AssignedOrder;
 
                         command.ExecuteNonQuery();
                     }

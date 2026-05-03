@@ -14,38 +14,44 @@ export default function PaidTimeScheduleCell({ timeCell, assignment, onUnassign 
     ? assignment.riderName || assignment.RiderName
     : "";
 
+  var productName = assignment
+    ? assignment.productName || assignment.ProductName
+    : "";
+
   return (
     <DroppableBox
-      id={"paid-time-cell-" + timeCell.slotId + "-" + timeCell.timeValue}
+      id={"paid-time-cell-" + timeCell.slotId + "-" + timeCell.assignedOrder}
       data={{ timeCell: timeCell }}
-      disabled={!!assignment}
+      disabled={false}
       className={[
-        "relative min-h-[68px] rounded-2xl border p-2 text-right transition-all",
-        assignment
-          ? "border-[#A5836A] bg-[#EFEBE9]"
-          : "border-[#D7CCC8] bg-white hover:border-[#BCAAA4]",
+        "relative min-h-[58px] border-0 border-r border-[#EFE5DF] bg-white px-4 py-3 text-right transition-all",
+        assignment ? "bg-[#EFEBE9]" : "hover:bg-[#FAF5F1]",
       ].join(" ")}
-      overClassName="scale-[1.02] border-[#795548] bg-[#F5EDE8]"
+      overClassName="bg-[#F5EDE8] ring-2 ring-[#795548]"
     >
-      <div className="text-xs font-bold text-[#8D6E63]">{timeCell.label}</div>
-
       {assignment ? (
-        <div className="mt-2">
-          <p className="text-sm font-bold text-[#3F312B]">{horseName}</p>
-          <p className="text-xs text-[#7A655C]">{riderName}</p>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-[#3F312B]">{horseName}</p>
+            <p className="text-xs text-[#7A655C]">
+              {riderName} {productName ? "• " + productName : ""}
+            </p>
+          </div>
 
           <button
             type="button"
             onClick={function () {
               onUnassign(requestId);
             }}
-            className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-100 text-red-500 hover:bg-red-200"
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-red-500 hover:bg-red-200"
           >
-            <X size={13} />
+            <X size={14} />
           </button>
         </div>
       ) : (
-        <p className="mt-2 text-xs text-[#BCAAA4]">גררי לכאן בקשה</p>
+        <p className="text-xs text-[#BCAAA4]">
+          גררי לכאן בקשה {timeCell.assignedOrder}
+        </p>
       )}
     </DroppableBox>
   );

@@ -64,6 +64,7 @@ function formatTime(value) {
   return String(value).substring(0, 5);
 }
 
+
 export default function CompetitionPaidTimePage() {
   const { competitionId } = useParams();
   const { activeRole } = useActiveRole();
@@ -161,37 +162,195 @@ export default function CompetitionPaidTimePage() {
           </td>
 
           <td className="px-4 py-3">
-            <div className="flex justify-end gap-2">
-              <TableActionButton
-                label="צפה בשיבוץ"
-                icon={<Eye size={15} />}
-                onClick={function () {
-                  page.enterAssignmentMode(slotId);
-                }}
-              />
-            </div>
+            <TableActionButton
+              label="צפה בשיבוץ"
+              icon={<Eye size={15} />}
+              onClick={function () {
+                page.enterAssignmentMode(slotId);
+              }}
+            />
           </td>
         </tr>
       );
     });
   }
 
-  function getAssignmentForCell(timeCell) {
-    return page.assignedRequests.find(function (request) {
-      var assignedSlotId =
-        request.assignedCompSlotId || request.AssignedCompSlotId;
-      var assignedStartTime =
-        request.assignedStartTime || request.AssignedStartTime;
+  function renderSlotsView() {
+    return (
+      <section className="rounded-3xl border border-[#EFE5DF] bg-[#FFFDFB] p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-[#3F312B]">סלוטים בתחרות</h2>
+            <p className="text-xs text-[#8D6E63]">
+              בחרי סלוט אחד או יותר כדי לשבץ בקשות ממתינות
+            </p>
+          </div>
 
-      if (!assignedStartTime) {
-        return false;
-      }
+          {page.assignmentMode ? (
+            <TableActionButton
+              label="פתח שיבוץ לסלוטים שנבחרו"
+              icon={<CheckSquare size={15} />}
+              onClick={page.loadRequests}
+              disabled={page.selectedSlotIds.length === 0}
+              loading={page.loadingRequests}
+            />
+          ) : null}
+        </div>
 
-      return (
-        Number(assignedSlotId) === Number(timeCell.slotId) &&
-        String(assignedStartTime).includes(timeCell.timeValue.substring(0, 5))
-      );
-    });
+        <DataTableShell>
+          <thead className="bg-[#FAF5F1] text-sm text-[#6B574F]">
+            <tr>
+              {page.assignmentMode ? (
+                <th className="px-4 py-3">בחירה</th>
+              ) : null}
+              <th className="px-4 py-3">תאריך</th>
+              <th className="px-4 py-3">זמן ביום</th>
+              <th className="px-4 py-3">התחלה</th>
+              <th className="px-4 py-3">סיום</th>
+              <th className="px-4 py-3">מגרש</th>
+              <th className="px-4 py-3">סטטוס</th>
+              <th className="px-4 py-3">פעולות</th>
+            </tr>
+          </thead>
+
+          <tbody>{renderSlotRows()}</tbody>
+        </DataTableShell>
+      </section>
+    );
+  }
+
+  function renderAssignmentView() {
+    return (
+      <DndContext
+        sensors={sensors}
+        onDragStart={page.handleDragStart}
+        onDragEnd={page.handleDragEnd}
+      >
+        <section className="grid grid-cols-1 gap-5 xl:grid-cols-[330px_1fr]">
+          <aside className="rounded-3xl border border-[#EFE5DF] bg-white p-4 shadow-sm xl:sticky xl:top-6 xl:max-h-[78vh]">
+            <div className="mb-3 flex items-start justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-bold text-[#3F312B]">
+                  בקשות ממתינות
+                </h2>
+                <p className="text-xs text-[#8D6E63]">
+                  {page.pendingRequests.length} בקשות לגרירה
+                </p>
+              </div>
+
+              <TableActionButton
+                icon={<RefreshCw size={15} />}
+                iconOnly
+                title="רענון בקשות"
+                onClick={page.loadRequests}
+                loading={page.loadingRequests}
+              />
+            </div>
+
+            <label className="mb-3 flex items-center gap-2 rounded-2xl bg-[#FAF5F1] px-3 py-2 text-xs text-[#6B574F]">
+              <input
+                type="checkbox"
+                checked={page.includeAllPending}
+                onChange={function (event) {
+                  page.setIncludeAllPending(event.target.checked);
+                }}
+              />
+              הצג את כל הבקשות הממתינות בתחרות
+            </label>
+
+            <div className="max-h-[62vh] space-y-3 overflow-y-auto pr-1">
+              {page.loadingRequests ? (
+                <p className="py-6 text-center text-sm text-[#8D6E63]">
+                  טוען בקשות...
+                </p>
+              ) : null}
+
+              {!page.loadingRequests && page.pendingRequests.length === 0 ? (
+                <p className="py-6 text-center text-sm text-[#BCAAA4]">
+                  אין בקשות ממתינות להצגה
+                </p>
+              ) : null}
+
+              {page.pendingRequests.map(function (request) {
+                return (
+                  <PaidTimeRequestCard
+                    key={request.paidTimeRequestId || request.PaidTimeRequestId}
+                    request={request}
+                    disabled={page.savingAssignment}
+                  />
+                );
+              })}
+            </div>
+          </aside>
+
+          <div className="space-y-4">
+            {page.selectedSlots.map(function (slot) {
+              var slotId = getSlotId(slot);
+              var assignedForSlot = page.getAssignedRequestsForSlot(slotId);
+              var timeCells = page.buildTimeCellsForSlot(slot, assignedForSlot);
+
+              return (
+                <div
+                  key={slotId}
+                  className="rounded-3xl border border-[#EFE5DF] bg-[#FFFDFB] p-4 shadow-sm"
+                >
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-[#EFE5DF] pb-3">
+                    <div>
+                      <h3 className="text-lg font-bold text-[#3F312B]">
+                        {formatTime(getSlotStartTime(slot))}–
+                        {formatTime(getSlotEndTime(slot))} |{" "}
+                        {formatDate(getSlotDate(slot))}
+                      </h3>
+                      <p className="text-xs text-[#8D6E63]">
+                        {getSlotArenaName(slot)} • {getSlotTimeOfDay(slot)}
+                      </p>
+                    </div>
+
+                    <span className="rounded-full bg-[#F5EDE8] px-3 py-1 text-xs font-semibold text-[#7B5A4D]">
+                      {page.getAssignedRequestsForSlot(slotId).length} משובצים
+                    </span>
+                  </div>
+
+                  <div className="overflow-hidden rounded-2xl border border-[#EFE5DF] bg-white">
+                    {timeCells.map(function (timeCell) {
+                      var assignment = timeCell.assignment;
+
+                      return (
+                        <div
+                          key={timeCell.slotId + "-" + timeCell.timeValue}
+                          className="grid grid-cols-[88px_1fr] border-b border-[#F3EAE4] last:border-b-0"
+                        >
+                          <div className="flex items-center justify-center bg-[#FAF5F1] text-sm font-bold text-[#7B5A4D]">
+                            {timeCell.label}
+                          </div>
+
+                          <PaidTimeScheduleCell
+                            timeCell={timeCell}
+                            assignment={assignment}
+                            onUnassign={page.handleUnassignRequest}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <DragOverlay>
+          {page.activeRequest ? (
+            <div className="w-72">
+              <PaidTimeRequestCard
+                request={page.activeRequest}
+                disabled={false}
+              />
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+    );
   }
 
   return (
@@ -201,28 +360,20 @@ export default function CompetitionPaidTimePage() {
           <div>
             <h1 className="text-2xl font-bold text-[#3F312B]">פייד־טיים</h1>
             <p className="text-sm text-[#8D6E63]">
-              ניהול סלוטים ושיבוץ בקשות פייד־טיים עבור התחרות הפעילה
+              {page.assignmentMode
+                ? "גררי בקשות ממתינות אל תוך לו״ז הפייד־טיים"
+                : "ניהול סלוטים ושיבוץ בקשות פייד־טיים עבור התחרות הפעילה"}
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             {page.assignmentMode ? (
-              <>
-                <TableActionButton
-                  label="טען בקשות"
-                  icon={<RefreshCw size={15} />}
-                  onClick={page.loadRequests}
-                  disabled={page.selectedSlotIds.length === 0}
-                  loading={page.loadingRequests}
-                />
-
-                <TableActionButton
-                  label="סגור מצב שיבוץ"
-                  icon={<X size={15} />}
-                  variant="danger"
-                  onClick={page.exitAssignmentMode}
-                />
-              </>
+              <TableActionButton
+                label="חזרה לרשימת סלוטים"
+                icon={<X size={15} />}
+                variant="danger"
+                onClick={page.exitAssignmentMode}
+              />
             ) : (
               <TableActionButton
                 label="מצב שיבוץ"
@@ -241,162 +392,18 @@ export default function CompetitionPaidTimePage() {
           </div>
         ) : null}
 
-        <section className="rounded-3xl border border-[#EFE5DF] bg-[#FFFDFB] p-4 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold text-[#3F312B]">
-                סלוטים בתחרות
-              </h2>
-              <p className="text-xs text-[#8D6E63]">
-                בחרי סלוט אחד או יותר כדי לשבץ בקשות ממתינות
-              </p>
+        {page.assignmentMode && !page.assignmentViewOpen ? (
+          <>
+            <div className="rounded-2xl border border-[#EFE5DF] bg-[#FAF5F1] px-4 py-3 text-sm text-[#7A655C]">
+              בחרי סלוט אחד או יותר מהרשימה כדי לפתוח את מסך השיבוץ.
             </div>
-
-            {page.assignmentMode ? (
-              <label className="flex items-center gap-2 text-sm text-[#6B574F]">
-                <input
-                  type="checkbox"
-                  checked={page.includeAllPending}
-                  onChange={function (event) {
-                    page.setIncludeAllPending(event.target.checked);
-                  }}
-                />
-                הצג את כל הבקשות הממתינות בתחרות
-              </label>
-            ) : null}
-          </div>
-
-          <DataTableShell>
-            <thead className="bg-[#FAF5F1] text-sm text-[#6B574F]">
-              <tr>
-                {page.assignmentMode ? (
-                  <th className="px-4 py-3">בחירה</th>
-                ) : null}
-                <th className="px-4 py-3">תאריך</th>
-                <th className="px-4 py-3">זמן ביום</th>
-                <th className="px-4 py-3">התחלה</th>
-                <th className="px-4 py-3">סיום</th>
-                <th className="px-4 py-3">מגרש</th>
-                <th className="px-4 py-3">סטטוס</th>
-                <th className="px-4 py-3">פעולות</th>
-              </tr>
-            </thead>
-
-            <tbody>{renderSlotRows()}</tbody>
-          </DataTableShell>
-        </section>
-
-        {page.assignmentMode ? (
-          <DndContext
-            sensors={sensors}
-            onDragStart={page.handleDragStart}
-            onDragEnd={page.handleDragEnd}
-          >
-            <section className="grid grid-cols-1 gap-5 xl:grid-cols-[320px_1fr]">
-              <aside className="rounded-3xl border border-[#EFE5DF] bg-white p-4 shadow-sm">
-                <div className="mb-3">
-                  <h2 className="text-lg font-bold text-[#3F312B]">
-                    בקשות ממתינות
-                  </h2>
-                  <p className="text-xs text-[#8D6E63]">
-                    {page.pendingRequests.length} בקשות לגרירה
-                  </p>
-                </div>
-
-                <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
-                  {page.loadingRequests ? (
-                    <p className="py-6 text-center text-sm text-[#8D6E63]">
-                      טוען בקשות...
-                    </p>
-                  ) : null}
-
-                  {!page.loadingRequests &&
-                  page.pendingRequests.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-[#BCAAA4]">
-                      אין בקשות ממתינות להצגה
-                    </p>
-                  ) : null}
-
-                  {page.pendingRequests.map(function (request) {
-                    return (
-                      <PaidTimeRequestCard
-                        key={
-                          request.paidTimeRequestId || request.PaidTimeRequestId
-                        }
-                        request={request}
-                        disabled={page.savingAssignment}
-                      />
-                    );
-                  })}
-                </div>
-              </aside>
-
-              <div className="space-y-4">
-                {page.selectedSlots.length === 0 ? (
-                  <div className="rounded-3xl border border-dashed border-[#D7CCC8] bg-[#FAF5F1] p-8 text-center text-sm text-[#8D6E63]">
-                    בחרי סלוט אחד או יותר מהטבלה כדי להתחיל שיבוץ
-                  </div>
-                ) : null}
-
-                {page.selectedSlots.map(function (slot) {
-                  var slotId = getSlotId(slot);
-                  var timeCells = page.buildTimeCellsForSlot(slot);
-
-                  return (
-                    <div
-                      key={slotId}
-                      className="rounded-3xl border border-[#EFE5DF] bg-[#FFFDFB] p-4 shadow-sm"
-                    >
-                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <h3 className="text-base font-bold text-[#3F312B]">
-                            {formatDate(getSlotDate(slot))} |{" "}
-                            {formatTime(getSlotStartTime(slot))}–
-                            {formatTime(getSlotEndTime(slot))}
-                          </h3>
-                          <p className="text-xs text-[#8D6E63]">
-                            {getSlotArenaName(slot)} • {getSlotTimeOfDay(slot)}
-                          </p>
-                        </div>
-
-                        <span className="rounded-full bg-[#F5EDE8] px-3 py-1 text-xs font-semibold text-[#7B5A4D]">
-                          {page.getAssignedRequestsForSlot(slotId).length}{" "}
-                          משובצים
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-3">
-                        {timeCells.map(function (timeCell) {
-                          var assignment = getAssignmentForCell(timeCell);
-
-                          return (
-                            <PaidTimeScheduleCell
-                              key={timeCell.slotId + "-" + timeCell.timeValue}
-                              timeCell={timeCell}
-                              assignment={assignment}
-                              onUnassign={page.handleUnassignRequest}
-                            />
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-
-            <DragOverlay>
-              {page.activeRequest ? (
-                <div className="w-72">
-                  <PaidTimeRequestCard
-                    request={page.activeRequest}
-                    disabled={false}
-                  />
-                </div>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
-        ) : null}
+            {renderSlotsView()}
+          </>
+        ) : page.assignmentMode ? (
+          renderAssignmentView()
+        ) : (
+          renderSlotsView()
+        )}
       </div>
 
       <ToastMessage

@@ -63,8 +63,20 @@ function formatMinutesToTime(totalMinutes) {
   );
 }
 
-function buildAssignedStartTime(slotDate, timeValue) {
-  return `${slotDate}T${timeValue}Z`;
+function getRequestId(request) {
+  return request.paidTimeRequestId || request.PaidTimeRequestId;
+}
+
+function getAssignedOrder(request) {
+  return request.assignedOrder || request.AssignedOrder;
+}
+
+function getEffectiveDuration(request) {
+  return Number(
+    request.effectiveDurationMinutes ||
+      request.EffectiveDurationMinutes ||
+      11,
+  );
 }
 
 export default function useCompetitionPaidTimePage(options) {
@@ -81,6 +93,7 @@ export default function useCompetitionPaidTimePage(options) {
 
   var [error, setError] = useState("");
   var [assignmentMode, setAssignmentMode] = useState(false);
+  var [assignmentViewOpen, setAssignmentViewOpen] = useState(false);
   var [selectedSlotIds, setSelectedSlotIds] = useState([]);
   var [includeAllPending, setIncludeAllPending] = useState(false);
   var [activeRequest, setActiveRequest] = useState(null);
@@ -115,6 +128,7 @@ export default function useCompetitionPaidTimePage(options) {
 
   function enterAssignmentMode(slotId) {
     setAssignmentMode(true);
+    setAssignmentViewOpen(false);
     setRequests([]);
     setIncludeAllPending(false);
 
@@ -127,6 +141,7 @@ export default function useCompetitionPaidTimePage(options) {
 
   function exitAssignmentMode() {
     setAssignmentMode(false);
+    setAssignmentViewOpen(false);
     setSelectedSlotIds([]);
     setRequests([]);
     setIncludeAllPending(false);
@@ -162,6 +177,7 @@ export default function useCompetitionPaidTimePage(options) {
       );
 
       setRequests(Array.isArray(response.data) ? response.data : []);
+      setAssignmentViewOpen(true);
     } catch (error) {
       console.error(error);
       setError(getErrorMessage(error, "שגיאה בטעינת בקשות פייד־טיים"));
@@ -169,17 +185,6 @@ export default function useCompetitionPaidTimePage(options) {
       setLoadingRequests(false);
     }
   }
-
-  useEffect(
-    function () {
-      if (!assignmentMode || selectedSlotIds.length === 0) {
-        return;
-      }
-
-      loadRequests();
-    },
-    [assignmentMode, selectedSlotIds, includeAllPending],
-  );
 
   var selectedSlots = useMemo(
     function () {
@@ -209,23 +214,53 @@ export default function useCompetitionPaidTimePage(options) {
   );
 
   function getAssignedRequestsForSlot(slotId) {
-    return assignedRequests.filter(function (request) {
-      return Number(request.assignedCompSlotId || request.AssignedCompSlotId) === Number(slotId);
-    });
+    return assignedRequests
+      .filter(function (request) {
+        return (
+          Number(request.assignedCompSlotId || request.AssignedCompSlotId) ===
+          Number(slotId)
+        );
+      })
+      .sort(function (a, b) {
+        return Number(getAssignedOrder(a) || 0) - Number(getAssignedOrder(b) || 0);
+      });
   }
 
-  function buildTimeCellsForSlot(slot) {
+  function buildTimeCellsForSlot(slot, assignedRequestsForSlot) {
     var slotStart = parseTimeToMinutes(getSlotStartTime(slot));
     var slotEnd = parseTimeToMinutes(getSlotEndTime(slot));
+    var defaultDuration = 11;
 
-    var step = activeRequest
-      ? Number(activeRequest.effectiveDurationMinutes || activeRequest.EffectiveDurationMinutes || 5)
-      : 5;
+    var assignedByOrder = {};
+    var assignedItems = Array.isArray(assignedRequestsForSlot)
+      ? assignedRequestsForSlot
+      : [];
+
+    assignedItems.forEach(function (request) {
+      var order = Number(getAssignedOrder(request));
+
+      if (order > 0) {
+        assignedByOrder[order] = request;
+      }
+    });
+
+    var activeDuration = activeRequest
+      ? getEffectiveDuration(activeRequest)
+      : defaultDuration;
 
     var cells = [];
     var current = slotStart;
+    var order = 1;
+    var maxAssignedOrder = assignedItems.length + 1;
 
-    while (current + step <= slotEnd) {
+    while (current < slotEnd) {
+      var assignment = assignedByOrder[order] || null;
+      var duration = assignment ? getEffectiveDuration(assignment) : activeDuration;
+
+      if (current + duration > slotEnd) {
+        break;
+      }
+
       var timeValue = formatMinutesToTime(current);
 
       cells.push({
@@ -233,10 +268,16 @@ export default function useCompetitionPaidTimePage(options) {
         slotDate: getSlotDate(slot),
         timeValue: timeValue,
         label: timeValue.substring(0, 5),
-        assignedStartTime: buildAssignedStartTime(getSlotDate(slot), timeValue),
+        assignedOrder: order,
+        assignment: assignment,
       });
 
-      current += step;
+      current += duration;
+      order += 1;
+
+      if (order > maxAssignedOrder + 20) {
+        break;
+      }
     }
 
     return cells;
@@ -261,13 +302,13 @@ export default function useCompetitionPaidTimePage(options) {
     }
 
     await handleAssignRequest(
-      request.paidTimeRequestId || request.PaidTimeRequestId,
+      getRequestId(request),
       timeCell.slotId,
-      timeCell.assignedStartTime,
+      timeCell.assignedOrder,
     );
   }
 
-  async function handleAssignRequest(requestId, slotId, assignedStartTime) {
+  async function handleAssignRequest(requestId, slotId, assignedOrder) {
     try {
       setSavingAssignment(true);
 
@@ -275,7 +316,7 @@ export default function useCompetitionPaidTimePage(options) {
         ranchId: ranchId,
         paidTimeRequestId: requestId,
         assignedCompSlotId: slotId,
-        assignedStartTime: assignedStartTime,
+        assignedOrder: assignedOrder,
       });
 
       if (onShowToast) {
@@ -289,7 +330,7 @@ export default function useCompetitionPaidTimePage(options) {
       if (onShowToast) {
         onShowToast(
           "error",
-          getErrorMessage(error, "שגיאה בשיבוץ בקשת פייד־טיים"),
+          getErrorMessage(error, "אירעה שגיאה בשיבוץ בקשת פייד־טיים"),
         );
       }
     } finally {
@@ -336,6 +377,7 @@ export default function useCompetitionPaidTimePage(options) {
     savingAssignment,
     error,
     assignmentMode,
+    assignmentViewOpen,
     selectedSlotIds,
     includeAllPending,
     activeRequest,

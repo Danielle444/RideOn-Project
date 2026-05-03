@@ -8,6 +8,6 @@
 
         public int AssignedCompSlotId { get; set; }
 
-        public DateTime AssignedStartTime { get; set; }
+        public int AssignedOrder { get; set; }
     }
 }
