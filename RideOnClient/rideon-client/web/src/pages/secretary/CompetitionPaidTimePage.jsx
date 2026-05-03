@@ -85,6 +85,14 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString("he-IL");
 }
 
+function getDayName(value) {
+  if (!value) return "-";
+
+  return new Date(value).toLocaleDateString("he-IL", {
+    weekday: "long",
+  });
+}
+
 function formatTime(value) {
   if (!value) {
     return "-";
@@ -374,7 +382,7 @@ export default function CompetitionPaidTimePage() {
                   ...uniqueDates.map(function (date) {
                     return {
                       value: date,
-                      label: formatDate(date),
+                      label: getDayName(date) + " (" + formatDate(date) + ")",
                     };
                   }),
                 ]}
@@ -564,7 +572,7 @@ export default function CompetitionPaidTimePage() {
                       <h3 className="text-lg font-bold text-[#3F312B]">
                         {formatTime(getSlotStartTime(slot))}–
                         {formatTime(getSlotEndTime(slot))} |{" "}
-                        {formatDate(getSlotDate(slot))}
+                        {getDayName(getSlotDate(slot))}
                       </h3>
                       <p className="text-xs text-[#8D6E63]">
                         {getSlotArenaName(slot)} • {getSlotTimeOfDay(slot)}
