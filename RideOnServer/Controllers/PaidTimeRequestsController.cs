@@ -121,7 +121,7 @@ namespace RideOnServer.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in AssignPaidTimeRequest: {ex.Message}");
-                return BadRequest("אירעה שגיאה בשיבוץ בקשת פייד־טיים");
+                return BadRequest(ex.Message);
             }
         }
 
