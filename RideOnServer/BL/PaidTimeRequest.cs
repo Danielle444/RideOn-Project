@@ -95,6 +95,97 @@ namespace RideOnServer.BL
             dal.UnassignPaidTimeRequest(request);
         }
 
+        internal static BulkCreatePaidTimeRequestsResponse BulkCreate(BulkCreatePaidTimeRequestsRequest request, int createdByPersonId)
+        {
+            ValidateBulkCreateRequest(request);
+
+            PaidTimeRequestDAL dal = new PaidTimeRequestDAL();
+
+            List<PaidTimeSlotCapacityWarning> warnings = dal.CheckSlotCapacity(request.Items);
+            List<PaidTimeSlotCapacityWarning> overflows = warnings
+                .Where(w => w.WouldOverflow)
+                .ToList();
+
+            if (overflows.Count > 0 && !request.ConfirmedOverflow)
+            {
+                return new BulkCreatePaidTimeRequestsResponse
+                {
+                    Created = false,
+                    Warnings = overflows,
+                    Message = "סלוט אחד או יותר עומדים לחרוג מהקיבולת. אשר במפורש כדי להמשיך."
+                };
+            }
+
+            (List<int> createdIds, int batchId) = dal.BulkCreatePaidTimeRequests(request, createdByPersonId);
+
+            return new BulkCreatePaidTimeRequestsResponse
+            {
+                Created = true,
+                BatchId = batchId,
+                CreatedRequestIds = createdIds,
+                Warnings = overflows,
+                Message = $"נוצרו {createdIds.Count} בקשות בהצלחה"
+            };
+        }
+
+        private static void ValidateBulkCreateRequest(BulkCreatePaidTimeRequestsRequest request)
+        {
+            if (request == null)
+            {
+                throw new Exception("Request is required");
+            }
+
+            if (request.OrderedBySystemUserId <= 0)
+            {
+                throw new Exception("Invalid OrderedBySystemUserId");
+            }
+
+            if (request.RanchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            if (request.CompetitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            if (request.Items == null || request.Items.Count == 0)
+            {
+                throw new Exception("At least one item is required");
+            }
+
+            for (int i = 0; i < request.Items.Count; i++)
+            {
+                BulkPaidTimeRequestItem item = request.Items[i];
+
+                if (item.HorseId <= 0)
+                {
+                    throw new Exception($"Invalid HorseId at item {i + 1}");
+                }
+                if (item.RiderFederationMemberId <= 0)
+                {
+                    throw new Exception($"Invalid RiderFederationMemberId at item {i + 1}");
+                }
+                if (item.CoachFederationMemberId <= 0)
+                {
+                    throw new Exception($"Invalid CoachFederationMemberId at item {i + 1}");
+                }
+                if (item.PaidByPersonId <= 0)
+                {
+                    throw new Exception($"Invalid PaidByPersonId at item {i + 1}");
+                }
+                if (item.PriceCatalogId <= 0)
+                {
+                    throw new Exception($"Invalid PriceCatalogId at item {i + 1}");
+                }
+                if (item.RequestedCompSlotId <= 0)
+                {
+                    throw new Exception($"Invalid RequestedCompSlotId at item {i + 1}");
+                }
+            }
+        }
+
         private static void ValidateCreateRequest(CreatePaidTimeRequestRequest request)
         {
             if (request == null)

@@ -251,6 +251,13 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             canSubmit={paidTime.canSubmit}
             isSaving={paidTime.isSaving}
             onSubmit={paidTime.handleCreatePaidTimeRequest}
+            onStartChatbot={function () {
+              props.navigation.navigate("PaidTimeChatbot", {
+                ranchId: activeRole?.ranchId,
+                competitionId: competitionId,
+                roleId: activeRole?.roleId,
+              });
+            }}
           />
         ) : null}
 

@@ -258,6 +258,7 @@ CREATE TABLE public.paidtimerequest (
   assignedstarttime timestamp with time zone,
   status character varying NOT NULL CHECK (status::text = ANY (ARRAY['Pending'::character varying, 'Assigned'::character varying, 'Cancelled'::character varying]::text[])),
   notes character varying,
+  assignedorder integer,
   CONSTRAINT paidtimerequest_pkey PRIMARY KEY (paidtimerequestid),
   CONSTRAINT fk_paidtimerequest_servicerequest FOREIGN KEY (paidtimerequestid) REFERENCES public.servicerequest(srequestid),
   CONSTRAINT fk_paidtimerequest_pricecatalog FOREIGN KEY (pricecatalogid) REFERENCES public.pricecatalog(pricecatalogid),

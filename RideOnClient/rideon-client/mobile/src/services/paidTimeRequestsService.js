@@ -4,4 +4,8 @@ function createPaidTimeRequest(payload) {
   return axios.post("/PaidTimeRequests", payload);
 }
 
-export { createPaidTimeRequest };
+function bulkCreatePaidTimeRequests(payload) {
+  return axios.post("/PaidTimeRequests/bulk", payload);
+}
+
+export { createPaidTimeRequest, bulkCreatePaidTimeRequests };
