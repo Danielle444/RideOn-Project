@@ -20,6 +20,7 @@ import AdminCompetitionClassesScreen from "../screens/roles/admin/screens/AdminC
 import AdminCompetitionStallsShavingsScreen from "../screens/roles/admin/screens/AdminCompetitionStallsShavingsScreen";
 import AdminCompetitionPaidTimesScreen from "../screens/roles/admin/screens/AdminCompetitionPaidTimesScreen";
 import AdminCompetitionHealthCertificatesScreen from "../screens/roles/admin/screens/AdminCompetitionHealthCertificatesScreen";
+import PaidTimeChatbotScreen from "../screens/competitions/PaidTimeChatbotScreen";
 import AdminAddPayerScreen from "../screens/roles/admin/screens/AdminAddPayerScreen";
 import AdminEditPayerScreen from "../screens/roles/admin/screens/AdminEditPayerScreen";
 import AdminCompetitionPayerAccountScreen from "../screens/roles/admin/screens/AdminCompetitionPayerAccountScreen";
@@ -283,6 +284,16 @@ export default function AppNavigator(props) {
               {...screenProps}
               onLogout={props.onLogout}
             />,
+          );
+        }}
+      </Stack.Screen>
+
+      <Stack.Screen name="PaidTimeChatbot">
+        {function (screenProps) {
+          return withGuard(
+            screenProps,
+            ["אדמין חווה"],
+            <PaidTimeChatbotScreen {...screenProps} />,
           );
         }}
       </Stack.Screen>

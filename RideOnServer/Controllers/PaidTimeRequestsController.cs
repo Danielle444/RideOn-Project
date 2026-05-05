@@ -157,5 +157,40 @@ namespace RideOnServer.Controllers
                 return BadRequest("אירעה שגיאה בביטול שיבוץ בקשת פייד־טיים");
             }
         }
+
+        [HttpPost("bulk")]
+        public IActionResult BulkCreatePaidTimeRequests([FromBody] BulkCreatePaidTimeRequestsRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.RanchAdmin
+                );
+
+                request.OrderedBySystemUserId = personId;
+
+                BulkCreatePaidTimeRequestsResponse response = PaidTimeRequest.BulkCreate(request, personId);
+
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in BulkCreatePaidTimeRequests: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת בקשות פייד־טיים מרובות");
+            }
+        }
     }
 }

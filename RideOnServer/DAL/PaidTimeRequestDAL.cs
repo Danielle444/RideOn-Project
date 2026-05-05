@@ -1,4 +1,5 @@
-﻿using Npgsql;
+﻿using System.Text.Json;
+using Npgsql;
 using NpgsqlTypes;
 using RideOnServer.BL.DTOs.Competition.PaidTimeRequests;
 
@@ -194,6 +195,119 @@ namespace RideOnServer.DAL
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
+        }
+
+        public List<PaidTimeSlotCapacityWarning> CheckSlotCapacity(List<BulkPaidTimeRequestItem> items)
+        {
+            List<PaidTimeSlotCapacityWarning> result = new List<PaidTimeSlotCapacityWarning>();
+
+            var minimal = items.Select(i => new
+            {
+                requestedCompSlotId = i.RequestedCompSlotId,
+                priceCatalogId = i.PriceCatalogId
+            });
+            string itemsJson = JsonSerializer.Serialize(minimal);
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = new NpgsqlCommand(@"
+                        SELECT *
+                        FROM public.usp_checkpaidtimeslotcapacity(
+                            p_items := @items::jsonb
+                        );", connection))
+                    {
+                        command.Parameters.Add("@items", NpgsqlDbType.Jsonb).Value = itemsJson;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                result.Add(new PaidTimeSlotCapacityWarning
+                                {
+                                    RequestedCompSlotId = Convert.ToInt32(reader["RequestedCompSlotId"]),
+                                    TotalCapacityMinutes = Convert.ToInt32(reader["TotalCapacityMinutes"]),
+                                    UsedCapacityMinutes = Convert.ToInt32(reader["UsedCapacityMinutes"]),
+                                    NewRequestMinutes = Convert.ToInt32(reader["NewRequestMinutes"]),
+                                    WouldOverflow = Convert.ToBoolean(reader["WouldOverflow"])
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+
+            return result;
+        }
+
+        public (List<int> CreatedRequestIds, int BatchId) BulkCreatePaidTimeRequests(BulkCreatePaidTimeRequestsRequest request, int createdByPersonId)
+        {
+            List<int> createdIds = new List<int>();
+            int batchId = 0;
+
+            string itemsJson = JsonSerializer.Serialize(request.Items.Select(i => new
+            {
+                horseId = i.HorseId,
+                riderFederationMemberId = i.RiderFederationMemberId,
+                coachFederationMemberId = i.CoachFederationMemberId,
+                paidByPersonId = i.PaidByPersonId,
+                priceCatalogId = i.PriceCatalogId,
+                requestedCompSlotId = i.RequestedCompSlotId,
+                notes = i.Notes
+            }));
+
+            string metadataJson = request.Metadata.HasValue
+                ? request.Metadata.Value.GetRawText()
+                : "{}";
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = new NpgsqlCommand(@"
+                        SELECT *
+                        FROM public.usp_bulkinsertpaidtimerequests(
+                            p_orderedbysystemuserid := @orderedBySystemUserId,
+                            p_ranchid               := @ranchId,
+                            p_competitionid         := @competitionId,
+                            p_createdbypersonid     := @createdByPersonId,
+                            p_items                 := @items::jsonb,
+                            p_metadata              := @metadata::jsonb
+                        );", connection))
+                    {
+                        command.Parameters.Add("@orderedBySystemUserId", NpgsqlDbType.Integer).Value = request.OrderedBySystemUserId;
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer).Value = request.RanchId;
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer).Value = request.CompetitionId;
+                        command.Parameters.Add("@createdByPersonId", NpgsqlDbType.Integer).Value = createdByPersonId;
+                        command.Parameters.Add("@items", NpgsqlDbType.Jsonb).Value = itemsJson;
+                        command.Parameters.Add("@metadata", NpgsqlDbType.Jsonb).Value = metadataJson;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                createdIds.Add(Convert.ToInt32(reader["PaidTimeRequestId"]));
+                                batchId = Convert.ToInt32(reader["BatchId"]);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+
+            return (createdIds, batchId);
         }
     }
 }
