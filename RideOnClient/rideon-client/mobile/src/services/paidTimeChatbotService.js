@@ -1,7 +1,5 @@
 import { getCompetitionInvitationDetails } from "./competitionService";
-import { getHorsesByRanch } from "./horsesService";
-import { getManagedPayers } from "./payerService";
-import { getRidersByRanch, getTrainersByRanch } from "./federationMembersService";
+import { getPaidTimeCandidatesByRanch } from "./entriesService";
 
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
@@ -96,20 +94,71 @@ function buildDays(slotsByDay) {
     });
 }
 
+function lookupKey(coachId, horseId) {
+  return String(coachId) + "-" + String(horseId);
+}
+
+function buildCoachesWithHorses(candidates) {
+  const byCoach = new Map();
+
+  for (const c of safeArray(candidates)) {
+    const coachId = c.coachFederationMemberId;
+    if (!coachId) continue;
+
+    if (!byCoach.has(coachId)) {
+      byCoach.set(coachId, {
+        coachFederationMemberId: coachId,
+        coachName: c.coachName || "מאמן",
+        horses: new Map(),
+      });
+    }
+
+    const entry = byCoach.get(coachId);
+    if (!entry.horses.has(c.horseId)) {
+      entry.horses.set(c.horseId, {
+        horseId: c.horseId,
+        horseName: c.horseName || "",
+        barnName: c.barnName || "",
+      });
+    }
+  }
+
+  return Array.from(byCoach.values()).map(function (e) {
+    return {
+      coachFederationMemberId: e.coachFederationMemberId,
+      coachName: e.coachName,
+      horses: Array.from(e.horses.values()),
+    };
+  });
+}
+
+function buildEntryLookup(candidates) {
+  const out = {};
+  for (const c of safeArray(candidates)) {
+    if (!c.coachFederationMemberId || !c.horseId) continue;
+    const key = lookupKey(c.coachFederationMemberId, c.horseId);
+    if (!out[key]) {
+      out[key] = {
+        entryId: c.entryId,
+        classInCompId: c.classInCompId,
+        riderFederationMemberId: c.riderFederationMemberId,
+        riderName: c.riderName || "",
+        paidByPersonId: c.paidByPersonId,
+        payerName: c.payerName || "",
+      };
+    }
+  }
+  return out;
+}
+
 async function loadPaidTimeChatbotContext({ ranchId, competitionId, roleId }) {
   const results = await Promise.all([
     getCompetitionInvitationDetails(competitionId, roleId, ranchId),
-    getHorsesByRanch(ranchId, null),
-    getManagedPayers(ranchId, null, null),
-    getRidersByRanch(ranchId, null),
-    getTrainersByRanch(ranchId, null),
+    getPaidTimeCandidatesByRanch(competitionId, ranchId),
   ]);
 
   const invitation = results[0]?.data || {};
-  const horsesRaw = safeArray(results[1]?.data);
-  const payersRaw = safeArray(results[2]?.data);
-  const ridersRaw = safeArray(results[3]?.data);
-  const trainersRaw = safeArray(results[4]?.data);
+  const candidates = safeArray(results[1]?.data);
 
   const paidTimeSection = findPaidTimeSection(invitation.servicePriceSections);
   const priceCatalog = buildPriceCatalog(paidTimeSection?.items);
@@ -118,11 +167,12 @@ async function loadPaidTimeChatbotContext({ ranchId, competitionId, roleId }) {
   const arenas = buildArenas(slotsByDay);
   const days = buildDays(slotsByDay);
 
+  const coachesWithHorses = buildCoachesWithHorses(candidates);
+  const entryLookup = buildEntryLookup(candidates);
+
   return {
-    coaches: trainersRaw,
-    horses: horsesRaw,
-    riders: ridersRaw,
-    payers: payersRaw,
+    coachesWithHorses: coachesWithHorses,
+    entryLookup: entryLookup,
     days: days,
     arenas: arenas,
     slotsByDay: slotsByDay,
@@ -130,4 +180,4 @@ async function loadPaidTimeChatbotContext({ ranchId, competitionId, roleId }) {
   };
 }
 
-export { loadPaidTimeChatbotContext };
+export { loadPaidTimeChatbotContext, lookupKey };

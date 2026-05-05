@@ -18,5 +18,20 @@ namespace RideOnServer.BL
             EntryDAL dal = new EntryDAL();
             return dal.InsertEntry(request);
         }
+
+        public static List<PaidTimeCandidateItem> GetPaidTimeCandidatesByRanch(int competitionId, int ranchId)
+        {
+            if (competitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+            if (ranchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            EntryDAL dal = new EntryDAL();
+            return dal.GetPaidTimeCandidatesByRanch(competitionId, ranchId);
+        }
     }
 }

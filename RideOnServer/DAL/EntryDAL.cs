@@ -1,4 +1,5 @@
 ﻿using Npgsql;
+using NpgsqlTypes;
 using RideOnServer.BL.DTOs.Competition.Entry;
 
 namespace RideOnServer.DAL
@@ -11,7 +12,7 @@ namespace RideOnServer.DAL
             {
                 { "@p_classincompid", request.ClassInCompId },
                 { "@p_orderedbysystemuserid", request.OrderedBySystemUserId },
-                { "@p_ranchid", request.RanchId }, 
+                { "@p_ranchid", request.RanchId },
                 { "@p_horseid", request.HorseId },
                 { "@p_riderfederationmemberid", request.RiderFederationMemberId },
                 { "@p_paidbypersonid", request.PaidByPersonId },
@@ -36,6 +37,59 @@ namespace RideOnServer.DAL
             }
 
             return Convert.ToInt32(result);
+        }
+
+        public List<PaidTimeCandidateItem> GetPaidTimeCandidatesByRanch(int competitionId, int ranchId)
+        {
+            List<PaidTimeCandidateItem> result = new List<PaidTimeCandidateItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = new NpgsqlCommand(@"
+                        SELECT *
+                        FROM public.usp_getpaidtimecandidatesbyranch(
+                            p_competitionid := @competitionId,
+                            p_ranchid       := @ranchId
+                        );", connection))
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer).Value = competitionId;
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer).Value = ranchId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                result.Add(new PaidTimeCandidateItem
+                                {
+                                    EntryId = Convert.ToInt32(reader["EntryId"]),
+                                    ClassInCompId = Convert.ToInt32(reader["ClassInCompId"]),
+                                    HorseId = Convert.ToInt32(reader["HorseId"]),
+                                    HorseName = reader["HorseName"]?.ToString() ?? string.Empty,
+                                    BarnName = reader["BarnName"] == DBNull.Value
+                                        ? null
+                                        : reader["BarnName"].ToString(),
+                                    CoachFederationMemberId = Convert.ToInt32(reader["CoachFederationMemberId"]),
+                                    CoachName = reader["CoachName"]?.ToString() ?? string.Empty,
+                                    RiderFederationMemberId = Convert.ToInt32(reader["RiderFederationMemberId"]),
+                                    RiderName = reader["RiderName"]?.ToString() ?? string.Empty,
+                                    PaidByPersonId = Convert.ToInt32(reader["PaidByPersonId"]),
+                                    PayerName = reader["PayerName"]?.ToString() ?? string.Empty
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+
+            return result;
         }
     }
 }
