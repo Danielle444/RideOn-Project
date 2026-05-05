@@ -1,6 +1,5 @@
 import React from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import CompetitionPaidTimeFormCard from "./CompetitionPaidTimeFormCard";
 import styles from "../../styles/adminCompetitionPaidTimesStyles";
 
@@ -20,30 +19,6 @@ export default function CompetitionPaidTimeTab(props) {
         <View style={styles.errorCard}>
           <Text style={styles.errorText}>{props.screenError}</Text>
         </View>
-      ) : null}
-
-      {props.onStartChatbot ? (
-        <Pressable
-          onPress={props.onStartChatbot}
-          style={{
-            flexDirection: "row-reverse",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "#5A4036",
-            paddingVertical: 12,
-            paddingHorizontal: 16,
-            borderRadius: 10,
-            marginBottom: 12,
-            gap: 8,
-          }}
-        >
-          <Ionicons name="sparkles" size={18} color="#FFFFFF" />
-          <Text
-            style={{ color: "#FFFFFF", fontSize: 15, fontWeight: "700" }}
-          >
-            התחל הזמנה חכמה
-          </Text>
-        </Pressable>
       ) : null}
 
       <CompetitionPaidTimeFormCard

@@ -48,5 +48,41 @@ namespace RideOnServer.Controllers
                 return BadRequest("אירעה שגיאה ביצירת הרשמה למקצה");
             }
         }
+
+        [HttpGet("paid-time-candidates")]
+        public IActionResult GetPaidTimeCandidatesByRanch(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (competitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                List<PaidTimeCandidateItem> items =
+                    Entry.GetPaidTimeCandidatesByRanch(competitionId, ranchId);
+
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetPaidTimeCandidatesByRanch: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת מועמדים לפייד טיים");
+            }
+        }
     }
 }

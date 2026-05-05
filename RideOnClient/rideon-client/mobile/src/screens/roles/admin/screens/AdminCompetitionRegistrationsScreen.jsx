@@ -23,6 +23,9 @@ import useAdminCompetitionStallBookings from "../../../../hooks/useAdminCompetit
 import CompetitionShavingsTab from "../../../../components/competitionRegistrations/CompetitionShavingsTab";
 import useAdminCompetitionShavings from "../../../../hooks/useAdminCompetitionShavings";
 
+import PaidTimeChatbotModal from "../../../../components/competitions/paidTimeChatbot/PaidTimeChatbotModal";
+import SmartBookingFab from "../../../../components/competitions/paidTimeChatbot/SmartBookingFab";
+
 function RegistrationsTabs(props) {
   return (
     <View style={styles.tabsWrapper}>
@@ -107,6 +110,7 @@ function RegistrationsTabs(props) {
 
 export default function AdminCompetitionRegistrationsScreen(props) {
   var [activeTab, setActiveTab] = useState("classes");
+  var [isChatbotOpen, setIsChatbotOpen] = useState(false);
 
   var userContext = useUser();
   var activeRoleContext = useActiveRole();
@@ -251,13 +255,6 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             canSubmit={paidTime.canSubmit}
             isSaving={paidTime.isSaving}
             onSubmit={paidTime.handleCreatePaidTimeRequest}
-            onStartChatbot={function () {
-              props.navigation.navigate("PaidTimeChatbot", {
-                ranchId: activeRole?.ranchId,
-                competitionId: competitionId,
-                roleId: activeRole?.roleId,
-              });
-            }}
           />
         ) : null}
 
@@ -370,6 +367,24 @@ export default function AdminCompetitionRegistrationsScreen(props) {
           />
         ) : null}
       </ScrollView>
+
+      {activeTab === "paidTimes" && !paidTime.loading ? (
+        <SmartBookingFab
+          onConfirm={function () {
+            setIsChatbotOpen(true);
+          }}
+        />
+      ) : null}
+
+      <PaidTimeChatbotModal
+        visible={isChatbotOpen}
+        ranchId={activeRole?.ranchId}
+        competitionId={competitionId}
+        roleId={activeRole?.roleId}
+        onClose={function () {
+          setIsChatbotOpen(false);
+        }}
+      />
     </MobileScreenLayout>
   );
 }

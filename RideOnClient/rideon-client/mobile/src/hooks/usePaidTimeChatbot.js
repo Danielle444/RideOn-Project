@@ -105,6 +105,7 @@ function buildItems(answers, context) {
 
   const items = [];
   const coachIds = answers.selectedCoachIds || [];
+  const entryLookup = context.entryLookup || {};
 
   for (const coachId of coachIds) {
     const horseIds = answers.horsesPerCoach[coachId] || [];
@@ -117,8 +118,16 @@ function buildItems(answers, context) {
       const slot = findSlotForHorse(answers, context, coachId);
       if (!slot) continue;
 
-      const riderId = answers.riderPerHorse[horseId];
-      const payerId = answers.payerPerHorse[horseId];
+      const lookupKey = String(coachId) + "-" + String(horseId);
+      const entry = entryLookup[lookupKey];
+
+      const riderId =
+        answers.riderPerHorse[horseId] ||
+        (entry ? entry.riderFederationMemberId : null);
+      const payerId =
+        answers.payerPerHorse[horseId] ||
+        (entry ? entry.paidByPersonId : null);
+
       if (!riderId || !payerId) continue;
 
       items.push({
