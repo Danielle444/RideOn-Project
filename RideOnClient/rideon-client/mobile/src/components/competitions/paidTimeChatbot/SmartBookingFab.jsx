@@ -28,35 +28,47 @@ export default function SmartBookingFab(props) {
       pointerEvents="box-none"
       style={{
         position: "absolute",
-        right: 16,
-        bottom: 24,
-        zIndex: 50,
-        elevation: 50,
-        alignItems: "flex-end",
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        zIndex: 9999,
+        elevation: 9999,
       }}
     >
-      <Pressable
-        onPress={handlePress}
+      <View
+        pointerEvents="box-none"
         style={{
-          flexDirection: "row-reverse",
-          alignItems: "center",
-          backgroundColor: "#5A4036",
-          paddingVertical: 12,
-          paddingHorizontal: 16,
-          borderRadius: 28,
-          gap: 8,
-          shadowColor: "#000",
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 4 },
-          elevation: 6,
+          position: "absolute",
+          right: 16,
+          bottom: 90,
+          alignItems: "flex-end",
         }}
       >
-        <Ionicons name="sparkles" size={20} color="#FFFFFF" />
-        <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "700" }}>
-          הזמנה חכמה
-        </Text>
-      </Pressable>
+        <Pressable
+          onPress={handlePress}
+          style={({ pressed }) => ({
+            flexDirection: "row-reverse",
+            alignItems: "center",
+            backgroundColor: "#5A4036",
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            borderRadius: 28,
+            gap: 8,
+            opacity: pressed ? 0.85 : 1,
+            shadowColor: "#000",
+            shadowOpacity: 0.3,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 10,
+          })}
+        >
+          <Ionicons name="sparkles" size={20} color="#FFFFFF" />
+          <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "700" }}>
+            הזמנה חכמה
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
