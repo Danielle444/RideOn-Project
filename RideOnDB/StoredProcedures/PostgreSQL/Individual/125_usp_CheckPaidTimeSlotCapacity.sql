@@ -49,6 +49,7 @@ BEGIN
         (COALESCE(u.used_min, 0) + nm.minutes_added)
             > (EXTRACT(EPOCH FROM (s.endtime - s.starttime))::INTEGER / 60) AS would_overflow
     FROM new_minutes nm
-    INNER JOIN paidtimeslotincompetition s ON s.paidtimeslotincompid = nm.slot_id;
+    INNER JOIN paidtimeslotincompetition s ON s.paidtimeslotincompid = nm.slot_id
+    LEFT JOIN used u ON u.slot_id = nm.slot_id;
 END;
 $$;

@@ -162,6 +162,7 @@ export default function AdminCompetitionRegistrationsScreen(props) {
   }
 
   return (
+    <View style={{ flex: 1 }}>
     <MobileScreenLayout
       title="הכנסת הרשמות"
       subtitle=""
@@ -368,12 +369,6 @@ export default function AdminCompetitionRegistrationsScreen(props) {
         ) : null}
       </ScrollView>
 
-      <SmartBookingFab
-        onConfirm={function () {
-          setIsChatbotOpen(true);
-        }}
-      />
-
       <PaidTimeChatbotModal
         visible={isChatbotOpen}
         ranchId={activeRole?.ranchId}
@@ -384,5 +379,14 @@ export default function AdminCompetitionRegistrationsScreen(props) {
         }}
       />
     </MobileScreenLayout>
+
+      {activeTab === "paidTimes" ? (
+        <SmartBookingFab
+          onConfirm={function () {
+            setIsChatbotOpen(true);
+          }}
+        />
+      ) : null}
+    </View>
   );
 }
