@@ -1,4 +1,5 @@
-﻿using RideOnServer.BL.DTOs.Competition.PaidTimeRequests;
+﻿using RideOnServer.BL.AutoScheduler;
+using RideOnServer.BL.DTOs.Competition.PaidTimeRequests;
 using RideOnServer.DAL;
 
 namespace RideOnServer.BL
@@ -118,13 +119,67 @@ namespace RideOnServer.BL
 
             (List<int> createdIds, int batchId) = dal.BulkCreatePaidTimeRequests(request, createdByPersonId);
 
+            AutoSchedulerSummary? schedulingSummary = null;
+            try
+            {
+                AutoScheduleResult schedResult = AutoSchedulerService.RunForCompetition(request.CompetitionId);
+
+                HashSet<int> createdIdSet = new HashSet<int>(createdIds);
+                List<UnscheduledRequestItem> unscheduledItems = schedResult.Audit
+                    .Where(a => a.Action == "unscheduled" && createdIdSet.Contains(a.PaidTimeRequestId))
+                    .Select(a => new UnscheduledRequestItem
+                    {
+                        PaidTimeRequestId = a.PaidTimeRequestId,
+                        Reason = a.Reason ?? "לא צוינה סיבה"
+                    })
+                    .ToList();
+
+                int scheduledFromThisBatch = schedResult.Audit
+                    .Count(a => a.Action == "scheduled" && createdIdSet.Contains(a.PaidTimeRequestId));
+
+                schedulingSummary = new AutoSchedulerSummary
+                {
+                    ScheduledCount = scheduledFromThisBatch,
+                    UnscheduledCount = unscheduledItems.Count,
+                    FrozenCount = schedResult.FrozenCount,
+                    UnscheduledItems = unscheduledItems
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"AutoScheduler failed but bulk insert succeeded: {ex.Message}");
+            }
+
             return new BulkCreatePaidTimeRequestsResponse
             {
                 Created = true,
                 BatchId = batchId,
                 CreatedRequestIds = createdIds,
                 Warnings = overflows,
-                Message = $"נוצרו {createdIds.Count} בקשות בהצלחה"
+                Message = $"נוצרו {createdIds.Count} בקשות בהצלחה",
+                Scheduling = schedulingSummary
+            };
+        }
+
+        internal static AutoSchedulerSummary RunAutoScheduler(int competitionId)
+        {
+            AutoScheduleResult schedResult = AutoSchedulerService.RunForCompetition(competitionId);
+
+            List<UnscheduledRequestItem> unscheduledItems = schedResult.Audit
+                .Where(a => a.Action == "unscheduled")
+                .Select(a => new UnscheduledRequestItem
+                {
+                    PaidTimeRequestId = a.PaidTimeRequestId,
+                    Reason = a.Reason ?? "לא צוינה סיבה"
+                })
+                .ToList();
+
+            return new AutoSchedulerSummary
+            {
+                ScheduledCount = schedResult.ScheduledCount,
+                UnscheduledCount = schedResult.UnscheduledCount,
+                FrozenCount = schedResult.FrozenCount,
+                UnscheduledItems = unscheduledItems
             };
         }
 

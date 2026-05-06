@@ -54,6 +54,11 @@ BEGIN
     )
     RETURNING batchid INTO v_batch_id;
 
+    -- מקשר כל בקשה שנוצרה לאצווה - לאלגוריתם השיבוץ האוטומטי.
+    UPDATE paidtimerequest
+    SET batchid = v_batch_id
+    WHERE paidtimerequestid = ANY(v_request_ids);
+
     RETURN QUERY
     SELECT unnest(v_request_ids) AS req_id, v_batch_id AS batch_id;
 END;
