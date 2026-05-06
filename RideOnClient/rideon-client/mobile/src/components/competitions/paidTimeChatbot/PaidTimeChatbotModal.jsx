@@ -20,6 +20,7 @@ import Step02_PickCoaches from "./Step02_PickCoaches";
 import Step03_DayArena from "./Step03_DayArena";
 import Step04_HorsesPerCoach from "./Step04_HorsesPerCoach";
 import Step05_TimePreferences from "./Step05_TimePreferences";
+import Step10_Summary from "./Step10_Summary";
 
 export default function PaidTimeChatbotModal(props) {
   const visible = !!props.visible;
@@ -118,7 +119,7 @@ export default function PaidTimeChatbotModal(props) {
               total={chatbot.totalSteps}
             />
             <ScrollView contentContainerStyle={styles.scrollContent}>
-              <StepRouter chatbot={chatbot} />
+              <StepRouter chatbot={chatbot} onClose={handleClose} />
             </ScrollView>
           </>
         )}
@@ -127,7 +128,7 @@ export default function PaidTimeChatbotModal(props) {
   );
 }
 
-function StepRouter({ chatbot }) {
+function StepRouter({ chatbot, onClose }) {
   switch (chatbot.currentStep) {
     case "intro":
       return <Step01_Intro chatbot={chatbot} />;
@@ -139,6 +140,8 @@ function StepRouter({ chatbot }) {
       return <Step04_HorsesPerCoach chatbot={chatbot} />;
     case "timePrefs":
       return <Step05_TimePreferences chatbot={chatbot} />;
+    case "summary":
+      return <Step10_Summary chatbot={chatbot} onClose={onClose} />;
     default:
       return (
         <View>

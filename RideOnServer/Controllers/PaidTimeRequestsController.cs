@@ -158,6 +158,39 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("auto-schedule")]
+        public IActionResult RunAutoScheduler([FromQuery] int competitionId, [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (competitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                AutoSchedulerSummary summary = PaidTimeRequest.RunAutoScheduler(competitionId);
+
+                return Ok(summary);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in RunAutoScheduler: {ex.Message}");
+                return BadRequest("אירעה שגיאה בהרצת השיבוץ האוטומטי");
+            }
+        }
+
         [HttpPost("bulk")]
         public IActionResult BulkCreatePaidTimeRequests([FromBody] BulkCreatePaidTimeRequestsRequest request)
         {
