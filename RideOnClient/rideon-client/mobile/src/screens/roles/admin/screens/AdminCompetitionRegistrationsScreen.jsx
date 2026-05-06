@@ -368,13 +368,11 @@ export default function AdminCompetitionRegistrationsScreen(props) {
         ) : null}
       </ScrollView>
 
-      {activeTab === "paidTimes" && !paidTime.loading ? (
-        <SmartBookingFab
-          onConfirm={function () {
-            setIsChatbotOpen(true);
-          }}
-        />
-      ) : null}
+      <SmartBookingFab
+        onConfirm={function () {
+          setIsChatbotOpen(true);
+        }}
+      />
 
       <PaidTimeChatbotModal
         visible={isChatbotOpen}

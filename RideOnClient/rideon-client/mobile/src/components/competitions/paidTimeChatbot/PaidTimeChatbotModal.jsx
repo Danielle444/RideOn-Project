@@ -20,6 +20,10 @@ import Step02_PickCoaches from "./Step02_PickCoaches";
 import Step03_DayArena from "./Step03_DayArena";
 import Step04_HorsesPerCoach from "./Step04_HorsesPerCoach";
 import Step05_TimePreferences from "./Step05_TimePreferences";
+import Step06_TimeConstraints from "./Step06_TimeConstraints";
+import Step07_ShortLong from "./Step07_ShortLong";
+import Step08_TrainingOrder from "./Step08_TrainingOrder";
+import Step09_Spacing from "./Step09_Spacing";
 import Step10_Summary from "./Step10_Summary";
 
 export default function PaidTimeChatbotModal(props) {
@@ -140,6 +144,14 @@ function StepRouter({ chatbot, onClose }) {
       return <Step04_HorsesPerCoach chatbot={chatbot} />;
     case "timePrefs":
       return <Step05_TimePreferences chatbot={chatbot} />;
+    case "timeConstraints":
+      return <Step06_TimeConstraints chatbot={chatbot} />;
+    case "shortLong":
+      return <Step07_ShortLong chatbot={chatbot} />;
+    case "order":
+      return <Step08_TrainingOrder chatbot={chatbot} />;
+    case "spacing":
+      return <Step09_Spacing chatbot={chatbot} />;
     case "summary":
       return <Step10_Summary chatbot={chatbot} onClose={onClose} />;
     default:
