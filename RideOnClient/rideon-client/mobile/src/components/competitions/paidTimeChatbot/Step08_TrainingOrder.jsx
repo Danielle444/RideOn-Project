@@ -1,6 +1,5 @@
 import React from "react";
-import { Text, View } from "react-native";
-import DraggableFlatList from "react-native-draggable-flatlist";
+import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import StepLayout from "./StepLayout";
 import styles, { COLORS } from "../../../styles/paidTimeChatbotStyles";
@@ -9,6 +8,14 @@ function formatHorseLabel(horse) {
   const name = horse.horseName || "סוס";
   const barn = horse.barnName || "";
   return barn ? name + " (" + barn + ")" : name;
+}
+
+function moveItem(arr, fromIndex, toIndex) {
+  if (toIndex < 0 || toIndex >= arr.length) return arr;
+  const next = arr.slice();
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item);
+  return next;
 }
 
 export default function Step08_TrainingOrder(props) {
@@ -25,7 +32,7 @@ export default function Step08_TrainingOrder(props) {
       .includes(String(c.coachFederationMemberId));
   });
 
-  function getHorsesForCoach(coach) {
+  function getOrderedHorses(coach) {
     const coachId = coach.coachFederationMemberId;
     const allHorses = coach.horses || [];
     const selectedIds = horsesPerCoach[coachId] || [];
@@ -35,21 +42,27 @@ export default function Step08_TrainingOrder(props) {
       return selectedIds.map(String).includes(String(h.horseId));
     });
 
-    if (Array.isArray(orderForCoach) && orderForCoach.length === selectedHorses.length) {
+    if (
+      Array.isArray(orderForCoach) &&
+      orderForCoach.length === selectedHorses.length
+    ) {
       const byId = {};
       for (const h of selectedHorses) byId[h.horseId] = h;
-      return orderForCoach
+      const ordered = orderForCoach
         .map(function (id) {
           return byId[id];
         })
         .filter(Boolean);
+      if (ordered.length === selectedHorses.length) return ordered;
     }
 
     return selectedHorses;
   }
 
-  function handleReorder(coachId, newData) {
-    const newOrder = newData.map(function (h) {
+  function moveHorse(coachId, currentList, fromIndex, direction) {
+    const toIndex = fromIndex + direction;
+    const reordered = moveItem(currentList, fromIndex, toIndex);
+    const newOrder = reordered.map(function (h) {
       return h.horseId;
     });
     chatbot.setAnswer("trainingOrder", {
@@ -61,7 +74,7 @@ export default function Step08_TrainingOrder(props) {
   return (
     <StepLayout
       bubbles={[
-        "סדר אימון מועדף - גרור את הסוסים לסדר שתרצה לכל מאמן.",
+        "סדר אימון מועדף - השתמש בחצים כדי לסדר את הסוסים לכל מאמן.",
         "אם לא תזיז כלום - המערכת תקבע סדר חכם לבד. זו העדפה, לא חובה.",
       ]}
       onNext={chatbot.next}
@@ -74,7 +87,7 @@ export default function Step08_TrainingOrder(props) {
         <View>
           {selectedCoaches.map(function (coach, idx) {
             const coachId = coach.coachFederationMemberId;
-            const horses = getHorsesForCoach(coach);
+            const horses = getOrderedHorses(coach);
 
             if (horses.length === 0) return null;
 
@@ -97,61 +110,75 @@ export default function Step08_TrainingOrder(props) {
                   מאמן: {coach.coachName}
                 </Text>
 
-                <DraggableFlatList
-                  data={horses}
-                  keyExtractor={function (item) {
-                    return "h-" + coachId + "-" + item.horseId;
-                  }}
-                  onDragEnd={function (info) {
-                    handleReorder(coachId, info.data);
-                  }}
-                  scrollEnabled={false}
-                  renderItem={function (params) {
-                    const isActive = params.isActive;
-                    const drag = params.drag;
-                    const item = params.item;
-                    const index = params.getIndex ? params.getIndex() : 0;
+                {horses.map(function (horse, hIdx) {
+                  const isFirst = hIdx === 0;
+                  const isLast = hIdx === horses.length - 1;
 
-                    return (
-                      <View
+                  return (
+                    <View
+                      key={"h-" + coachId + "-" + horse.horseId}
+                      style={[styles.optionRow, { marginBottom: 6 }]}
+                    >
+                      <Text
                         style={[
-                          styles.optionRow,
+                          styles.optionLabel,
                           {
-                            opacity: isActive ? 0.7 : 1,
-                            backgroundColor: isActive
-                              ? COLORS.primaryLight
-                              : "#FFFFFF",
+                            flex: 0,
+                            fontWeight: "700",
+                            color: COLORS.primary,
+                            minWidth: 28,
                           },
                         ]}
                       >
-                        <View
-                          onTouchStart={drag}
+                        {hIdx + 1}.
+                      </Text>
+                      <Text style={[styles.optionLabel, { flex: 1 }]}>
+                        {formatHorseLabel(horse)}
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: "row-reverse",
+                          gap: 4,
+                        }}
+                      >
+                        <Pressable
+                          onPress={function () {
+                            moveHorse(coachId, horses, hIdx, -1);
+                          }}
+                          disabled={isFirst}
+                          hitSlop={6}
                           style={{
-                            paddingRight: 4,
-                            paddingLeft: 8,
+                            padding: 6,
+                            opacity: isFirst ? 0.3 : 1,
                           }}
                         >
                           <Ionicons
-                            name="reorder-three"
+                            name="arrow-up"
                             size={22}
-                            color={COLORS.textMuted}
+                            color={COLORS.primary}
                           />
-                        </View>
-                        <Text
-                          style={[
-                            styles.optionLabel,
-                            { fontWeight: "600", color: COLORS.primary },
-                          ]}
+                        </Pressable>
+                        <Pressable
+                          onPress={function () {
+                            moveHorse(coachId, horses, hIdx, 1);
+                          }}
+                          disabled={isLast}
+                          hitSlop={6}
+                          style={{
+                            padding: 6,
+                            opacity: isLast ? 0.3 : 1,
+                          }}
                         >
-                          {(index || 0) + 1}.
-                        </Text>
-                        <Text style={[styles.optionLabel, { flex: 5 }]}>
-                          {formatHorseLabel(item)}
-                        </Text>
+                          <Ionicons
+                            name="arrow-down"
+                            size={22}
+                            color={COLORS.primary}
+                          />
+                        </Pressable>
                       </View>
-                    );
-                  }}
-                />
+                    </View>
+                  );
+                })}
               </View>
             );
           })}
@@ -162,7 +189,7 @@ export default function Step08_TrainingOrder(props) {
               { color: COLORS.textMuted, fontSize: 13, marginTop: 4 },
             ]}
           >
-            טיפ: לחץ ארוך על האייקון השמאלי וגרור למעלה/למטה.
+            טיפ: לחץ על החצים כדי להעלות/להוריד סוס בסדר האימון.
           </Text>
         </View>
       )}

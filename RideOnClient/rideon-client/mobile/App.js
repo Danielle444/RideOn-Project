@@ -1,7 +1,6 @@
 import { ActivityIndicator, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import AuthNavigator from "./src/navigation/AuthNavigator";
 import AppNavigator from "./src/navigation/AppNavigator";
@@ -42,18 +41,16 @@ function AppShell() {
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <UserProvider>
-          <ActiveRoleProvider>
-            <CompetitionProvider>
-              <AuthProvider>
-                <AppShell />
-              </AuthProvider>
-            </CompetitionProvider>
-          </ActiveRoleProvider>
-        </UserProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <UserProvider>
+        <ActiveRoleProvider>
+          <CompetitionProvider>
+            <AuthProvider>
+              <AppShell />
+            </AuthProvider>
+          </CompetitionProvider>
+        </ActiveRoleProvider>
+      </UserProvider>
+    </SafeAreaProvider>
   );
 }
