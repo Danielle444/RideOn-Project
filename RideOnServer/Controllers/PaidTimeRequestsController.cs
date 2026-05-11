@@ -225,5 +225,44 @@ namespace RideOnServer.Controllers
                 return BadRequest("אירעה שגיאה ביצירת בקשות פייד־טיים מרובות");
             }
         }
+
+        [HttpGet("my-competition")]
+        public IActionResult GetMyPaidTimeRequestsForCompetition(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (competitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                List<MyCompetitionPaidTimeRequestItem> requests =
+                    PaidTimeRequest.GetMyPaidTimeRequestsForCompetition(
+                        competitionId,
+                        personId
+                    );
+
+                return Ok(requests);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetMyPaidTimeRequestsForCompetition: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }
