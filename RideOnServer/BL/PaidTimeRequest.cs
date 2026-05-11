@@ -288,5 +288,23 @@ namespace RideOnServer.BL
                 throw new Exception("Invalid RequestedCompSlotId");
             }
         }
+
+        internal static List<MyCompetitionPaidTimeRequestItem> GetMyPaidTimeRequestsForCompetition(
+            int competitionId,
+            int orderedBySystemUserId)
+        {
+            if (competitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            if (orderedBySystemUserId <= 0)
+            {
+                throw new Exception("Invalid OrderedBySystemUserId");
+            }
+
+            PaidTimeRequestDAL dal = new PaidTimeRequestDAL();
+            return dal.GetMyPaidTimeRequestsForCompetition(competitionId, orderedBySystemUserId);
+        }
     }
 }
