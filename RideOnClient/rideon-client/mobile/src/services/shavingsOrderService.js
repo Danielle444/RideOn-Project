@@ -43,11 +43,11 @@ function createShavingsOrder(payload) {
   return axios.post("/ShavingsOrders", payload);
 }
 
-export function getAllShavingsOrderDetailsForCompetitionAndRanch(
+function getAllShavingsOrderDetailsForCompetitionAndRanch(
   competitionId,
   ranchId,
 ) {
-  return api.get("/ShavingsOrders/details/by-competition-and-ranch", {
+  return axios.get("/ShavingsOrders/details/by-competition-and-ranch", {
     params: {
       competitionId,
       ranchId,
@@ -63,4 +63,5 @@ export {
   getStallBookingsForShavings,
   getShavingsOrdersForCompetitionAndRanch,
   createShavingsOrder,
+  getAllShavingsOrderDetailsForCompetitionAndRanch,
 };
