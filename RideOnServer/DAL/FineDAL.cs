@@ -13,61 +13,61 @@ namespace RideOnServer.DAL
                 {
                     connection.Open();
 
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetAllFines", connection, null))
+                    using (
+                        NpgsqlCommand command =
+                            CreateCommandWithStoredProcedure(
+                                "usp_GetAllFines",
+                                connection,
+                                null
+                            )
+                    )
                     using (NpgsqlDataReader reader = command.ExecuteReader())
                     {
                         List<Fine> list = new List<Fine>();
 
                         while (reader.Read())
                         {
-                            list.Add(new Fine
-                            {
-                                FineId = Convert.ToInt32(reader["FineId"]),
+                            list.Add(
+                                new Fine
+                                {
+                                    FineId = Convert.ToInt32(reader["FineId"]),
 
-                                FineName =
-                                    reader["FineName"]?.ToString()
-                                    ?? string.Empty,
+                                    FineAmount = Convert.ToDecimal(
+                                        reader["FineAmount"]
+                                    ),
 
-                                                            FineDescription =
-                                    reader["FineDescription"] == DBNull.Value
-                                        ? string.Empty
-                                        : reader["FineDescription"]?.ToString()
-                                          ?? string.Empty,
+                                    FineReason =
+                                        reader["FineReason"] == DBNull.Value
+                                            ? null
+                                            : reader["FineReason"]?.ToString(),
 
-                                                            FineAmount =
-                                    Convert.ToDecimal(reader["FineAmount"]),
+                                    TriggerMode =
+                                        reader["TriggerMode"] == DBNull.Value
+                                            ? null
+                                            : reader["TriggerMode"]?.ToString(),
 
-                                                            FineReason =
-                                    reader["FineReason"] == DBNull.Value
-                                        ? null
-                                        : reader["FineReason"]?.ToString(),
+                                    StartEvent =
+                                        reader["StartEvent"] == DBNull.Value
+                                            ? null
+                                            : reader["StartEvent"]?.ToString(),
 
-                                                            TriggerMode =
-                                    reader["TriggerMode"] == DBNull.Value
-                                        ? null
-                                        : reader["TriggerMode"]?.ToString(),
+                                    EndEvent =
+                                        reader["EndEvent"] == DBNull.Value
+                                            ? null
+                                            : reader["EndEvent"]?.ToString(),
 
-                                                            StartEvent =
-                                    reader["StartEvent"] == DBNull.Value
-                                        ? null
-                                        : reader["StartEvent"]?.ToString(),
-
-                                                            EndEvent =
-                                    reader["EndEvent"] == DBNull.Value
-                                        ? null
-                                        : reader["EndEvent"]?.ToString(),
-
-                                                            IsActive =
-                                    reader["IsActive"] != DBNull.Value
-                                    && Convert.ToBoolean(reader["IsActive"])
-                            });
+                                    IsActive =
+                                        reader["IsActive"] != DBNull.Value
+                                        && Convert.ToBoolean(reader["IsActive"])
+                                }
+                            );
                         }
 
                         return list;
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception(ex.Message);
             }
@@ -75,8 +75,6 @@ namespace RideOnServer.DAL
 
         public void UpdateFine(
             int fineId,
-            string fineName,
-            string fineDescription,
             decimal fineAmount,
             string? fineReason,
             string? triggerMode,
@@ -85,50 +83,42 @@ namespace RideOnServer.DAL
             bool isActive
         )
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
-            {
-                { "@fineid_param", fineId },
-                { "@finename_param", fineName },
-
+            Dictionary<string, object> paramDic =
+                new Dictionary<string, object>
                 {
-                    "@finedescription_param",
-                    string.IsNullOrWhiteSpace(fineDescription)
-                        ? DBNull.Value
-                        : fineDescription
-                },
+                    { "@fineid_param", fineId },
+                    { "@fineamount_param", fineAmount },
 
-                { "@fineamount_param", fineAmount },
+                    {
+                        "@finereason_param",
+                        string.IsNullOrWhiteSpace(fineReason)
+                            ? DBNull.Value
+                            : fineReason
+                    },
 
-                {
-                    "@finereason_param",
-                    string.IsNullOrWhiteSpace(fineReason)
-                        ? DBNull.Value
-                        : fineReason
-                },
+                    {
+                        "@triggermode_param",
+                        string.IsNullOrWhiteSpace(triggerMode)
+                            ? DBNull.Value
+                            : triggerMode
+                    },
 
-                {
-                    "@triggermode_param",
-                    string.IsNullOrWhiteSpace(triggerMode)
-                        ? DBNull.Value
-                        : triggerMode
-                },
+                    {
+                        "@startevent_param",
+                        string.IsNullOrWhiteSpace(startEvent)
+                            ? DBNull.Value
+                            : startEvent
+                    },
 
-                {
-                    "@startevent_param",
-                    string.IsNullOrWhiteSpace(startEvent)
-                        ? DBNull.Value
-                        : startEvent
-                },
+                    {
+                        "@endevent_param",
+                        string.IsNullOrWhiteSpace(endEvent)
+                            ? DBNull.Value
+                            : endEvent
+                    },
 
-                {
-                    "@endevent_param",
-                    string.IsNullOrWhiteSpace(endEvent)
-                        ? DBNull.Value
-                        : endEvent
-                },
-
-                { "@isactive_param", isActive }
-            };
+                    { "@isactive_param", isActive }
+                };
 
             try
             {
@@ -136,17 +126,23 @@ namespace RideOnServer.DAL
                 {
                     connection.Open();
 
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpdateFine", connection, paramDic))
+                    using (
+                        NpgsqlCommand command =
+                            CreateCommandWithStoredProcedure(
+                                "usp_UpdateFine",
+                                connection,
+                                paramDic
+                            )
+                    )
                     {
                         command.ExecuteNonQuery();
                     }
                 }
             }
-            catch (NpgsqlException  ex)
+            catch (NpgsqlException ex)
             {
                 throw new Exception(ex.Message);
             }
         }
-
     }
 }
