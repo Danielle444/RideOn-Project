@@ -16,6 +16,17 @@ var triggerModeOptions = [
   },
 ];
 
+var eventOptions = [
+  {
+    value: "RegistrationEnd",
+    label: "סיום הרשמה",
+  },
+  {
+    value: "CompetitionStart",
+    label: "תחילת תחרות",
+  },
+];
+
 function getFineReasonLabel(reason) {
   switch (reason) {
     case "LateRegistration":
@@ -35,28 +46,16 @@ function getFineReasonLabel(reason) {
   }
 }
 
-function getEventLabel(eventName) {
-  switch (eventName) {
-    case "RegistrationEnd":
-      return "סיום הרשמה";
-
-    case "CompetitionStart":
-      return "תחילת תחרות";
-
-    default:
-      return eventName || "-";
-  }
-}
-
 export default function FineModal(props) {
-  const [fineAmount, setFineAmount] =
-    useState("");
+  const [fineAmount, setFineAmount] = useState("");
 
-  const [triggerMode, setTriggerMode] =
-    useState("None");
+  const [triggerMode, setTriggerMode] = useState("None");
 
-  const [isActive, setIsActive] =
-    useState(true);
+  const [startEvent, setStartEvent] = useState("");
+
+  const [endEvent, setEndEvent] = useState("");
+
+  const [isActive, setIsActive] = useState(true);
 
   useEffect(() => {
     if (!props.isOpen) {
@@ -64,29 +63,20 @@ export default function FineModal(props) {
     }
 
     setFineAmount(
-      props.initialValue?.fineAmount !==
-        undefined &&
-        props.initialValue?.fineAmount !==
-          null
-        ? String(
-            props.initialValue.fineAmount,
-          )
+      props.initialValue?.fineAmount !== undefined &&
+        props.initialValue?.fineAmount !== null
+        ? String(props.initialValue.fineAmount)
         : "",
     );
 
-    setTriggerMode(
-      props.initialValue?.triggerMode ||
-        "None",
-    );
+    setTriggerMode(props.initialValue?.triggerMode || "None");
 
-    setIsActive(
-      props.initialValue?.isActive !==
-        false,
-    );
-  }, [
-    props.isOpen,
-    props.initialValue,
-  ]);
+    setStartEvent(props.initialValue?.startEvent || "");
+
+    setEndEvent(props.initialValue?.endEvent || "");
+
+    setIsActive(props.initialValue?.isActive !== false);
+  }, [props.isOpen, props.initialValue]);
 
   if (!props.isOpen) {
     return null;
@@ -96,30 +86,12 @@ export default function FineModal(props) {
     e.preventDefault();
 
     props.onSubmit({
-      fineId:
-        props.initialValue?.fineId || 0,
-
-      fineName:
-        props.initialValue?.fineName ||
-        "",
-
-      fineDescription:
-        props.initialValue
-          ?.fineDescription || "",
-
+      fineId: props.initialValue?.fineId || 0,
       fineAmount: Number(fineAmount),
-
-      fineReason:
-        props.initialValue?.fineReason,
-
+      fineReason: props.initialValue?.fineReason,
       triggerMode,
-
-      startEvent:
-        props.initialValue?.startEvent,
-
-      endEvent:
-        props.initialValue?.endEvent,
-
+      startEvent,
+      endEvent,
       isActive,
     });
   }
@@ -141,10 +113,7 @@ export default function FineModal(props) {
           </button>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="px-6 py-6"
-        >
+        <form onSubmit={handleSubmit} className="px-6 py-6">
           <div className="space-y-5">
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
@@ -152,10 +121,7 @@ export default function FineModal(props) {
               </label>
 
               <div className="rounded-xl border border-[#E0D5CF] bg-[#F8F5F3] px-4 py-3 text-[#5D4037]">
-                {getFineReasonLabel(
-                  props.initialValue
-                    ?.fineReason,
-                )}
+                {getFineReasonLabel(props.initialValue?.fineReason)}
               </div>
             </div>
 
@@ -167,52 +133,71 @@ export default function FineModal(props) {
               <select
                 value={triggerMode}
                 onChange={function (e) {
-                  setTriggerMode(
-                    e.target.value,
-                  );
+                  setTriggerMode(e.target.value);
                 }}
                 className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
               >
-                {triggerModeOptions.map(
-                  function (option) {
-                    return (
-                      <option
-                        key={option.value}
-                        value={option.value}
-                      >
-                        {option.label}
-                      </option>
-                    );
-                  },
-                )}
+                {triggerModeOptions.map(function (option) {
+                  return (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                אירוע התחלה
-              </label>
+            {triggerMode !== "None" ? (
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
+                  אירוע התחלה
+                </label>
 
-              <div className="rounded-xl border border-[#E0D5CF] bg-[#F8F5F3] px-4 py-3 text-[#5D4037]">
-                {getEventLabel(
-                  props.initialValue
-                    ?.startEvent,
-                )}
+                <select
+                  value={startEvent}
+                  onChange={function (e) {
+                    setStartEvent(e.target.value);
+                  }}
+                  className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
+                >
+                  <option value="">בחרי אירוע</option>
+
+                  {eventOptions.map(function (option) {
+                    return (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
-            </div>
+            ) : null}
 
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                אירוע סיום
-              </label>
+            {triggerMode === "Between" ? (
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
+                  אירוע סיום
+                </label>
 
-              <div className="rounded-xl border border-[#E0D5CF] bg-[#F8F5F3] px-4 py-3 text-[#5D4037]">
-                {getEventLabel(
-                  props.initialValue
-                    ?.endEvent,
-                )}
+                <select
+                  value={endEvent}
+                  onChange={function (e) {
+                    setEndEvent(e.target.value);
+                  }}
+                  className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
+                >
+                  <option value="">בחרי אירוע</option>
+
+                  {eventOptions.map(function (option) {
+                    return (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
-            </div>
+            ) : null}
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
@@ -225,9 +210,7 @@ export default function FineModal(props) {
                 step="0.01"
                 value={fineAmount}
                 onChange={function (e) {
-                  setFineAmount(
-                    e.target.value,
-                  );
+                  setFineAmount(e.target.value);
                 }}
                 className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
                 required
@@ -239,9 +222,7 @@ export default function FineModal(props) {
                 type="checkbox"
                 checked={isActive}
                 onChange={function (e) {
-                  setIsActive(
-                    e.target.checked,
-                  );
+                  setIsActive(e.target.checked);
                 }}
                 className="h-4 w-4"
               />

@@ -68,7 +68,6 @@ namespace RideOnServer.Controllers
                 Fine.UpdateFine(
                     fine.FineId,
                     fine.FineName,
-                    fine.FineDescription,
                     fine.FineAmount,
                     fine.FineReason,
                     fine.TriggerMode,

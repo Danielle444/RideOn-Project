@@ -19,28 +19,64 @@ function formatAmount(value) {
   }
 }
 
+function getFineReasonLabel(reason) {
+  switch (reason) {
+    case "LateRegistration":
+      return "רישום באיחור";
+
+    case "EntryChange":
+      return "שינוי הרשמה";
+
+    case "EntryCancellation":
+      return "ביטול הרשמה";
+
+    case "LostNumber":
+      return "איבוד מספר";
+
+    default:
+      return reason || "-";
+  }
+}
+
+function getTriggerModeLabel(mode) {
+  switch (mode) {
+    case "None":
+      return "ללא טריגר";
+
+    case "After":
+      return "לאחר אירוע";
+
+    case "Between":
+      return "בין אירועים";
+
+    default:
+      return mode || "-";
+  }
+}
+
 export default function FinesTable(props) {
   const rows = Array.isArray(props.fines) ? props.fines : [];
 
   return (
-    <DataTableShell tableClassName="w-full min-w-[980px] text-right">
+    <DataTableShell tableClassName="w-full min-w-[900px] text-right">
       <thead>
         <tr className="border-b border-[#E8DDD6] bg-[#FAF7F5] text-sm text-[#6A5248]">
-          <th className="px-5 py-4 font-bold">שם קנס</th>
           <th className="px-5 py-4 font-bold">סוג קנס</th>
           <th className="px-5 py-4 font-bold">טריגר</th>
           <th className="px-5 py-4 font-bold text-center">פעיל</th>
-          <th className="px-5 py-4 font-bold">תיאור</th>
           <th className="px-5 py-4 font-bold">סכום</th>
           <th className="px-5 py-4 font-bold text-center">פעולות</th>
         </tr>
       </thead>
 
       <tbody>
-        {props.loading && <DataTableLoadingState colSpan={7} />}
+        {props.loading && <DataTableLoadingState colSpan={5} />}
 
         {!props.loading && rows.length === 0 && (
-          <DataTableEmptyState colSpan={7} message="לא קיימים קנסות להצגה" />
+          <DataTableEmptyState
+            colSpan={5}
+            message="לא קיימות מדיניות קנסות להצגה"
+          />
         )}
 
         {!props.loading &&
@@ -53,19 +89,21 @@ export default function FinesTable(props) {
                   (index % 2 === 0 ? "bg-white" : "bg-[#FFFEFD]")
                 }
               >
-                <td className="px-5 py-5 font-medium">{item.fineName}</td>
+                <td className="px-5 py-5 font-medium">
+                  {getFineReasonLabel(item.fineReason)}
+                </td>
 
-                <td className="px-5 py-5">{item.fineReason || "-"}</td>
-
-                <td className="px-5 py-5">{item.triggerMode || "-"}</td>
+                <td className="px-5 py-5">
+                  {getTriggerModeLabel(item.triggerMode)}
+                </td>
 
                 <td className="px-5 py-5 text-center">
                   {item.isActive ? "כן" : "לא"}
                 </td>
 
-                <td className="px-5 py-5">{item.fineDescription || "-"}</td>
-
-                <td className="px-5 py-5">₪ {formatAmount(item.fineAmount)}</td>
+                <td className="px-5 py-5">
+                  ₪ {formatAmount(item.fineAmount)}
+                </td>
 
                 <td className="px-5 py-5">
                   <div className="flex items-center justify-center gap-2">

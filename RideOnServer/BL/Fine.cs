@@ -6,10 +6,6 @@ namespace RideOnServer.BL
     {
         public int FineId { get; set; }
 
-        public string FineName { get; set; } = string.Empty;
-
-        public string FineDescription { get; set; } = string.Empty;
-
         public decimal FineAmount { get; set; }
 
         public string? FineReason { get; set; }
@@ -30,8 +26,6 @@ namespace RideOnServer.BL
 
         internal static void UpdateFine(
             int fineId,
-            string fineName,
-            string fineDescription,
             decimal fineAmount,
             string? fineReason,
             string? triggerMode,
@@ -40,14 +34,12 @@ namespace RideOnServer.BL
             bool isActive
         )
         {
-            ValidateFine(fineName, fineAmount);
+            ValidateFine(fineAmount);
 
             FineDAL dal = new FineDAL();
 
             dal.UpdateFine(
                 fineId,
-                fineName.Trim(),
-                fineDescription?.Trim() ?? string.Empty,
                 fineAmount,
                 fineReason,
                 triggerMode,
@@ -57,16 +49,8 @@ namespace RideOnServer.BL
             );
         }
 
-        private static void ValidateFine(
-            string fineName,
-            decimal fineAmount
-        )
+        private static void ValidateFine(decimal fineAmount)
         {
-            if (string.IsNullOrWhiteSpace(fineName))
-            {
-                throw new Exception("Fine name is required");
-            }
-
             if (fineAmount < 0)
             {
                 throw new Exception("Fine amount cannot be negative");
