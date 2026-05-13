@@ -332,5 +332,35 @@ namespace RideOnServer.BL
             PaidTimeRequestDAL dal = new PaidTimeRequestDAL();
             return dal.GetMyPaidTimeRequestsForCompetition(competitionId, orderedBySystemUserId);
         }
+
+        internal static void CancelMyPaidTimeRequest(int paidTimeRequestId, int orderedBySystemUserId)
+        {
+            if (paidTimeRequestId <= 0)
+            {
+                throw new Exception("Invalid PaidTimeRequestId");
+            }
+            if (orderedBySystemUserId <= 0)
+            {
+                throw new Exception("Invalid OrderedBySystemUserId");
+            }
+
+            PaidTimeRequestDAL dal = new PaidTimeRequestDAL();
+            dal.CancelPaidTimeRequest(paidTimeRequestId, orderedBySystemUserId);
+        }
+
+        internal static void UpdateMyPaidTimeRequestNotes(int paidTimeRequestId, int orderedBySystemUserId, string? notes)
+        {
+            if (paidTimeRequestId <= 0)
+            {
+                throw new Exception("Invalid PaidTimeRequestId");
+            }
+            if (orderedBySystemUserId <= 0)
+            {
+                throw new Exception("Invalid OrderedBySystemUserId");
+            }
+
+            PaidTimeRequestDAL dal = new PaidTimeRequestDAL();
+            dal.UpdatePaidTimeRequestNotes(paidTimeRequestId, orderedBySystemUserId, notes);
+        }
     }
 }

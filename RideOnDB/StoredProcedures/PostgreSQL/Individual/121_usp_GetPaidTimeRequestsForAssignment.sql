@@ -1,3 +1,6 @@
+-- הוספת BatchId+BatchPayload משנה את טבלת ההחזרה - חייבים DROP לפני CREATE.
+DROP FUNCTION IF EXISTS usp_GetPaidTimeRequestsForAssignment(INTEGER, INTEGER[], BOOLEAN);
+
 CREATE OR REPLACE FUNCTION usp_GetPaidTimeRequestsForAssignment(
     p_CompetitionId       INTEGER,
     p_SelectedCompSlotIds INTEGER[],

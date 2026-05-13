@@ -17,8 +17,18 @@ function getMyCompetitionPaidTimeRequests(competitionId, ranchId) {
   });
 }
 
+function cancelPaidTimeRequest(payload) {
+  return axios.post("/PaidTimeRequests/cancel", payload);
+}
+
+function updatePaidTimeRequestNotes(payload) {
+  return axios.post("/PaidTimeRequests/update-notes", payload);
+}
+
 export {
   createPaidTimeRequest,
   bulkCreatePaidTimeRequests,
   getMyCompetitionPaidTimeRequests,
+  cancelPaidTimeRequest,
+  updatePaidTimeRequestNotes,
 };

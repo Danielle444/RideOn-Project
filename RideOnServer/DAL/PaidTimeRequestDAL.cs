@@ -403,8 +403,72 @@ namespace RideOnServer.DAL
                 Notes = reader["notes"] == DBNull.Value ? null : reader["notes"].ToString(),
                 Status = reader["status"]?.ToString() ?? string.Empty,
 
-                CreatedAt = Convert.ToDateTime(reader["createdat"])
+                CreatedAt = Convert.ToDateTime(reader["createdat"]),
+
+                HoursUntilStart = reader["hoursuntilstart"] == DBNull.Value
+                    ? 0m
+                    : Convert.ToDecimal(reader["hoursuntilstart"]),
+                CanModify = reader["canmodify"] != DBNull.Value && Convert.ToBoolean(reader["canmodify"]),
+                CanCancel = reader["cancancel"] != DBNull.Value && Convert.ToBoolean(reader["cancancel"]),
+                BatchId = reader["batchid"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["batchid"]),
+                HorseId = reader["horseid"] == DBNull.Value ? 0 : Convert.ToInt32(reader["horseid"]),
+                CoachFederationMemberId = reader["coachfederationmemberid"] == DBNull.Value
+                    ? (int?)null
+                    : Convert.ToInt32(reader["coachfederationmemberid"])
             };
+        }
+
+        public void CancelPaidTimeRequest(int paidTimeRequestId, int orderedBySystemUserId)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+                    using (NpgsqlCommand command = new NpgsqlCommand(@"
+                        SELECT public.usp_cancelpaidtimerequest(
+                            p_paidtimerequestid     := @id,
+                            p_orderedbysystemuserid := @orderedBy
+                        );", connection))
+                    {
+                        command.Parameters.Add("@id", NpgsqlDbType.Integer).Value = paidTimeRequestId;
+                        command.Parameters.Add("@orderedBy", NpgsqlDbType.Integer).Value = orderedBySystemUserId;
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public void UpdatePaidTimeRequestNotes(int paidTimeRequestId, int orderedBySystemUserId, string? notes)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+                    using (NpgsqlCommand command = new NpgsqlCommand(@"
+                        SELECT public.usp_updatepaidtimerequestnotes(
+                            p_paidtimerequestid     := @id,
+                            p_orderedbysystemuserid := @orderedBy,
+                            p_notes                 := @notes
+                        );", connection))
+                    {
+                        command.Parameters.Add("@id", NpgsqlDbType.Integer).Value = paidTimeRequestId;
+                        command.Parameters.Add("@orderedBy", NpgsqlDbType.Integer).Value = orderedBySystemUserId;
+                        command.Parameters.Add("@notes", NpgsqlDbType.Text).Value =
+                            string.IsNullOrWhiteSpace(notes) ? (object)DBNull.Value : notes;
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
         }
     }
 }
