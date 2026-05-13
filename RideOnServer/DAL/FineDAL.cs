@@ -23,11 +23,43 @@ namespace RideOnServer.DAL
                             list.Add(new Fine
                             {
                                 FineId = Convert.ToInt32(reader["FineId"]),
-                                FineName = reader["FineName"].ToString() ?? string.Empty,
-                                FineDescription = reader["FineDescription"] == DBNull.Value
-                                    ? string.Empty
-                                    : reader["FineDescription"].ToString() ?? string.Empty,
-                                FineAmount = Convert.ToDecimal(reader["FineAmount"])
+
+                                FineName =
+                                    reader["FineName"]?.ToString()
+                                    ?? string.Empty,
+
+                                                            FineDescription =
+                                    reader["FineDescription"] == DBNull.Value
+                                        ? string.Empty
+                                        : reader["FineDescription"]?.ToString()
+                                          ?? string.Empty,
+
+                                                            FineAmount =
+                                    Convert.ToDecimal(reader["FineAmount"]),
+
+                                                            FineReason =
+                                    reader["FineReason"] == DBNull.Value
+                                        ? null
+                                        : reader["FineReason"]?.ToString(),
+
+                                                            TriggerMode =
+                                    reader["TriggerMode"] == DBNull.Value
+                                        ? null
+                                        : reader["TriggerMode"]?.ToString(),
+
+                                                            StartEvent =
+                                    reader["StartEvent"] == DBNull.Value
+                                        ? null
+                                        : reader["StartEvent"]?.ToString(),
+
+                                                            EndEvent =
+                                    reader["EndEvent"] == DBNull.Value
+                                        ? null
+                                        : reader["EndEvent"]?.ToString(),
+
+                                                            IsActive =
+                                    reader["IsActive"] != DBNull.Value
+                                    && Convert.ToBoolean(reader["IsActive"])
                             });
                         }
 
@@ -41,42 +73,61 @@ namespace RideOnServer.DAL
             }
         }
 
-        public int InsertFine(string fineName, string fineDescription, decimal fineAmount)
+        public void UpdateFine(
+            int fineId,
+            string fineName,
+            string fineDescription,
+            decimal fineAmount,
+            string? fineReason,
+            string? triggerMode,
+            string? startEvent,
+            string? endEvent,
+            bool isActive
+        )
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
-                { "@FineName", fineName },
-                { "@FineDescription", string.IsNullOrWhiteSpace(fineDescription) ? DBNull.Value : fineDescription },
-                { "@FineAmount", fineAmount }
-            };
+                { "@fineid_param", fineId },
+                { "@finename_param", fineName },
 
-            try
-            {
-                using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
-                    connection.Open();
+                    "@finedescription_param",
+                    string.IsNullOrWhiteSpace(fineDescription)
+                        ? DBNull.Value
+                        : fineDescription
+                },
 
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_InsertFine", connection, paramDic))
-                    {
-                        object result = command.ExecuteScalar()!;
-                        return Convert.ToInt32(result);
-                    }
-                }
-            }
-            catch (NpgsqlException  ex)
-            {
-                throw new Exception(ex.Message);
-            }
-        }
+                { "@fineamount_param", fineAmount },
 
-        public void UpdateFine(int fineId, string fineName, string fineDescription, decimal fineAmount)
-        {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
-            {
-                { "@FineId", fineId },
-                { "@FineName", fineName },
-                { "@FineDescription", string.IsNullOrWhiteSpace(fineDescription) ? DBNull.Value : fineDescription },
-                { "@FineAmount", fineAmount }
+                {
+                    "@finereason_param",
+                    string.IsNullOrWhiteSpace(fineReason)
+                        ? DBNull.Value
+                        : fineReason
+                },
+
+                {
+                    "@triggermode_param",
+                    string.IsNullOrWhiteSpace(triggerMode)
+                        ? DBNull.Value
+                        : triggerMode
+                },
+
+                {
+                    "@startevent_param",
+                    string.IsNullOrWhiteSpace(startEvent)
+                        ? DBNull.Value
+                        : startEvent
+                },
+
+                {
+                    "@endevent_param",
+                    string.IsNullOrWhiteSpace(endEvent)
+                        ? DBNull.Value
+                        : endEvent
+                },
+
+                { "@isactive_param", isActive }
             };
 
             try
@@ -97,29 +148,5 @@ namespace RideOnServer.DAL
             }
         }
 
-        public void DeleteFine(int fineId)
-        {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
-            {
-                { "@FineId", fineId }
-            };
-
-            try
-            {
-                using (NpgsqlConnection connection = Connect("DefaultConnection"))
-                {
-                    connection.Open();
-
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_DeleteFine", connection, paramDic))
-                    {
-                        command.ExecuteNonQuery();
-                    }
-                }
-            }
-            catch (NpgsqlException  ex)
-            {
-                throw new Exception(ex.Message);
-            }
-        }
     }
 }

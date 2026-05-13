@@ -353,6 +353,101 @@ var styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
   },
+
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "#F8F4F1",
+  },
+
+  modalHeader: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E7D6CA",
+  },
+
+  modalCloseButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  modalHeaderSpacer: {
+    width: 40,
+  },
+
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#4F3B31",
+    textAlign: "center",
+  },
+
+  modalContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+
+  actionsRow: {
+    flexDirection: "row-reverse",
+    gap: 10,
+    marginTop: 8,
+  },
+
+  secondaryActionButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#7B5A4D",
+    backgroundColor: "#FFFFFF",
+  },
+
+  secondaryActionButtonDisabled: {
+    opacity: 0.5,
+  },
+
+  secondaryActionButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#7B5A4D",
+  },
+
+  secondaryActionButtonTextDisabled: {
+    color: "#8E7A70",
+  },
+
+  dangerActionButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FCE8E6",
+    borderWidth: 1,
+    borderColor: "#E7B4AE",
+  },
+
+  dangerActionButtonDisabled: {
+    opacity: 0.5,
+  },
+
+  dangerActionButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#B5483F",
+  },
+
+  dangerActionButtonTextDisabled: {
+    color: "#B07A75",
+  },
 });
 
 export default styles;

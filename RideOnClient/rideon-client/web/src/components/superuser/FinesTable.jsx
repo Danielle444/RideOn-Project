@@ -1,4 +1,4 @@
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil } from "lucide-react";
 import DataTableShell from "../common/table/DataTableShell";
 import DataTableEmptyState from "../common/table/DataTableEmptyState";
 import DataTableLoadingState from "../common/table/DataTableLoadingState";
@@ -27,6 +27,9 @@ export default function FinesTable(props) {
       <thead>
         <tr className="border-b border-[#E8DDD6] bg-[#FAF7F5] text-sm text-[#6A5248]">
           <th className="px-5 py-4 font-bold">שם קנס</th>
+          <th className="px-5 py-4 font-bold">סוג קנס</th>
+          <th className="px-5 py-4 font-bold">טריגר</th>
+          <th className="px-5 py-4 font-bold text-center">פעיל</th>
           <th className="px-5 py-4 font-bold">תיאור</th>
           <th className="px-5 py-4 font-bold">סכום</th>
           <th className="px-5 py-4 font-bold text-center">פעולות</th>
@@ -34,10 +37,10 @@ export default function FinesTable(props) {
       </thead>
 
       <tbody>
-        {props.loading && <DataTableLoadingState colSpan={4} />}
+        {props.loading && <DataTableLoadingState colSpan={7} />}
 
         {!props.loading && rows.length === 0 && (
-          <DataTableEmptyState colSpan={4} message="לא קיימים קנסות להצגה" />
+          <DataTableEmptyState colSpan={7} message="לא קיימים קנסות להצגה" />
         )}
 
         {!props.loading &&
@@ -51,7 +54,17 @@ export default function FinesTable(props) {
                 }
               >
                 <td className="px-5 py-5 font-medium">{item.fineName}</td>
+
+                <td className="px-5 py-5">{item.fineReason || "-"}</td>
+
+                <td className="px-5 py-5">{item.triggerMode || "-"}</td>
+
+                <td className="px-5 py-5 text-center">
+                  {item.isActive ? "כן" : "לא"}
+                </td>
+
                 <td className="px-5 py-5">{item.fineDescription || "-"}</td>
+
                 <td className="px-5 py-5">₪ {formatAmount(item.fineAmount)}</td>
 
                 <td className="px-5 py-5">
@@ -62,14 +75,6 @@ export default function FinesTable(props) {
                       title="עריכה"
                       icon={<Pencil size={17} />}
                       onClick={() => props.onEdit(item)}
-                    />
-
-                    <TableActionButton
-                      iconOnly={true}
-                      variant="danger"
-                      title="מחיקה"
-                      icon={<Trash2 size={17} />}
-                      onClick={() => props.onDelete(item)}
                     />
                   </div>
                 </td>
