@@ -2,14 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import SuperUserLayout from "../../components/superuser/SuperUserLayout";
 import FinesTable from "../../components/superuser/FinesTable";
 import FineModal from "../../components/superuser/FineModal";
-import ConfirmDialog from "../../components/superuser/ConfirmDialog";
 import ToastMessage from "../../components/common/ToastMessage";
-import {
-  getAllFines,
-  createFine,
-  updateFine,
-  deleteFine,
-} from "../../services/superUserService";
+import { getAllFines, updateFine } from "../../services/superUserService";
 
 export default function FinesManagementPage() {
   const [fines, setFines] = useState([]);
@@ -20,13 +14,6 @@ export default function FinesManagementPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [error, setError] = useState("");
-
-  const [confirmDialog, setConfirmDialog] = useState({
-    isOpen: false,
-    title: "",
-    message: "",
-    onConfirm: null,
-  });
 
   const [toast, setToast] = useState({
     isOpen: false,
@@ -64,7 +51,9 @@ export default function FinesManagementPage() {
         return (
           (item.fineName || "").toLowerCase().includes(s) ||
           (item.fineDescription || "").toLowerCase().includes(s) ||
-          String(item.fineAmount || "").toLowerCase().includes(s)
+          String(item.fineAmount || "")
+            .toLowerCase()
+            .includes(s)
         );
       });
     },
@@ -87,12 +76,6 @@ export default function FinesManagementPage() {
     });
   }
 
-  function openCreate() {
-    setEditItem(null);
-    setError("");
-    setModalOpen(true);
-  }
-
   function openEdit(item) {
     setEditItem(item);
     setError("");
@@ -105,53 +88,22 @@ export default function FinesManagementPage() {
     setError("");
   }
 
-  function closeConfirmDialog() {
-    setConfirmDialog({
-      isOpen: false,
-      title: "",
-      message: "",
-      onConfirm: null,
-    });
-  }
-
   async function handleSubmit(formData) {
     try {
       setError("");
 
-      if (editItem) {
-        await updateFine(formData);
-        showToast("success", "הקנס עודכן בהצלחה");
-      } else {
-        await createFine(formData);
-        showToast("success", "הקנס נוצר בהצלחה");
-      }
+      await updateFine(formData);
+
+      showToast("success", "מדיניות הקנס עודכנה בהצלחה");
 
       closeModal();
+
       await loadFines();
     } catch (err) {
       console.error(err);
+
       setError(err.response?.data || "שגיאה בשמירת הקנס");
     }
-  }
-
-  function handleDelete(item) {
-    setConfirmDialog({
-      isOpen: true,
-      title: "מחיקת קנס",
-      message: "האם את בטוחה שברצונך למחוק את הקנס?",
-      onConfirm: async function () {
-        try {
-          await deleteFine(item.fineId);
-          closeConfirmDialog();
-          showToast("success", "הקנס נמחק בהצלחה");
-          await loadFines();
-        } catch (err) {
-          console.error(err);
-          closeConfirmDialog();
-          showToast("error", err.response?.data || "שגיאה במחיקת הקנס");
-        }
-      },
-    });
   }
 
   return (
@@ -159,15 +111,9 @@ export default function FinesManagementPage() {
       <div className="rounded-[26px] border border-[#E6DCD5] bg-white shadow-sm overflow-hidden">
         <div className="px-8 pt-8 pb-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <h1 className="text-[2rem] font-bold text-[#3F312B]">ניהול קנסות</h1>
-
-            <button
-              type="button"
-              onClick={openCreate}
-              className="rounded-xl bg-[#8B6352] px-5 py-3 font-semibold text-white shadow-sm hover:bg-[#7A5547] transition-colors"
-            >
-              + הוספת קנס
-            </button>
+            <h1 className="text-[2rem] font-bold text-[#3F312B]">
+              ניהול מדיניות קנסות
+            </h1>
           </div>
 
           <div className="mt-8 flex justify-start">
@@ -185,7 +131,6 @@ export default function FinesManagementPage() {
             fines={filteredFines}
             loading={loading}
             onEdit={openEdit}
-            onDelete={handleDelete}
           />
         </div>
       </div>
@@ -196,14 +141,6 @@ export default function FinesManagementPage() {
         onSubmit={handleSubmit}
         initialValue={editItem}
         error={error}
-      />
-
-      <ConfirmDialog
-        isOpen={confirmDialog.isOpen}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        onCancel={closeConfirmDialog}
-        onConfirm={confirmDialog.onConfirm}
       />
 
       <ToastMessage
