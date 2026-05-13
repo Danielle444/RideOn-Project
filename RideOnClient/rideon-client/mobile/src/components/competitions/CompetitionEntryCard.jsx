@@ -3,13 +3,10 @@ import { useState } from "react";
 
 import styles from "../../styles/adminCompetitionClassesStyles";
 
-export default function CompetitionEntryCard(
-  props,
-) {
+export default function CompetitionEntryCard(props) {
   var item = props.item;
 
-  var [expanded, setExpanded] =
-    useState(false);
+  var [expanded, setExpanded] = useState(false);
 
   function renderPaymentBadge() {
     return (
@@ -109,36 +106,38 @@ export default function CompetitionEntryCard(
 
           <View style={styles.actionsRow}>
             <Pressable
-              style={[
-                styles.secondaryActionButton,
-                styles.secondaryActionButtonDisabled,
-              ]}
-              disabled={true}
+              style={
+                styles.secondaryActionButton
+              }
+              onPress={function () {
+                if (props.onEdit) {
+                  props.onEdit(item);
+                }
+              }}
             >
               <Text
-                style={[
-                  styles.secondaryActionButtonText,
-                  styles.secondaryActionButtonTextDisabled,
-                ]}
+                style={
+                  styles.secondaryActionButtonText
+                }
               >
-                עריכת הרשמה בקרוב
+                ערוך הרשמה
               </Text>
             </Pressable>
 
             <Pressable
-              style={[
-                styles.dangerActionButton,
-                styles.dangerActionButtonDisabled,
-              ]}
-              disabled={true}
+              style={styles.dangerActionButton}
+              onPress={function () {
+                if (props.onCancel) {
+                  props.onCancel(item);
+                }
+              }}
             >
               <Text
-                style={[
-                  styles.dangerActionButtonText,
-                  styles.dangerActionButtonTextDisabled,
-                ]}
+                style={
+                  styles.dangerActionButtonText
+                }
               >
-                ביטול הרשמה בקרוב
+                בטל הרשמה
               </Text>
             </Pressable>
           </View>

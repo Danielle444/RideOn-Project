@@ -6,6 +6,7 @@ import {
   Text,
   TextInput,
   View,
+  Alert,
 } from "react-native";
 
 import { useState } from "react";
@@ -25,6 +26,10 @@ import styles from "../../../../styles/adminCompetitionClassesStyles";
 
 import CompetitionEntryCreateModal from "../../../../components/competitions/CompetitionEntryCreateModal";
 
+import CompetitionEntryCard from "../../../../components/competitions/CompetitionEntryCard";
+
+import { createChangeEntryRequest } from "../../../../services/entriesService";
+
 export default function AdminCompetitionClassesScreen(props) {
   var activeRoleContext = useActiveRole();
 
@@ -43,6 +48,8 @@ export default function AdminCompetitionClassesScreen(props) {
 
   var [showCreateModal, setShowCreateModal] = useState(false);
 
+  var [editingItem, setEditingItem] = useState(null);
+
   function handleCompetitionMenuPress(item) {
     props.navigation.navigate(item.screen);
   }
@@ -51,6 +58,48 @@ export default function AdminCompetitionClassesScreen(props) {
     await competitionContext.clearCompetition();
 
     props.navigation.navigate("AdminCompetitionsBoard");
+  }
+
+  function handleEditEntry(item) {
+    setEditingItem(item);
+
+    setShowCreateModal(true);
+  }
+
+  function handleCancelEntry(item) {
+    Alert.alert("ביטול הרשמה", "האם לשלוח בקשת ביטול למזכירה?", [
+      {
+        text: "לא",
+        style: "cancel",
+      },
+
+      {
+        text: "כן",
+        style: "destructive",
+
+        onPress: async function () {
+          try {
+            await createChangeEntryRequest({
+              competitionId: activeCompetition?.competitionId,
+
+              originalEntryId: item.entryId,
+
+              newEntryId: null,
+
+              isCancelled: true,
+            });
+
+            await entries.handleRefresh();
+
+            Alert.alert("נשלח", "בקשת הביטול נשלחה למזכירה");
+          } catch (error) {
+            Alert.alert("שגיאה", "אירעה שגיאה בשליחת בקשת הביטול");
+
+            console.log(error);
+          }
+        },
+      },
+    ]);
   }
 
   function renderFilterChip(label, isActive, onPress, keyValue) {
@@ -204,6 +253,8 @@ export default function AdminCompetitionClassesScreen(props) {
           key={String(item.entryId)}
           item={item}
           formatDate={entries.formatDate}
+          onEdit={handleEditEntry}
+          onCancel={handleCancelEntry}
         />
       );
     });
@@ -311,8 +362,11 @@ export default function AdminCompetitionClassesScreen(props) {
 
         <CompetitionEntryCreateModal
           visible={showCreateModal}
+          editItem={editingItem}
           onClose={function () {
             setShowCreateModal(false);
+
+            setEditingItem(null);
           }}
           onCreated={entries.handleRefresh}
         />

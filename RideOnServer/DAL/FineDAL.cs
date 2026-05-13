@@ -144,5 +144,75 @@ namespace RideOnServer.DAL
                 throw new Exception(ex.Message);
             }
         }
+
+
+        public List<Fine> GetActiveFinePolicies()
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command =
+                            CreateCommandWithStoredProcedure(
+                                "usp_GetActiveFinePolicies",
+                                connection,
+                                null
+                            )
+                    )
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<Fine> list = new List<Fine>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(
+                                new Fine
+                                {
+                                    FineId = Convert.ToInt32(reader["FineId"]),
+
+                                    FineAmount = Convert.ToDecimal(
+                                        reader["FineAmount"]
+                                    ),
+
+                                    FineReason =
+                                        reader["FineReason"] == DBNull.Value
+                                            ? null
+                                            : reader["FineReason"]?.ToString(),
+
+                                    TriggerMode =
+                                        reader["TriggerMode"] == DBNull.Value
+                                            ? null
+                                            : reader["TriggerMode"]?.ToString(),
+
+                                    StartEvent =
+                                        reader["StartEvent"] == DBNull.Value
+                                            ? null
+                                            : reader["StartEvent"]?.ToString(),
+
+                                    EndEvent =
+                                        reader["EndEvent"] == DBNull.Value
+                                            ? null
+                                            : reader["EndEvent"]?.ToString(),
+
+                                    IsActive =
+                                        reader["IsActive"] != DBNull.Value
+                                        && Convert.ToBoolean(reader["IsActive"])
+                                }
+                            );
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
     }
 }
