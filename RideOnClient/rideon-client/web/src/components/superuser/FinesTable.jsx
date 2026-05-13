@@ -54,6 +54,35 @@ function getTriggerModeLabel(mode) {
   }
 }
 
+function getTriggerDisplay(item) {
+  if (!item.triggerMode || item.triggerMode === "None") {
+    return "ללא טריגר";
+  }
+
+  function getEventLabel(eventName) {
+    switch (eventName) {
+      case "RegistrationEnd":
+        return "סיום הרשמה";
+
+      case "CompetitionStart":
+        return "תחילת תחרות";
+
+      default:
+        return eventName || "-";
+    }
+  }
+
+  if (item.triggerMode === "After") {
+    return `לאחר ${getEventLabel(item.startEvent)}`;
+  }
+
+  if (item.triggerMode === "Between") {
+    return `בין ${getEventLabel(item.startEvent)} ל־${getEventLabel(item.endEvent)}`;
+  }
+
+  return item.triggerMode;
+}
+
 export default function FinesTable(props) {
   const rows = Array.isArray(props.fines) ? props.fines : [];
 
@@ -94,16 +123,14 @@ export default function FinesTable(props) {
                 </td>
 
                 <td className="px-5 py-5">
-                  {getTriggerModeLabel(item.triggerMode)}
+                  {getTriggerDisplay(item)}
                 </td>
 
                 <td className="px-5 py-5 text-center">
                   {item.isActive ? "כן" : "לא"}
                 </td>
 
-                <td className="px-5 py-5">
-                  ₪ {formatAmount(item.fineAmount)}
-                </td>
+                <td className="px-5 py-5">₪ {formatAmount(item.fineAmount)}</td>
 
                 <td className="px-5 py-5">
                   <div className="flex items-center justify-center gap-2">
