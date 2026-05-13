@@ -33,5 +33,31 @@ namespace RideOnServer.BL
             EntryDAL dal = new EntryDAL();
             return dal.GetPaidTimeCandidatesByRanch(competitionId, ranchId);
         }
+
+
+        public static List<MyCompetitionEntryItem>
+            GetMyCompetitionEntries(
+                int competitionId,
+                int orderedBySystemUserId)
+        {
+            if (competitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            if (orderedBySystemUserId <= 0)
+            {
+                throw new Exception(
+                    "Invalid OrderedBySystemUserId"
+                );
+            }
+
+            EntryDAL dal = new EntryDAL();
+
+            return dal.GetMyCompetitionEntries(
+                competitionId,
+                orderedBySystemUserId
+            );
+        }
     }
 }
