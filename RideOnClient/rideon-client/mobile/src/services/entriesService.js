@@ -28,8 +28,16 @@ function getMyCompetitionEntries(
   });
 }
 
+function createChangeEntryRequest(payload) {
+  return axios.post(
+    "/ChangeEntryRequests",
+    payload,
+  );
+}
+
 export {
   createEntry,
   getPaidTimeCandidatesByRanch,
   getMyCompetitionEntries,
+  createChangeEntryRequest,
 };

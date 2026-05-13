@@ -183,6 +183,8 @@ export default function useAdminCompetitionRegistrations(params) {
   var [isSaving, setIsSaving] = useState(false);
   var [screenError, setScreenError] = useState("");
 
+  var [lastCreatedEntry, setLastCreatedEntry] = useState(null);
+
   useEffect(
     function () {
       if (locks.prizeRecipient) {
@@ -389,7 +391,7 @@ export default function useAdminCompetitionRegistrations(params) {
 
     if (validationMessage) {
       Alert.alert("שגיאה", validationMessage);
-      return;
+      return null;
     }
 
     try {
@@ -408,15 +410,20 @@ export default function useAdminCompetitionRegistrations(params) {
           : null,
       };
 
-      await createEntry(payload);
+      var response = await createEntry(payload);
 
-      Alert.alert("נשמר", "ההרשמה נוספה בהצלחה");
+      setLastCreatedEntry(response.data);
+
       resetUnlockedFields();
+
+      return response.data;
     } catch (error) {
       Alert.alert(
         "שגיאה",
         String(error?.response?.data || "אירעה שגיאה בשמירת ההרשמה"),
       );
+
+      return null;
     } finally {
       setIsSaving(false);
     }
@@ -478,5 +485,7 @@ export default function useAdminCompetitionRegistrations(params) {
     formatHorseLabel,
     formatMemberLabel,
     formatPayerLabel,
+
+    lastCreatedEntry,
   };
 }

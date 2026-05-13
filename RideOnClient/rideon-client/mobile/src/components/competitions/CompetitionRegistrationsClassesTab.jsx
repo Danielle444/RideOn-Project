@@ -1,6 +1,8 @@
 import React from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+
 import CompetitionRegistrationFormCard from "./CompetitionRegistrationFormCard";
+
 import styles from "../../styles/adminCompetitionRegistrationsStyles";
 
 export default function CompetitionRegistrationsClassesTab(props) {
@@ -8,6 +10,7 @@ export default function CompetitionRegistrationsClassesTab(props) {
     return (
       <View style={styles.loadingWrap}>
         <ActivityIndicator size="large" color="#7B5A4D" />
+
         <Text style={styles.loadingText}>טוענת נתוני מקצים...</Text>
       </View>
     );
@@ -56,7 +59,7 @@ export default function CompetitionRegistrationsClassesTab(props) {
         onPress={props.onSubmit}
       >
         <Text style={styles.primaryButtonText}>
-          {props.isSaving ? "שומרת..." : "הוסף הרשמה"}
+          {props.isSaving ? "שומרת..." : props.submitButtonText || "הוסף הרשמה"}
         </Text>
       </Pressable>
     </>
