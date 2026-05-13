@@ -103,74 +103,6 @@ export default function AdminCompetitionClassesScreen(props) {
     );
   }
 
-  function renderPaymentBadge(item) {
-    return (
-      <View
-        style={[
-          styles.paymentBadge,
-          item.isPaid ? styles.paymentPaid : styles.paymentUnpaid,
-        ]}
-      >
-        <Text style={styles.paymentBadgeText}>
-          {item.isPaid ? "שולם" : "לא שולם"}
-        </Text>
-      </View>
-    );
-  }
-
-  function renderFineBadge(item) {
-    if (!item.fineAmount || Number(item.fineAmount) <= 0) {
-      return null;
-    }
-
-    return (
-      <View style={styles.fineBadge}>
-        <Text style={styles.fineBadgeText}>כולל קנס ₪{item.fineAmount}</Text>
-      </View>
-    );
-  }
-
-  function renderEntryCard(item) {
-    return (
-      <View key={String(item.entryId)} style={styles.entryCard}>
-        <View style={styles.topRow}>
-          <View style={styles.classBlock}>
-            <Text style={styles.className}>{item.className}</Text>
-
-            <Text style={styles.classDate}>
-              {entries.formatDate(item.classDate)}
-            </Text>
-          </View>
-
-          <Text style={styles.amountText}>₪{item.amountToPay}</Text>
-        </View>
-
-        <Text style={styles.mainLine}>
-          {item.riderName} • {item.horseName}
-        </Text>
-
-        <View style={styles.badgesRow}>
-          {renderPaymentBadge(item)}
-          {renderFineBadge(item)}
-        </View>
-
-        <View style={styles.detailsBlock}>
-          <Text style={styles.detailText}>מאמן: {item.coachName || "-"}</Text>
-
-          <Text style={styles.detailText}>משלם: {item.payerName || "-"}</Text>
-
-          <Text style={styles.detailText}>
-            מקבל פרס: {item.prizeRecipientName || "-"}
-          </Text>
-
-          {item.drawOrder ? (
-            <Text style={styles.detailText}>סדר כניסה: {item.drawOrder}</Text>
-          ) : null}
-        </View>
-      </View>
-    );
-  }
-
   function renderFilters() {
     return (
       <View style={styles.filterSection}>
@@ -267,7 +199,13 @@ export default function AdminCompetitionClassesScreen(props) {
     }
 
     return entries.filteredItems.map(function (item) {
-      return renderEntryCard(item);
+      return (
+        <CompetitionEntryCard
+          key={String(item.entryId)}
+          item={item}
+          formatDate={entries.formatDate}
+        />
+      );
     });
   }
 
