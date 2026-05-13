@@ -95,6 +95,11 @@ function reducer(state, action) {
       };
     case "RESET":
       return initialState;
+    case "RESTART":
+      return {
+        ...initialState,
+        context: state.context,
+      };
     default:
       return state;
   }
@@ -155,6 +160,23 @@ function findSlotForHorse(answers, context, coachId) {
   );
 }
 
+function extractErrorMessage(err) {
+  const data = err?.response?.data;
+  if (typeof data === "string" && data.trim()) return data;
+  if (data && typeof data === "object") {
+    if (typeof data.message === "string") return data.message;
+    if (typeof data.title === "string") return data.title;
+    if (typeof data.error === "string") return data.error;
+    try {
+      return JSON.stringify(data);
+    } catch (e) {
+      // fall through
+    }
+  }
+  if (typeof err?.message === "string") return err.message;
+  return "אירעה שגיאה בשליחה לשרת";
+}
+
 function buildMetadata(answers) {
   return {
     schemaVersion: 1,
@@ -206,6 +228,10 @@ export default function usePaidTimeChatbot(config) {
     dispatch({ type: "RESET" });
   }, []);
 
+  const restart = useCallback(function () {
+    dispatch({ type: "RESTART" });
+  }, []);
+
   const submit = useCallback(
     async function (options) {
       const confirmed = !!(options && options.confirmedOverflow);
@@ -249,12 +275,8 @@ export default function usePaidTimeChatbot(config) {
         dispatch({ type: "SUBMIT_SUCCESS", payload: data });
         return { success: true, data: data };
       } catch (err) {
-        const message =
-          err?.response?.data?.message ||
-          err?.response?.data ||
-          err?.message ||
-          "אירעה שגיאה בשליחה לשרת";
-        dispatch({ type: "SUBMIT_ERROR", payload: String(message) });
+        const message = extractErrorMessage(err);
+        dispatch({ type: "SUBMIT_ERROR", payload: message });
         return null;
       }
     },
@@ -285,6 +307,7 @@ export default function usePaidTimeChatbot(config) {
     patchAnswers: patchAnswers,
     submit: submit,
     reset: reset,
+    restart: restart,
   };
 }
 

@@ -2,16 +2,38 @@ import React, { useMemo } from "react";
 import { Text, View } from "react-native";
 import StepLayout from "./StepLayout";
 import OptionRow from "./OptionRow";
-import styles from "../../../styles/paidTimeChatbotStyles";
+import styles, { COLORS } from "../../../styles/paidTimeChatbotStyles";
+
+function toDateOnlyKey(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return null;
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return year + "-" + month + "-" + day;
+}
 
 function formatDateHebrew(dateStr) {
   if (!dateStr) return "";
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  return day + "/" + month + "/" + year;
+  return (
+    String(d.getDate()).padStart(2, "0") +
+    "/" +
+    String(d.getMonth() + 1).padStart(2, "0") +
+    "/" +
+    d.getFullYear()
+  );
+}
+
+function isCompetitionDay(dayKey, startDate, endDate) {
+  if (!dayKey) return false;
+  const start = toDateOnlyKey(startDate);
+  const end = toDateOnlyKey(endDate);
+  if (!start) return false;
+  if (!end) return dayKey === start;
+  return dayKey >= start && dayKey <= end;
 }
 
 function getArenasForDay(slotsByDay, day) {
@@ -21,10 +43,7 @@ function getArenasForDay(slotsByDay, day) {
   for (const s of slots) {
     const key = s.arenaRanchId + "-" + s.arenaId;
     if (!seen[key]) {
-      seen[key] = {
-        key: key,
-        arenaName: s.arenaName,
-      };
+      seen[key] = { key: key, arenaName: s.arenaName };
     }
   }
   return Object.values(seen);
@@ -47,10 +66,24 @@ export default function Step03_DayArena(props) {
   );
 
   const onlyOneArena = arenasForDay.length === 1;
-  const effectiveArenaKey = onlyOneArena ? arenasForDay[0].key : arenaKey;
+  const showBeforeAfter = isCompetitionDay(
+    day,
+    ctx.competitionStartDate,
+    ctx.competitionEndDate
+  );
 
   const canAdvance =
-    !!day && (onlyOneArena || !!arenaKey);
+    !!day &&
+    (onlyOneArena || !!arenaKey) &&
+    (!showBeforeAfter || beforeOrAfter === "before" || beforeOrAfter === "after");
+
+  function handleDayPick(d) {
+    chatbot.patchAnswers({
+      day: d.date,
+      arenaKey: null,
+      beforeOrAfterCompetition: null,
+    });
+  }
 
   function handleNext() {
     if (onlyOneArena && !arenaKey) {
@@ -74,7 +107,12 @@ export default function Step03_DayArena(props) {
         </Text>
       ) : (
         <View>
-          <Text style={[styles.bubbleTextBot, { fontWeight: "700", marginBottom: 8 }]}>
+          <Text
+            style={[
+              styles.bubbleTextBot,
+              { fontWeight: "700", marginBottom: 8 },
+            ]}
+          >
             יום:
           </Text>
           {days.map(function (d) {
@@ -84,10 +122,7 @@ export default function Step03_DayArena(props) {
                 selected={day === d.date}
                 label={formatDateHebrew(d.date)}
                 onPress={function () {
-                  chatbot.patchAnswers({
-                    day: d.date,
-                    arenaKey: null,
-                  });
+                  handleDayPick(d);
                 }}
               />
             );
@@ -107,7 +142,7 @@ export default function Step03_DayArena(props) {
                 return (
                   <OptionRow
                     key={"arena-" + a.key}
-                    selected={effectiveArenaKey === a.key}
+                    selected={arenaKey === a.key}
                     label={a.arenaName}
                     onPress={function () {
                       chatbot.setAnswer("arenaKey", a.key);
@@ -122,14 +157,14 @@ export default function Step03_DayArena(props) {
             <Text
               style={[
                 styles.bubbleTextBot,
-                { marginTop: 16, color: "#7A7A7A" },
+                { marginTop: 16, color: COLORS.textMuted },
               ]}
             >
               רק מגרש אחד פעיל ביום זה: {arenasForDay[0].arenaName}
             </Text>
           ) : null}
 
-          {day ? (
+          {showBeforeAfter ? (
             <View style={{ marginTop: 16 }}>
               <Text
                 style={[
@@ -137,7 +172,7 @@ export default function Step03_DayArena(props) {
                   { fontWeight: "700", marginBottom: 8 },
                 ]}
               >
-                לפני התחרות / אחריה (אם רלוונטי):
+                היום הזה הוא יום תחרות - לפני או אחרי התחרות?
               </Text>
               <OptionRow
                 selected={beforeOrAfter === "before"}
@@ -151,13 +186,6 @@ export default function Step03_DayArena(props) {
                 label="אחרי התחרות"
                 onPress={function () {
                   chatbot.setAnswer("beforeOrAfterCompetition", "after");
-                }}
-              />
-              <OptionRow
-                selected={beforeOrAfter === null || beforeOrAfter === undefined}
-                label="לא רלוונטי / לא בטוח"
-                onPress={function () {
-                  chatbot.setAnswer("beforeOrAfterCompetition", null);
                 }}
               />
             </View>

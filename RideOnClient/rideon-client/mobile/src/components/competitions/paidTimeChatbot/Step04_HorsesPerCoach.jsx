@@ -2,6 +2,7 @@ import React from "react";
 import { Text, View } from "react-native";
 import StepLayout from "./StepLayout";
 import OptionRow from "./OptionRow";
+import CoachAccordion from "./CoachAccordion";
 import styles, { COLORS } from "../../../styles/paidTimeChatbotStyles";
 
 function formatHorseLabel(horse) {
@@ -47,16 +48,19 @@ export default function Step04_HorsesPerCoach(props) {
     });
   }
 
-  const totalSelected = Object.values(horsesPerCoach).reduce(function (sum, arr) {
-    return sum + (Array.isArray(arr) ? arr.length : 0);
-  }, 0);
+  const totalSelected = Object.values(horsesPerCoach).reduce(
+    function (sum, arr) {
+      return sum + (Array.isArray(arr) ? arr.length : 0);
+    },
+    0
+  );
 
   const canAdvance = totalSelected > 0;
 
   return (
     <StepLayout
       bubbles={[
-        "אלו הסוסים הרשומים תחת כל מאמן שבחרת. בחר אילו לרשום לפייד טיים.",
+        "אלו הסוסים תחת כל מאמן. בחר אילו לרשום לפייד טיים.",
       ]}
       onNext={chatbot.next}
       onBack={chatbot.prev}
@@ -64,11 +68,11 @@ export default function Step04_HorsesPerCoach(props) {
     >
       {selectedCoaches.length === 0 ? (
         <Text style={styles.bubbleTextBot}>
-          לא נבחרו מאמנים. חזור צעד אחורה ובחר מאמן אחד לפחות.
+          לא נבחרו מאמנים. חזור צעד אחורה.
         </Text>
       ) : (
         <View>
-          {selectedCoaches.map(function (coach, idx) {
+          {selectedCoaches.map(function (coach) {
             const coachId = coach.coachFederationMemberId;
             const horses = coach.horses || [];
             const selectedHorseIds = horsesPerCoach[coachId] || [];
@@ -77,26 +81,18 @@ export default function Step04_HorsesPerCoach(props) {
             });
             const isAll =
               allIds.length > 0 && selectedHorseIds.length === allIds.length;
+            const subtitle =
+              selectedHorseIds.length > 0
+                ? "נבחרו " + selectedHorseIds.length + " מתוך " + horses.length
+                : "טרם נבחרו סוסים";
 
             return (
-              <View
-                key={"coach-section-" + coachId}
-                style={{
-                  marginBottom: 18,
-                  paddingBottom: 14,
-                  borderBottomWidth: idx < selectedCoaches.length - 1 ? 1 : 0,
-                  borderBottomColor: COLORS.border,
-                }}
+              <CoachAccordion
+                key={"coach-" + coachId}
+                title={coach.coachName}
+                subtitle={subtitle}
+                defaultOpen={true}
               >
-                <Text
-                  style={[
-                    styles.bubbleTextBot,
-                    { fontWeight: "700", marginBottom: 8 },
-                  ]}
-                >
-                  מאמן: {coach.coachName}
-                </Text>
-
                 {horses.length === 0 ? (
                   <Text style={styles.bubbleTextBot}>
                     אין סוסים תחת מאמן זה.
@@ -111,8 +107,7 @@ export default function Step04_HorsesPerCoach(props) {
                         toggleAllForCoach(coachId, horses);
                       }}
                     />
-                    <View style={{ height: 8 }} />
-
+                    <View style={{ height: 6 }} />
                     {horses.map(function (horse) {
                       const isSel = selectedHorseIds
                         .map(String)
@@ -131,7 +126,7 @@ export default function Step04_HorsesPerCoach(props) {
                     })}
                   </>
                 )}
-              </View>
+              </CoachAccordion>
             );
           })}
 

@@ -2,6 +2,7 @@ import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import StepLayout from "./StepLayout";
+import CoachAccordion from "./CoachAccordion";
 import styles, { COLORS } from "../../../styles/paidTimeChatbotStyles";
 
 function formatHorseLabel(horse) {
@@ -55,7 +56,6 @@ export default function Step08_TrainingOrder(props) {
         .filter(Boolean);
       if (ordered.length === selectedHorses.length) return ordered;
     }
-
     return selectedHorses;
   }
 
@@ -74,8 +74,8 @@ export default function Step08_TrainingOrder(props) {
   return (
     <StepLayout
       bubbles={[
-        "סדר אימון מועדף - השתמש בחצים כדי לסדר את הסוסים לכל מאמן.",
-        "אם לא תזיז כלום - המערכת תקבע סדר חכם לבד. זו העדפה, לא חובה.",
+        "סדר אימון מועדף - השתמש בחצים כדי לסדר.",
+        "אם לא תזיז כלום - המערכת תקבע סדר חכם. זו העדפה, לא חובה.",
       ]}
       onNext={chatbot.next}
       onBack={chatbot.prev}
@@ -85,31 +85,25 @@ export default function Step08_TrainingOrder(props) {
         <Text style={styles.bubbleTextBot}>לא נבחרו מאמנים.</Text>
       ) : (
         <View>
-          {selectedCoaches.map(function (coach, idx) {
+          {selectedCoaches.map(function (coach) {
             const coachId = coach.coachFederationMemberId;
             const horses = getOrderedHorses(coach);
 
             if (horses.length === 0) return null;
 
-            return (
-              <View
-                key={"order-" + coachId}
-                style={{
-                  marginBottom: 16,
-                  paddingBottom: 12,
-                  borderBottomWidth: idx < selectedCoaches.length - 1 ? 1 : 0,
-                  borderBottomColor: COLORS.border,
-                }}
-              >
-                <Text
-                  style={[
-                    styles.bubbleTextBot,
-                    { fontWeight: "700", marginBottom: 8 },
-                  ]}
-                >
-                  מאמן: {coach.coachName}
-                </Text>
+            const subtitle = horses
+              .map(function (h, idx) {
+                return idx + 1 + ". " + (h.horseName || "");
+              })
+              .join("  ");
 
+            return (
+              <CoachAccordion
+                key={"order-" + coachId}
+                title={coach.coachName}
+                subtitle={subtitle}
+                defaultOpen={false}
+              >
                 {horses.map(function (horse, hIdx) {
                   const isFirst = hIdx === 0;
                   const isLast = hIdx === horses.length - 1;
@@ -179,18 +173,9 @@ export default function Step08_TrainingOrder(props) {
                     </View>
                   );
                 })}
-              </View>
+              </CoachAccordion>
             );
           })}
-
-          <Text
-            style={[
-              styles.bubbleTextBot,
-              { color: COLORS.textMuted, fontSize: 13, marginTop: 4 },
-            ]}
-          >
-            טיפ: לחץ על החצים כדי להעלות/להוריד סוס בסדר האימון.
-          </Text>
         </View>
       )}
     </StepLayout>

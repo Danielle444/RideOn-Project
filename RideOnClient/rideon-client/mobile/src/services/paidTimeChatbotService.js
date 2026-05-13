@@ -151,6 +151,16 @@ function buildEntryLookup(candidates) {
   return out;
 }
 
+function extractCompetitionDates(invitation) {
+  const comp = invitation?.competition || {};
+  return {
+    competitionStartDate:
+      comp.competitionStartDate || comp.CompetitionStartDate || null,
+    competitionEndDate:
+      comp.competitionEndDate || comp.CompetitionEndDate || null,
+  };
+}
+
 async function loadPaidTimeChatbotContext({ ranchId, competitionId, roleId }) {
   const results = await Promise.all([
     getCompetitionInvitationDetails(competitionId, roleId, ranchId),
@@ -170,6 +180,8 @@ async function loadPaidTimeChatbotContext({ ranchId, competitionId, roleId }) {
   const coachesWithHorses = buildCoachesWithHorses(candidates);
   const entryLookup = buildEntryLookup(candidates);
 
+  const competitionDates = extractCompetitionDates(invitation);
+
   return {
     coachesWithHorses: coachesWithHorses,
     entryLookup: entryLookup,
@@ -177,6 +189,8 @@ async function loadPaidTimeChatbotContext({ ranchId, competitionId, roleId }) {
     arenas: arenas,
     slotsByDay: slotsByDay,
     priceCatalog: priceCatalog,
+    competitionStartDate: competitionDates.competitionStartDate,
+    competitionEndDate: competitionDates.competitionEndDate,
   };
 }
 
