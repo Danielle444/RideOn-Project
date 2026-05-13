@@ -4,7 +4,10 @@ function createEntry(payload) {
   return axios.post("/Entries", payload);
 }
 
-function getPaidTimeCandidatesByRanch(competitionId, ranchId) {
+function getPaidTimeCandidatesByRanch(
+  competitionId,
+  ranchId
+) {
   return axios.get("/Entries/paid-time-candidates", {
     params: {
       competitionId: competitionId,
@@ -13,4 +16,20 @@ function getPaidTimeCandidatesByRanch(competitionId, ranchId) {
   });
 }
 
-export { createEntry, getPaidTimeCandidatesByRanch };
+function getMyCompetitionEntries(
+  competitionId,
+  ranchId
+) {
+  return axios.get("/Entries/my-competition", {
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
+  });
+}
+
+export {
+  createEntry,
+  getPaidTimeCandidatesByRanch,
+  getMyCompetitionEntries,
+};

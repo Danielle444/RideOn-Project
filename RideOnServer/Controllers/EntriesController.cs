@@ -84,5 +84,53 @@ namespace RideOnServer.Controllers
                 return BadRequest("אירעה שגיאה בשליפת מועמדים לפייד טיים");
             }
         }
+
+        [HttpGet("my-competition")]
+        public IActionResult GetMyCompetitionEntries(
+    [FromQuery] int competitionId,
+    [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (competitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId =
+                    UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                List<MyCompetitionEntryItem> items =
+                    Entry.GetMyCompetitionEntries(
+                        competitionId,
+                        personId
+                    );
+
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ex.Message
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in GetMyCompetitionEntries: {ex.Message}"
+                );
+
+                return BadRequest(
+                    "אירעה שגיאה בשליפת הרשמות למקצים"
+                );
+            }
+        }
     }
 }
