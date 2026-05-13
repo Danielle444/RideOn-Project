@@ -1,5 +1,7 @@
 import {
   ActivityIndicator,
+  Alert,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -21,6 +23,11 @@ import { useCompetition } from "../../../../context/CompetitionContext";
 
 import useAdminCompetitionPaidTimesList from "../../../../hooks/useAdminCompetitionPaidTimesList";
 
+import {
+  cancelPaidTimeRequest,
+  updatePaidTimeRequestNotes,
+} from "../../../../services/paidTimeRequestsService";
+
 import styles from "../../../../styles/adminCompetitionPaidTimesStyles";
 
 export default function AdminCompetitionPaidTimesScreen(props) {
@@ -36,6 +43,81 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   });
 
   var [showFilters, setShowFilters] = useState(false);
+  var [editingItem, setEditingItem] = useState(null);
+  var [editNotes, setEditNotes] = useState("");
+  var [savingNotes, setSavingNotes] = useState(false);
+  var [cancellingId, setCancellingId] = useState(null);
+
+  function openEditNotes(item) {
+    setEditingItem(item);
+    setEditNotes(item.notes || "");
+  }
+
+  function closeEditNotes() {
+    setEditingItem(null);
+    setEditNotes("");
+  }
+
+  async function handleSaveNotes() {
+    if (!editingItem) return;
+    try {
+      setSavingNotes(true);
+      await updatePaidTimeRequestNotes({
+        paidTimeRequestId: editingItem.paidTimeRequestId,
+        ranchId: activeRole?.ranchId,
+        notes: editNotes,
+      });
+      closeEditNotes();
+      await paidTimes.handleRefresh();
+    } catch (err) {
+      var msg = err?.response?.data || err?.message || "אירעה שגיאה";
+      Alert.alert("שגיאה", String(msg));
+    } finally {
+      setSavingNotes(false);
+    }
+  }
+
+  function confirmCancel(item) {
+    var withinDay = item.hoursUntilStart != null && item.hoursUntilStart <= 24;
+    var title = withinDay
+      ? "ביטול בתוך 24 שעות - חיוב מלא"
+      : "ביטול פייד טיים";
+    var body = withinDay
+      ? "שים לב: הביטול מתבצע פחות מ-24 שעות לפני המועד. במידה ותאשר, תחויב בתשלום מלא של הפייד טיים. הסלוט יתפנה לרוכב אחר. להמשיך?"
+      : "ביטול הבקשה ישחרר את הסלוט לרוכב אחר. עפ\"י כללי העסק חיוב מלא חל. להמשיך?";
+
+    Alert.alert(
+      title,
+      body,
+      [
+        { text: "חזרה", style: "cancel" },
+        {
+          text: withinDay ? "אישור וחיוב" : "אישור ביטול",
+          style: "destructive",
+          onPress: function () {
+            handleCancel(item);
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  }
+
+  async function handleCancel(item) {
+    try {
+      setCancellingId(item.paidTimeRequestId);
+      await cancelPaidTimeRequest({
+        paidTimeRequestId: item.paidTimeRequestId,
+        ranchId: activeRole?.ranchId,
+      });
+      await paidTimes.handleRefresh();
+    } catch (err) {
+      var msg = err?.response?.data || err?.message || "אירעה שגיאה";
+      Alert.alert("שגיאה", String(msg));
+    } finally {
+      setCancellingId(null);
+    }
+  }
 
   function handleCompetitionMenuPress(item) {
     props.navigation.navigate(item.screen);
@@ -172,6 +254,104 @@ export default function AdminCompetitionPaidTimesScreen(props) {
             <Text style={styles.notesTitle}>הערות</Text>
             <Text style={styles.notesText}>{item.notes}</Text>
           </View>
+        ) : null}
+
+        {renderCardActions(item)}
+      </View>
+    );
+  }
+
+  function renderCardActions(item) {
+    var isCancelling = cancellingId === item.paidTimeRequestId;
+    var canEdit = !!item.canModify;
+    var canCancel = !!item.canCancel;
+    var isCancelled = item.status === "Cancelled";
+
+    if (!canEdit && !canCancel) {
+      var lockReason = "";
+      if (isCancelled) {
+        lockReason = "הבקשה בוטלה";
+      } else if (item.isPaid) {
+        lockReason = "הבקשה כבר שולמה - לא ניתן לערוך או לבטל";
+      } else {
+        lockReason = "לא ניתן לבצע פעולות על בקשה זו";
+      }
+
+      return (
+        <View
+          style={{
+            marginTop: 10,
+            paddingTop: 10,
+            borderTopWidth: 1,
+            borderTopColor: "#EFE5DF",
+          }}
+        >
+          <Text
+            style={{
+              textAlign: "right",
+              fontSize: 12,
+              color: "#8D6E63",
+            }}
+          >
+            {lockReason}
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View
+        style={{
+          flexDirection: "row-reverse",
+          gap: 8,
+          marginTop: 10,
+          paddingTop: 10,
+          borderTopWidth: 1,
+          borderTopColor: "#EFE5DF",
+        }}
+      >
+        {canEdit ? (
+          <Pressable
+            onPress={function () {
+              openEditNotes(item);
+            }}
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: "#7B5A4D",
+              alignItems: "center",
+            }}
+          >
+            <Text style={{ color: "#7B5A4D", fontWeight: "600" }}>
+              ערוך הערות
+            </Text>
+          </Pressable>
+        ) : null}
+
+        {canCancel ? (
+          <Pressable
+            onPress={function () {
+              confirmCancel(item);
+            }}
+            disabled={isCancelling}
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              borderRadius: 8,
+              backgroundColor: isCancelling ? "#C4B5AA" : "#B45454",
+              alignItems: "center",
+            }}
+          >
+            {isCancelling ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>
+                בטל פייד טיים
+              </Text>
+            )}
+          </Pressable>
         ) : null}
       </View>
     );
@@ -414,6 +594,109 @@ export default function AdminCompetitionPaidTimesScreen(props) {
 
         {renderContent()}
       </ScrollView>
+
+      <Modal
+        visible={!!editingItem}
+        transparent
+        animationType="fade"
+        onRequestClose={closeEditNotes}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.4)",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: 14,
+              padding: 18,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 17,
+                fontWeight: "700",
+                color: "#3F312B",
+                textAlign: "right",
+                marginBottom: 12,
+              }}
+            >
+              עריכת הערות
+            </Text>
+            {editingItem ? (
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: "#8D6E63",
+                  textAlign: "right",
+                  marginBottom: 10,
+                }}
+              >
+                {editingItem.horseName}
+                {editingItem.barnName ? " (" + editingItem.barnName + ")" : ""}
+              </Text>
+            ) : null}
+            <TextInput
+              value={editNotes}
+              onChangeText={setEditNotes}
+              placeholder="הערות לבקשה"
+              placeholderTextColor="#9E8A7F"
+              multiline
+              style={{
+                borderWidth: 1,
+                borderColor: "#D9CFC2",
+                borderRadius: 8,
+                padding: 10,
+                minHeight: 90,
+                textAlign: "right",
+                color: "#3F312B",
+                marginBottom: 12,
+              }}
+            />
+            <View style={{ flexDirection: "row-reverse", gap: 8 }}>
+              <Pressable
+                onPress={handleSaveNotes}
+                disabled={savingNotes}
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 8,
+                  backgroundColor: savingNotes ? "#C4B5AA" : "#7B5A4D",
+                  alignItems: "center",
+                }}
+              >
+                {savingNotes ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>
+                    שמור
+                  </Text>
+                )}
+              </Pressable>
+              <Pressable
+                onPress={closeEditNotes}
+                disabled={savingNotes}
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: "#7B5A4D",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#7B5A4D", fontWeight: "600" }}>
+                  ביטול
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </MobileScreenLayout>
   );
 }

@@ -303,8 +303,10 @@ export default function useCompetitionPaidTimePage(options) {
   }
 
   async function openAssignmentForSlot(slotId) {
+    // עברים מיידית למסך השיבוץ - בלי "מסך ביניים".
+    // המסך עצמו מציג מצב טעינה בסיידבר עד שהבקשות חוזרות מהשרת.
     setAssignmentMode(true);
-    setAssignmentViewOpen(false);
+    setAssignmentViewOpen(true);
     setRequests([]);
     setIncludeAllPending(false);
     setSelectedSlotIds([slotId]);
@@ -321,7 +323,6 @@ export default function useCompetitionPaidTimePage(options) {
 
       var items = Array.isArray(res.data) ? res.data : [];
       setRequests(items);
-      setAssignmentViewOpen(true);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {

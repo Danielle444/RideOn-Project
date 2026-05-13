@@ -91,19 +91,26 @@ function describeTimePref(pref) {
   return null;
 }
 
+function pairMatches(p, pair) {
+  return (
+    (String(p.horseA) === String(pair.a.horseId) &&
+      String(p.horseB) === String(pair.b.horseId)) ||
+    (String(p.horseA) === String(pair.b.horseId) &&
+      String(p.horseB) === String(pair.a.horseId))
+  );
+}
+
 function describeSpacing(pair, spacing) {
+  const adjacency = (spacing && spacing.adjacency) || [];
+  if (adjacency.some(function (p) { return pairMatches(p, pair); })) {
+    return "צמודים";
+  }
   const minSpacingList = (spacing && spacing.minSpacing) || [];
   const found = minSpacingList.find(function (p) {
-    return (
-      (String(p.horseA) === String(pair.a.horseId) &&
-        String(p.horseB) === String(pair.b.horseId)) ||
-      (String(p.horseA) === String(pair.b.horseId) &&
-        String(p.horseB) === String(pair.a.horseId))
-    );
+    return pairMatches(p, pair);
   });
-  if (!found) return "לא משנה";
+  if (!found || found.minutes === 0) return "לא משנה";
   const m = found.minutes;
-  if (m === 0) return "לא משנה";
   const h = Math.floor(m / 60);
   const mm = m % 60;
   if (h > 0 && mm > 0) return "לפחות " + h + "ש' " + mm + " דק'";
@@ -175,28 +182,34 @@ export default function Step10_Summary(props) {
     await chatbot.submit({ confirmedOverflow: true });
   }
 
-  // -------- WARNINGS GATE (capacity overflow) --------
+  // -------- WARNINGS GATE (true overflow only) --------
   if (warnings.length > 0 && !result) {
     return (
       <View>
         <ChatBubble
           from="bot"
-          text="שים לב - חלק מהסלוטים עומדים לחרוג מהקיבולת:"
+          text="שים לב - אין מספיק מקום בסלוט/ים הבאים גם אם הסלוט ריק:"
         />
         {warnings.map(function (w, idx) {
+          const over = (w.newRequestMinutes || 0) - (w.totalCapacityMinutes || 0);
           return (
             <View key={"warn-" + idx} style={styles.warningBanner}>
-              <Text style={styles.warningTitle}>סלוט #{w.requestedCompSlotId}</Text>
+              <Text style={styles.warningTitle}>
+                סלוט #{w.requestedCompSlotId}
+              </Text>
               <Text style={styles.warningText}>
-                קיבולת: {w.totalCapacityMinutes} דק' | תפוס:{" "}
-                {w.usedCapacityMinutes} דק' | חדש: {w.newRequestMinutes} דק'
+                קיבולת הסלוט: {w.totalCapacityMinutes} דק'. הבקשות שביקשת מצטברות
+                ל-{w.newRequestMinutes} דק' (חריגה של {over} דק').
+              </Text>
+              <Text style={[styles.warningText, { marginTop: 4 }]}>
+                חלק מהבקשות לא ישובצו אוטומטית ויעברו לטיפול ידני של המזכירה.
               </Text>
             </View>
           );
         })}
         <ChatBubble
           from="bot"
-          text="אפשר להמשיך בכל זאת, או לחזור ולתקן."
+          text="אפשר להמשיך בכל זאת (חלק יעברו לידני), או לחזור ולהוריד סוסים/לבחור סלוט אחר."
         />
         <View style={{ flexDirection: "row-reverse", gap: 8, marginTop: 8 }}>
           <Pressable
@@ -273,6 +286,8 @@ export default function Step10_Summary(props) {
             key={"rev-" + coach.coachFederationMemberId}
             coach={coach}
             answers={answers}
+            shortMin={ctx.priceCatalog?.short?.durationMinutes || 7}
+            longMin={ctx.priceCatalog?.long?.durationMinutes || 10}
           />
         );
       })}
@@ -321,6 +336,8 @@ export default function Step10_Summary(props) {
 function CoachReviewCard(props) {
   const coach = props.coach;
   const answers = props.answers;
+  const shortMin = props.shortMin;
+  const longMin = props.longMin;
   const coachId = coach.coachFederationMemberId;
 
   const orderedHorses = buildOrderedHorses(
@@ -356,7 +373,10 @@ function CoachReviewCard(props) {
       </Text>
       {orderedHorses.map(function (h, idx) {
         const length = (answers.shortLong || {})[h.horseId] || "short";
-        const lengthLabel = length === "short" ? "קצר 8 דק'" : "ארוך 11 דק'";
+        const lengthLabel =
+          length === "short"
+            ? "קצר " + shortMin + " דק'"
+            : "ארוך " + longMin + " דק'";
         return (
           <Text
             key={"h-" + h.horseId}

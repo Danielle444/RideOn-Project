@@ -46,7 +46,10 @@ BEGIN
         (EXTRACT(EPOCH FROM (s.endtime - s.starttime))::INTEGER / 60) AS total_capacity,
         COALESCE(u.used_min, 0) AS used_min,
         nm.minutes_added,
-        (COALESCE(u.used_min, 0) + nm.minutes_added)
+        -- חריגה אמיתית: האצווה החדשה לבדה (בלי שיבוצים קיימים) לא נכנסת
+        -- בקיבולת הסלוט. שאר המצבים (התנגשות עם משובץ קיים) יטופלו
+        -- בשלב השיבוץ האוטומטי - הבקשה תישאר Pending.
+        nm.minutes_added
             > (EXTRACT(EPOCH FROM (s.endtime - s.starttime))::INTEGER / 60) AS would_overflow
     FROM new_minutes nm
     INNER JOIN paidtimeslotincompetition s ON s.paidtimeslotincompid = nm.slot_id

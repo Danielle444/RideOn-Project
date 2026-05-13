@@ -264,5 +264,71 @@ namespace RideOnServer.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [HttpPost("cancel")]
+        public IActionResult CancelPaidTimeRequest([FromBody] CancelPaidTimeRequestRequest request)
+        {
+            try
+            {
+                if (request == null || request.PaidTimeRequestId <= 0 || request.RanchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.RanchAdmin
+                );
+
+                PaidTimeRequest.CancelMyPaidTimeRequest(request.PaidTimeRequestId, personId);
+
+                return Ok("הבקשה בוטלה בהצלחה");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in CancelPaidTimeRequest: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("update-notes")]
+        public IActionResult UpdatePaidTimeRequestNotes([FromBody] UpdatePaidTimeRequestNotesRequest request)
+        {
+            try
+            {
+                if (request == null || request.PaidTimeRequestId <= 0 || request.RanchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.RanchAdmin
+                );
+
+                PaidTimeRequest.UpdateMyPaidTimeRequestNotes(request.PaidTimeRequestId, personId, request.Notes);
+
+                return Ok("ההערות עודכנו בהצלחה");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in UpdatePaidTimeRequestNotes: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

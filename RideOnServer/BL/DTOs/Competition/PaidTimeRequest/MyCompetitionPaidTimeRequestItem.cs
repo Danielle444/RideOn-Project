@@ -37,5 +37,25 @@
         public string Status { get; set; } = string.Empty;
 
         public DateTime CreatedAt { get; set; }
+
+        public decimal HoursUntilStart { get; set; }
+        public bool CanModify { get; set; }
+        public bool CanCancel { get; set; }
+        public int? BatchId { get; set; }
+        public int HorseId { get; set; }
+        public int? CoachFederationMemberId { get; set; }
+    }
+
+    public class CancelPaidTimeRequestRequest
+    {
+        public int PaidTimeRequestId { get; set; }
+        public int RanchId { get; set; }
+    }
+
+    public class UpdatePaidTimeRequestNotesRequest
+    {
+        public int PaidTimeRequestId { get; set; }
+        public int RanchId { get; set; }
+        public string? Notes { get; set; }
     }
 }
