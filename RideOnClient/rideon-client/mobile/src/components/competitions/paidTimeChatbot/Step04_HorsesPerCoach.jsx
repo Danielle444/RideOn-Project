@@ -55,7 +55,13 @@ export default function Step04_HorsesPerCoach(props) {
     0
   );
 
-  const canAdvance = totalSelected > 0;
+  const coachesMissingHorses = selectedCoaches.filter(function (c) {
+    const list = horsesPerCoach[c.coachFederationMemberId] || [];
+    return list.length === 0;
+  });
+
+  const canAdvance =
+    totalSelected > 0 && coachesMissingHorses.length === 0;
 
   return (
     <StepLayout
@@ -138,6 +144,23 @@ export default function Step04_HorsesPerCoach(props) {
           >
             סה״כ נבחרו {totalSelected} שיבוצי סוס
           </Text>
+
+          {coachesMissingHorses.length > 0 ? (
+            <View style={[styles.warningBanner, { marginTop: 10 }]}>
+              <Text style={styles.warningTitle}>
+                חסר סוס למאמן/ים
+              </Text>
+              <Text style={styles.warningText}>
+                כדי להתקדם, בחר לפחות סוס אחד עבור:{" "}
+                {coachesMissingHorses
+                  .map(function (c) {
+                    return c.coachName;
+                  })
+                  .join(", ")}
+                . אם אין סוס מתאים, חזור לשלב המאמנים והסר אותם מהבחירה.
+              </Text>
+            </View>
+          ) : null}
         </View>
       )}
     </StepLayout>

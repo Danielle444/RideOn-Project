@@ -38,5 +38,8 @@
         public TimeOnly? AssignedSlotStartTime { get; set; }
         public TimeOnly? AssignedSlotEndTime { get; set; }
         public string? AssignedArenaName { get; set; }
+
+        public int? BatchId { get; set; }
+        public string? BatchPayload { get; set; }
     }
 }

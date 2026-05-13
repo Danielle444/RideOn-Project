@@ -88,6 +88,12 @@ export default function Step09_Spacing(props) {
     [selectedCoaches, horsesPerCoach, trainingOrder]
   );
 
+  function isAdjacent(pairKey) {
+    return (spacing.adjacency || []).some(function (p) {
+      return getPairKey(p.horseA, p.horseB) === pairKey;
+    });
+  }
+
   function getMinutes(pairKey) {
     const found = (spacing.minSpacing || []).find(function (p) {
       return getPairKey(p.horseA, p.horseB) === pairKey;
@@ -95,21 +101,34 @@ export default function Step09_Spacing(props) {
     return found ? found.minutes : null;
   }
 
-  function setMinutes(pair, minutes) {
-    let list = (spacing.minSpacing || []).filter(function (p) {
+  // mode: "none" | "adjacent" | "spacing"
+  function getMode(pairKey) {
+    if (isAdjacent(pairKey)) return "adjacent";
+    if (getMinutes(pairKey) != null) return "spacing";
+    return "none";
+  }
+
+  function setMode(pair, mode, minutes) {
+    const adjacency = (spacing.adjacency || []).filter(function (p) {
+      return getPairKey(p.horseA, p.horseB) !== pair.key;
+    });
+    const minSpacing = (spacing.minSpacing || []).filter(function (p) {
       return getPairKey(p.horseA, p.horseB) !== pair.key;
     });
 
-    if (minutes != null) {
-      list = [
-        ...list,
-        { horseA: pair.a.horseId, horseB: pair.b.horseId, minutes: minutes },
-      ];
+    if (mode === "adjacent") {
+      adjacency.push({ horseA: pair.a.horseId, horseB: pair.b.horseId });
+    } else if (mode === "spacing" && minutes != null) {
+      minSpacing.push({
+        horseA: pair.a.horseId,
+        horseB: pair.b.horseId,
+        minutes: minutes,
+      });
     }
 
     chatbot.setAnswer("spacing", {
-      adjacency: [],
-      minSpacing: list,
+      adjacency: adjacency,
+      minSpacing: minSpacing,
     });
   }
 
@@ -138,12 +157,12 @@ export default function Step09_Spacing(props) {
 
             const coachId = block.coach.coachFederationMemberId;
             const definedCount = block.pairs.filter(function (p) {
-              return getMinutes(p.key) != null;
+              return getMode(p.key) !== "none";
             }).length;
             const subtitle =
               definedCount > 0
                 ? definedCount + " מתוך " + block.pairs.length + " הוגדרו"
-                : "ללא מרווחים מוגדרים";
+                : "לא משנה (ברירת מחדל)";
 
             return (
               <CoachAccordion
@@ -153,8 +172,8 @@ export default function Step09_Spacing(props) {
                 defaultOpen={false}
               >
                 {block.pairs.map(function (pair) {
+                  const mode = getMode(pair.key);
                   const minutes = getMinutes(pair.key);
-                  const isOn = minutes != null;
 
                   return (
                     <View
@@ -199,38 +218,56 @@ export default function Step09_Spacing(props) {
                           flexDirection: "row-reverse",
                           gap: 6,
                           marginTop: 8,
+                          flexWrap: "wrap",
                         }}
                       >
                         <Pressable
                           onPress={function () {
-                            setMinutes(pair, null);
+                            setMode(pair, "none");
                           }}
                           style={[
                             styles.optionRow,
-                            { flex: 1, justifyContent: "center" },
-                            !isOn ? styles.optionRowSelected : null,
+                            { flex: 1, justifyContent: "center", minWidth: 90 },
+                            mode === "none" ? styles.optionRowSelected : null,
                           ]}
                         >
                           <Text style={styles.optionLabel}>לא משנה</Text>
                         </Pressable>
                         <Pressable
                           onPress={function () {
-                            setMinutes(
+                            setMode(pair, "adjacent");
+                          }}
+                          style={[
+                            styles.optionRow,
+                            { flex: 1, justifyContent: "center", minWidth: 90 },
+                            mode === "adjacent"
+                              ? styles.optionRowSelected
+                              : null,
+                          ]}
+                        >
+                          <Text style={styles.optionLabel}>הצמד</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={function () {
+                            setMode(
                               pair,
+                              "spacing",
                               minutes != null ? minutes : DEFAULT_SPACING
                             );
                           }}
                           style={[
                             styles.optionRow,
-                            { flex: 1, justifyContent: "center" },
-                            isOn ? styles.optionRowSelected : null,
+                            { flex: 1, justifyContent: "center", minWidth: 110 },
+                            mode === "spacing"
+                              ? styles.optionRowSelected
+                              : null,
                           ]}
                         >
                           <Text style={styles.optionLabel}>מרווח מינימלי</Text>
                         </Pressable>
                       </View>
 
-                      {isOn ? (
+                      {mode === "spacing" ? (
                         <View style={{ marginTop: 8 }}>
                           <Text
                             style={[
@@ -245,9 +282,9 @@ export default function Step09_Spacing(props) {
                             לפחות (שעות:דקות)
                           </Text>
                           <TimePickerWheel
-                            value={minutes}
+                            value={minutes != null ? minutes : DEFAULT_SPACING}
                             onChange={function (v) {
-                              setMinutes(pair, v);
+                              setMode(pair, "spacing", v);
                             }}
                             minHour={0}
                             maxHour={3}

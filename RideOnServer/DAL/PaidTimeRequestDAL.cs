@@ -122,7 +122,10 @@ namespace RideOnServer.DAL
                                     AssignedSlotDate = reader["AssignedSlotDate"] == DBNull.Value ? null : DateOnly.FromDateTime(Convert.ToDateTime(reader["AssignedSlotDate"])),
                                     AssignedSlotStartTime = reader["AssignedSlotStartTime"] == DBNull.Value ? null : TimeOnly.FromTimeSpan((TimeSpan)reader["AssignedSlotStartTime"]),
                                     AssignedSlotEndTime = reader["AssignedSlotEndTime"] == DBNull.Value ? null : TimeOnly.FromTimeSpan((TimeSpan)reader["AssignedSlotEndTime"]),
-                                    AssignedArenaName = reader["AssignedArenaName"] == DBNull.Value ? null : reader["AssignedArenaName"].ToString()
+                                    AssignedArenaName = reader["AssignedArenaName"] == DBNull.Value ? null : reader["AssignedArenaName"].ToString(),
+
+                                    BatchId = reader["BatchId"] == DBNull.Value ? null : Convert.ToInt32(reader["BatchId"]),
+                                    BatchPayload = reader["BatchPayload"] == DBNull.Value ? null : reader["BatchPayload"].ToString()
                                 };
 
                                 requests.Add(item);

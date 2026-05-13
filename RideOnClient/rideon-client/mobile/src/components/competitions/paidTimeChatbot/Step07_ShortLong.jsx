@@ -24,6 +24,11 @@ export default function Step07_ShortLong(props) {
       .includes(String(c.coachFederationMemberId));
   });
 
+  const shortMin = ctx.priceCatalog?.short?.durationMinutes || 7;
+  const longMin = ctx.priceCatalog?.long?.durationMinutes || 10;
+  const shortLabel = "קצר (" + shortMin + " דק')";
+  const longLabel = "ארוך (" + longMin + " דק')";
+
   function setHorse(horseId, value) {
     chatbot.setAnswer("shortLong", {
       ...shortLong,
@@ -43,7 +48,11 @@ export default function Step07_ShortLong(props) {
   return (
     <StepLayout
       bubbles={[
-        "לכל סוס בחר אם הפייד טיים יהיה קצר (8 דק') או ארוך (11 דק').",
+        "לכל סוס בחר אם הפייד טיים יהיה " +
+          shortLabel +
+          " או " +
+          longLabel +
+          ".",
       ]}
       onNext={chatbot.next}
       onBack={chatbot.prev}
@@ -138,7 +147,7 @@ export default function Step07_ShortLong(props) {
                               : null,
                           ]}
                         >
-                          <Text style={styles.optionLabel}>קצר (8 דק')</Text>
+                          <Text style={styles.optionLabel}>{shortLabel}</Text>
                         </Pressable>
                         <Pressable
                           onPress={function () {
@@ -150,7 +159,7 @@ export default function Step07_ShortLong(props) {
                             value === "long" ? styles.optionRowSelected : null,
                           ]}
                         >
-                          <Text style={styles.optionLabel}>ארוך (11 דק')</Text>
+                          <Text style={styles.optionLabel}>{longLabel}</Text>
                         </Pressable>
                       </View>
                     </View>

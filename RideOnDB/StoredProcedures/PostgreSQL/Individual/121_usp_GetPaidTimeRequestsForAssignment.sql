@@ -32,7 +32,9 @@ RETURNS TABLE(
     "AssignedSlotDate"          DATE,
     "AssignedSlotStartTime"     TIME,
     "AssignedSlotEndTime"       TIME,
-    "AssignedArenaName"         TEXT
+    "AssignedArenaName"         TEXT,
+    "BatchId"                   INTEGER,
+    "BatchPayload"              JSONB
 )
 LANGUAGE plpgsql AS $$
 begin
@@ -76,7 +78,10 @@ begin
         assigned_slot.slotdate,
         assigned_slot.starttime,
         assigned_slot.endtime,
-        assigned_arena.arenaname
+        assigned_arena.arenaname,
+
+        ptr.batchid,
+        batch.payload
 
     from paidtimerequest ptr
     inner join servicerequest sr
@@ -111,6 +116,8 @@ begin
     left join arena assigned_arena
         on assigned_arena.ranchid = assigned_slot.arenaranchid
        and assigned_arena.arenaid = assigned_slot.arenaid
+    left join paidtimerequestbatch batch
+        on batch.batchid = ptr.batchid
     where requested_slot.competitionid = p_competitionid
       and (
             ptr.assignedcompslotid = any(p_selectedcompslotids)

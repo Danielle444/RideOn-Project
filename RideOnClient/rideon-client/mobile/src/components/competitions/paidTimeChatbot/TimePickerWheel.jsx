@@ -49,7 +49,7 @@ export default function TimePickerWheel(props) {
   return (
     <View
       style={{
-        flexDirection: "row-reverse",
+        flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
         gap: 8,
