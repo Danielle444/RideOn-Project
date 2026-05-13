@@ -142,7 +142,9 @@ namespace RideOnServer.DAL
                     Notes = reader["notes"] == DBNull.Value ? null : reader["notes"].ToString(),
                     ApprovalDate = reader["approvaldate"] == DBNull.Value ? null : Convert.ToDateTime(reader["approvaldate"]),
                     IsCancelled = Convert.ToBoolean(reader["iscancelled"]),
-                    HasApprovedChange = Convert.ToBoolean(reader["hasapprovedchange"])
+                    HasApprovedChange = Convert.ToBoolean(reader["hasapprovedchange"]),
+                    TotalAmount = reader["totalamount"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["totalamount"]),
+                    IsPaid = reader["ispaid"] != DBNull.Value && Convert.ToBoolean( reader["ispaid"]),
                 });
             }
 

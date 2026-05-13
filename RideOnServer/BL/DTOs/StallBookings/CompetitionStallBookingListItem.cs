@@ -18,5 +18,9 @@ namespace RideOnServer.BL.DTOs.StallBookings
         public DateTime? ApprovalDate { get; set; }
         public bool IsCancelled { get; set; }
         public bool HasApprovedChange { get; set; }
+
+        public decimal TotalAmount { get; set; }
+
+        public bool IsPaid { get; set; }
     }
 }

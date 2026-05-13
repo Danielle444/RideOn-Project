@@ -18,8 +18,6 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                UserAccessValidator.EnsureAuthenticated(User);
-
                 Competition? competition =
                     Competition.GetCompetitionById(
                         dto.CompetitionId

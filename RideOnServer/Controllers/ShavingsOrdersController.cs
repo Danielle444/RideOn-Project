@@ -355,5 +355,53 @@ namespace RideOnServer.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [HttpGet("details/by-competition-and-ranch")]
+        public IActionResult GetAllDetailsForCompetitionAndRanch(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId
+        )
+        {
+            try
+            {
+                int personId =
+                    UserAccessValidator
+                        .GetPersonIdFromClaims(User);
+
+                UserAccessValidator
+                    .EnsureUserHasAnyRoleInRanch(
+                        personId,
+                        ranchId,
+                        RoleNames.HostSecretary,
+                        RoleNames.RanchAdmin
+                    );
+
+                var list =
+                    ShavingsOrderDAL
+                        .GetAllShavingsOrderDetailsForCompetitionAndRanch(
+                            competitionId,
+                            ranchId
+                        );
+
+                return Ok(list);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ex.Message
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error getting shavings details: {ex.Message}"
+                );
+
+                return BadRequest(
+                    "אירעה שגיאה בשליפת פרטי נסורת"
+                );
+            }
+        }
     }
 }
