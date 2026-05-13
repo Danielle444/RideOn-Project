@@ -1,6 +1,20 @@
 import React from "react";
 
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+
+import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
+
+import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
+
+import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
+
+import { getAdminCompetitionMenuItems } from "../../../../navigation/competitionMenuConfigs";
 
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
 
@@ -8,21 +22,11 @@ import { useCompetition } from "../../../../context/CompetitionContext";
 
 import useAdminCompetitionStallsOverview from "../../../../hooks/useAdminCompetitionStallsOverview";
 
+import CompetitionStallCard from "../../../../components/competitions/CompetitionStallCard";
+
 import styles from "../../../../styles/adminCompetitionStallsStyles";
 
-function formatPrice(value) {
-  if (value === null || value === undefined) {
-    return "₪0";
-  }
-
-  try {
-    return "₪" + Number(value).toLocaleString("he-IL");
-  } catch {
-    return "₪" + String(value);
-  }
-}
-
-export default function AdminCompetitionStallsShavingsScreen() {
+export default function AdminCompetitionStallsShavingsScreen(props) {
   var activeRoleContext = useActiveRole();
 
   var competitionContext = useCompetition();
@@ -37,83 +41,89 @@ export default function AdminCompetitionStallsShavingsScreen() {
     activeRole: activeRole,
   });
 
-  if (overview.loading) {
-    return (
-      <View style={styles.loadingWrap}>
-        <ActivityIndicator size="large" color="#7B5A4D" />
+  var cards = Array.isArray(overview.cards) ? overview.cards : [];
 
-        <Text style={styles.loadingText}>טוענת תאים ונסורת...</Text>
-      </View>
-    );
+  function handleCompetitionMenuPress(item) {
+    props.navigation.navigate(item.screen);
   }
 
-  if (overview.screenError) {
-    return (
-      <View style={styles.errorWrap}>
-        <Text style={styles.errorText}>{overview.screenError}</Text>
-      </View>
-    );
+  async function handleExitCompetition() {
+    await competitionContext.clearCompetition();
+
+    props.navigation.navigate("AdminCompetitionsBoard");
+  }
+
+  function renderContent() {
+    if (overview.loading) {
+      return (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color="#7B5A4D" />
+
+          <Text style={styles.loadingText}>טוענת תאים ונסורת...</Text>
+        </View>
+      );
+    }
+
+    if (overview.screenError) {
+      return (
+        <View style={styles.errorWrap}>
+          <Text style={styles.errorText}>{overview.screenError}</Text>
+        </View>
+      );
+    }
+
+    if (cards.length === 0) {
+      return (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>עדיין אין הזמנות תאים</Text>
+
+          <Text style={styles.emptyText}>
+            הזמנות תאים ונסורת יופיעו כאן לאחר יצירה
+          </Text>
+        </View>
+      );
+    }
+
+    return cards.map(function (item) {
+      return (
+        <CompetitionStallCard key={String(item.stallBookingId)} item={item} />
+      );
+    });
   }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      {overview.cards.map(function (item) {
+    <MobileScreenLayout
+      title="תאים ונסורת"
+      subtitle=""
+      activeBottomTab={null}
+      bottomNavItems={getAdminBottomNavConfig(props.navigation)}
+      menuContent={function ({ closeMenu }) {
         return (
-          <View key={item.stallBookingId} style={styles.card}>
-            <View style={styles.cardTop}>
-              <View>
-                <Text style={styles.horseName}>
-                  {item.isTackBooking ? "תא ציוד" : item.horseName || "ללא סוס"}
-                </Text>
-
-                <Text style={styles.dateText}>
-                  {item.startDate} - {item.endDate}
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.paymentBadge,
-                  item.isPaid ? styles.paymentPaid : styles.paymentUnpaid,
-                ]}
-              >
-                <Text style={styles.paymentBadgeText}>
-                  {item.isPaid ? "שולם" : "לא שולם"}
-                </Text>
-              </View>
-            </View>
-
-            <Text style={styles.amountText}>
-              {formatPrice(item.totalAmount)}
-            </Text>
-
-            <View style={styles.shavingsSection}>
-              <Text style={styles.sectionTitle}>נסורת</Text>
-
-              {item.shavingsOrders?.length === 0 ? (
-                <Text style={styles.emptyText}>אין הזמנות נסורת</Text>
-              ) : (
-                item.shavingsOrders.map(function (order) {
-                  return (
-                    <View
-                      key={order.shavingsOrderId}
-                      style={styles.shavingsCard}
-                    >
-                      <Text style={styles.shavingsText}>
-                        שקיות: {order.bagQuantityPerStall}
-                      </Text>
-
-                      <Text style={styles.shavingsText}>
-                        סטטוס: {order.deliveryStatus}
-                      </Text>
-                    </View>
-                  );
-                })
-              )}
-            </View>
-          </View>
+          <CompetitionMenuTemplate
+            activeKey="stalls-shavings"
+            closeMenu={closeMenu}
+            competitionName={
+              activeCompetition ? activeCompetition.competitionName : ""
+            }
+            items={getAdminCompetitionMenuItems()}
+            onItemPress={handleCompetitionMenuPress}
+            onExitCompetition={handleExitCompetition}
+          />
         );
-      })}
-    </ScrollView>
+      }}
+    >
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.screenContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={overview.loading}
+            onRefresh={overview.reload}
+          />
+        }
+      >
+        {renderContent()}
+      </ScrollView>
+    </MobileScreenLayout>
   );
 }

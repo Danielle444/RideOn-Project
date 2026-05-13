@@ -8,8 +8,7 @@ export default StyleSheet.create({
 
   content: {
     padding: 16,
-    paddingBottom: 40,
-    gap: 16,
+    paddingBottom: 120,
   },
 
   loadingWrap: {
@@ -85,8 +84,10 @@ export default StyleSheet.create({
 
   paymentBadge: {
     borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   paymentPaid: {
@@ -99,8 +100,15 @@ export default StyleSheet.create({
 
   paymentBadgeText: {
     fontSize: 13,
-    fontWeight: "700",
-    color: "#3E2E27",
+    fontWeight: "800",
+  },
+
+  paymentBadgeTextPaid: {
+    color: "#2F6B3B",
+  },
+
+  paymentBadgeTextUnpaid: {
+    color: "#9D3E3E",
   },
 
   shavingsSection: {
@@ -134,5 +142,474 @@ export default StyleSheet.create({
   shavingsText: {
     fontSize: 14,
     color: "#5C463D",
+  },
+
+  emptyWrap: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 32,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E9DDD6",
+  },
+
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#3E2E27",
+  },
+
+  emptySubtitle: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#7B685F",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+
+  shavingsMiniWidget: {
+    marginTop: 10,
+    alignSelf: "flex-start",
+    backgroundColor: "#FAF5F1",
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#E7D6CA",
+    minWidth: 170,
+  },
+
+  shavingsMiniTop: {
+    gap: 4,
+  },
+
+  shavingsMiniTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#4F3B31",
+    textAlign: "right",
+  },
+
+  shavingsMiniCount: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#7B5A4D",
+    textAlign: "right",
+  },
+
+  shavingsMiniActions: {
+    flexDirection: "row-reverse",
+    gap: 8,
+    marginTop: 10,
+  },
+
+  shavingsMiniButton: {
+    flex: 1,
+    minHeight: 36,
+    borderRadius: 10,
+    backgroundColor: "#7B5A4D",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+
+  shavingsMiniButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    padding: 18,
+  },
+
+  historyModalCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    maxHeight: "80%",
+    overflow: "hidden",
+  },
+
+  historyModalHeader: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E7D6CA",
+  },
+
+  historyCloseButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  historyHeaderSpacer: {
+    width: 40,
+  },
+
+  historyModalTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#4F3B31",
+  },
+
+  historyContent: {
+    padding: 16,
+    gap: 12,
+  },
+
+  historyEmptyWrap: {
+    alignItems: "center",
+    paddingVertical: 30,
+  },
+
+  historyEmptyTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#4F3B31",
+  },
+
+  historyEmptyText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#7B5A4D",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+
+  historyOrderCard: {
+    backgroundColor: "#FAF5F1",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#E7D6CA",
+    gap: 6,
+  },
+
+  historyOrderTop: {
+    flexDirection: "row-reverse",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  historyOrderAmount: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#7B5A4D",
+  },
+
+  historyOrderStatus: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#4F3B31",
+  },
+
+  historyOrderText: {
+    fontSize: 14,
+    color: "#5B4438",
+    textAlign: "right",
+    lineHeight: 20,
+  },
+
+  stallCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#E1D2CB",
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    elevation: 2,
+  },
+
+  stallTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 14,
+  },
+
+  shavingsPanel: {
+    width: 150,
+    minHeight: 122,
+    backgroundColor: "#FFFDFB",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#DCCBC2",
+    padding: 10,
+  },
+
+  shavingsPanelTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 6,
+  },
+
+  shavingsPlus: {
+    fontSize: 18,
+    color: "#5B4438",
+    fontWeight: "400",
+    lineHeight: 20,
+  },
+
+  shavingsPanelTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#5B4438",
+    textAlign: "right",
+    lineHeight: 18,
+  },
+
+  shavingsPanelPrice: {
+    marginTop: 10,
+    fontSize: 13,
+    color: "#6B554B",
+    fontWeight: "600",
+    textAlign: "right",
+    lineHeight: 17,
+  },
+
+  historyButton: {
+    marginTop: 10,
+    minHeight: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D9C8BF",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+
+  historyButtonText: {
+    fontSize: 12,
+    lineHeight: 15,
+    color: "#6A5248",
+    fontWeight: "700",
+    textAlign: "center",
+  },
+
+  stallDetails: {
+    flex: 1,
+    alignItems: "flex-end",
+  },
+
+  stallHorseName: {
+    fontSize: 20,
+    lineHeight: 25,
+    fontWeight: "900",
+    color: "#3E2E27",
+    textAlign: "right",
+  },
+
+  stallMeta: {
+    marginTop: 5,
+    fontSize: 14,
+    lineHeight: 19,
+    color: "#6F5A51",
+    fontWeight: "500",
+    textAlign: "right",
+  },
+
+  stallDivider: {
+    height: 1,
+    backgroundColor: "#E8DCD6",
+    marginTop: 16,
+    marginBottom: 12,
+  },
+
+  stallFooterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  footerActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    minWidth: 48,
+  },
+
+  iconButton: {
+    minWidth: 28,
+    minHeight: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  iconButtonText: {
+    fontSize: 20,
+    color: "#5B4438",
+  },
+
+  totalAndStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  stallTotalText: {
+    fontSize: 19,
+    lineHeight: 24,
+    fontWeight: "900",
+    color: "#6A4F43",
+    textAlign: "right",
+  },
+
+  stallCardHeader: {
+    minHeight: 160,
+    justifyContent: "flex-start",
+  },
+
+  stallMainInfo: {
+    flex: 1,
+    paddingLeft: 170,
+  },
+
+  stallContentRow: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "stretch",
+  },
+
+  stallDates: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#7B685F",
+    textAlign: "right",
+  },
+
+  stallMiddleRow: {
+    marginTop: 10,
+    flexDirection: "row-reverse",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+  },
+
+  stallLabel: {
+    fontSize: 13,
+    color: "#8A766A",
+    textAlign: "right",
+  },
+
+  stallDateText: {
+    marginTop: 2,
+    fontSize: 14,
+    color: "#7B685F",
+    textAlign: "right",
+    lineHeight: 20,
+  },
+
+  stallPriceSection: {
+    marginTop: 12,
+    alignItems: "flex-end",
+  },
+
+  stallPriceLabel: {
+    fontSize: 14,
+    color: "#8A766A",
+    textAlign: "right",
+  },
+
+  stallPrice: {
+    marginTop: 2,
+    fontSize: 24,
+    fontWeight: "900",
+    color: "#5B4438",
+    textAlign: "right",
+    lineHeight: 30,
+  },
+
+  stallNumber: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#6B5245",
+    textAlign: "right",
+  },
+
+  shavingsCountWrap: {
+    marginTop: 6,
+    alignItems: "flex-end",
+  },
+
+  shavingsPanelCount: {
+    marginTop: 8,
+    fontSize: 24,
+    fontWeight: "900",
+    color: "#4B342B",
+    textAlign: "right",
+    lineHeight: 28,
+  },
+
+  shavingsPanelSubtitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#4B342B",
+    textAlign: "right",
+    lineHeight: 18,
+  },
+
+  shavingsButtonsWrap: {
+    gap: 8,
+  },
+
+  addShavingsButton: {
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#8A6454",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  addShavingsButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+
+  shavingsActionButton: {
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#7B5A4D",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  shavingsActionText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+
+  shavingsActionButtonSecondary: {
+    height: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#D8C2B4",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+  },
+
+  shavingsActionTextSecondary: {
+    color: "#6B5245",
+    fontWeight: "700",
+    fontSize: 13,
   },
 });
