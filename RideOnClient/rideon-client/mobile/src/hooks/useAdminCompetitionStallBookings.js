@@ -139,25 +139,29 @@ function normalizeExistingStallBooking(item) {
   return {
     stallBookingId:
       item.stallBookingId || item.StallBookingId || item.stallbookingid || null,
+
     horseId: horseId,
+
     isForTack: isForTack,
+
     isTackBooking: isForTack === true || horseId === null,
+
     priceCatalogId:
       Number(item.priceCatalogId || item.PriceCatalogId || 0) || null,
+
+    totalAmount: Number(item.totalAmount || item.TotalAmount || 0) || 0,
+
+    isPaid: normalizeBoolean(item.isPaid ?? item.IsPaid),
+
     startDate: normalizeDateString(
-      item.startDate ||
-        item.StartDate ||
-        item.startdate ||
-        item.startDate ||
-        item.startDate,
+      item.startDate || item.StartDate || item.startdate,
     ),
-    endDate: normalizeDateString(
-      item.endDate ||
-        item.EndDate ||
-        item.enddate ||
-        item.endDate ||
-        item.endDate,
-    ),
+
+    endDate: normalizeDateString(item.endDate || item.EndDate || item.enddate),
+
+    compoundId: item.compoundId || item.CompoundId || item.compoundid || null,
+
+    stallId: item.stallId || item.StallId || item.stallid || null,
   };
 }
 

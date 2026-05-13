@@ -419,5 +419,80 @@ namespace RideOnServer.DAL
 
             return payers;
         }
+
+        public static List<CompetitionShavingsOrderDetailsItem>
+    GetAllShavingsOrderDetailsForCompetitionAndRanch(
+        int competitionId,
+        int ranchId
+    )
+        {
+            List<CompetitionShavingsOrderDetailsItem>
+                details =
+                    new List<CompetitionShavingsOrderDetailsItem>();
+
+            using NpgsqlConnection conn =
+                DBServices.GetDefaultConnection();
+
+            conn.Open();
+
+            using NpgsqlCommand cmd =
+                new NpgsqlCommand(
+                    "SELECT * FROM usp_getallshavingsorderdetailsforcompetitionandranch(@competitionId, @ranchId)",
+                    conn
+                );
+
+            cmd.Parameters.AddWithValue(
+                "@competitionId",
+                competitionId
+            );
+
+            cmd.Parameters.AddWithValue(
+                "@ranchId",
+                ranchId
+            );
+
+            using NpgsqlDataReader reader =
+                cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                details.Add(
+                    new CompetitionShavingsOrderDetailsItem
+                    {
+                        ShavingsOrderId =
+                            Convert.ToInt32(
+                                reader["shavingsorderid"]
+                            ),
+
+                        StallBookingId =
+                            Convert.ToInt32(
+                                reader["stallbookingid"]
+                            ),
+
+                        HorseId =
+                            reader["horseid"] == DBNull.Value
+                                ? null
+                                : Convert.ToInt32(
+                                    reader["horseid"]
+                                ),
+
+                        HorseName =
+                            reader["horsename"] == DBNull.Value
+                                ? null
+                                : reader["horsename"]
+                                    .ToString(),
+
+                        BagQuantityPerStall =
+                            Convert.ToInt16(
+                                reader[
+                                    "bagquantityperstall"
+                                ]
+                            )
+                    }
+                );
+            }
+
+            return details;
+        }
     }
 }
