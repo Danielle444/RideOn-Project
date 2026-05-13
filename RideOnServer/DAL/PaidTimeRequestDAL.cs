@@ -312,5 +312,99 @@ namespace RideOnServer.DAL
 
             return (createdIds, batchId);
         }
+
+
+        public List<MyCompetitionPaidTimeRequestItem> GetMyPaidTimeRequestsForCompetition(
+    int competitionId,
+    int orderedBySystemUserId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+    {
+        { "@p_competitionid", competitionId },
+        { "@p_orderedbysystemuserid", orderedBySystemUserId }
+    };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_getmypaidtimerequestsforcompetition",
+                        connection,
+                        paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<MyCompetitionPaidTimeRequestItem> list = new List<MyCompetitionPaidTimeRequestItem>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(MapMyCompetitionPaidTimeRequestItem(reader));
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+
+        private MyCompetitionPaidTimeRequestItem MapMyCompetitionPaidTimeRequestItem(NpgsqlDataReader reader)
+        {
+            return new MyCompetitionPaidTimeRequestItem
+            {
+                PaidTimeRequestId = Convert.ToInt32(reader["paidtimerequestid"]),
+
+                HorseName = reader["horsename"]?.ToString() ?? string.Empty,
+                BarnName = reader["barnname"] == DBNull.Value ? null : reader["barnname"].ToString(),
+
+                CoachName = reader["coachname"] == DBNull.Value ? null : reader["coachname"].ToString(),
+                PayerName = reader["payername"]?.ToString() ?? string.Empty,
+
+                ProductName = reader["productname"]?.ToString() ?? string.Empty,
+                AmountToPay = Convert.ToDecimal(reader["amounttopay"]),
+
+                IsPaid = Convert.ToBoolean(reader["ispaid"]),
+                IsAssigned = Convert.ToBoolean(reader["isassigned"]),
+
+                DisplayStatus = reader["displaystatus"]?.ToString() ?? string.Empty,
+
+                DisplaySlotDate = DateOnly.FromDateTime(Convert.ToDateTime(reader["displayslotdate"])),
+                DisplayStartTime = TimeOnly.FromTimeSpan((TimeSpan)reader["displaystarttime"]),
+                DisplayEndTime = TimeOnly.FromTimeSpan((TimeSpan)reader["displayendtime"]),
+                DisplayArenaName = reader["displayarenaname"]?.ToString() ?? string.Empty,
+
+                RequestedSlotDate = DateOnly.FromDateTime(Convert.ToDateTime(reader["requestedslotdate"])),
+                RequestedStartTime = TimeOnly.FromTimeSpan((TimeSpan)reader["requestedstarttime"]),
+                RequestedEndTime = TimeOnly.FromTimeSpan((TimeSpan)reader["requestedendtime"]),
+                RequestedArenaName = reader["requestedarenaname"]?.ToString() ?? string.Empty,
+
+                AssignedSlotDate = reader["assignedslotdate"] == DBNull.Value
+                    ? null
+                    : DateOnly.FromDateTime(Convert.ToDateTime(reader["assignedslotdate"])),
+
+                AssignedSlotStartTime = reader["assignedslotstarttime"] == DBNull.Value
+                    ? null
+                    : TimeOnly.FromTimeSpan((TimeSpan)reader["assignedslotstarttime"]),
+
+                AssignedSlotEndTime = reader["assignedslotendtime"] == DBNull.Value
+                    ? null
+                    : TimeOnly.FromTimeSpan((TimeSpan)reader["assignedslotendtime"]),
+
+                AssignedArenaName = reader["assignedarenaname"] == DBNull.Value
+                    ? null
+                    : reader["assignedarenaname"].ToString(),
+
+                Notes = reader["notes"] == DBNull.Value ? null : reader["notes"].ToString(),
+                Status = reader["status"]?.ToString() ?? string.Empty,
+
+                CreatedAt = Convert.ToDateTime(reader["createdat"])
+            };
+        }
     }
 }
