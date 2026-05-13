@@ -56,5 +56,12 @@ namespace RideOnServer.BL
                 throw new Exception("Fine amount cannot be negative");
             }
         }
+
+        internal static List<Fine> GetActiveFinePolicies()
+        {
+            FineDAL dal = new FineDAL();
+
+            return dal.GetActiveFinePolicies();
+        }
     }
 }
