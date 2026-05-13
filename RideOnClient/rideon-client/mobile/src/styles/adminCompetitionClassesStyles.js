@@ -353,6 +353,45 @@ var styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
   },
+
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "#F8F4F1",
+  },
+
+  modalHeader: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E7D6CA",
+  },
+
+  modalCloseButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  modalHeaderSpacer: {
+    width: 40,
+  },
+
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#4F3B31",
+    textAlign: "center",
+  },
+
+  modalContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
 });
 
 export default styles;
