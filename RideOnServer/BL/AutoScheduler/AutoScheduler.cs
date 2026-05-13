@@ -98,6 +98,8 @@ namespace RideOnServer.BL.AutoScheduler
                     result.Assignments.Add(new AssignmentDecision
                     {
                         PaidTimeRequestId = req.PaidTimeRequestId,
+                        HorseId = req.HorseId,
+                        CoachFederationMemberId = req.CoachFederationMemberId,
                         Status = "Pending"
                     });
                     result.UnscheduledCount++;
@@ -117,6 +119,8 @@ namespace RideOnServer.BL.AutoScheduler
                     result.Assignments.Add(new AssignmentDecision
                     {
                         PaidTimeRequestId = req.PaidTimeRequestId,
+                        HorseId = req.HorseId,
+                        CoachFederationMemberId = req.CoachFederationMemberId,
                         Status = "Pending"
                     });
                     result.UnscheduledCount++;
@@ -135,6 +139,8 @@ namespace RideOnServer.BL.AutoScheduler
                     result.Assignments.Add(new AssignmentDecision
                     {
                         PaidTimeRequestId = req.PaidTimeRequestId,
+                        HorseId = req.HorseId,
+                        CoachFederationMemberId = req.CoachFederationMemberId,
                         AssignedCompSlotId = requestedSlot.PaidTimeSlotInCompId,
                         AssignedStartTime = placement.Value.Start,
                         AssignedOrder = order,
@@ -158,6 +164,8 @@ namespace RideOnServer.BL.AutoScheduler
                     result.Assignments.Add(new AssignmentDecision
                     {
                         PaidTimeRequestId = req.PaidTimeRequestId,
+                        HorseId = req.HorseId,
+                        CoachFederationMemberId = req.CoachFederationMemberId,
                         Status = "Pending"
                     });
 

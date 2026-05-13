@@ -125,24 +125,50 @@ namespace RideOnServer.BL
                 AutoScheduleResult schedResult = AutoSchedulerService.RunForCompetition(request.CompetitionId);
 
                 HashSet<int> createdIdSet = new HashSet<int>(createdIds);
-                List<UnscheduledRequestItem> unscheduledItems = schedResult.Audit
-                    .Where(a => a.Action == "unscheduled" && createdIdSet.Contains(a.PaidTimeRequestId))
-                    .Select(a => new UnscheduledRequestItem
+
+                Dictionary<int, AssignmentDecision> decisionByRequestId =
+                    schedResult.Assignments.ToDictionary(a => a.PaidTimeRequestId);
+
+                List<ScheduledRequestItem> scheduledItems = schedResult.Assignments
+                    .Where(a =>
+                        a.Status == "Assigned"
+                        && a.AssignedCompSlotId.HasValue
+                        && a.AssignedStartTime.HasValue
+                        && createdIdSet.Contains(a.PaidTimeRequestId))
+                    .OrderBy(a => a.AssignedStartTime)
+                    .Select(a => new ScheduledRequestItem
                     {
                         PaidTimeRequestId = a.PaidTimeRequestId,
-                        Reason = a.Reason ?? "לא צוינה סיבה"
+                        HorseId = a.HorseId,
+                        CoachFederationMemberId = a.CoachFederationMemberId,
+                        AssignedCompSlotId = a.AssignedCompSlotId!.Value,
+                        AssignedStartTime = a.AssignedStartTime!.Value,
+                        AssignedOrder = a.AssignedOrder ?? 0
                     })
                     .ToList();
 
-                int scheduledFromThisBatch = schedResult.Audit
-                    .Count(a => a.Action == "scheduled" && createdIdSet.Contains(a.PaidTimeRequestId));
+                List<UnscheduledRequestItem> unscheduledItems = schedResult.Audit
+                    .Where(a => a.Action == "unscheduled" && createdIdSet.Contains(a.PaidTimeRequestId))
+                    .Select(a =>
+                    {
+                        decisionByRequestId.TryGetValue(a.PaidTimeRequestId, out AssignmentDecision? d);
+                        return new UnscheduledRequestItem
+                        {
+                            PaidTimeRequestId = a.PaidTimeRequestId,
+                            HorseId = d?.HorseId ?? 0,
+                            CoachFederationMemberId = d?.CoachFederationMemberId ?? 0,
+                            Reason = a.Reason ?? "לא צוינה סיבה"
+                        };
+                    })
+                    .ToList();
 
                 schedulingSummary = new AutoSchedulerSummary
                 {
-                    ScheduledCount = scheduledFromThisBatch,
+                    ScheduledCount = scheduledItems.Count,
                     UnscheduledCount = unscheduledItems.Count,
                     FrozenCount = schedResult.FrozenCount,
-                    UnscheduledItems = unscheduledItems
+                    UnscheduledItems = unscheduledItems,
+                    ScheduledItems = scheduledItems
                 };
             }
             catch (Exception ex)

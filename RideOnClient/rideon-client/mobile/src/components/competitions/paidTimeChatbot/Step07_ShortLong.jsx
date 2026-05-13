@@ -1,7 +1,7 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import StepLayout from "./StepLayout";
-import OptionRow from "./OptionRow";
+import CoachAccordion from "./CoachAccordion";
 import styles, { COLORS } from "../../../styles/paidTimeChatbotStyles";
 
 function formatHorseLabel(horse) {
@@ -24,23 +24,6 @@ export default function Step07_ShortLong(props) {
       .includes(String(c.coachFederationMemberId));
   });
 
-  // Build flat list of selected (coach, horse) pairs
-  const allSelectedHorses = [];
-  for (const coach of selectedCoaches) {
-    const horseIds = horsesPerCoach[coach.coachFederationMemberId] || [];
-    for (const hId of horseIds) {
-      const horse = (coach.horses || []).find(function (h) {
-        return String(h.horseId) === String(hId);
-      });
-      if (horse) {
-        allSelectedHorses.push({
-          coachName: coach.coachName,
-          horse: horse,
-        });
-      }
-    }
-  }
-
   function setHorse(horseId, value) {
     chatbot.setAnswer("shortLong", {
       ...shortLong,
@@ -48,22 +31,14 @@ export default function Step07_ShortLong(props) {
     });
   }
 
-  function applyAll(value) {
+  function applyToCoach(coachId, value) {
+    const horseIds = horsesPerCoach[coachId] || [];
     const next = { ...shortLong };
-    for (const item of allSelectedHorses) {
-      next[item.horse.horseId] = value;
+    for (const hId of horseIds) {
+      next[hId] = value;
     }
     chatbot.setAnswer("shortLong", next);
   }
-
-  const allShort = allSelectedHorses.length > 0 &&
-    allSelectedHorses.every(function (item) {
-      return shortLong[item.horse.horseId] === "short";
-    });
-  const allLong = allSelectedHorses.length > 0 &&
-    allSelectedHorses.every(function (item) {
-      return shortLong[item.horse.horseId] === "long";
-    });
 
   return (
     <StepLayout
@@ -74,99 +49,114 @@ export default function Step07_ShortLong(props) {
       onBack={chatbot.prev}
       canAdvance={true}
     >
-      {allSelectedHorses.length === 0 ? (
-        <Text style={styles.bubbleTextBot}>אין סוסים לבחירה.</Text>
+      {selectedCoaches.length === 0 ? (
+        <Text style={styles.bubbleTextBot}>לא נבחרו מאמנים.</Text>
       ) : (
         <View>
-          <View
-            style={{
-              flexDirection: "row-reverse",
-              gap: 8,
-              marginBottom: 14,
-            }}
-          >
-            <Pressable
-              onPress={function () {
-                applyAll("short");
-              }}
-              style={[
-                styles.secondaryButton,
-                { flex: 1, marginTop: 0 },
-                allShort
-                  ? { backgroundColor: COLORS.primaryLight }
-                  : null,
-              ]}
-            >
-              <Text style={styles.secondaryButtonText}>הכל קצר</Text>
-            </Pressable>
-            <Pressable
-              onPress={function () {
-                applyAll("long");
-              }}
-              style={[
-                styles.secondaryButton,
-                { flex: 1, marginTop: 0 },
-                allLong
-                  ? { backgroundColor: COLORS.primaryLight }
-                  : null,
-              ]}
-            >
-              <Text style={styles.secondaryButtonText}>הכל ארוך</Text>
-            </Pressable>
-          </View>
+          {selectedCoaches.map(function (coach) {
+            const coachId = coach.coachFederationMemberId;
+            const horseIds = horsesPerCoach[coachId] || [];
+            const horses = (coach.horses || []).filter(function (h) {
+              return horseIds.map(String).includes(String(h.horseId));
+            });
 
-          {allSelectedHorses.map(function (item, idx) {
-            const horseId = item.horse.horseId;
-            const value = shortLong[horseId] || "short";
+            if (horses.length === 0) return null;
+
+            const shortCount = horses.filter(function (h) {
+              return (shortLong[h.horseId] || "short") === "short";
+            }).length;
+            const longCount = horses.length - shortCount;
+            const subtitle =
+              shortCount + " קצר, " + longCount + " ארוך";
 
             return (
-              <View
-                key={"h-" + horseId + "-" + idx}
-                style={{
-                  marginBottom: 12,
-                  paddingBottom: 10,
-                  borderBottomWidth: idx < allSelectedHorses.length - 1 ? 1 : 0,
-                  borderBottomColor: COLORS.border,
-                }}
+              <CoachAccordion
+                key={"sl-" + coachId}
+                title={coach.coachName}
+                subtitle={subtitle}
+                defaultOpen={false}
               >
-                <Text style={[styles.bubbleTextBot, { fontWeight: "700" }]}>
-                  {formatHorseLabel(item.horse)}
-                </Text>
-                <Text
-                  style={[
-                    styles.bubbleTextBot,
-                    { fontSize: 12, color: COLORS.textMuted, marginBottom: 6 },
-                  ]}
+                <View
+                  style={{
+                    flexDirection: "row-reverse",
+                    gap: 6,
+                    marginBottom: 10,
+                  }}
                 >
-                  מאמן: {item.coachName}
-                </Text>
-                <View style={{ flexDirection: "row-reverse", gap: 6 }}>
                   <Pressable
                     onPress={function () {
-                      setHorse(horseId, "short");
+                      applyToCoach(coachId, "short");
                     }}
                     style={[
-                      styles.optionRow,
-                      { flex: 1, justifyContent: "center" },
-                      value === "short" ? styles.optionRowSelected : null,
+                      styles.secondaryButton,
+                      { flex: 1, marginTop: 0 },
                     ]}
                   >
-                    <Text style={styles.optionLabel}>קצר (8 דק')</Text>
+                    <Text style={styles.secondaryButtonText}>הכל קצר</Text>
                   </Pressable>
                   <Pressable
                     onPress={function () {
-                      setHorse(horseId, "long");
+                      applyToCoach(coachId, "long");
                     }}
                     style={[
-                      styles.optionRow,
-                      { flex: 1, justifyContent: "center" },
-                      value === "long" ? styles.optionRowSelected : null,
+                      styles.secondaryButton,
+                      { flex: 1, marginTop: 0 },
                     ]}
                   >
-                    <Text style={styles.optionLabel}>ארוך (11 דק')</Text>
+                    <Text style={styles.secondaryButtonText}>הכל ארוך</Text>
                   </Pressable>
                 </View>
-              </View>
+
+                {horses.map(function (horse) {
+                  const value = shortLong[horse.horseId] || "short";
+                  return (
+                    <View
+                      key={"h-" + coachId + "-" + horse.horseId}
+                      style={{ marginBottom: 8 }}
+                    >
+                      <Text
+                        style={[styles.bubbleTextBot, { fontWeight: "700" }]}
+                      >
+                        {formatHorseLabel(horse)}
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: "row-reverse",
+                          gap: 6,
+                          marginTop: 4,
+                        }}
+                      >
+                        <Pressable
+                          onPress={function () {
+                            setHorse(horse.horseId, "short");
+                          }}
+                          style={[
+                            styles.optionRow,
+                            { flex: 1, justifyContent: "center" },
+                            value === "short"
+                              ? styles.optionRowSelected
+                              : null,
+                          ]}
+                        >
+                          <Text style={styles.optionLabel}>קצר (8 דק')</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={function () {
+                            setHorse(horse.horseId, "long");
+                          }}
+                          style={[
+                            styles.optionRow,
+                            { flex: 1, justifyContent: "center" },
+                            value === "long" ? styles.optionRowSelected : null,
+                          ]}
+                        >
+                          <Text style={styles.optionLabel}>ארוך (11 דק')</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  );
+                })}
+              </CoachAccordion>
             );
           })}
         </View>
