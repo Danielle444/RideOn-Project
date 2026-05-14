@@ -55,12 +55,51 @@ function getNumberOfDays(item) {
   }
 }
 
+function getBookingStatusText(item) {
+  if (item.isCancelled) {
+    return "בוטל";
+  }
+
+  if (item.hasPendingCancellation) {
+    return "בקשת ביטול ממתינה";
+  }
+
+  if (item.hasApprovedChange) {
+    return "עודכן";
+  }
+
+  return "";
+}
+
+function getBookingStatusStyle(item) {
+  if (item.isCancelled) {
+    return styles.stallStatusCancelled;
+  }
+
+  if (item.hasPendingCancellation) {
+    return styles.stallStatusPending;
+  }
+
+  if (item.hasApprovedChange) {
+    return styles.stallStatusUpdated;
+  }
+
+  return null;
+}
+
 export default function CompetitionStallCard(props) {
   var item = props.item;
 
   var [showHistory, setShowHistory] = useState(false);
 
   var isTackBooking = item.isTackBooking === true;
+
+  var isLocked =
+    item.isCancelled === true || item.hasPendingCancellation === true;
+
+  var bookingStatusText = getBookingStatusText(item);
+
+  var bookingStatusStyle = getBookingStatusStyle(item);
 
   var shavingsOrders = Array.isArray(item.shavingsOrders)
     ? item.shavingsOrders
@@ -80,29 +119,43 @@ export default function CompetitionStallCard(props) {
   );
 
   var numberOfDays = getNumberOfDays(item);
+
   var stallAmount = Number(item.stallAmount || 0);
+
   var shavingsAmount = isTackBooking
     ? 0
     : Number(item.shavingsTotalAmount || 0);
+
   var totalAmount = Number(item.totalAmount || 0);
 
   return (
     <>
-      <View style={styles.stallCard}>
+      <View
+        style={[
+          styles.stallCard,
+          item.isCancelled ? styles.stallCardDisabled : null,
+        ]}
+      >
         <View style={styles.stallTopRow}>
-          {!isTackBooking ? (
+          {!isTackBooking && !item.isCancelled ? (
             <View style={styles.shavingsPanel}>
               <View style={styles.shavingsPanelTopRow}>
-                <Pressable
-                  style={styles.shavingsPlusButton}
-                  onPress={function () {
-                    if (typeof props.onAddShavings === "function") {
-                      props.onAddShavings(item);
-                    }
-                  }}
-                >
-                  <Text style={styles.shavingsPlus}>+</Text>
-                </Pressable>
+                {!isLocked ? (
+                  <Pressable
+                    style={styles.shavingsPlusButton}
+                    onPress={function () {
+                      if (typeof props.onAddShavings === "function") {
+                        props.onAddShavings(item);
+                      }
+                    }}
+                  >
+                    <Text style={styles.shavingsPlus}>+</Text>
+                  </Pressable>
+                ) : (
+                  <View style={styles.shavingsPlusButtonDisabled}>
+                    <Text style={styles.shavingsPlusDisabled}>+</Text>
+                  </View>
+                )}
 
                 <Text style={styles.shavingsPanelTitle}>
                   נסורת - {totalBags} שקים
@@ -127,9 +180,19 @@ export default function CompetitionStallCard(props) {
           ) : null}
 
           <View style={styles.stallDetails}>
-            <Text style={styles.stallHorseName}>
-              {isTackBooking ? "תא ציוד" : item.horseName || "ללא סוס"}
-            </Text>
+            <View style={styles.stallTitleBlock}>
+              <Text style={styles.stallHorseName}>
+                {isTackBooking ? "תא ציוד" : item.horseName || "ללא סוס"}
+              </Text>
+
+              {bookingStatusText ? (
+                <View style={[styles.stallStatusBadge, bookingStatusStyle]}>
+                  <Text style={styles.stallStatusText}>
+                    {bookingStatusText}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
 
             <Text style={styles.stallMeta}>
               סוג תא: {isTackBooking ? "תא ציוד" : "תא רגיל"}
@@ -152,32 +215,12 @@ export default function CompetitionStallCard(props) {
 
         <View style={styles.stallDivider} />
 
-        <View style={styles.stallFooterRow}>
-          <View style={styles.footerActionsRow}>
-            {props.onDelete ? (
-              <Pressable
-                style={styles.iconButton}
-                onPress={function () {
-                  props.onDelete(item);
-                }}
-              >
-                <Text style={styles.iconButtonText}>🗑</Text>
-              </Pressable>
-            ) : null}
+        <View style={styles.stallFooterBlock}>
+          <Text style={styles.stallTotalText}>
+            סה״כ תא: {formatPrice(totalAmount)}
+          </Text>
 
-            {props.onEdit ? (
-              <Pressable
-                style={styles.iconButton}
-                onPress={function () {
-                  props.onEdit(item);
-                }}
-              >
-                <Text style={styles.iconButtonText}>✎</Text>
-              </Pressable>
-            ) : null}
-          </View>
-
-          <View style={styles.totalAndStatusRow}>
+          <View style={styles.stallFooterActionsLine}>
             <View
               style={[
                 styles.paymentBadge,
@@ -196,14 +239,34 @@ export default function CompetitionStallCard(props) {
               </Text>
             </View>
 
-            <Text style={styles.stallTotalText}>
-              סה״כ תא: {formatPrice(totalAmount)}
-            </Text>
+            <View style={styles.footerActionsRow}>
+              {props.onDelete && !isLocked ? (
+                <Pressable
+                  style={styles.cancelStallButton}
+                  onPress={function () {
+                    props.onDelete(item);
+                  }}
+                >
+                  <Text style={styles.cancelStallButtonText}>ביטול תא</Text>
+                </Pressable>
+              ) : null}
+
+              {props.onEdit && !isLocked ? (
+                <Pressable
+                  style={styles.editStallButton}
+                  onPress={function () {
+                    props.onEdit(item);
+                  }}
+                >
+                  <Text style={styles.editStallButtonText}>עריכה</Text>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
         </View>
       </View>
 
-      {!isTackBooking ? (
+      {!isTackBooking && !item.isCancelled ? (
         <ShavingsHistoryModal
           visible={showHistory}
           onClose={function () {
