@@ -19,6 +19,7 @@ namespace RideOnServer.BL.DTOs.StallBookings
         public bool IsCancelled { get; set; }
         public bool HasApprovedChange { get; set; }
         public bool HasPendingCancellation { get; set; }
+        public bool HasPendingChange { get; set; }
         public decimal TotalAmount { get; set; }
         public bool IsPaid { get; set; }
     }
