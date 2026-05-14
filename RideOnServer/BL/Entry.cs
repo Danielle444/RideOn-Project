@@ -59,5 +59,20 @@ namespace RideOnServer.BL
                 orderedBySystemUserId
             );
         }
+
+        public static List<SecretaryCompetitionEntryItem> GetSecretaryCompetitionEntries(
+           int competitionId)
+        {
+            if (competitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            EntryDAL dal = new EntryDAL();
+
+            return dal.GetSecretaryCompetitionEntries(competitionId);
+        }
+
+
     }
 }

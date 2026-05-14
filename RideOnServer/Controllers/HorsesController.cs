@@ -166,11 +166,12 @@ namespace RideOnServer.Controllers
 
         [HttpPost("health-certificates/upload")]
         [RequestSizeLimit(20_000_000)]
+        [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadHealthCertificate(
             [FromForm] int horseId,
             [FromForm] int competitionId,
             [FromForm] int ranchId,
-            [FromForm] IFormFile file
+            IFormFile file
         )
         {
             try

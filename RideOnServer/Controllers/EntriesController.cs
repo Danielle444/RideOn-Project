@@ -87,8 +87,8 @@ namespace RideOnServer.Controllers
 
         [HttpGet("my-competition")]
         public IActionResult GetMyCompetitionEntries(
-    [FromQuery] int competitionId,
-    [FromQuery] int ranchId)
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
         {
             try
             {
@@ -129,6 +129,65 @@ namespace RideOnServer.Controllers
 
                 return BadRequest(
                     "אירעה שגיאה בשליפת הרשמות למקצים"
+                );
+            }
+        }
+
+        [HttpGet("secretary-competition")]
+        public IActionResult GetSecretaryCompetitionEntries(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (competitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                Competition? competition = Competition.GetCompetitionById(competitionId);
+
+                if (competition == null)
+                {
+                    return NotFound("Competition not found");
+                }
+
+                if (competition.HostRanchId != ranchId)
+                {
+                    return StatusCode(
+                        StatusCodes.Status403Forbidden,
+                        "אין לך הרשאה לצפות בהרשמות של תחרות זו"
+                    );
+                }
+
+                List<SecretaryCompetitionEntryItem> items =
+                    Entry.GetSecretaryCompetitionEntries(competitionId);
+
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ex.Message
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in GetSecretaryCompetitionEntries: {ex.Message}"
+                );
+
+                return BadRequest(
+                    "אירעה שגיאה בשליפת הכניסות למקצים"
                 );
             }
         }
