@@ -64,6 +64,10 @@ function getBookingStatusText(item) {
     return "בקשת ביטול ממתינה";
   }
 
+  if (item.hasPendingChange) {
+    return "בקשת שינוי ממתינה";
+  }
+
   if (item.hasApprovedChange) {
     return "עודכן";
   }
@@ -78,6 +82,10 @@ function getBookingStatusStyle(item) {
 
   if (item.hasPendingCancellation) {
     return styles.stallStatusPending;
+  }
+
+  if (item.hasPendingChange) {
+    return styles.stallStatusUpdated;
   }
 
   if (item.hasApprovedChange) {
@@ -97,7 +105,8 @@ export default function CompetitionStallCard(props) {
   var isLocked =
     item.isPaid === true ||
     item.isCancelled === true ||
-    item.hasPendingCancellation === true;
+    item.hasPendingCancellation === true ||
+    item.hasPendingChange === true;
 
   var bookingStatusText = getBookingStatusText(item);
 

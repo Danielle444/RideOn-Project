@@ -131,6 +131,10 @@ function normalizeBooking(item) {
         item.hasapprovedchange,
     ),
 
+    hasPendingChange: normalizeBoolean(
+      item.hasPendingChange ?? item.HasPendingChange ?? item.haspendingchange,
+    ),
+
     hasPendingCancellation: normalizeBoolean(
       item.hasPendingCancellation ??
         item.HasPendingCancellation ??
