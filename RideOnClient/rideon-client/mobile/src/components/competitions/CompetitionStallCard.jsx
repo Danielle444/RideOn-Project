@@ -106,7 +106,16 @@ export default function CompetitionStallCard(props) {
         <View style={styles.stallTopRow}>
           <View style={styles.shavingsPanel}>
             <View style={styles.shavingsPanelTopRow}>
-              <Text style={styles.shavingsPlus}>+</Text>
+              <Pressable
+                style={styles.shavingsPlusButton}
+                onPress={function () {
+                  if (typeof props.onAddShavings === "function") {
+                    props.onAddShavings(item);
+                  }
+                }}
+              >
+                <Text style={styles.shavingsPlus}>+</Text>
+              </Pressable>
 
               <Text style={styles.shavingsPanelTitle}>
                 נסורת - {totalBags} שקים

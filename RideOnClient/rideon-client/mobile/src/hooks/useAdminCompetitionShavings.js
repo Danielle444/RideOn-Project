@@ -154,6 +154,7 @@ export default function useAdminCompetitionShavings(params) {
   var [quantityMode, setQuantityMode] = useState("equal");
   var [equalBagQuantity, setEqualBagQuantity] = useState("");
   var [selectedStalls, setSelectedStalls] = useState([]);
+  var [appliedInitialStallId, setAppliedInitialStallId] = useState(null);
   var [notes, setNotes] = useState("");
 
   var loadData = useCallback(
@@ -243,6 +244,51 @@ export default function useAdminCompetitionShavings(params) {
       },
       [isActiveTab, loadData],
     ),
+  );
+
+  useEffect(
+    function () {
+      if (!isActiveTab) {
+        setAppliedInitialStallId(null);
+        return;
+      }
+
+      if (!params.initialStallBookingId) {
+        return;
+      }
+
+      if (appliedInitialStallId === params.initialStallBookingId) {
+        return;
+      }
+
+      var matchedStall = availableStalls.find(function (stall) {
+        return (
+          Number(stall.stallBookingId) === Number(params.initialStallBookingId)
+        );
+      });
+
+      if (!matchedStall) {
+        return;
+      }
+
+      setSelectedStalls([
+        {
+          stallBookingId: matchedStall.stallBookingId,
+          horseName: matchedStall.horseName,
+          payerNames: matchedStall.payerNames,
+          bagQuantity: "",
+        },
+      ]);
+
+      setQuantityMode("equal");
+      setAppliedInitialStallId(params.initialStallBookingId);
+    },
+    [
+      isActiveTab,
+      params.initialStallBookingId,
+      availableStalls,
+      appliedInitialStallId,
+    ],
   );
 
   function toggleStallSelection(stall) {
@@ -401,7 +447,7 @@ export default function useAdminCompetitionShavings(params) {
 
     if (validationMessage) {
       Alert.alert("שגיאה", validationMessage);
-      return;
+      return false;
     }
 
     try {
@@ -437,11 +483,15 @@ export default function useAdminCompetitionShavings(params) {
       setDeliveryMode("now");
       setDeliveryDate("");
       setDeliveryTime("");
+
+      return true;
     } catch (error) {
       Alert.alert(
         "שגיאה",
         String(error?.response?.data || "אירעה שגיאה ביצירת הזמנת הנסורת"),
       );
+
+      return false;
     } finally {
       setIsSaving(false);
     }

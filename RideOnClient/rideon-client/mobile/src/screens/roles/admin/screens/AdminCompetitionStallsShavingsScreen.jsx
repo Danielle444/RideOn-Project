@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 
 import {
   ActivityIndicator,
+  Pressable,
   RefreshControl,
   ScrollView,
   Text,
@@ -24,6 +25,8 @@ import useAdminCompetitionStallsOverview from "../../../../hooks/useAdminCompeti
 
 import CompetitionStallCard from "../../../../components/competitions/CompetitionStallCard";
 
+import ShavingsOrderModal from "../../../../components/competitions/ShavingsOrderModal";
+
 import styles from "../../../../styles/adminCompetitionStallsStyles";
 
 export default function AdminCompetitionStallsShavingsScreen(props) {
@@ -35,9 +38,12 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
 
   var activeCompetition = competitionContext.activeCompetition;
 
+  var [showShavingsModal, setShowShavingsModal] = useState(false);
+
+  var [selectedStallForShavings, setSelectedStallForShavings] = useState(null);
+
   var overview = useAdminCompetitionStallsOverview({
     competitionId: activeCompetition?.competitionId,
-
     activeRole: activeRole,
   });
 
@@ -51,6 +57,30 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
     await competitionContext.clearCompetition();
 
     props.navigation.navigate("AdminCompetitionsBoard");
+  }
+
+  function handleOpenGeneralShavingsModal() {
+    setSelectedStallForShavings(null);
+
+    setShowShavingsModal(true);
+  }
+
+  function handleAddShavingsForStall(item) {
+    setSelectedStallForShavings(item);
+
+    setShowShavingsModal(true);
+  }
+
+  function handleCloseShavingsModal() {
+    setShowShavingsModal(false);
+
+    setSelectedStallForShavings(null);
+  }
+
+  async function handleShavingsCreated() {
+    await overview.reload();
+
+    setSelectedStallForShavings(null);
   }
 
   function renderContent() {
@@ -74,10 +104,10 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
 
     if (cards.length === 0) {
       return (
-        <View style={styles.emptyCard}>
+        <View style={styles.emptyWrap}>
           <Text style={styles.emptyTitle}>עדיין אין הזמנות תאים</Text>
 
-          <Text style={styles.emptyText}>
+          <Text style={styles.emptySubtitle}>
             הזמנות תאים ונסורת יופיעו כאן לאחר יצירה
           </Text>
         </View>
@@ -86,7 +116,11 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
 
     return cards.map(function (item) {
       return (
-        <CompetitionStallCard key={String(item.stallBookingId)} item={item} />
+        <CompetitionStallCard
+          key={String(item.stallBookingId)}
+          item={item}
+          onAddShavings={handleAddShavingsForStall}
+        />
       );
     });
   }
@@ -114,7 +148,7 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
     >
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.screenContent}
+        contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
             refreshing={overview.loading}
@@ -122,7 +156,28 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           />
         }
       >
+        <Pressable
+          style={styles.addShavingsTopButton}
+          onPress={handleOpenGeneralShavingsModal}
+        >
+          <Text style={styles.addShavingsTopButtonText}>
+            + הוסף הזמנת נסורת
+          </Text>
+        </Pressable>
+
         {renderContent()}
+
+        <ShavingsOrderModal
+          visible={showShavingsModal}
+          competitionId={activeCompetition?.competitionId}
+          initialStallBookingId={
+            selectedStallForShavings
+              ? selectedStallForShavings.stallBookingId
+              : null
+          }
+          onClose={handleCloseShavingsModal}
+          onCreated={handleShavingsCreated}
+        />
       </ScrollView>
     </MobileScreenLayout>
   );

@@ -756,4 +756,73 @@ export default StyleSheet.create({
     fontWeight: "700",
     fontSize: 13,
   },
+
+  addShavingsTopButton: {
+    backgroundColor: "#7B5A4D",
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+
+  addShavingsTopButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  shavingsModalContainer: {
+    flex: 1,
+    backgroundColor: "#F8F4F1",
+  },
+
+  shavingsModalHeader: {
+    minHeight: 58,
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E7D6CA",
+  },
+
+  shavingsModalCloseButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F6F1EE",
+  },
+
+  shavingsModalHeaderSpacer: {
+    width: 42,
+    height: 42,
+  },
+
+  shavingsModalTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#4F3B31",
+    textAlign: "center",
+  },
+
+  shavingsModalContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+
+  shavingsPlusButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F6EFEA",
+  },
 });
