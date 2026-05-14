@@ -50,6 +50,32 @@ function normalizeDateString(value) {
   return text;
 }
 
+function calculateNumberOfDays(startDate, endDate) {
+  if (!startDate || !endDate) {
+    return 1;
+  }
+
+  try {
+    var start = new Date(startDate);
+    var end = new Date(endDate);
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return 1;
+    }
+
+    var diff = end.getTime() - start.getTime();
+    var days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+
+    if (days <= 0) {
+      return 1;
+    }
+
+    return days;
+  } catch {
+    return 1;
+  }
+}
+
 function normalizeBooking(item) {
   if (!item) {
     return null;
@@ -84,14 +110,14 @@ function normalizeBooking(item) {
     stallId: item.stallId || item.StallId || item.stallid || null,
 
     priceCatalogId:
-      Number(item.priceCatalogId || item.PriceCatalogId || item.pricecatalogid || 0) ||
-      null,
+      Number(
+        item.priceCatalogId || item.PriceCatalogId || item.pricecatalogid || 0,
+      ) || null,
 
-    itemPrice: Number(item.itemPrice || item.ItemPrice || item.itemprice || 0) || 0,
+    itemPrice:
+      Number(item.itemPrice || item.ItemPrice || item.itemprice || 0) || 0,
 
     notes: item.notes || item.Notes || "",
-
-    totalAmount: Number(item.totalAmount || item.TotalAmount || item.totalamount || 0) || 0,
 
     isPaid: normalizeBoolean(item.isPaid ?? item.IsPaid ?? item.ispaid),
 
@@ -127,16 +153,13 @@ function normalizeStallBookingPayer(item) {
       null,
 
     payerFullName:
-      item.payerFullName ||
-      item.PayerFullName ||
-      item.payerfullname ||
-      "",
+      item.payerFullName || item.PayerFullName || item.payerfullname || "",
 
     amountToPay:
-      Number(item.amountToPay || item.AmountToPay || item.amounttopay || 0) || 0,
+      Number(item.amountToPay || item.AmountToPay || item.amounttopay || 0) ||
+      0,
 
-    dateClosed:
-      item.dateClosed || item.DateClosed || item.dateclosed || null,
+    dateClosed: item.dateClosed || item.DateClosed || item.dateclosed || null,
   };
 }
 
@@ -159,13 +182,11 @@ function normalizeShavingsOrder(item) {
       null,
 
     bagQuantity:
-      Number(item.bagQuantity || item.BagQuantity || item.bagquantity || 0) || 0,
+      Number(item.bagQuantity || item.BagQuantity || item.bagquantity || 0) ||
+      0,
 
     deliveryStatus:
-      item.deliveryStatus ||
-      item.DeliveryStatus ||
-      item.deliverystatus ||
-      "",
+      item.deliveryStatus || item.DeliveryStatus || item.deliverystatus || "",
 
     notes: item.notes || item.Notes || "",
 
@@ -181,20 +202,20 @@ function normalizeShavingsOrder(item) {
       item.approvedbypersonid ||
       null,
 
-    approvedAt:
-      item.approvedAt ||
-      item.ApprovedAt ||
-      item.approvedat ||
-      null,
+    approvedAt: item.approvedAt || item.ApprovedAt || item.approvedat || null,
 
     orderedByName:
-      item.orderedByName ||
-      item.OrderedByName ||
-      item.orderedbyname ||
-      "",
+      item.orderedByName || item.OrderedByName || item.orderedbyname || "",
+
+    priceCatalogId:
+      item.priceCatalogId || item.PriceCatalogId || item.pricecatalogid || null,
+
+    itemPrice:
+      Number(item.itemPrice || item.ItemPrice || item.itemprice || 0) || 0,
 
     totalAmount:
-      Number(item.totalAmount || item.TotalAmount || item.totalamount || 0) || 0,
+      Number(item.totalAmount || item.TotalAmount || item.totalamount || 0) ||
+      0,
   };
 }
 
@@ -211,10 +232,7 @@ function normalizeShavingsDetail(item) {
       null,
 
     stallBookingId:
-      item.stallBookingId ||
-      item.StallBookingId ||
-      item.stallbookingid ||
-      null,
+      item.stallBookingId || item.StallBookingId || item.stallbookingid || null,
 
     horseId: item.horseId || item.HorseId || item.horseid || null,
 
@@ -245,18 +263,6 @@ function getMainPayerName(payers) {
     })
     .filter(Boolean)
     .join(", ");
-}
-
-function calculateOrderAmountForStall(order, detail) {
-  var totalOrderBags = Number(order.bagQuantity || 0);
-  var totalOrderAmount = Number(order.totalAmount || 0);
-  var stallBags = Number(detail.bagQuantityPerStall || 0);
-
-  if (!totalOrderBags || totalOrderBags <= 0) {
-    return 0;
-  }
-
-  return (totalOrderAmount / totalOrderBags) * stallBags;
 }
 
 export default function useAdminCompetitionStallsOverview(params) {
@@ -389,22 +395,42 @@ export default function useAdminCompetitionStallsOverview(params) {
               return null;
             }
 
+            var amountForThisStall =
+              Number(detail.bagQuantityPerStall || 0) *
+              Number(order.itemPrice || 0);
+
             return {
               ...order,
 
               bagQuantityPerStall: detail.bagQuantityPerStall,
 
-              amountForThisStall: calculateOrderAmountForStall(order, detail),
+              amountForThisStall: amountForThisStall,
+
+              totalAmount: amountForThisStall,
             };
           })
           .filter(Boolean);
+
+        var numberOfDays = calculateNumberOfDays(
+          booking.startDate,
+          booking.endDate,
+        );
+
+        var stallAmount =
+          Number(numberOfDays || 1) * Number(booking.itemPrice || 0);
 
         var shavingsTotalAmount = relatedOrders.reduce(function (sum, order) {
           return sum + Number(order.amountForThisStall || 0);
         }, 0);
 
+        var totalCardAmount = stallAmount + shavingsTotalAmount;
+
         return {
           ...booking,
+
+          numberOfDays: numberOfDays,
+
+          stallAmount: stallAmount,
 
           payers: bookingPayers,
 
@@ -413,6 +439,8 @@ export default function useAdminCompetitionStallsOverview(params) {
           shavingsOrders: relatedOrders,
 
           shavingsTotalAmount: shavingsTotalAmount,
+
+          totalAmount: totalCardAmount,
         };
       });
     },

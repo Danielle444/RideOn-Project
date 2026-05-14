@@ -56,11 +56,17 @@ function getNumberOfDays(item) {
 }
 
 function getShavingsTotalAmount(item, totalBags) {
-  if (item.shavingsTotalAmount !== null && item.shavingsTotalAmount !== undefined) {
+  if (
+    item.shavingsTotalAmount !== null &&
+    item.shavingsTotalAmount !== undefined
+  ) {
     return Number(item.shavingsTotalAmount || 0);
   }
 
-  if (item.totalShavingsAmount !== null && item.totalShavingsAmount !== undefined) {
+  if (
+    item.totalShavingsAmount !== null &&
+    item.totalShavingsAmount !== undefined
+  ) {
     return Number(item.totalShavingsAmount || 0);
   }
 
@@ -90,9 +96,9 @@ export default function CompetitionStallCard(props) {
   );
 
   var numberOfDays = getNumberOfDays(item);
-  var stallAmount = Number(item.totalAmount || 0);
-  var shavingsAmount = getShavingsTotalAmount(item, totalBags);
-  var totalAmount = stallAmount + shavingsAmount;
+  var stallAmount = Number(item.stallAmount || 0);
+  var shavingsAmount = Number(item.shavingsTotalAmount || 0);
+  var totalAmount = Number(item.totalAmount || 0);
 
   return (
     <>
