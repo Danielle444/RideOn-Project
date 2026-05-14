@@ -217,62 +217,124 @@ export default StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
     justifyContent: "center",
-    padding: 18,
+    paddingHorizontal: 18,
   },
 
   historyModalCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 24,
-    maxHeight: "80%",
+    maxHeight: "78%",
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E5D6CE",
   },
 
   historyModalHeader: {
     flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#E7D6CA",
+    borderBottomColor: "#E9DDD6",
+    backgroundColor: "#FFFFFF",
   },
 
   historyCloseButton: {
-    width: 40,
-    height: 40,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#F6F1EE",
     alignItems: "center",
     justifyContent: "center",
   },
 
   historyHeaderSpacer: {
-    width: 40,
+    width: 42,
+  },
+
+  historyTitleWrap: {
+    flex: 1,
+    alignItems: "center",
   },
 
   historyModalTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#4F3B31",
+    fontSize: 19,
+    lineHeight: 25,
+    fontWeight: "900",
+    color: "#3E2E27",
+    textAlign: "center",
+  },
+
+  historySubtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "700",
+    color: "#8A766A",
+    textAlign: "center",
+  },
+
+  historySummaryRow: {
+    flexDirection: "row-reverse",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: "#FFFDFB",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E9DDD6",
+  },
+
+  historySummaryBox: {
+    flex: 1,
+    borderRadius: 14,
+    backgroundColor: "#FAF5F1",
+    borderWidth: 1,
+    borderColor: "#E7D6CA",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    alignItems: "center",
+  },
+
+  historySummaryValue: {
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: "900",
+    color: "#5B4438",
+    textAlign: "center",
+  },
+
+  historySummaryLabel: {
+    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "700",
+    color: "#8A766A",
+    textAlign: "center",
   },
 
   historyContent: {
-    padding: 16,
+    padding: 14,
+    paddingBottom: 18,
     gap: 12,
   },
 
   historyEmptyWrap: {
     alignItems: "center",
-    paddingVertical: 30,
+    paddingVertical: 34,
+    paddingHorizontal: 18,
   },
 
   historyEmptyTitle: {
-    fontSize: 16,
-    fontWeight: "800",
+    fontSize: 17,
+    fontWeight: "900",
     color: "#4F3B31",
+    textAlign: "center",
   },
 
   historyEmptyText: {
@@ -285,36 +347,118 @@ export default StyleSheet.create({
 
   historyOrderCard: {
     backgroundColor: "#FAF5F1",
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 14,
     borderWidth: 1,
     borderColor: "#E7D6CA",
-    gap: 6,
   },
 
-  historyOrderTop: {
+  historyOrderHeader: {
     flexDirection: "row-reverse",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E8DCD6",
   },
 
-  historyOrderAmount: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#7B5A4D",
+  historyOrderPrice: {
+    fontSize: 21,
+    lineHeight: 26,
+    fontWeight: "900",
+    color: "#5B4438",
+    textAlign: "left",
   },
 
-  historyOrderStatus: {
-    fontSize: 13,
-    fontWeight: "700",
+  historyStatusBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    maxWidth: 150,
+  },
+
+  historyStatusSuccess: {
+    backgroundColor: "#DDF5E3",
+  },
+
+  historyStatusInfo: {
+    backgroundColor: "#E6F0FA",
+  },
+
+  historyStatusWarning: {
+    backgroundColor: "#FFF3D6",
+  },
+
+  historyStatusDanger: {
+    backgroundColor: "#FCE4E4",
+  },
+
+  historyStatusNeutral: {
+    backgroundColor: "#EEE4DE",
+  },
+
+  historyStatusText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900",
     color: "#4F3B31",
+    textAlign: "center",
   },
 
-  historyOrderText: {
+  historyDetailsList: {
+    marginTop: 10,
+    gap: 8,
+  },
+
+  historyDetailRow: {
+    flexDirection: "row-reverse",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+
+  historyDetailLabel: {
+    width: 92,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "900",
+    color: "#8A766A",
+    textAlign: "right",
+  },
+
+  historyDetailValue: {
+    flex: 1,
     fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "800",
+    color: "#3E2E27",
+    textAlign: "left",
+  },
+
+  historyNotesBox: {
+    marginTop: 12,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#EADDD5",
+  },
+
+  historyNotesLabel: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900",
+    color: "#8A766A",
+    textAlign: "right",
+    marginBottom: 4,
+  },
+
+  historyNotesText: {
+    fontSize: 13,
+    lineHeight: 20,
     color: "#5B4438",
     textAlign: "right",
-    lineHeight: 20,
   },
 
   stallCard: {
@@ -611,5 +755,74 @@ export default StyleSheet.create({
     color: "#6B5245",
     fontWeight: "700",
     fontSize: 13,
+  },
+
+  addShavingsTopButton: {
+    backgroundColor: "#7B5A4D",
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+
+  addShavingsTopButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  shavingsModalContainer: {
+    flex: 1,
+    backgroundColor: "#F8F4F1",
+  },
+
+  shavingsModalHeader: {
+    minHeight: 58,
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E7D6CA",
+  },
+
+  shavingsModalCloseButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F6F1EE",
+  },
+
+  shavingsModalHeaderSpacer: {
+    width: 42,
+    height: 42,
+  },
+
+  shavingsModalTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#4F3B31",
+    textAlign: "center",
+  },
+
+  shavingsModalContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+
+  shavingsPlusButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F6EFEA",
   },
 });
