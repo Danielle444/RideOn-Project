@@ -307,14 +307,13 @@ namespace RideOnServer.DAL
 
             using NpgsqlCommand cmd = new NpgsqlCommand(
                 @"SELECT usp_createstallbookingchangerequest(
-            @originalStallBookingId,
-            @ranchId,
-            @orderedBySystemUserId,
-            @newPriceCatalogId,
-            @newStartDate::date,
-            @newEndDate::date,
-            @notes::text
-        )",
+                    @originalStallBookingId,
+                    @ranchId,
+                    @orderedBySystemUserId,
+                    @newStartDate::date,
+                    @newEndDate::date,
+                    @notes::text
+                )",
                 conn
             );
 
@@ -331,11 +330,6 @@ namespace RideOnServer.DAL
             cmd.Parameters.AddWithValue(
                 "@orderedBySystemUserId",
                 orderedBySystemUserId
-            );
-
-            cmd.Parameters.AddWithValue(
-                "@newPriceCatalogId",
-                request.NewPriceCatalogId
             );
 
             cmd.Parameters.Add(
@@ -362,7 +356,6 @@ namespace RideOnServer.DAL
 
             return Convert.ToInt32(result);
         }
-
 
     }
 }

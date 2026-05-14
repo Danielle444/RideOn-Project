@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 import {
-  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -16,74 +15,11 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { useActiveRole } from "../../context/ActiveRoleContext";
 
-import { getCompetitionInvitationDetails } from "../../services/competitionService";
-
 import { createStallBookingChangeRequest } from "../../services/stallBookingsService";
 
 import CompetitionDateField from "../competitionRegistrations/CompetitionDateField";
 
 import styles from "../../styles/adminCompetitionStallsStyles";
-
-function normalizePriceCatalogItem(item, categoryName) {
-  if (!item) {
-    return null;
-  }
-
-  return {
-    priceCatalogId: item.priceCatalogId || item.PriceCatalogId || null,
-    productId: item.productId || item.ProductId || null,
-    itemPrice: Number(item.itemPrice || item.ItemPrice || 0),
-    productName: item.productName || item.ProductName || "",
-    categoryName: categoryName || "",
-  };
-}
-
-function extractStallPriceItems(invitationResponse, isTackBooking) {
-  var sections = Array.isArray(invitationResponse?.data?.servicePriceSections)
-    ? invitationResponse.data.servicePriceSections
-    : [];
-
-  var result = [];
-
-  sections.forEach(function (section) {
-    var categoryName = String(section?.categoryName || "").trim();
-    var items = Array.isArray(section?.items) ? section.items : [];
-
-    items.forEach(function (item) {
-      var normalized = normalizePriceCatalogItem(item, categoryName);
-
-      if (!normalized) {
-        return;
-      }
-
-      var productName = String(normalized.productName || "").trim();
-      var lowerProductName = productName.toLowerCase();
-      var lowerCategoryName = categoryName.toLowerCase();
-
-      var mentionsStall =
-        categoryName.includes("תא") ||
-        productName.includes("תא") ||
-        lowerProductName.includes("stall") ||
-        lowerCategoryName.includes("stall");
-
-      var mentionsTack =
-        categoryName.includes("ציוד") ||
-        productName.includes("ציוד") ||
-        lowerProductName.includes("tack") ||
-        lowerCategoryName.includes("tack");
-
-      if (isTackBooking && mentionsTack) {
-        result.push(normalized);
-      }
-
-      if (!isTackBooking && mentionsStall && !mentionsTack) {
-        result.push(normalized);
-      }
-    });
-  });
-
-  return result;
-}
 
 function normalizeDateForInput(value) {
   if (!value) {
@@ -119,22 +55,6 @@ function formatPrice(value) {
   }
 }
 
-function formatPriceCatalogLabel(item) {
-  if (!item) {
-    return "";
-  }
-
-  var parts = [];
-
-  if (item.productName) {
-    parts.push(item.productName);
-  }
-
-  parts.push(formatPrice(item.itemPrice));
-
-  return parts.join(" • ");
-}
-
 function calculateNumberOfDays(startDate, endDate) {
   if (!startDate || !endDate) {
     return 1;
@@ -164,12 +84,7 @@ export default function StallBookingEditModal(props) {
 
   var item = props.item;
 
-  var [loading, setLoading] = useState(false);
   var [isSaving, setIsSaving] = useState(false);
-  var [screenError, setScreenError] = useState("");
-
-  var [priceCatalogItems, setPriceCatalogItems] = useState([]);
-  var [selectedPriceCatalog, setSelectedPriceCatalog] = useState(null);
   var [startDate, setStartDate] = useState("");
   var [endDate, setEndDate] = useState("");
   var [notes, setNotes] = useState("");
@@ -185,62 +100,8 @@ export default function StallBookingEditModal(props) {
       setStartDate(normalizeDateForInput(item.startDate));
       setEndDate(normalizeDateForInput(item.endDate));
       setNotes(item.notes || "");
-      setSelectedPriceCatalog(null);
-      setPriceCatalogItems([]);
-      setScreenError("");
     },
     [props.visible, item],
-  );
-
-  useEffect(
-    function () {
-      async function loadPrices() {
-        if (!props.visible || !item || !activeRole || !activeRole.ranchId) {
-          return;
-        }
-
-        if (!props.competitionId) {
-          setScreenError("לא נמצאה תחרות פעילה");
-          return;
-        }
-
-        try {
-          setLoading(true);
-          setScreenError("");
-
-          var response = await getCompetitionInvitationDetails(
-            props.competitionId,
-            activeRole.roleId,
-            activeRole.ranchId,
-          );
-
-          var prices = extractStallPriceItems(response, isTackBooking);
-
-          setPriceCatalogItems(prices);
-
-          var currentPrice = prices.find(function (priceItem) {
-            return (
-              Number(priceItem.priceCatalogId) === Number(item.priceCatalogId)
-            );
-          });
-
-          if (currentPrice) {
-            setSelectedPriceCatalog(currentPrice);
-          } else if (prices.length === 1) {
-            setSelectedPriceCatalog(prices[0]);
-          }
-        } catch (error) {
-          setScreenError(
-            String(error?.response?.data || "אירעה שגיאה בטעינת סוגי התאים"),
-          );
-        } finally {
-          setLoading(false);
-        }
-      }
-
-      loadPrices();
-    },
-    [props.visible, props.competitionId, item, activeRole, isTackBooking],
   );
 
   var numberOfDays = useMemo(
@@ -252,9 +113,9 @@ export default function StallBookingEditModal(props) {
 
   var estimatedAmount = useMemo(
     function () {
-      return numberOfDays * Number(selectedPriceCatalog?.itemPrice || 0);
+      return numberOfDays * Number(item?.itemPrice || 0);
     },
-    [numberOfDays, selectedPriceCatalog],
+    [numberOfDays, item],
   );
 
   function validateForm() {
@@ -272,10 +133,6 @@ export default function StallBookingEditModal(props) {
 
     if (!activeRole || !activeRole.ranchId) {
       return "לא נמצאה חווה פעילה";
-    }
-
-    if (!selectedPriceCatalog || !selectedPriceCatalog.priceCatalogId) {
-      return "יש לבחור סוג תא";
     }
 
     if (!startDate || !endDate) {
@@ -303,7 +160,6 @@ export default function StallBookingEditModal(props) {
       await createStallBookingChangeRequest({
         originalStallBookingId: item.stallBookingId,
         ranchId: activeRole.ranchId,
-        newPriceCatalogId: selectedPriceCatalog.priceCatalogId,
         newStartDate: startDate,
         newEndDate: endDate,
         notes: notes ? notes.trim() : null,
@@ -360,61 +216,18 @@ export default function StallBookingEditModal(props) {
             </Text>
 
             <Text style={styles.editFormSubtitle}>
-              השינוי יישלח לאישור מזכירת התחרות ולא יחייב את המשלמים עד אישור.
+              אפשר לערוך תאריכים והערות בלבד. סוג התא והמחיר נקבעים לפי השיבוץ
+              בפועל.
             </Text>
 
-            {loading ? (
-              <View style={styles.editLoadingWrap}>
-                <ActivityIndicator size="small" color="#7B5A4D" />
+            <View style={styles.editSummaryBox}>
+              <Text style={styles.editSummaryText}>
+                סוג תא: {isTackBooking ? "תא ציוד" : "תא רגיל"}
+              </Text>
 
-                <Text style={styles.editHelperText}>טוען סוגי תאים...</Text>
-              </View>
-            ) : null}
-
-            {screenError ? (
-              <View style={styles.editErrorBox}>
-                <Text style={styles.editErrorText}>{screenError}</Text>
-              </View>
-            ) : null}
-
-            <View style={styles.editFieldBlock}>
-              <Text style={styles.editFieldLabel}>סוג תא</Text>
-
-              {priceCatalogItems.length === 0 && !loading ? (
-                <Text style={styles.editHelperText}>
-                  לא נמצאו סוגי תאים פעילים
-                </Text>
-              ) : null}
-
-              {priceCatalogItems.map(function (priceItem) {
-                var active =
-                  selectedPriceCatalog &&
-                  Number(selectedPriceCatalog.priceCatalogId) ===
-                    Number(priceItem.priceCatalogId);
-
-                return (
-                  <Pressable
-                    key={String(priceItem.priceCatalogId)}
-                    style={[
-                      styles.editOptionRow,
-                      active ? styles.editOptionRowActive : null,
-                    ]}
-                    onPress={function () {
-                      setSelectedPriceCatalog(priceItem);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.editOptionText,
-                        active ? styles.editOptionTextActive : null,
-                      ]}
-                    >
-                      {active ? "✓ " : ""}
-                      {formatPriceCatalogLabel(priceItem)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              <Text style={styles.editSummaryText}>
+                מחיר יומי לפי השיבוץ: {formatPrice(item?.itemPrice || 0)}
+              </Text>
             </View>
 
             <View style={styles.editDateFields}>
@@ -445,11 +258,11 @@ export default function StallBookingEditModal(props) {
 
             <View style={styles.editSummaryBox}>
               <Text style={styles.editSummaryText}>
-                מספר ימים: {numberOfDays}
+                מספר ימים חדש: {numberOfDays}
               </Text>
 
               <Text style={styles.editSummaryText}>
-                עלות משוערת: {formatPrice(estimatedAmount)}
+                עלות תא משוערת: {formatPrice(estimatedAmount)}
               </Text>
             </View>
 

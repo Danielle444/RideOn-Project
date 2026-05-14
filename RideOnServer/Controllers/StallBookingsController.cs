@@ -312,11 +312,6 @@ namespace RideOnServer.Controllers
                     return BadRequest("Invalid ranch id.");
                 }
 
-                if (request.NewPriceCatalogId <= 0)
-                {
-                    return BadRequest("Invalid price catalog id.");
-                }
-
                 if (request.NewStartDate == default || request.NewEndDate == default)
                 {
                     return BadRequest("Start date and end date are required.");
