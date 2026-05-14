@@ -95,7 +95,9 @@ export default function CompetitionStallCard(props) {
   var isTackBooking = item.isTackBooking === true;
 
   var isLocked =
-    item.isCancelled === true || item.hasPendingCancellation === true;
+    item.isPaid === true ||
+    item.isCancelled === true ||
+    item.hasPendingCancellation === true;
 
   var bookingStatusText = getBookingStatusText(item);
 

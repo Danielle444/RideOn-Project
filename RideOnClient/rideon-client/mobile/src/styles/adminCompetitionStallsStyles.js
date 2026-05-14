@@ -637,4 +637,157 @@ export default StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
+
+  editFormCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E1D2CB",
+  },
+
+  editFormTitle: {
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: "900",
+    color: "#3E2E27",
+    textAlign: "right",
+  },
+
+  editFormSubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: "600",
+    color: "#7B685F",
+    textAlign: "right",
+  },
+
+  editLoadingWrap: {
+    marginTop: 14,
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  editHelperText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#7B685F",
+    textAlign: "right",
+  },
+
+  editErrorBox: {
+    marginTop: 14,
+    backgroundColor: "#FFF7F6",
+    borderWidth: 1,
+    borderColor: "#F0C4BD",
+    borderRadius: 12,
+    padding: 10,
+  },
+
+  editErrorText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#A3473F",
+    fontWeight: "700",
+    textAlign: "right",
+  },
+
+  editFieldBlock: {
+    marginTop: 18,
+  },
+
+  editFieldLabel: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "900",
+    color: "#4F3B31",
+    textAlign: "right",
+    marginBottom: 8,
+  },
+
+  editOptionRow: {
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E3D5CE",
+    backgroundColor: "#FFFDFB",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+
+  editOptionRowActive: {
+    borderColor: "#8A6454",
+    backgroundColor: "#F6EFEA",
+  },
+
+  editOptionText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "700",
+    color: "#5B4438",
+    textAlign: "right",
+  },
+
+  editOptionTextActive: {
+    color: "#4F3B31",
+    fontWeight: "900",
+  },
+
+  editDateFields: {
+    marginTop: 18,
+    gap: 12,
+  },
+
+  editTextInput: {
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E3D5CE",
+    backgroundColor: "#FFFDFB",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#3E2E27",
+  },
+
+  editSummaryBox: {
+    marginTop: 18,
+    borderRadius: 14,
+    backgroundColor: "#FAF5F1",
+    borderWidth: 1,
+    borderColor: "#E7D6CA",
+    padding: 12,
+    gap: 4,
+  },
+
+  editSummaryText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "800",
+    color: "#5B4438",
+    textAlign: "right",
+  },
+
+  editSubmitButton: {
+    marginTop: 18,
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: "#7B5A4D",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  editSubmitButtonDisabled: {
+    opacity: 0.6,
+  },
+
+  editSubmitButtonText: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
 });

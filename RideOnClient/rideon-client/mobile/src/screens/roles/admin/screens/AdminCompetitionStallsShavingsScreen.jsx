@@ -28,6 +28,8 @@ import CompetitionStallCard from "../../../../components/competitions/Competitio
 
 import ShavingsOrderModal from "../../../../components/competitions/ShavingsOrderModal";
 
+import StallBookingEditModal from "../../../../components/competitions/StallBookingEditModal";
+
 import { createStallBookingCancelRequest } from "../../../../services/stallBookingsService";
 
 import styles from "../../../../styles/adminCompetitionStallsStyles";
@@ -44,6 +46,10 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
   var [showShavingsModal, setShowShavingsModal] = useState(false);
 
   var [selectedStallForShavings, setSelectedStallForShavings] = useState(null);
+
+  var [showEditModal, setShowEditModal] = useState(false);
+
+  var [selectedStallForEdit, setSelectedStallForEdit] = useState(null);
 
   var overview = useAdminCompetitionStallsOverview({
     competitionId: activeCompetition?.competitionId,
@@ -86,9 +92,46 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
     setSelectedStallForShavings(null);
   }
 
+  function handleEditStallBooking(item) {
+    if (!item || !item.stallBookingId) {
+      Alert.alert("שגיאה", "לא נמצא מזהה הזמנת תא תקין");
+      return;
+    }
+
+    if (item.isPaid) {
+      Alert.alert("לא ניתן לערוך", "לא ניתן לערוך תא שכבר שולם");
+      return;
+    }
+
+    if (item.isCancelled || item.hasPendingCancellation) {
+      Alert.alert("לא ניתן לערוך", "קיימת בקשה פתוחה או שהתא כבר בוטל");
+      return;
+    }
+
+    setSelectedStallForEdit(item);
+    setShowEditModal(true);
+  }
+
+  function handleCloseEditModal() {
+    setShowEditModal(false);
+
+    setSelectedStallForEdit(null);
+  }
+
+  async function handleEditCreated() {
+    await overview.reload();
+
+    setSelectedStallForEdit(null);
+  }
+
   function handleCancelStallBooking(item) {
     if (!item || !item.stallBookingId) {
       Alert.alert("שגיאה", "לא נמצא מזהה הזמנת תא תקין");
+      return;
+    }
+
+    if (item.isPaid) {
+      Alert.alert("לא ניתן לבטל", "לא ניתן לבטל תא שכבר שולם");
       return;
     }
 
@@ -168,6 +211,7 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           item={item}
           onAddShavings={handleAddShavingsForStall}
           onDelete={handleCancelStallBooking}
+          onEdit={handleEditStallBooking}
         />
       );
     });
@@ -225,6 +269,14 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           }
           onClose={handleCloseShavingsModal}
           onCreated={handleShavingsCreated}
+        />
+
+        <StallBookingEditModal
+          visible={showEditModal}
+          item={selectedStallForEdit}
+          competitionId={activeCompetition?.competitionId}
+          onClose={handleCloseEditModal}
+          onUpdated={handleEditCreated}
         />
       </ScrollView>
     </MobileScreenLayout>

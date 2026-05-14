@@ -38,16 +38,9 @@ export default function ShavingsOrderModal(props) {
     activeRole: activeRole,
     competitionId: competitionId,
     isActiveTab: props.visible,
-  });
-
-  var shavings = useAdminCompetitionShavings({
-    user: user,
-    activeRole: activeRole,
-    competitionId: competitionId,
-    isActiveTab: props.visible,
     initialStallBookingId: props.initialStallBookingId,
   });
-  
+
   async function handleSubmit() {
     var success = await shavings.handleCreateShavingsOrder();
 
