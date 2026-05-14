@@ -49,11 +49,17 @@ function uploadHealthCertificateFile(params) {
     type: params.file.mimeType || "application/pdf",
   });
 
-  return axios.post("/Horses/health-certificates/upload", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+  console.log("UPLOAD HEALTH CERTIFICATE REQUEST START");
+  console.log("UPLOAD HEALTH CERTIFICATE PARAMS", {
+    horseId: params.horseId,
+    competitionId: params.competitionId,
+    ranchId: params.ranchId,
+    fileName: params.file?.name,
+    fileUri: params.file?.uri,
+    fileType: params.file?.mimeType,
   });
+
+  return axios.post("/Horses/health-certificates/upload", formData);
 }
 
 function saveHealthCertificate(horseId, competitionId, ranchId, hcPath) {

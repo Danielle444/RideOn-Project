@@ -1,4 +1,5 @@
 ﻿using Npgsql;
+using NpgsqlTypes;
 using RideOnServer.BL.DTOs.Payers;
 
 namespace RideOnServer.DAL
@@ -482,15 +483,15 @@ namespace RideOnServer.DAL
                         {
                             list.Add(new PendingPayerRegistrationItem
                             {
-                                PersonId    = Convert.ToInt32(reader["PersonId"]),
-                                FirstName   = reader["FirstName"].ToString() ?? string.Empty,
-                                LastName    = reader["LastName"].ToString() ?? string.Empty,
-                                Email       = reader["Email"] == DBNull.Value ? null : reader["Email"].ToString(),
-                                CellPhone   = reader["CellPhone"] == DBNull.Value ? null : reader["CellPhone"].ToString(),
-                                Username    = reader["Username"].ToString() ?? string.Empty,
-                                RanchId     = Convert.ToInt32(reader["RanchId"]),
-                                RanchName   = reader["RanchName"].ToString() ?? string.Empty,
-                                RoleId      = Convert.ToInt16(reader["RoleId"]),
+                                PersonId = Convert.ToInt32(reader["PersonId"]),
+                                FirstName = reader["FirstName"].ToString() ?? string.Empty,
+                                LastName = reader["LastName"].ToString() ?? string.Empty,
+                                Email = reader["Email"] == DBNull.Value ? null : reader["Email"].ToString(),
+                                CellPhone = reader["CellPhone"] == DBNull.Value ? null : reader["CellPhone"].ToString(),
+                                Username = reader["Username"].ToString() ?? string.Empty,
+                                RanchId = Convert.ToInt32(reader["RanchId"]),
+                                RanchName = reader["RanchName"].ToString() ?? string.Empty,
+                                RoleId = Convert.ToInt16(reader["RoleId"]),
                                 RequestDate = Convert.ToDateTime(reader["RequestDate"])
                             });
                         }
@@ -566,6 +567,49 @@ namespace RideOnServer.DAL
                         "usp_UpdatePersonRoleStatus", connection, paramDic))
                     {
                         command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public string GetPayerCompetitionAccount(
+            int systemUserId,
+            int competitionId,
+            int ranchId,
+            int payerPersonId
+        )
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@p_competitionid", competitionId },
+                { "@p_ranchid", ranchId },
+                { "@p_payerpersonid", payerPersonId },
+                { "@p_adminsystemuserid", systemUserId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_getpayercompetitionaccount",
+                        connection,
+                        paramDic))
+                    {
+                        object? result = command.ExecuteScalar();
+
+                        if (result == null || result == DBNull.Value)
+                        {
+                            return "{}";
+                        }
+
+                        return result.ToString() ?? "{}";
                     }
                 }
             }
