@@ -1,4 +1,4 @@
-import { Eye, ListOrdered } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import DataTableShell from "../../common/table/DataTableShell";
 import DataTableEmptyState from "../../common/table/DataTableEmptyState";
 import DataTableLoadingState from "../../common/table/DataTableLoadingState";
@@ -199,6 +199,7 @@ export default function SecretaryClassesOverviewTable(props) {
                         <span className="font-bold text-[#3F312B]">
                           {classEntriesCount}
                         </span>
+
                         <span className="text-xs text-[#8D6E63]">
                           {groupEntriesCount} במס׳ זה
                         </span>
@@ -240,20 +241,28 @@ export default function SecretaryClassesOverviewTable(props) {
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap justify-end gap-2">
                         <TableActionButton
-                          label="כניסות"
-                          icon={<Eye size={15} />}
+                          icon={<Pencil size={15} />}
+                          iconOnly
+                          title="עריכת מקצה"
                           onClick={function () {
-                            props.onOpenClassEntries(item);
+                            if (props.onEditClass) {
+                              props.onEditClass(item);
+                            }
                           }}
+                          disabled={!props.onEditClass}
                         />
 
                         <TableActionButton
-                          icon={<ListOrdered size={15} />}
+                          icon={<Trash2 size={15} />}
                           iconOnly
-                          title="כל הכניסות במספר זה"
+                          title="מחיקת מקצה"
+                          variant="danger"
                           onClick={function () {
-                            props.onOpenGroupEntries(item);
+                            if (props.onDeleteClass) {
+                              props.onDeleteClass(item);
+                            }
                           }}
+                          disabled={!props.onDeleteClass}
                         />
                       </div>
                     </td>
