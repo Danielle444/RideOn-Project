@@ -19,10 +19,27 @@ namespace RideOnServer.BL
 
         public int? HCApproverSystemUserId { get; set; }
 
-        public static List<HealthCertificateItem> GetHealthCertificatesForCompetition(int competitionId)
+        public static List<HealthCertificateItem> GetHealthCertificatesForCompetition(
+            int competitionId,
+            int ranchId
+        )
         {
+            if (competitionId <= 0)
+            {
+                throw new ArgumentException("מזהה תחרות לא תקין");
+            }
+
+            if (ranchId <= 0)
+            {
+                throw new ArgumentException("מזהה חווה לא תקין");
+            }
+
             HorseDAL dal = new HorseDAL();
-            return dal.GetHealthCertificatesForCompetition(competitionId);
+
+            return dal.GetHealthCertificatesForCompetition(
+                competitionId,
+                ranchId
+            );
         }
 
         public static void SaveHealthCertificate(SaveHealthCertificateRequest request)

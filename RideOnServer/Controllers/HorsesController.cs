@@ -129,9 +129,16 @@ namespace RideOnServer.Controllers
                 );
 
                 var certificates =
-                    HorseParticipationInCompetition.GetHealthCertificatesForCompetition(competitionId);
+                    HorseParticipationInCompetition.GetHealthCertificatesForCompetition(
+                        competitionId,
+                        ranchId
+                    );
 
                 return Ok(new { data = certificates });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
             }
             catch (Exception ex)
             {
