@@ -372,6 +372,7 @@ export default function CompetitionClassesPage() {
             searchText={page.searchText}
             paymentFilter={page.paymentFilter}
             canEditDrawOrder={page.viewMode === "group"}
+            canEditEntry={page.viewMode === "class"}
             drawOrderEditMode={page.drawOrderEditMode}
             savingDrawOrder={page.savingDrawOrder}
             drawOrderError={page.drawOrderError}
@@ -380,7 +381,8 @@ export default function CompetitionClassesPage() {
             onStartDrawOrderEdit={page.startDrawOrderEditMode}
             onCancelDrawOrderEdit={page.cancelDrawOrderEditMode}
             onMoveDrawOrderEntry={page.moveDrawOrderEntry}
-            onShuffleDrawOrder={page.shuffleDrawOrderEntries}
+            onUpdateDraftDrawOrder={page.updateDraftDrawOrder}
+            onRandomizeAndSaveDrawOrder={page.randomizeAndSaveDrawOrder}
             onSaveDrawOrder={page.saveDrawOrder}
           />
         )}

@@ -1,25 +1,18 @@
-import { ArrowDown, ArrowUp, Dice5, Save, Shuffle, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Dice5,
+  Pencil,
+  Save,
+  Shuffle,
+  Trash2,
+  X,
+} from "lucide-react";
 import DataTableShell from "../../common/table/DataTableShell";
 import DataTableEmptyState from "../../common/table/DataTableEmptyState";
 import DataTableLoadingState from "../../common/table/DataTableLoadingState";
 import TableActionButton from "../../common/table/TableActionButton";
 import SecretaryClassEntriesSummaryCards from "./SecretaryClassEntriesSummaryCards";
-
-function formatMoney(value) {
-  if (value === null || value === undefined || value === "") {
-    return "-";
-  }
-
-  return "₪" + Number(value).toLocaleString("he-IL");
-}
-
-function formatDateTime(value) {
-  if (!value) {
-    return "-";
-  }
-
-  return new Date(value).toLocaleString("he-IL");
-}
 
 function getValue(item, camelKey, pascalKey, fallback) {
   if (item[camelKey] !== null && item[camelKey] !== undefined) {
@@ -37,6 +30,10 @@ function getEntryId(item) {
   return getValue(item, "entryId", "EntryId", 0);
 }
 
+function getEntryDrawOrder(item) {
+  return getValue(item, "drawOrder", "DrawOrder", "");
+}
+
 function getFilterButtonClass(isActive) {
   return (
     "rounded-2xl border px-4 py-2 text-sm font-semibold transition-colors " +
@@ -49,6 +46,17 @@ function getFilterButtonClass(isActive) {
 export default function SecretaryClassEntriesTable(props) {
   var items = Array.isArray(props.items) ? props.items : [];
   var canEditDrawOrder = !!props.canEditDrawOrder;
+  var canEditEntry = !!props.canEditEntry;
+
+  var colSpan = 7;
+
+  if (props.drawOrderEditMode) {
+    colSpan += 1;
+  }
+
+  if (canEditEntry && !props.drawOrderEditMode) {
+    colSpan += 1;
+  }
 
   return (
     <div className="space-y-4">
@@ -63,31 +71,34 @@ export default function SecretaryClassEntriesTable(props) {
             <h2 className="text-lg font-bold text-[#3F312B]">כניסות למקצה</h2>
             <p className="text-xs text-[#8D6E63]">
               {props.drawOrderEditMode
-                ? "מצב עריכת סדר פעיל - הזיזי כניסות למעלה/למטה ואז שמרי"
+                ? "מצב עריכת סדר פעיל - אפשר להזיז כניסות או להזין מספר הגרלה ידנית"
                 : items.length + " כניסות מוצגות כרגע"}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {canEditDrawOrder && !props.drawOrderEditMode ? (
-              <TableActionButton
-                label="עריכת סדר"
-                icon={<Shuffle size={15} />}
-                onClick={props.onStartDrawOrderEdit}
-              />
+              <>
+                <TableActionButton
+                  label="הגרלה אקראית"
+                  icon={<Dice5 size={15} />}
+                  onClick={props.onRandomizeAndSaveDrawOrder}
+                  loading={props.savingDrawOrder}
+                />
+
+                <TableActionButton
+                  label="עריכת סדר"
+                  icon={<Shuffle size={15} />}
+                  onClick={props.onStartDrawOrderEdit}
+                  disabled={props.savingDrawOrder}
+                />
+              </>
             ) : null}
 
             {props.drawOrderEditMode ? (
               <>
                 <TableActionButton
-                  label="הגרלה אקראית"
-                  icon={<Dice5 size={15} />}
-                  onClick={props.onShuffleDrawOrder}
-                  disabled={props.savingDrawOrder}
-                />
-
-                <TableActionButton
-                  label="שמירת סדר"
+                  label="שמירה ויציאה"
                   icon={<Save size={15} />}
                   onClick={props.onSaveDrawOrder}
                   loading={props.savingDrawOrder}
@@ -165,14 +176,14 @@ export default function SecretaryClassEntriesTable(props) {
 
         {props.drawOrderEditMode ? (
           <div className="mb-4 rounded-2xl border border-[#EFE5DF] bg-[#FAF5F1] px-4 py-3 text-sm text-[#7A655C]">
-            שימי לב: שמירת הסדר תעדכן את סדר ההגרלה של המקצה הנוכחי בלבד.
+            שימי לב: שמירה תעדכן את סדר ההגרלה של כל המקצים באותו יום ובאותו
+            מספר.
           </div>
         ) : null}
 
         <DataTableShell>
           <thead className="bg-[#FAF5F1] text-sm text-[#6B574F]">
             <tr>
-              <th className="px-4 py-3">#</th>
               <th className="px-4 py-3">סדר הגרלה</th>
               <th className="px-4 py-3">מקצה</th>
               <th className="px-4 py-3">רוכב</th>
@@ -180,9 +191,11 @@ export default function SecretaryClassEntriesTable(props) {
               <th className="px-4 py-3">מאמן</th>
               <th className="px-4 py-3">משלם</th>
               <th className="px-4 py-3">מקבל פרס</th>
-              <th className="px-4 py-3">סה״כ</th>
-              <th className="px-4 py-3">סטטוס תשלום</th>
-              <th className="px-4 py-3">נוצר בתאריך</th>
+
+              {canEditEntry && !props.drawOrderEditMode ? (
+                <th className="px-4 py-3">פעולות</th>
+              ) : null}
+
               {props.drawOrderEditMode ? (
                 <th className="px-4 py-3">סידור</th>
               ) : null}
@@ -192,24 +205,24 @@ export default function SecretaryClassEntriesTable(props) {
           <tbody>
             {props.loading ? (
               <DataTableLoadingState
-                colSpan={props.drawOrderEditMode ? 12 : 11}
+                colSpan={colSpan}
                 message="טוען כניסות..."
               />
             ) : null}
 
             {!props.loading && items.length === 0 ? (
               <DataTableEmptyState
-                colSpan={props.drawOrderEditMode ? 12 : 11}
+                colSpan={colSpan}
                 message="לא נמצאו כניסות להצגה"
               />
             ) : null}
 
             {!props.loading
               ? items.map(function (item, index) {
-                  var isPaid = !!getValue(item, "isPaid", "IsPaid", false);
                   var horseName = getValue(item, "horseName", "HorseName", "");
                   var barnName = getValue(item, "barnName", "BarnName", "");
                   var entryId = getEntryId(item);
+                  var drawOrder = getEntryDrawOrder(item);
 
                   return (
                     <tr
@@ -219,13 +232,24 @@ export default function SecretaryClassEntriesTable(props) {
                         (props.drawOrderEditMode ? "bg-white" : "")
                       }
                     >
-                      <td className="px-4 py-3 font-bold">{index + 1}</td>
-
                       <td className="px-4 py-3 font-bold text-[#7B5A4D]">
-                        {props.drawOrderEditMode
-                          ? index + 1
-                          : getValue(item, "drawOrder", "DrawOrder", null) ||
-                            "-"}
+                        {props.drawOrderEditMode ? (
+                          <input
+                            type="number"
+                            min="1"
+                            value={drawOrder || ""}
+                            onChange={function (event) {
+                              props.onUpdateDraftDrawOrder(
+                                entryId,
+                                event.target.value,
+                              );
+                            }}
+                            disabled={props.savingDrawOrder}
+                            className="h-10 w-20 rounded-xl border border-[#E2D5CE] bg-white px-3 text-center text-sm font-bold text-[#3F312B] outline-none transition-colors focus:border-[#8B6352]"
+                          />
+                        ) : (
+                          drawOrder || "-"
+                        )}
                       </td>
 
                       <td className="px-4 py-3 font-semibold">
@@ -267,30 +291,36 @@ export default function SecretaryClassEntriesTable(props) {
                         ) || "-"}
                       </td>
 
-                      <td className="px-4 py-3 font-bold">
-                        {formatMoney(
-                          getValue(item, "amountToPay", "AmountToPay", 0),
-                        )}
-                      </td>
+                      {canEditEntry && !props.drawOrderEditMode ? (
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-2">
+                            <TableActionButton
+                              icon={<Pencil size={15} />}
+                              iconOnly
+                              title="עריכת כניסה"
+                              onClick={function () {
+                                if (props.onEditEntry) {
+                                  props.onEditEntry(item);
+                                }
+                              }}
+                              disabled={!props.onEditEntry}
+                            />
 
-                      <td className="px-4 py-3">
-                        <span
-                          className={
-                            "rounded-full px-3 py-1 text-xs font-semibold " +
-                            (isPaid
-                              ? "bg-[#EEF8F0] text-[#2F6B3B]"
-                              : "bg-[#FFF4E5] text-[#9A5B00]")
-                          }
-                        >
-                          {isPaid ? "שולם" : "לא שולם"}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3">
-                        {formatDateTime(
-                          getValue(item, "createdAt", "CreatedAt", null),
-                        )}
-                      </td>
+                            <TableActionButton
+                              icon={<Trash2 size={15} />}
+                              iconOnly
+                              title="מחיקת כניסה"
+                              variant="danger"
+                              onClick={function () {
+                                if (props.onDeleteEntry) {
+                                  props.onDeleteEntry(item);
+                                }
+                              }}
+                              disabled={!props.onDeleteEntry}
+                            />
+                          </div>
+                        </td>
+                      ) : null}
 
                       {props.drawOrderEditMode ? (
                         <td className="px-4 py-3">

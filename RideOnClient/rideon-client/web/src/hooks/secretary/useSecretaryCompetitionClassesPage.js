@@ -38,6 +38,16 @@ function getEntryId(item) {
   return item.entryId || item.EntryId;
 }
 
+function getEntryDrawOrder(item) {
+  var value = item.drawOrder;
+
+  if (value === null || value === undefined || value === "") {
+    value = item.DrawOrder;
+  }
+
+  return value;
+}
+
 function getEntryIsPaid(item) {
   return !!(item.isPaid || item.IsPaid);
 }
@@ -132,8 +142,8 @@ function sortClasses(items) {
 
 function sortEntries(items) {
   return [...items].sort(function (a, b) {
-    var aDraw = a.drawOrder || a.DrawOrder;
-    var bDraw = b.drawOrder || b.DrawOrder;
+    var aDraw = getEntryDrawOrder(a);
+    var bDraw = getEntryDrawOrder(b);
 
     if (aDraw && bDraw && Number(aDraw) !== Number(bDraw)) {
       return Number(aDraw) - Number(bDraw);
@@ -176,6 +186,31 @@ function normalizeDraftEntries(items) {
       DrawOrder: index + 1,
     };
   });
+}
+
+function validateDrawOrderDraft(items) {
+  if (!items || items.length === 0) {
+    return "אין כניסות לשמירה";
+  }
+
+  var usedNumbers = {};
+
+  for (var i = 0; i < items.length; i++) {
+    var entry = items[i];
+    var drawOrder = Number(getEntryDrawOrder(entry));
+
+    if (!drawOrder || drawOrder <= 0) {
+      return "יש להזין מספר הגרלה תקין לכל כניסה";
+    }
+
+    if (usedNumbers[drawOrder]) {
+      return "יש מספר הגרלה שמופיע יותר מפעם אחת";
+    }
+
+    usedNumbers[drawOrder] = true;
+  }
+
+  return "";
 }
 
 export default function useSecretaryCompetitionClassesPage(options) {
@@ -294,7 +329,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
     var classEntries = getEntriesForClass(item);
 
     return classEntries.some(function (entry) {
-      var drawOrder = entry.drawOrder || entry.DrawOrder;
+      var drawOrder = getEntryDrawOrder(entry);
       return drawOrder !== null && drawOrder !== undefined && drawOrder !== "";
     });
   }
@@ -602,13 +637,23 @@ export default function useSecretaryCompetitionClassesPage(options) {
     });
   }
 
-  function shuffleDrawOrderEntries() {
+  function updateDraftDrawOrder(entryId, value) {
     setDrawOrderDraftEntries(function (prev) {
-      return normalizeDraftEntries(shuffleItems(prev));
+      return prev.map(function (entry) {
+        if (Number(getEntryId(entry)) !== Number(entryId)) {
+          return entry;
+        }
+
+        return {
+          ...entry,
+          drawOrder: value,
+          DrawOrder: value,
+        };
+      });
     });
   }
 
-  async function saveDrawOrder() {
+  async function saveDrawOrderWithEntries(itemsToSave) {
     if (!selectedGroup) {
       setDrawOrderError("לא נבחרה קבוצת מקצים לשמירת הגרלה");
       return;
@@ -619,8 +664,10 @@ export default function useSecretaryCompetitionClassesPage(options) {
       return;
     }
 
-    if (drawOrderDraftEntries.length === 0) {
-      setDrawOrderError("אין כניסות לשמירה");
+    var validationError = validateDrawOrderDraft(itemsToSave);
+
+    if (validationError) {
+      setDrawOrderError(validationError);
       return;
     }
 
@@ -633,10 +680,10 @@ export default function useSecretaryCompetitionClassesPage(options) {
         classDate: selectedGroup.classDate,
         orderInDay: Number(selectedGroup.orderInDay),
         ranchId: Number(ranchId),
-        entries: drawOrderDraftEntries.map(function (entry, index) {
+        entries: itemsToSave.map(function (entry) {
           return {
             entryId: Number(getEntryId(entry)),
-            drawOrder: index + 1,
+            drawOrder: Number(getEntryDrawOrder(entry)),
           };
         }),
       };
@@ -652,6 +699,28 @@ export default function useSecretaryCompetitionClassesPage(options) {
     } finally {
       setSavingDrawOrder(false);
     }
+  }
+
+  async function saveDrawOrder() {
+    await saveDrawOrderWithEntries(drawOrderDraftEntries);
+  }
+
+  async function randomizeAndSaveDrawOrder() {
+    if (!selectedGroup) {
+      setDrawOrderError("הגרלה אפשרית רק במסך שנפתח דרך מספר המקצה");
+      return;
+    }
+
+    if (selectedEntriesBase.length === 0) {
+      setDrawOrderError("אין כניסות להגרלה");
+      return;
+    }
+
+    var randomizedItems = normalizeDraftEntries(
+      shuffleItems(selectedEntriesBase),
+    );
+
+    await saveDrawOrderWithEntries(randomizedItems);
   }
 
   return {
@@ -704,7 +773,8 @@ export default function useSecretaryCompetitionClassesPage(options) {
     startDrawOrderEditMode,
     cancelDrawOrderEditMode,
     moveDrawOrderEntry,
-    shuffleDrawOrderEntries,
+    updateDraftDrawOrder,
+    randomizeAndSaveDrawOrder,
     saveDrawOrder,
   };
 }
