@@ -2,6 +2,7 @@ import React, { useState } from "react";
 
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -26,6 +27,8 @@ import useAdminCompetitionStallsOverview from "../../../../hooks/useAdminCompeti
 import CompetitionStallCard from "../../../../components/competitions/CompetitionStallCard";
 
 import ShavingsOrderModal from "../../../../components/competitions/ShavingsOrderModal";
+
+import { createStallBookingCancelRequest } from "../../../../services/stallBookingsService";
 
 import styles from "../../../../styles/adminCompetitionStallsStyles";
 
@@ -83,6 +86,50 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
     setSelectedStallForShavings(null);
   }
 
+  function handleCancelStallBooking(item) {
+    if (!item || !item.stallBookingId) {
+      Alert.alert("שגיאה", "לא נמצא מזהה הזמנת תא תקין");
+      return;
+    }
+
+    if (!activeRole || !activeRole.ranchId) {
+      Alert.alert("שגיאה", "לא נמצאה חווה פעילה");
+      return;
+    }
+
+    Alert.alert("ביטול הזמנת תא", "האם לשלוח בקשת ביטול למזכירת התחרות?", [
+      {
+        text: "לא",
+        style: "cancel",
+      },
+      {
+        text: "כן, שלחי בקשה",
+        style: "destructive",
+        onPress: async function () {
+          try {
+            await createStallBookingCancelRequest({
+              stallBookingId: item.stallBookingId,
+              ranchId: activeRole.ranchId,
+            });
+
+            await overview.reload();
+
+            Alert.alert("נשלח", "בקשת ביטול התא נשלחה בהצלחה");
+          } catch (error) {
+            console.log("CREATE STALL CANCEL REQUEST ERROR", error);
+
+            Alert.alert(
+              "שגיאה",
+              String(
+                error?.response?.data || "אירעה שגיאה בשליחת בקשת ביטול התא",
+              ),
+            );
+          }
+        },
+      },
+    ]);
+  }
+
   function renderContent() {
     if (overview.loading) {
       return (
@@ -120,6 +167,7 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           key={String(item.stallBookingId)}
           item={item}
           onAddShavings={handleAddShavingsForStall}
+          onDelete={handleCancelStallBooking}
         />
       );
     });
