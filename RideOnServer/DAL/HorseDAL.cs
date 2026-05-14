@@ -136,11 +136,15 @@ namespace RideOnServer.DAL
             }
         }
 
-        public List<HealthCertificateItem> GetHealthCertificatesForCompetition(int competitionId)
+        public List<HealthCertificateItem> GetHealthCertificatesForCompetition(
+            int competitionId,
+            int ranchId
+        )
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
-                { "@CompetitionId", competitionId }
+                { "@p_competitionid", competitionId },
+                { "@p_ranchid", ranchId }
             };
 
             try
@@ -150,7 +154,7 @@ namespace RideOnServer.DAL
                     connection.Open();
 
                     using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
-                        "usp_GetHealthCertificatesForCompetition",
+                        "usp_gethealthcertificatesforcompetition",
                         connection,
                         paramDic))
                     using (NpgsqlDataReader reader = command.ExecuteReader())
@@ -163,13 +167,26 @@ namespace RideOnServer.DAL
                             {
                                 HorseId = Convert.ToInt32(reader["HorseId"]),
                                 HorseName = reader["HorseName"].ToString() ?? string.Empty,
-                                BarnName = reader["BarnName"] as string,
-                                HcPath = reader["HcPath"] as string,
-                                HcUploadDate = reader["HcUploadDate"] as DateTime?,
-                                HcApprovalStatus = reader["HcApprovalStatus"] as string,
+                                BarnName = reader["BarnName"] == DBNull.Value
+                                    ? null
+                                    : reader["BarnName"].ToString(),
+
+                                HcPath = reader["HcPath"] == DBNull.Value
+                                    ? null
+                                    : reader["HcPath"].ToString(),
+
+                                HcUploadDate = reader["HcUploadDate"] == DBNull.Value
+                                    ? null
+                                    : Convert.ToDateTime(reader["HcUploadDate"]),
+
+                                HcApprovalStatus = reader["HcApprovalStatus"] == DBNull.Value
+                                    ? null
+                                    : reader["HcApprovalStatus"].ToString(),
+
                                 HcApprovalDate = reader["HcApprovalDate"] == DBNull.Value
                                     ? null
                                     : DateOnly.FromDateTime(Convert.ToDateTime(reader["HcApprovalDate"])),
+
                                 HcApproverSystemUserId = reader["HcApproverSystemUserId"] == DBNull.Value
                                     ? null
                                     : Convert.ToInt32(reader["HcApproverSystemUserId"])
