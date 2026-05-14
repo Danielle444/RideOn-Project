@@ -297,6 +297,72 @@ namespace RideOnServer.DAL
             return Convert.ToInt32(result);
         }
 
+        public static int CreateStallBookingChangeRequest(
+            CreateStallBookingChangeRequest request,
+            int orderedBySystemUserId
+        )
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                @"SELECT usp_createstallbookingchangerequest(
+            @originalStallBookingId,
+            @ranchId,
+            @orderedBySystemUserId,
+            @newPriceCatalogId,
+            @newStartDate::date,
+            @newEndDate::date,
+            @notes::text
+        )",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue(
+                "@originalStallBookingId",
+                request.OriginalStallBookingId
+            );
+
+            cmd.Parameters.AddWithValue(
+                "@ranchId",
+                request.RanchId
+            );
+
+            cmd.Parameters.AddWithValue(
+                "@orderedBySystemUserId",
+                orderedBySystemUserId
+            );
+
+            cmd.Parameters.AddWithValue(
+                "@newPriceCatalogId",
+                request.NewPriceCatalogId
+            );
+
+            cmd.Parameters.Add(
+                "@newStartDate",
+                NpgsqlDbType.Date
+            ).Value = request.NewStartDate.Date;
+
+            cmd.Parameters.Add(
+                "@newEndDate",
+                NpgsqlDbType.Date
+            ).Value = request.NewEndDate.Date;
+
+            cmd.Parameters.AddWithValue(
+                "@notes",
+                (object?)request.Notes ?? DBNull.Value
+            );
+
+            object? result = cmd.ExecuteScalar();
+
+            if (result == null || result == DBNull.Value)
+            {
+                throw new Exception("Failed to create stall booking change request.");
+            }
+
+            return Convert.ToInt32(result);
+        }
+
 
     }
 }
