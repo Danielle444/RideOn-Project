@@ -47,6 +47,10 @@ function createTackStallBookings(payload) {
   return axios.post("/StallBookings/tack", payload);
 }
 
+function createStallBookingCancelRequest(payload) {
+  return axios.post("/StallBookings/cancel-request", payload);
+}
+
 export {
   getHorsesForStallBooking,
   getHorsePayersForCompetition,
@@ -54,4 +58,5 @@ export {
   getAllStallBookingPayersForCompetitionAndRanch,
   createStallBooking,
   createTackStallBookings,
+  createStallBookingCancelRequest,
 };

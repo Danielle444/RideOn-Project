@@ -240,5 +240,54 @@ namespace RideOnServer.Controllers
                 return BadRequest("אירעה שגיאה ביצירת תאי ציוד");
             }
         }
+
+        [HttpPost("cancel-request")]
+        public IActionResult CreateStallBookingCancelRequest(
+            [FromBody] CreateStallBookingCancelRequest request
+        )
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Request body is required.");
+                }
+
+                if (request.StallBookingId <= 0)
+                {
+                    return BadRequest("Invalid stall booking id.");
+                }
+
+                if (request.RanchId <= 0)
+                {
+                    return BadRequest("Invalid ranch id.");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.RanchAdmin,
+                    RoleNames.HostSecretary
+                );
+
+                int requestId = StallBookingDAL.CreateStallBookingCancelRequest(
+                    request.StallBookingId,
+                    request.RanchId
+                );
+
+                return Ok(requestId);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in CreateStallBookingCancelRequest: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליחת בקשת ביטול התא");
+            }
+        }
     }
 }

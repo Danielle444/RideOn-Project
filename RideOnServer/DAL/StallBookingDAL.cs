@@ -270,6 +270,32 @@ namespace RideOnServer.DAL
             return createdIds;
         }
 
+        public static int CreateStallBookingCancelRequest(
+            int stallBookingId,
+            int ranchId
+        )
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT usp_createstallbookingcancelrequest(@stallBookingId, @ranchId)",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
+            cmd.Parameters.AddWithValue("@ranchId", ranchId);
+
+            object? result = cmd.ExecuteScalar();
+
+            if (result == null || result == DBNull.Value)
+            {
+                throw new Exception("Failed to create stall booking cancellation request.");
+            }
+
+            return Convert.ToInt32(result);
+        }
+
 
     }
 }
