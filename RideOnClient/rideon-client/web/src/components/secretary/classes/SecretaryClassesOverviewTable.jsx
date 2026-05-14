@@ -49,21 +49,55 @@ function getPrizeTypeName(item) {
 }
 
 function getPrizeAmount(item) {
-  return item.prizeAmount || item.PrizeAmount;
+  var value = item.prizeAmount;
+
+  if (value === null || value === undefined) {
+    value = item.PrizeAmount;
+  }
+
+  return value;
 }
 
 function getOrganizerCost(item) {
-  return item.organizerCost || item.OrganizerCost || 0;
+  var value = item.organizerCost;
+
+  if (value === null || value === undefined) {
+    value = item.OrganizerCost;
+  }
+
+  return value || 0;
 }
 
 function getFederationCost(item) {
-  return item.federationCost || item.FederationCost || 0;
+  var value = item.federationCost;
+
+  if (value === null || value === undefined) {
+    value = item.FederationCost;
+  }
+
+  return value || 0;
+}
+
+function getStartTime(item) {
+  return item.startTime || item.StartTime;
 }
 
 function getTotalCost(item) {
   return (
     Number(getOrganizerCost(item) || 0) + Number(getFederationCost(item) || 0)
   );
+}
+
+function getStatusClass(statusKey) {
+  if (statusKey === "drawn") {
+    return "bg-[#EEF8F0] text-[#2F6B3B]";
+  }
+
+  if (statusKey === "hasEntries") {
+    return "bg-[#FFF4E5] text-[#9A5B00]";
+  }
+
+  return "bg-[#F4F0ED] text-[#7A655C]";
 }
 
 export default function SecretaryClassesOverviewTable(props) {
@@ -86,6 +120,7 @@ export default function SecretaryClassesOverviewTable(props) {
           <tr>
             <th className="px-4 py-3">מס׳</th>
             <th className="px-4 py-3">שם מקצה</th>
+            <th className="px-4 py-3">סטטוס</th>
             <th className="px-4 py-3">כניסות</th>
             <th className="px-4 py-3">מסלול</th>
             <th className="px-4 py-3">שופטים</th>
@@ -102,11 +137,11 @@ export default function SecretaryClassesOverviewTable(props) {
 
         <tbody>
           {props.loading ? (
-            <DataTableLoadingState colSpan={13} message="טוען מקצים..." />
+            <DataTableLoadingState colSpan={14} message="טוען מקצים..." />
           ) : null}
 
           {!props.loading && items.length === 0 ? (
-            <DataTableEmptyState colSpan={13} message="לא נמצאו מקצים להצגה" />
+            <DataTableEmptyState colSpan={14} message="לא נמצאו מקצים להצגה" />
           ) : null}
 
           {!props.loading
@@ -114,6 +149,9 @@ export default function SecretaryClassesOverviewTable(props) {
                 var orderInDay = getOrderInDay(item);
                 var classEntriesCount = props.getEntriesCountForClass(item);
                 var groupEntriesCount = props.getEntriesCountForGroup(item);
+                var status = props.getClassStatus
+                  ? props.getClassStatus(item)
+                  : { key: "empty", label: "אין כניסות" };
 
                 return (
                   <tr
@@ -146,6 +184,17 @@ export default function SecretaryClassesOverviewTable(props) {
                     </td>
 
                     <td className="px-4 py-3">
+                      <span
+                        className={
+                          "rounded-full px-3 py-1 text-xs font-semibold " +
+                          getStatusClass(status.key)
+                        }
+                      >
+                        {status.label}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
                         <span className="font-bold text-[#3F312B]">
                           {classEntriesCount}
@@ -167,7 +216,7 @@ export default function SecretaryClassesOverviewTable(props) {
                     <td className="px-4 py-3">{getArenaName(item)}</td>
 
                     <td className="px-4 py-3">
-                      {formatTime(item.startTime || item.StartTime)}
+                      {formatTime(getStartTime(item))}
                     </td>
 
                     <td className="px-4 py-3">

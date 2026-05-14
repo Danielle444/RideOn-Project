@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { getClassesByCompetitionId } from "../../services/classInCompetitionService";
-import { getSecretaryCompetitionEntries } from "../../services/entryService";
+import {
+  getSecretaryCompetitionEntries,
+  updateGroupEntriesDrawOrder,
+} from "../../services/entryService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 function normalizeDateOnly(value) {
@@ -23,8 +26,85 @@ function getClassInCompId(item) {
   return item.classInCompId || item.ClassInCompId;
 }
 
+function getEntryClassInCompId(item) {
+  return item.classInCompId || item.ClassInCompId;
+}
+
 function getOrderInDay(item) {
   return item.orderInDay || item.OrderInDay;
+}
+
+function getEntryId(item) {
+  return item.entryId || item.EntryId;
+}
+
+function getEntryIsPaid(item) {
+  return !!(item.isPaid || item.IsPaid);
+}
+
+function getEntryAmount(item) {
+  return Number(item.amountToPay || item.AmountToPay || 0);
+}
+
+function getClassPrizeTypeName(item) {
+  return item.prizeTypeName || item.PrizeTypeName || "";
+}
+
+function getClassPrizeAmount(item) {
+  var value = item.prizeAmount;
+
+  if (value === null || value === undefined) {
+    value = item.PrizeAmount;
+  }
+
+  return value;
+}
+
+function getClassSearchText(item) {
+  return [
+    item.className || item.ClassName,
+    item.arenaName || item.ArenaName,
+    item.judgesDisplay || item.JudgesDisplay,
+    item.patternNumber || item.PatternNumber,
+    item.prizeTypeName || item.PrizeTypeName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function buildEntriesSummary(items) {
+  var entries = Array.isArray(items) ? items : [];
+
+  var paidCount = 0;
+  var unpaidCount = 0;
+  var totalAmount = 0;
+  var paidAmount = 0;
+  var unpaidAmount = 0;
+
+  entries.forEach(function (entry) {
+    var amount = getEntryAmount(entry);
+    var isPaid = getEntryIsPaid(entry);
+
+    totalAmount += amount;
+
+    if (isPaid) {
+      paidCount += 1;
+      paidAmount += amount;
+    } else {
+      unpaidCount += 1;
+      unpaidAmount += amount;
+    }
+  });
+
+  return {
+    totalCount: entries.length,
+    paidCount: paidCount,
+    unpaidCount: unpaidCount,
+    totalAmount: totalAmount,
+    paidAmount: paidAmount,
+    unpaidAmount: unpaidAmount,
+  };
 }
 
 function sortClasses(items) {
@@ -74,6 +154,30 @@ function sortEntries(items) {
   });
 }
 
+function shuffleItems(items) {
+  var nextItems = [...items];
+
+  for (var i = nextItems.length - 1; i > 0; i--) {
+    var randomIndex = Math.floor(Math.random() * (i + 1));
+    var temp = nextItems[i];
+
+    nextItems[i] = nextItems[randomIndex];
+    nextItems[randomIndex] = temp;
+  }
+
+  return nextItems;
+}
+
+function normalizeDraftEntries(items) {
+  return items.map(function (entry, index) {
+    return {
+      ...entry,
+      drawOrder: index + 1,
+      DrawOrder: index + 1,
+    };
+  });
+}
+
 export default function useSecretaryCompetitionClassesPage(options) {
   var competitionId = options.competitionId;
   var ranchId = options.ranchId;
@@ -91,6 +195,17 @@ export default function useSecretaryCompetitionClassesPage(options) {
   var [selectedClass, setSelectedClass] = useState(null);
   var [selectedGroup, setSelectedGroup] = useState(null);
   var [searchText, setSearchText] = useState("");
+  var [paymentFilter, setPaymentFilter] = useState("all");
+
+  var [classSearchText, setClassSearchText] = useState("");
+  var [classPrizeFilter, setClassPrizeFilter] = useState("all");
+  var [classEntriesFilter, setClassEntriesFilter] = useState("all");
+  var [classDrawFilter, setClassDrawFilter] = useState("all");
+
+  var [drawOrderEditMode, setDrawOrderEditMode] = useState(false);
+  var [drawOrderDraftEntries, setDrawOrderDraftEntries] = useState([]);
+  var [savingDrawOrder, setSavingDrawOrder] = useState(false);
+  var [drawOrderError, setDrawOrderError] = useState("");
 
   useEffect(
     function () {
@@ -134,7 +249,11 @@ export default function useSecretaryCompetitionClassesPage(options) {
       setLoadingEntries(true);
       setError("");
 
-      var response = await getSecretaryCompetitionEntries(competitionId, ranchId);
+      var response = await getSecretaryCompetitionEntries(
+        competitionId,
+        ranchId,
+      );
+
       var items = Array.isArray(response.data) ? response.data : [];
 
       setEntries(sortEntries(items));
@@ -163,20 +282,149 @@ export default function useSecretaryCompetitionClassesPage(options) {
     [classes],
   );
 
+  function getEntriesForClass(item) {
+    var classId = getClassInCompId(item);
+
+    return entries.filter(function (entry) {
+      return Number(getEntryClassInCompId(entry)) === Number(classId);
+    });
+  }
+
+  function getHasDrawForClass(item) {
+    var classEntries = getEntriesForClass(item);
+
+    return classEntries.some(function (entry) {
+      var drawOrder = entry.drawOrder || entry.DrawOrder;
+      return drawOrder !== null && drawOrder !== undefined && drawOrder !== "";
+    });
+  }
+
+  function getEntriesCountForClass(item) {
+    return getEntriesForClass(item).length;
+  }
+
+  function getEntriesCountForGroup(item) {
+    var classDate = getClassDate(item);
+    var orderInDay = getOrderInDay(item);
+
+    return entries.filter(function (entry) {
+      return (
+        getEntryClassDate(entry) === classDate &&
+        Number(entry.orderInDay || entry.OrderInDay) === Number(orderInDay)
+      );
+    }).length;
+  }
+
+  function getClassStatus(item) {
+    var count = getEntriesCountForClass(item);
+
+    if (count === 0) {
+      return {
+        key: "empty",
+        label: "אין כניסות",
+      };
+    }
+
+    if (getHasDrawForClass(item)) {
+      return {
+        key: "drawn",
+        label: "יש הגרלה",
+      };
+    }
+
+    return {
+      key: "hasEntries",
+      label: "יש כניסות",
+    };
+  }
+
   var visibleClasses = useMemo(
     function () {
       return classes.filter(function (item) {
-        if (!selectedDate) {
-          return true;
+        if (selectedDate && getClassDate(item) !== selectedDate) {
+          return false;
         }
 
-        return getClassDate(item) === selectedDate;
+        if (classSearchText.trim()) {
+          var normalizedSearch = classSearchText.trim().toLowerCase();
+
+          if (!getClassSearchText(item).includes(normalizedSearch)) {
+            return false;
+          }
+        }
+
+        if (classPrizeFilter !== "all") {
+          var prizeTypeName = getClassPrizeTypeName(item);
+          var prizeAmount = getClassPrizeAmount(item);
+          var hasPrize =
+            !!prizeTypeName ||
+            (prizeAmount !== null &&
+              prizeAmount !== undefined &&
+              Number(prizeAmount) > 0);
+
+          if (classPrizeFilter === "withPrize" && !hasPrize) {
+            return false;
+          }
+
+          if (classPrizeFilter === "withoutPrize" && hasPrize) {
+            return false;
+          }
+        }
+
+        if (classEntriesFilter !== "all") {
+          var entriesCount = getEntriesCountForClass(item);
+
+          if (classEntriesFilter === "withEntries" && entriesCount === 0) {
+            return false;
+          }
+
+          if (classEntriesFilter === "withoutEntries" && entriesCount > 0) {
+            return false;
+          }
+        }
+
+        if (classDrawFilter !== "all") {
+          var hasDraw = getHasDrawForClass(item);
+
+          if (classDrawFilter === "withDraw" && !hasDraw) {
+            return false;
+          }
+
+          if (classDrawFilter === "withoutDraw" && hasDraw) {
+            return false;
+          }
+        }
+
+        return true;
       });
     },
-    [classes, selectedDate],
+    [
+      classes,
+      entries,
+      selectedDate,
+      classSearchText,
+      classPrizeFilter,
+      classEntriesFilter,
+      classDrawFilter,
+    ],
   );
 
-  var selectedEntries = useMemo(
+  var visibleClassesSummary = useMemo(
+    function () {
+      var visibleClassIds = visibleClasses.map(function (item) {
+        return Number(getClassInCompId(item));
+      });
+
+      var dayEntries = entries.filter(function (entry) {
+        return visibleClassIds.includes(Number(getEntryClassInCompId(entry)));
+      });
+
+      return buildEntriesSummary(dayEntries);
+    },
+    [visibleClasses, entries],
+  );
+
+  var selectedEntriesBase = useMemo(
     function () {
       var items = entries;
 
@@ -184,7 +432,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
         var classId = getClassInCompId(selectedClass);
 
         items = items.filter(function (entry) {
-          return Number(entry.classInCompId || entry.ClassInCompId) === Number(classId);
+          return Number(getEntryClassInCompId(entry)) === Number(classId);
         });
       }
 
@@ -192,8 +440,41 @@ export default function useSecretaryCompetitionClassesPage(options) {
         items = items.filter(function (entry) {
           return (
             getEntryClassDate(entry) === selectedGroup.classDate &&
-            Number(entry.orderInDay || entry.OrderInDay) === Number(selectedGroup.orderInDay)
+            Number(entry.orderInDay || entry.OrderInDay) ===
+              Number(selectedGroup.orderInDay)
           );
+        });
+      }
+
+      return sortEntries(items);
+    },
+    [entries, viewMode, selectedClass, selectedGroup],
+  );
+
+  var entriesSummary = useMemo(
+    function () {
+      return buildEntriesSummary(selectedEntriesBase);
+    },
+    [selectedEntriesBase],
+  );
+
+  var selectedEntries = useMemo(
+    function () {
+      if (drawOrderEditMode) {
+        return drawOrderDraftEntries;
+      }
+
+      var items = selectedEntriesBase;
+
+      if (paymentFilter === "paid") {
+        items = items.filter(function (entry) {
+          return getEntryIsPaid(entry);
+        });
+      }
+
+      if (paymentFilter === "unpaid") {
+        items = items.filter(function (entry) {
+          return !getEntryIsPaid(entry);
         });
       }
 
@@ -219,13 +500,21 @@ export default function useSecretaryCompetitionClassesPage(options) {
 
       return sortEntries(items);
     },
-    [entries, viewMode, selectedClass, selectedGroup, searchText],
+    [
+      selectedEntriesBase,
+      paymentFilter,
+      searchText,
+      drawOrderEditMode,
+      drawOrderDraftEntries,
+    ],
   );
 
   function openClassEntries(item) {
     setSelectedClass(item);
     setSelectedGroup(null);
     setSearchText("");
+    setPaymentFilter("all");
+    cancelDrawOrderEditMode();
     setViewMode("class");
   }
 
@@ -236,6 +525,8 @@ export default function useSecretaryCompetitionClassesPage(options) {
       orderInDay: getOrderInDay(item),
     });
     setSearchText("");
+    setPaymentFilter("all");
+    cancelDrawOrderEditMode();
     setViewMode("group");
   }
 
@@ -244,6 +535,8 @@ export default function useSecretaryCompetitionClassesPage(options) {
     setSelectedClass(null);
     setSelectedGroup(null);
     setSearchText("");
+    setPaymentFilter("all");
+    cancelDrawOrderEditMode();
   }
 
   function changeSelectedDate(date) {
@@ -251,24 +544,114 @@ export default function useSecretaryCompetitionClassesPage(options) {
     backToClasses();
   }
 
-  function getEntriesCountForClass(item) {
-    var classId = getClassInCompId(item);
-
-    return entries.filter(function (entry) {
-      return Number(entry.classInCompId || entry.ClassInCompId) === Number(classId);
-    }).length;
+  function clearClassFilters() {
+    setClassSearchText("");
+    setClassPrizeFilter("all");
+    setClassEntriesFilter("all");
+    setClassDrawFilter("all");
   }
 
-  function getEntriesCountForGroup(item) {
-    var classDate = getClassDate(item);
-    var orderInDay = getOrderInDay(item);
+  function startDrawOrderEditMode() {
+    if (!selectedGroup) {
+      setDrawOrderError("הגרלה אפשרית רק במסך שנפתח דרך מספר המקצה");
+      return;
+    }
 
-    return entries.filter(function (entry) {
-      return (
-        getEntryClassDate(entry) === classDate &&
-        Number(entry.orderInDay || entry.OrderInDay) === Number(orderInDay)
-      );
-    }).length;
+    if (selectedEntriesBase.length === 0) {
+      setDrawOrderError("אין כניסות לעריכת סדר");
+      return;
+    }
+
+    setDrawOrderError("");
+    setSearchText("");
+    setPaymentFilter("all");
+    setDrawOrderDraftEntries(normalizeDraftEntries(selectedEntriesBase));
+    setDrawOrderEditMode(true);
+  }
+
+  function cancelDrawOrderEditMode() {
+    setDrawOrderEditMode(false);
+    setDrawOrderDraftEntries([]);
+    setSavingDrawOrder(false);
+    setDrawOrderError("");
+  }
+
+  function moveDrawOrderEntry(entryId, direction) {
+    setDrawOrderDraftEntries(function (prev) {
+      var currentIndex = prev.findIndex(function (entry) {
+        return Number(getEntryId(entry)) === Number(entryId);
+      });
+
+      if (currentIndex < 0) {
+        return prev;
+      }
+
+      var targetIndex = currentIndex + direction;
+
+      if (targetIndex < 0 || targetIndex >= prev.length) {
+        return prev;
+      }
+
+      var nextItems = [...prev];
+      var temp = nextItems[currentIndex];
+
+      nextItems[currentIndex] = nextItems[targetIndex];
+      nextItems[targetIndex] = temp;
+
+      return normalizeDraftEntries(nextItems);
+    });
+  }
+
+  function shuffleDrawOrderEntries() {
+    setDrawOrderDraftEntries(function (prev) {
+      return normalizeDraftEntries(shuffleItems(prev));
+    });
+  }
+
+  async function saveDrawOrder() {
+    if (!selectedGroup) {
+      setDrawOrderError("לא נבחרה קבוצת מקצים לשמירת הגרלה");
+      return;
+    }
+
+    if (!competitionId || !ranchId) {
+      setDrawOrderError("חסרים פרטי תחרות או חווה");
+      return;
+    }
+
+    if (drawOrderDraftEntries.length === 0) {
+      setDrawOrderError("אין כניסות לשמירה");
+      return;
+    }
+
+    try {
+      setSavingDrawOrder(true);
+      setDrawOrderError("");
+
+      var payload = {
+        competitionId: Number(competitionId),
+        classDate: selectedGroup.classDate,
+        orderInDay: Number(selectedGroup.orderInDay),
+        ranchId: Number(ranchId),
+        entries: drawOrderDraftEntries.map(function (entry, index) {
+          return {
+            entryId: Number(getEntryId(entry)),
+            drawOrder: index + 1,
+          };
+        }),
+      };
+
+      await updateGroupEntriesDrawOrder(payload);
+      await loadEntries();
+
+      setDrawOrderEditMode(false);
+      setDrawOrderDraftEntries([]);
+    } catch (error) {
+      console.error(error);
+      setDrawOrderError(getErrorMessage(error, "שגיאה בשמירת סדר ההגרלה"));
+    } finally {
+      setSavingDrawOrder(false);
+    }
   }
 
   return {
@@ -276,6 +659,8 @@ export default function useSecretaryCompetitionClassesPage(options) {
     entries,
     visibleClasses,
     selectedEntries,
+    entriesSummary,
+    visibleClassesSummary,
     availableDates,
 
     loadingClasses,
@@ -287,14 +672,39 @@ export default function useSecretaryCompetitionClassesPage(options) {
     selectedClass,
     selectedGroup,
     searchText,
+    paymentFilter,
+
+    classSearchText,
+    classPrizeFilter,
+    classEntriesFilter,
+    classDrawFilter,
+
+    drawOrderEditMode,
+    savingDrawOrder,
+    drawOrderError,
 
     setSearchText,
+    setPaymentFilter,
+    setClassSearchText,
+    setClassPrizeFilter,
+    setClassEntriesFilter,
+    setClassDrawFilter,
+
     changeSelectedDate,
     openClassEntries,
     openGroupEntries,
     backToClasses,
+    clearClassFilters,
     loadPageData,
     getEntriesCountForClass,
     getEntriesCountForGroup,
+    getHasDrawForClass,
+    getClassStatus,
+
+    startDrawOrderEditMode,
+    cancelDrawOrderEditMode,
+    moveDrawOrderEntry,
+    shuffleDrawOrderEntries,
+    saveDrawOrder,
   };
 }

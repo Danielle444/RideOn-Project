@@ -73,6 +73,142 @@ namespace RideOnServer.BL
             return dal.GetSecretaryCompetitionEntries(competitionId);
         }
 
+        public static void UpdateClassEntriesDrawOrder(
+          UpdateClassEntriesDrawOrderRequest request)
+        {
+            if (request == null)
+            {
+                throw new Exception("Invalid request");
+            }
+
+            if (request.CompetitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            if (request.ClassInCompId <= 0)
+            {
+                throw new Exception("Invalid ClassInCompId");
+            }
+
+            if (request.RanchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            if (request.Entries == null || request.Entries.Count == 0)
+            {
+                throw new Exception("Entries list is empty");
+            }
+
+            if (request.Entries.Any(item => item.EntryId <= 0))
+            {
+                throw new Exception("Entries contain invalid EntryId");
+            }
+
+            if (request.Entries.Any(item => item.DrawOrder <= 0))
+            {
+                throw new Exception("Entries contain invalid DrawOrder");
+            }
+
+            var duplicateEntryIds = request.Entries
+                .GroupBy(item => item.EntryId)
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key)
+                .ToList();
+
+            if (duplicateEntryIds.Count > 0)
+            {
+                throw new Exception("Entries contain duplicate EntryId values");
+            }
+
+            var duplicateDrawOrders = request.Entries
+                .GroupBy(item => item.DrawOrder)
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key)
+                .ToList();
+
+            if (duplicateDrawOrders.Count > 0)
+            {
+                throw new Exception("Entries contain duplicate DrawOrder values");
+            }
+
+            EntryDAL dal = new EntryDAL();
+
+            dal.UpdateClassEntriesDrawOrder(request);
+        }
+
+        public static void UpdateGroupEntriesDrawOrder(
+           UpdateGroupEntriesDrawOrderRequest request)
+        {
+            if (request == null)
+            {
+                throw new Exception("Invalid request");
+            }
+
+            if (request.CompetitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            if (request.RanchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            if (request.ClassDate == default)
+            {
+                throw new Exception("Invalid ClassDate");
+            }
+
+            if (request.OrderInDay <= 0)
+            {
+                throw new Exception("Invalid OrderInDay");
+            }
+
+            if (request.Entries == null || request.Entries.Count == 0)
+            {
+                throw new Exception("Entries list is empty");
+            }
+
+            if (request.Entries.Any(item => item.EntryId <= 0))
+            {
+                throw new Exception("Entries contain invalid EntryId");
+            }
+
+            if (request.Entries.Any(item => item.DrawOrder <= 0))
+            {
+                throw new Exception("Entries contain invalid DrawOrder");
+            }
+
+            var duplicateEntryIds = request.Entries
+                .GroupBy(item => item.EntryId)
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key)
+                .ToList();
+
+            if (duplicateEntryIds.Count > 0)
+            {
+                throw new Exception("Entries contain duplicate EntryId values");
+            }
+
+            var duplicateDrawOrders = request.Entries
+                .GroupBy(item => item.DrawOrder)
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key)
+                .ToList();
+
+            if (duplicateDrawOrders.Count > 0)
+            {
+                throw new Exception("Entries contain duplicate DrawOrder values");
+            }
+
+            EntryDAL dal = new EntryDAL();
+
+            dal.UpdateGroupEntriesDrawOrder(request);
+        }
+
+
 
     }
 }

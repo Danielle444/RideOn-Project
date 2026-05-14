@@ -23,4 +23,8 @@ function getSecretaryCompetitionEntries(competitionId, ranchId) {
   });
 }
 
-export { getSecretaryCompetitionEntries };
+function updateGroupEntriesDrawOrder(data) {
+  return axios.put(`${API}/Entries/group-draw-order`, data, getAuthHeaders());
+}
+
+export { getSecretaryCompetitionEntries, updateGroupEntriesDrawOrder };

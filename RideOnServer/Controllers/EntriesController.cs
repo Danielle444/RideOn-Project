@@ -191,5 +191,142 @@ namespace RideOnServer.Controllers
                 );
             }
         }
+
+        [HttpPut("draw-order")]
+        public IActionResult UpdateClassEntriesDrawOrder(
+          [FromBody] UpdateClassEntriesDrawOrderRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                if (request.CompetitionId <= 0 ||
+                    request.ClassInCompId <= 0 ||
+                    request.RanchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
+                Competition? competition =
+                    Competition.GetCompetitionById(request.CompetitionId);
+
+                if (competition == null)
+                {
+                    return NotFound("Competition not found");
+                }
+
+                if (competition.HostRanchId != request.RanchId)
+                {
+                    return StatusCode(
+                        StatusCodes.Status403Forbidden,
+                        "אין לך הרשאה לעדכן סדר כניסות בתחרות זו"
+                    );
+                }
+
+                Entry.UpdateClassEntriesDrawOrder(request);
+
+                return Ok(new
+                {
+                    Message = "Draw order updated successfully"
+                });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ex.Message
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in UpdateClassEntriesDrawOrder: {ex.Message}"
+                );
+
+                return BadRequest("אירעה שגיאה בעדכון סדר הכניסות");
+            }
+        }
+
+
+        [HttpPut("group-draw-order")]
+        public IActionResult UpdateGroupEntriesDrawOrder(
+         [FromBody] UpdateGroupEntriesDrawOrderRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                if (request.CompetitionId <= 0 ||
+                    request.RanchId <= 0 ||
+                    request.OrderInDay <= 0 ||
+                    request.ClassDate == default)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
+                Competition? competition =
+                    Competition.GetCompetitionById(request.CompetitionId);
+
+                if (competition == null)
+                {
+                    return NotFound("Competition not found");
+                }
+
+                if (competition.HostRanchId != request.RanchId)
+                {
+                    return StatusCode(
+                        StatusCodes.Status403Forbidden,
+                        "אין לך הרשאה לעדכן סדר כניסות בתחרות זו"
+                    );
+                }
+
+                Entry.UpdateGroupEntriesDrawOrder(request);
+
+                return Ok(new
+                {
+                    Message = "Group draw order updated successfully"
+                });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ex.Message
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in UpdateGroupEntriesDrawOrder: {ex.Message}"
+                );
+
+                return BadRequest("אירעה שגיאה בעדכון סדר ההגרלה");
+            }
+        }
+
+
+
     }
 }
