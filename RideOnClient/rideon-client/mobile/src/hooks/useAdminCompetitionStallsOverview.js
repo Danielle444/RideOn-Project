@@ -130,6 +130,12 @@ function normalizeBooking(item) {
         item.HasApprovedChange ??
         item.hasapprovedchange,
     ),
+
+    hasPendingCancellation: normalizeBoolean(
+      item.hasPendingCancellation ??
+        item.HasPendingCancellation ??
+        item.haspendingcancellation,
+    ),
   };
 }
 
