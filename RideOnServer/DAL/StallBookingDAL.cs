@@ -179,29 +179,45 @@ namespace RideOnServer.DAL
             return payers;
         }
 
-        public static List<StallBookingPayerItem> GetAllStallBookingPayersForCompetitionAndRanch(int competitionId, int ranchId)
+        public static List<StallBookingPayerItem> GetAllStallBookingPayersForCompetitionAndRanch(
+            int competitionId,
+            int ranchId
+        )
         {
             List<StallBookingPayerItem> payers = new List<StallBookingPayerItem>();
 
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();
             conn.Open();
 
-            using NpgsqlCommand cmd = new NpgsqlCommand("SELECT * FROM usp_getallstallbookingpayersforcompetitionandranch(@competitionId, @ranchId)", conn);
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT * FROM usp_getallstallbookingpayersforcompetitionandranch(@competitionId, @ranchId)",
+                conn
+            );
+
             cmd.Parameters.AddWithValue("@competitionId", competitionId);
             cmd.Parameters.AddWithValue("@ranchId", ranchId);
 
             using NpgsqlDataReader reader = cmd.ExecuteReader();
+
             while (reader.Read())
             {
                 payers.Add(new StallBookingPayerItem
                 {
                     StallBookingId = Convert.ToInt32(reader["stallbookingid"]),
+
                     BillId = Convert.ToInt32(reader["billid"]),
-                    payerPersonId = Convert.ToInt32(reader["payerPersonId"]),
+
+                    payerPersonId = Convert.ToInt32(reader["paidbypersonid"]),
+
                     PayerFullName = reader["payerfullname"]?.ToString() ?? string.Empty,
+
                     AmountToPay = Convert.ToDecimal(reader["amounttopay"]),
+
                     DateOpened = Convert.ToDateTime(reader["dateopened"]),
-                    DateClosed = reader["dateclosed"] == DBNull.Value ? null : Convert.ToDateTime(reader["dateclosed"])
+
+                    DateClosed = reader["dateclosed"] == DBNull.Value
+                        ? null
+                        : Convert.ToDateTime(reader["dateclosed"])
                 });
             }
 

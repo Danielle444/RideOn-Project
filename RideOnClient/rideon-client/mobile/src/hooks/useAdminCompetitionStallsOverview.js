@@ -1,36 +1,142 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { getStallBookingsForCompetitionAndRanch } from "../services/stallBookingsService";
+import {
+  getStallBookingsForCompetitionAndRanch,
+  getAllStallBookingPayersForCompetitionAndRanch,
+} from "../services/stallBookingsService";
 
 import {
   getShavingsOrdersForCompetitionAndRanch,
   getAllShavingsOrderDetailsForCompetitionAndRanch,
 } from "../services/shavingsOrderService";
 
+function normalizeBoolean(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value === 1;
+  }
+
+  if (typeof value === "string") {
+    var normalized = value.trim().toLowerCase();
+
+    return normalized === "true" || normalized === "1";
+  }
+
+  return false;
+}
+
+function normalizeDateString(value) {
+  if (!value) {
+    return "";
+  }
+
+  var text = String(value).trim();
+
+  if (!text) {
+    return "";
+  }
+
+  if (text.includes("T")) {
+    return text.split("T")[0];
+  }
+
+  if (text.length >= 10) {
+    return text.slice(0, 10);
+  }
+
+  return text;
+}
+
 function normalizeBooking(item) {
   if (!item) {
     return null;
   }
 
+  var horseId = item.horseId || item.HorseId || item.horseid || null;
+
+  var isForTack = normalizeBoolean(
+    item.isForTack ?? item.IsForTack ?? item.isfortack,
+  );
+
   return {
-    stallBookingId: item.stallBookingId || item.StallBookingId || null,
+    stallBookingId:
+      item.stallBookingId || item.StallBookingId || item.stallbookingid || null,
 
-    horseName: item.horseName || item.HorseName || "",
+    horseId: horseId,
 
-    isTackBooking:
-      item.isTackBooking ||
-      item.IsTackBooking ||
-      item.isForTack ||
-      item.IsForTack ||
-      false,
+    horseName: item.horseName || item.HorseName || item.horsename || "",
 
-    startDate: item.startDate || item.StartDate || "",
+    isForTack: isForTack,
 
-    endDate: item.endDate || item.EndDate || "",
+    isTackBooking: isForTack === true || horseId === null,
 
-    totalAmount: Number(item.totalAmount || item.TotalAmount || 0) || 0,
+    startDate: normalizeDateString(
+      item.startDate || item.StartDate || item.startdate,
+    ),
 
-    isPaid: item.isPaid || item.IsPaid || false,
+    endDate: normalizeDateString(item.endDate || item.EndDate || item.enddate),
+
+    compoundId: item.compoundId || item.CompoundId || item.compoundid || null,
+
+    stallId: item.stallId || item.StallId || item.stallid || null,
+
+    priceCatalogId:
+      Number(item.priceCatalogId || item.PriceCatalogId || item.pricecatalogid || 0) ||
+      null,
+
+    itemPrice: Number(item.itemPrice || item.ItemPrice || item.itemprice || 0) || 0,
+
+    notes: item.notes || item.Notes || "",
+
+    totalAmount: Number(item.totalAmount || item.TotalAmount || item.totalamount || 0) || 0,
+
+    isPaid: normalizeBoolean(item.isPaid ?? item.IsPaid ?? item.ispaid),
+
+    isCancelled: normalizeBoolean(
+      item.isCancelled ?? item.IsCancelled ?? item.iscancelled,
+    ),
+
+    hasApprovedChange: normalizeBoolean(
+      item.hasApprovedChange ??
+        item.HasApprovedChange ??
+        item.hasapprovedchange,
+    ),
+  };
+}
+
+function normalizeStallBookingPayer(item) {
+  if (!item) {
+    return null;
+  }
+
+  return {
+    stallBookingId:
+      item.stallBookingId || item.StallBookingId || item.stallbookingid || null,
+
+    billId: item.billId || item.BillId || item.billid || null,
+
+    payerPersonId:
+      item.payerPersonId ||
+      item.PayerPersonId ||
+      item.paidByPersonId ||
+      item.PaidByPersonId ||
+      item.payerpersonid ||
+      null,
+
+    payerFullName:
+      item.payerFullName ||
+      item.PayerFullName ||
+      item.payerfullname ||
+      "",
+
+    amountToPay:
+      Number(item.amountToPay || item.AmountToPay || item.amounttopay || 0) || 0,
+
+    dateClosed:
+      item.dateClosed || item.DateClosed || item.dateclosed || null,
   };
 }
 
@@ -40,11 +146,55 @@ function normalizeShavingsOrder(item) {
   }
 
   return {
-    shavingsOrderId: item.shavingsOrderId || item.ShavingsOrderId || null,
+    shavingsOrderId:
+      item.shavingsOrderId ||
+      item.ShavingsOrderId ||
+      item.shavingsorderid ||
+      null,
 
-    deliveryStatus: item.deliveryStatus || item.DeliveryStatus || "",
+    requestedDeliveryTime:
+      item.requestedDeliveryTime ||
+      item.RequestedDeliveryTime ||
+      item.requesteddeliverytime ||
+      null,
 
-    bagQuantity: item.bagQuantity || item.BagQuantity || 0,
+    bagQuantity:
+      Number(item.bagQuantity || item.BagQuantity || item.bagquantity || 0) || 0,
+
+    deliveryStatus:
+      item.deliveryStatus ||
+      item.DeliveryStatus ||
+      item.deliverystatus ||
+      "",
+
+    notes: item.notes || item.Notes || "",
+
+    workerSystemUserId:
+      item.workerSystemUserId ||
+      item.WorkerSystemUserId ||
+      item.workersystemuserid ||
+      null,
+
+    approvedByPersonId:
+      item.approvedByPersonId ||
+      item.ApprovedByPersonId ||
+      item.approvedbypersonid ||
+      null,
+
+    approvedAt:
+      item.approvedAt ||
+      item.ApprovedAt ||
+      item.approvedat ||
+      null,
+
+    orderedByName:
+      item.orderedByName ||
+      item.OrderedByName ||
+      item.orderedbyname ||
+      "",
+
+    totalAmount:
+      Number(item.totalAmount || item.TotalAmount || item.totalamount || 0) || 0,
   };
 }
 
@@ -54,13 +204,59 @@ function normalizeShavingsDetail(item) {
   }
 
   return {
-    shavingsOrderId: item.shavingsOrderId || item.ShavingsOrderId || null,
+    shavingsOrderId:
+      item.shavingsOrderId ||
+      item.ShavingsOrderId ||
+      item.shavingsorderid ||
+      null,
 
-    stallBookingId: item.stallBookingId || item.StallBookingId || null,
+    stallBookingId:
+      item.stallBookingId ||
+      item.StallBookingId ||
+      item.stallbookingid ||
+      null,
+
+    horseId: item.horseId || item.HorseId || item.horseid || null,
+
+    horseName: item.horseName || item.HorseName || item.horsename || "",
 
     bagQuantityPerStall:
-      item.bagQuantityPerStall || item.BagQuantityPerStall || 0,
+      Number(
+        item.bagQuantityPerStall ||
+          item.BagQuantityPerStall ||
+          item.bagquantityperstall ||
+          0,
+      ) || 0,
   };
+}
+
+function getMainPayerName(payers) {
+  if (!Array.isArray(payers) || payers.length === 0) {
+    return "";
+  }
+
+  if (payers.length === 1) {
+    return payers[0].payerFullName || "";
+  }
+
+  return payers
+    .map(function (payer) {
+      return payer.payerFullName;
+    })
+    .filter(Boolean)
+    .join(", ");
+}
+
+function calculateOrderAmountForStall(order, detail) {
+  var totalOrderBags = Number(order.bagQuantity || 0);
+  var totalOrderAmount = Number(order.totalAmount || 0);
+  var stallBags = Number(detail.bagQuantityPerStall || 0);
+
+  if (!totalOrderBags || totalOrderBags <= 0) {
+    return 0;
+  }
+
+  return (totalOrderAmount / totalOrderBags) * stallBags;
 }
 
 export default function useAdminCompetitionStallsOverview(params) {
@@ -74,13 +270,15 @@ export default function useAdminCompetitionStallsOverview(params) {
 
   var [stallBookings, setStallBookings] = useState([]);
 
+  var [stallBookingPayers, setStallBookingPayers] = useState([]);
+
   var [shavingsOrders, setShavingsOrders] = useState([]);
 
   var [shavingsDetails, setShavingsDetails] = useState([]);
 
   var loadData = useCallback(
     async function () {
-      if (!competitionId || !activeRole?.ranchId) {
+      if (!competitionId || !activeRole || !activeRole.ranchId) {
         return;
       }
 
@@ -91,6 +289,11 @@ export default function useAdminCompetitionStallsOverview(params) {
 
         var results = await Promise.all([
           getStallBookingsForCompetitionAndRanch(
+            competitionId,
+            activeRole.ranchId,
+          ),
+
+          getAllStallBookingPayersForCompetitionAndRanch(
             competitionId,
             activeRole.ranchId,
           ),
@@ -112,14 +315,20 @@ export default function useAdminCompetitionStallsOverview(params) {
             .filter(Boolean),
         );
 
-        setShavingsOrders(
+        setStallBookingPayers(
           (Array.isArray(results[1]?.data) ? results[1].data : [])
+            .map(normalizeStallBookingPayer)
+            .filter(Boolean),
+        );
+
+        setShavingsOrders(
+          (Array.isArray(results[2]?.data) ? results[2].data : [])
             .map(normalizeShavingsOrder)
             .filter(Boolean),
         );
 
         setShavingsDetails(
-          (Array.isArray(results[2]?.data) ? results[2].data : [])
+          (Array.isArray(results[3]?.data) ? results[3].data : [])
             .map(normalizeShavingsDetail)
             .filter(Boolean),
         );
@@ -147,11 +356,21 @@ export default function useAdminCompetitionStallsOverview(params) {
     function () {
       var safeBookings = Array.isArray(stallBookings) ? stallBookings : [];
 
+      var safePayers = Array.isArray(stallBookingPayers)
+        ? stallBookingPayers
+        : [];
+
       var safeOrders = Array.isArray(shavingsOrders) ? shavingsOrders : [];
 
       var safeDetails = Array.isArray(shavingsDetails) ? shavingsDetails : [];
 
       return safeBookings.map(function (booking) {
+        var bookingPayers = safePayers.filter(function (payer) {
+          return (
+            Number(payer.stallBookingId) === Number(booking.stallBookingId)
+          );
+        });
+
         var relatedDetails = safeDetails.filter(function (detail) {
           return (
             Number(detail.stallBookingId) === Number(booking.stallBookingId)
@@ -174,25 +393,37 @@ export default function useAdminCompetitionStallsOverview(params) {
               ...order,
 
               bagQuantityPerStall: detail.bagQuantityPerStall,
+
+              amountForThisStall: calculateOrderAmountForStall(order, detail),
             };
           })
           .filter(Boolean);
 
+        var shavingsTotalAmount = relatedOrders.reduce(function (sum, order) {
+          return sum + Number(order.amountForThisStall || 0);
+        }, 0);
+
         return {
           ...booking,
 
+          payers: bookingPayers,
+
+          payerName: getMainPayerName(bookingPayers),
+
           shavingsOrders: relatedOrders,
+
+          shavingsTotalAmount: shavingsTotalAmount,
         };
       });
     },
-    [stallBookings, shavingsOrders, shavingsDetails],
+    [stallBookings, stallBookingPayers, shavingsOrders, shavingsDetails],
   );
 
   return {
-    loading,
-    screenError,
+    loading: loading,
+    screenError: screenError,
 
-    cards,
+    cards: cards,
 
     reload: loadData,
   };
