@@ -8,12 +8,8 @@ import * as DocumentPicker from "expo-document-picker";
 
 import {
   getHealthCertificates,
-  saveHealthCertificate,
+  uploadHealthCertificateFile,
 } from "../services/horsesService";
-
-import { supabase } from "../lib/supabaseClient";
-
-var HC_BUCKET = "health-certificates";
 
 function normalizeCertificatesResponse(response) {
   if (Array.isArray(response?.data)) {
@@ -98,48 +94,23 @@ export default function useAdminCompetitionHealthCertificates(params) {
       return;
     }
 
-    var file = result.assets[0];
+    var file =
+      result.assets && result.assets.length > 0 ? result.assets[0] : null;
+
+    if (!file || !file.uri) {
+      Alert.alert("שגיאה", "לא נמצא קובץ תקין להעלאה");
+      return;
+    }
 
     try {
       setUploadingHorseId(horse.horseId);
 
-      var fileName =
-        "horse_" +
-        horse.horseId +
-        "_comp_" +
-        activeCompetition.competitionId +
-        "_" +
-        Date.now() +
-        ".pdf";
-
-      var filePath =
-        "competitions/" + activeCompetition.competitionId + "/" + fileName;
-
-      var fileResponse = await fetch(file.uri);
-
-      var blob = await fileResponse.blob();
-
-      var uploadResult = await supabase.storage
-        .from(HC_BUCKET)
-        .upload(filePath, blob, {
-          contentType: "application/pdf",
-          upsert: true,
-        });
-
-      if (uploadResult.error) {
-        throw new Error(uploadResult.error.message);
-      }
-
-      var publicUrlResult = supabase.storage
-        .from(HC_BUCKET)
-        .getPublicUrl(filePath);
-
-      await saveHealthCertificate(
-        horse.horseId,
-        activeCompetition.competitionId,
-        activeRole.ranchId,
-        publicUrlResult.data.publicUrl,
-      );
+      await uploadHealthCertificateFile({
+        horseId: horse.horseId,
+        competitionId: activeCompetition.competitionId,
+        ranchId: activeRole.ranchId,
+        file: file,
+      });
 
       Alert.alert(
         "בוצע",
@@ -149,11 +120,16 @@ export default function useAdminCompetitionHealthCertificates(params) {
       await loadCertificates();
     } catch (error) {
       console.log("HEALTH CERTIFICATE UPLOAD ERROR", error);
+      console.log("HEALTH CERTIFICATE UPLOAD MESSAGE", error?.message);
       console.log("HEALTH CERTIFICATE UPLOAD RESPONSE", error?.response?.data);
 
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "לא ניתן להעלות את הקובץ. נסי שוב."),
+        String(
+          error?.response?.data ||
+            error?.message ||
+            "לא ניתן להעלות את הקובץ. נסי שוב.",
+        ),
       );
     } finally {
       setUploadingHorseId(null);
