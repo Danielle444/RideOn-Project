@@ -55,32 +55,12 @@ function getNumberOfDays(item) {
   }
 }
 
-function getShavingsTotalAmount(item, totalBags) {
-  if (
-    item.shavingsTotalAmount !== null &&
-    item.shavingsTotalAmount !== undefined
-  ) {
-    return Number(item.shavingsTotalAmount || 0);
-  }
-
-  if (
-    item.totalShavingsAmount !== null &&
-    item.totalShavingsAmount !== undefined
-  ) {
-    return Number(item.totalShavingsAmount || 0);
-  }
-
-  if (item.shavingsBagPrice !== null && item.shavingsBagPrice !== undefined) {
-    return Number(totalBags || 0) * Number(item.shavingsBagPrice || 0);
-  }
-
-  return 0;
-}
-
 export default function CompetitionStallCard(props) {
   var item = props.item;
 
   var [showHistory, setShowHistory] = useState(false);
+
+  var isTackBooking = item.isTackBooking === true;
 
   var shavingsOrders = Array.isArray(item.shavingsOrders)
     ? item.shavingsOrders
@@ -88,63 +68,71 @@ export default function CompetitionStallCard(props) {
 
   var totalBags = useMemo(
     function () {
+      if (isTackBooking) {
+        return 0;
+      }
+
       return shavingsOrders.reduce(function (sum, order) {
         return sum + Number(order.bagQuantityPerStall || 0);
       }, 0);
     },
-    [shavingsOrders],
+    [shavingsOrders, isTackBooking],
   );
 
   var numberOfDays = getNumberOfDays(item);
   var stallAmount = Number(item.stallAmount || 0);
-  var shavingsAmount = Number(item.shavingsTotalAmount || 0);
+  var shavingsAmount = isTackBooking
+    ? 0
+    : Number(item.shavingsTotalAmount || 0);
   var totalAmount = Number(item.totalAmount || 0);
 
   return (
     <>
       <View style={styles.stallCard}>
         <View style={styles.stallTopRow}>
-          <View style={styles.shavingsPanel}>
-            <View style={styles.shavingsPanelTopRow}>
+          {!isTackBooking ? (
+            <View style={styles.shavingsPanel}>
+              <View style={styles.shavingsPanelTopRow}>
+                <Pressable
+                  style={styles.shavingsPlusButton}
+                  onPress={function () {
+                    if (typeof props.onAddShavings === "function") {
+                      props.onAddShavings(item);
+                    }
+                  }}
+                >
+                  <Text style={styles.shavingsPlus}>+</Text>
+                </Pressable>
+
+                <Text style={styles.shavingsPanelTitle}>
+                  נסורת - {totalBags} שקים
+                </Text>
+              </View>
+
+              <Text style={styles.shavingsPanelPrice}>
+                עלות נסורת: {formatPrice(shavingsAmount)}
+              </Text>
+
               <Pressable
-                style={styles.shavingsPlusButton}
+                style={styles.historyButton}
                 onPress={function () {
-                  if (typeof props.onAddShavings === "function") {
-                    props.onAddShavings(item);
-                  }
+                  setShowHistory(true);
                 }}
               >
-                <Text style={styles.shavingsPlus}>+</Text>
+                <Text style={styles.historyButtonText}>
+                  צפייה בהיסטוריית הזמנות
+                </Text>
               </Pressable>
-
-              <Text style={styles.shavingsPanelTitle}>
-                נסורת - {totalBags} שקים
-              </Text>
             </View>
-
-            <Text style={styles.shavingsPanelPrice}>
-              עלות נסורת: {formatPrice(shavingsAmount)}
-            </Text>
-
-            <Pressable
-              style={styles.historyButton}
-              onPress={function () {
-                setShowHistory(true);
-              }}
-            >
-              <Text style={styles.historyButtonText}>
-                צפייה בהיסטוריית הזמנות
-              </Text>
-            </Pressable>
-          </View>
+          ) : null}
 
           <View style={styles.stallDetails}>
             <Text style={styles.stallHorseName}>
-              {item.isTackBooking ? "תא ציוד" : item.horseName || "ללא סוס"}
+              {isTackBooking ? "תא ציוד" : item.horseName || "ללא סוס"}
             </Text>
 
             <Text style={styles.stallMeta}>
-              סוג תא: {item.isTackBooking ? "תא ציוד" : "תא רגיל"}
+              סוג תא: {isTackBooking ? "תא ציוד" : "תא רגיל"}
             </Text>
 
             <Text style={styles.stallMeta}>
@@ -215,13 +203,15 @@ export default function CompetitionStallCard(props) {
         </View>
       </View>
 
-      <ShavingsHistoryModal
-        visible={showHistory}
-        onClose={function () {
-          setShowHistory(false);
-        }}
-        orders={shavingsOrders}
-      />
+      {!isTackBooking ? (
+        <ShavingsHistoryModal
+          visible={showHistory}
+          onClose={function () {
+            setShowHistory(false);
+          }}
+          orders={shavingsOrders}
+        />
+      ) : null}
     </>
   );
 }
