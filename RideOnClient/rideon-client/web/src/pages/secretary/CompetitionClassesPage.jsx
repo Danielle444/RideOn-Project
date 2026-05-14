@@ -3,9 +3,9 @@ import { useParams } from "react-router-dom";
 
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import TableActionButton from "../../components/common/table/TableActionButton";
-import CustomDropdown from "../../components/common/CustomDropdown";
 import SecretaryClassesOverviewTable from "../../components/secretary/classes/SecretaryClassesOverviewTable";
 import SecretaryClassEntriesTable from "../../components/secretary/classes/SecretaryClassEntriesTable";
+import SecretaryClassEntriesSummaryCards from "../../components/secretary/classes/SecretaryClassEntriesSummaryCards";
 import useSecretaryCompetitionClassesPage from "../../hooks/secretary/useSecretaryCompetitionClassesPage";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 
@@ -173,6 +173,11 @@ export default function CompetitionClassesPage() {
               </div>
             </section>
 
+            <SecretaryClassEntriesSummaryCards
+              summary={page.visibleClassesSummary}
+              titlePrefix="כניסות ביום"
+            />
+
             <SecretaryClassesOverviewTable
               items={page.visibleClasses}
               loading={page.loadingClasses}
@@ -185,9 +190,12 @@ export default function CompetitionClassesPage() {
         ) : (
           <SecretaryClassEntriesTable
             items={page.selectedEntries}
+            summary={page.entriesSummary}
             loading={page.loadingEntries}
             searchText={page.searchText}
+            paymentFilter={page.paymentFilter}
             onSearchTextChange={page.setSearchText}
+            onPaymentFilterChange={page.setPaymentFilter}
           />
         )}
       </div>

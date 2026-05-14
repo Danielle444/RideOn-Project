@@ -23,8 +23,54 @@ function getClassInCompId(item) {
   return item.classInCompId || item.ClassInCompId;
 }
 
+function getEntryClassInCompId(item) {
+  return item.classInCompId || item.ClassInCompId;
+}
+
 function getOrderInDay(item) {
   return item.orderInDay || item.OrderInDay;
+}
+
+function getEntryIsPaid(item) {
+  return !!(item.isPaid || item.IsPaid);
+}
+
+function getEntryAmount(item) {
+  return Number(item.amountToPay || item.AmountToPay || 0);
+}
+
+function buildEntriesSummary(items) {
+  var entries = Array.isArray(items) ? items : [];
+
+  var paidCount = 0;
+  var unpaidCount = 0;
+  var totalAmount = 0;
+  var paidAmount = 0;
+  var unpaidAmount = 0;
+
+  entries.forEach(function (entry) {
+    var amount = getEntryAmount(entry);
+    var isPaid = getEntryIsPaid(entry);
+
+    totalAmount += amount;
+
+    if (isPaid) {
+      paidCount += 1;
+      paidAmount += amount;
+    } else {
+      unpaidCount += 1;
+      unpaidAmount += amount;
+    }
+  });
+
+  return {
+    totalCount: entries.length,
+    paidCount: paidCount,
+    unpaidCount: unpaidCount,
+    totalAmount: totalAmount,
+    paidAmount: paidAmount,
+    unpaidAmount: unpaidAmount,
+  };
 }
 
 function sortClasses(items) {
@@ -91,6 +137,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
   var [selectedClass, setSelectedClass] = useState(null);
   var [selectedGroup, setSelectedGroup] = useState(null);
   var [searchText, setSearchText] = useState("");
+  var [paymentFilter, setPaymentFilter] = useState("all");
 
   useEffect(
     function () {
@@ -134,7 +181,11 @@ export default function useSecretaryCompetitionClassesPage(options) {
       setLoadingEntries(true);
       setError("");
 
-      var response = await getSecretaryCompetitionEntries(competitionId, ranchId);
+      var response = await getSecretaryCompetitionEntries(
+        competitionId,
+        ranchId,
+      );
+
       var items = Array.isArray(response.data) ? response.data : [];
 
       setEntries(sortEntries(items));
@@ -176,7 +227,22 @@ export default function useSecretaryCompetitionClassesPage(options) {
     [classes, selectedDate],
   );
 
-  var selectedEntries = useMemo(
+  var visibleClassesSummary = useMemo(
+    function () {
+      var visibleClassIds = visibleClasses.map(function (item) {
+        return Number(getClassInCompId(item));
+      });
+
+      var dayEntries = entries.filter(function (entry) {
+        return visibleClassIds.includes(Number(getEntryClassInCompId(entry)));
+      });
+
+      return buildEntriesSummary(dayEntries);
+    },
+    [visibleClasses, entries],
+  );
+
+  var selectedEntriesBase = useMemo(
     function () {
       var items = entries;
 
@@ -184,7 +250,10 @@ export default function useSecretaryCompetitionClassesPage(options) {
         var classId = getClassInCompId(selectedClass);
 
         items = items.filter(function (entry) {
-          return Number(entry.classInCompId || entry.ClassInCompId) === Number(classId);
+          return (
+            Number(entry.classInCompId || entry.ClassInCompId) ===
+            Number(classId)
+          );
         });
       }
 
@@ -192,8 +261,37 @@ export default function useSecretaryCompetitionClassesPage(options) {
         items = items.filter(function (entry) {
           return (
             getEntryClassDate(entry) === selectedGroup.classDate &&
-            Number(entry.orderInDay || entry.OrderInDay) === Number(selectedGroup.orderInDay)
+            Number(entry.orderInDay || entry.OrderInDay) ===
+              Number(selectedGroup.orderInDay)
           );
+        });
+      }
+
+      return sortEntries(items);
+    },
+    [entries, viewMode, selectedClass, selectedGroup],
+  );
+
+  var entriesSummary = useMemo(
+    function () {
+      return buildEntriesSummary(selectedEntriesBase);
+    },
+    [selectedEntriesBase],
+  );
+
+  var selectedEntries = useMemo(
+    function () {
+      var items = selectedEntriesBase;
+
+      if (paymentFilter === "paid") {
+        items = items.filter(function (entry) {
+          return getEntryIsPaid(entry);
+        });
+      }
+
+      if (paymentFilter === "unpaid") {
+        items = items.filter(function (entry) {
+          return !getEntryIsPaid(entry);
         });
       }
 
@@ -219,13 +317,14 @@ export default function useSecretaryCompetitionClassesPage(options) {
 
       return sortEntries(items);
     },
-    [entries, viewMode, selectedClass, selectedGroup, searchText],
+    [selectedEntriesBase, paymentFilter, searchText],
   );
 
   function openClassEntries(item) {
     setSelectedClass(item);
     setSelectedGroup(null);
     setSearchText("");
+    setPaymentFilter("all");
     setViewMode("class");
   }
 
@@ -236,6 +335,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
       orderInDay: getOrderInDay(item),
     });
     setSearchText("");
+    setPaymentFilter("all");
     setViewMode("group");
   }
 
@@ -244,6 +344,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
     setSelectedClass(null);
     setSelectedGroup(null);
     setSearchText("");
+    setPaymentFilter("all");
   }
 
   function changeSelectedDate(date) {
@@ -255,7 +356,9 @@ export default function useSecretaryCompetitionClassesPage(options) {
     var classId = getClassInCompId(item);
 
     return entries.filter(function (entry) {
-      return Number(entry.classInCompId || entry.ClassInCompId) === Number(classId);
+      return (
+        Number(entry.classInCompId || entry.ClassInCompId) === Number(classId)
+      );
     }).length;
   }
 
@@ -276,6 +379,8 @@ export default function useSecretaryCompetitionClassesPage(options) {
     entries,
     visibleClasses,
     selectedEntries,
+    entriesSummary,
+    visibleClassesSummary,
     availableDates,
 
     loadingClasses,
@@ -287,8 +392,10 @@ export default function useSecretaryCompetitionClassesPage(options) {
     selectedClass,
     selectedGroup,
     searchText,
+    paymentFilter,
 
     setSearchText,
+    setPaymentFilter,
     changeSelectedDate,
     openClassEntries,
     openGroupEntries,
