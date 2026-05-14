@@ -39,6 +39,33 @@ function getEntryAmount(item) {
   return Number(item.amountToPay || item.AmountToPay || 0);
 }
 
+function getClassPrizeTypeName(item) {
+  return item.prizeTypeName || item.PrizeTypeName || "";
+}
+
+function getClassPrizeAmount(item) {
+  var value = item.prizeAmount;
+
+  if (value === null || value === undefined) {
+    value = item.PrizeAmount;
+  }
+
+  return value;
+}
+
+function getClassSearchText(item) {
+  return [
+    item.className || item.ClassName,
+    item.arenaName || item.ArenaName,
+    item.judgesDisplay || item.JudgesDisplay,
+    item.patternNumber || item.PatternNumber,
+    item.prizeTypeName || item.PrizeTypeName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
 function buildEntriesSummary(items) {
   var entries = Array.isArray(items) ? items : [];
 
@@ -139,6 +166,11 @@ export default function useSecretaryCompetitionClassesPage(options) {
   var [searchText, setSearchText] = useState("");
   var [paymentFilter, setPaymentFilter] = useState("all");
 
+  var [classSearchText, setClassSearchText] = useState("");
+  var [classPrizeFilter, setClassPrizeFilter] = useState("all");
+  var [classEntriesFilter, setClassEntriesFilter] = useState("all");
+  var [classDrawFilter, setClassDrawFilter] = useState("all");
+
   useEffect(
     function () {
       loadPageData();
@@ -214,17 +246,131 @@ export default function useSecretaryCompetitionClassesPage(options) {
     [classes],
   );
 
+  function getEntriesForClass(item) {
+    var classId = getClassInCompId(item);
+
+    return entries.filter(function (entry) {
+      return Number(getEntryClassInCompId(entry)) === Number(classId);
+    });
+  }
+
+  function getHasDrawForClass(item) {
+    var classEntries = getEntriesForClass(item);
+
+    return classEntries.some(function (entry) {
+      var drawOrder = entry.drawOrder || entry.DrawOrder;
+      return drawOrder !== null && drawOrder !== undefined && drawOrder !== "";
+    });
+  }
+
+  function getEntriesCountForClass(item) {
+    return getEntriesForClass(item).length;
+  }
+
+  function getEntriesCountForGroup(item) {
+    var classDate = getClassDate(item);
+    var orderInDay = getOrderInDay(item);
+
+    return entries.filter(function (entry) {
+      return (
+        getEntryClassDate(entry) === classDate &&
+        Number(entry.orderInDay || entry.OrderInDay) === Number(orderInDay)
+      );
+    }).length;
+  }
+
+  function getClassStatus(item) {
+    var count = getEntriesCountForClass(item);
+
+    if (count === 0) {
+      return {
+        key: "empty",
+        label: "אין כניסות",
+      };
+    }
+
+    if (getHasDrawForClass(item)) {
+      return {
+        key: "drawn",
+        label: "יש הגרלה",
+      };
+    }
+
+    return {
+      key: "hasEntries",
+      label: "יש כניסות",
+    };
+  }
+
   var visibleClasses = useMemo(
     function () {
       return classes.filter(function (item) {
-        if (!selectedDate) {
-          return true;
+        if (selectedDate && getClassDate(item) !== selectedDate) {
+          return false;
         }
 
-        return getClassDate(item) === selectedDate;
+        if (classSearchText.trim()) {
+          var normalizedSearch = classSearchText.trim().toLowerCase();
+
+          if (!getClassSearchText(item).includes(normalizedSearch)) {
+            return false;
+          }
+        }
+
+        if (classPrizeFilter !== "all") {
+          var prizeTypeName = getClassPrizeTypeName(item);
+          var prizeAmount = getClassPrizeAmount(item);
+          var hasPrize =
+            !!prizeTypeName ||
+            (prizeAmount !== null &&
+              prizeAmount !== undefined &&
+              Number(prizeAmount) > 0);
+
+          if (classPrizeFilter === "withPrize" && !hasPrize) {
+            return false;
+          }
+
+          if (classPrizeFilter === "withoutPrize" && hasPrize) {
+            return false;
+          }
+        }
+
+        if (classEntriesFilter !== "all") {
+          var entriesCount = getEntriesCountForClass(item);
+
+          if (classEntriesFilter === "withEntries" && entriesCount === 0) {
+            return false;
+          }
+
+          if (classEntriesFilter === "withoutEntries" && entriesCount > 0) {
+            return false;
+          }
+        }
+
+        if (classDrawFilter !== "all") {
+          var hasDraw = getHasDrawForClass(item);
+
+          if (classDrawFilter === "withDraw" && !hasDraw) {
+            return false;
+          }
+
+          if (classDrawFilter === "withoutDraw" && hasDraw) {
+            return false;
+          }
+        }
+
+        return true;
       });
     },
-    [classes, selectedDate],
+    [
+      classes,
+      entries,
+      selectedDate,
+      classSearchText,
+      classPrizeFilter,
+      classEntriesFilter,
+      classDrawFilter,
+    ],
   );
 
   var visibleClassesSummary = useMemo(
@@ -352,26 +498,11 @@ export default function useSecretaryCompetitionClassesPage(options) {
     backToClasses();
   }
 
-  function getEntriesCountForClass(item) {
-    var classId = getClassInCompId(item);
-
-    return entries.filter(function (entry) {
-      return (
-        Number(entry.classInCompId || entry.ClassInCompId) === Number(classId)
-      );
-    }).length;
-  }
-
-  function getEntriesCountForGroup(item) {
-    var classDate = getClassDate(item);
-    var orderInDay = getOrderInDay(item);
-
-    return entries.filter(function (entry) {
-      return (
-        getEntryClassDate(entry) === classDate &&
-        Number(entry.orderInDay || entry.OrderInDay) === Number(orderInDay)
-      );
-    }).length;
+  function clearClassFilters() {
+    setClassSearchText("");
+    setClassPrizeFilter("all");
+    setClassEntriesFilter("all");
+    setClassDrawFilter("all");
   }
 
   return {
@@ -394,14 +525,27 @@ export default function useSecretaryCompetitionClassesPage(options) {
     searchText,
     paymentFilter,
 
+    classSearchText,
+    classPrizeFilter,
+    classEntriesFilter,
+    classDrawFilter,
+
     setSearchText,
     setPaymentFilter,
+    setClassSearchText,
+    setClassPrizeFilter,
+    setClassEntriesFilter,
+    setClassDrawFilter,
+
     changeSelectedDate,
     openClassEntries,
     openGroupEntries,
     backToClasses,
+    clearClassFilters,
     loadPageData,
     getEntriesCountForClass,
     getEntriesCountForGroup,
+    getHasDrawForClass,
+    getClassStatus,
   };
 }

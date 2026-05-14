@@ -1,4 +1,4 @@
-import { ArrowRight, RefreshCw } from "lucide-react";
+import { ArrowRight, RefreshCw, RotateCcw } from "lucide-react";
 import { useParams } from "react-router-dom";
 
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
@@ -52,6 +52,15 @@ function getOrderInDay(item) {
   }
 
   return item.orderInDay || item.OrderInDay || "";
+}
+
+function getFilterButtonClass(isActive) {
+  return (
+    "rounded-2xl border px-4 py-2 text-sm font-semibold transition-colors " +
+    (isActive
+      ? "border-[#8B6352] bg-[#8B6352] text-white"
+      : "border-[#E2D5CE] bg-white text-[#6B574F] hover:bg-[#FAF5F1]")
+  );
 }
 
 export default function CompetitionClassesPage() {
@@ -178,6 +187,171 @@ export default function CompetitionClassesPage() {
               titlePrefix="כניסות ביום"
             />
 
+            <section className="rounded-3xl border border-[#EFE5DF] bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-[#3F312B]">
+                    סינון מקצים
+                  </h2>
+                  <p className="text-xs text-[#8D6E63]">
+                    סינון וחיפוש בתוך היום שנבחר
+                  </p>
+                </div>
+
+                <TableActionButton
+                  label="ניקוי סינון"
+                  icon={<RotateCcw size={15} />}
+                  onClick={page.clearClassFilters}
+                />
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_1fr_1fr_1fr]">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
+                    חיפוש מקצה
+                  </label>
+                  <input
+                    type="text"
+                    value={page.classSearchText}
+                    onChange={function (event) {
+                      page.setClassSearchText(event.target.value);
+                    }}
+                    placeholder="שם מקצה, שופט, מגרש או מסלול..."
+                    className="h-11 w-full rounded-2xl border border-[#E2D5CE] bg-white px-4 text-right text-sm text-[#3F312B] outline-none transition-colors focus:border-[#8B6352]"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
+                    פרס
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={function () {
+                        page.setClassPrizeFilter("all");
+                      }}
+                      className={getFilterButtonClass(
+                        page.classPrizeFilter === "all",
+                      )}
+                    >
+                      הכל
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={function () {
+                        page.setClassPrizeFilter("withPrize");
+                      }}
+                      className={getFilterButtonClass(
+                        page.classPrizeFilter === "withPrize",
+                      )}
+                    >
+                      עם פרס
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={function () {
+                        page.setClassPrizeFilter("withoutPrize");
+                      }}
+                      className={getFilterButtonClass(
+                        page.classPrizeFilter === "withoutPrize",
+                      )}
+                    >
+                      בלי פרס
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
+                    כניסות
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={function () {
+                        page.setClassEntriesFilter("all");
+                      }}
+                      className={getFilterButtonClass(
+                        page.classEntriesFilter === "all",
+                      )}
+                    >
+                      הכל
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={function () {
+                        page.setClassEntriesFilter("withEntries");
+                      }}
+                      className={getFilterButtonClass(
+                        page.classEntriesFilter === "withEntries",
+                      )}
+                    >
+                      יש כניסות
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={function () {
+                        page.setClassEntriesFilter("withoutEntries");
+                      }}
+                      className={getFilterButtonClass(
+                        page.classEntriesFilter === "withoutEntries",
+                      )}
+                    >
+                      אין כניסות
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
+                    הגרלה
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={function () {
+                        page.setClassDrawFilter("all");
+                      }}
+                      className={getFilterButtonClass(
+                        page.classDrawFilter === "all",
+                      )}
+                    >
+                      הכל
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={function () {
+                        page.setClassDrawFilter("withDraw");
+                      }}
+                      className={getFilterButtonClass(
+                        page.classDrawFilter === "withDraw",
+                      )}
+                    >
+                      יש הגרלה
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={function () {
+                        page.setClassDrawFilter("withoutDraw");
+                      }}
+                      className={getFilterButtonClass(
+                        page.classDrawFilter === "withoutDraw",
+                      )}
+                    >
+                      אין הגרלה
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <SecretaryClassesOverviewTable
               items={page.visibleClasses}
               loading={page.loadingClasses}
@@ -185,6 +359,7 @@ export default function CompetitionClassesPage() {
               onOpenGroupEntries={page.openGroupEntries}
               getEntriesCountForClass={page.getEntriesCountForClass}
               getEntriesCountForGroup={page.getEntriesCountForGroup}
+              getClassStatus={page.getClassStatus}
             />
           </>
         ) : (
