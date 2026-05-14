@@ -225,7 +225,7 @@ export default function useAdminHorseStallBookings(params) {
 
     if (validationMessage) {
       Alert.alert("שגיאה", validationMessage);
-      return;
+      return false;
     }
 
     var invalidHorseBooking = selectedHorseBookings.find(function (booking) {
@@ -243,7 +243,7 @@ export default function useAdminHorseStallBookings(params) {
         "שגיאה",
         "יש לפחות סוס אחד עם משלם לא תקין. פתחי עריכה ובחרי משלם מחדש.",
       );
-      return;
+      return false;
     }
 
     try {
@@ -281,13 +281,18 @@ export default function useAdminHorseStallBookings(params) {
       }
 
       Alert.alert("נשמר", "תאי הסוסים הוזמנו בהצלחה");
+
       setSelectedHorseBookings([]);
       setExpandedHorseEditorId(null);
+
+      return true;
     } catch (error) {
       Alert.alert(
         "שגיאה",
         String(error?.response?.data || "אירעה שגיאה בשמירת הזמנת התאים"),
       );
+
+      return false;
     } finally {
       setIsSaving(false);
     }

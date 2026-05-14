@@ -64,22 +64,6 @@ export default StyleSheet.create({
     lineHeight: 22,
   },
 
-  addShavingsTopButton: {
-    backgroundColor: "#7B5A4D",
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 14,
-  },
-
-  addShavingsTopButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-
   paymentBadge: {
     borderRadius: 999,
     paddingHorizontal: 12,
@@ -789,5 +773,52 @@ export default StyleSheet.create({
     fontSize: 15,
     fontWeight: "900",
     color: "#FFFFFF",
+  },
+
+  topActionsRow: {
+    flexDirection: "row-reverse",
+    gap: 8,
+    marginBottom: 12,
+  },
+
+  addStallTopButton: {
+    flex: 1,
+    minHeight: 42,
+    backgroundColor: "#7B5A4D",
+    borderRadius: 13,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  addStallTopButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  addShavingsTopButton: {
+    flex: 1,
+    minHeight: 42,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D8C7BC",
+    borderRadius: 13,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 0,
+  },
+
+  addShavingsTopButtonText: {
+    color: "#6A5248",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "900",
+    textAlign: "center",
   },
 });

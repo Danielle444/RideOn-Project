@@ -221,34 +221,34 @@ export default function useAdminTackStallBookings(params) {
   async function handleSubmitTackDraft() {
     if (!selectedTackStallType || !selectedTackStallType.priceCatalogId) {
       Alert.alert("שגיאה", "יש לבחור סוג תא ציוד");
-      return;
+      return false;
     }
 
     if (!tackStartDate || !tackEndDate) {
       Alert.alert("שגיאה", "יש לבחור תאריכי כניסה ויציאה לתאי ציוד");
-      return;
+      return false;
     }
 
     var quantityNumber = Number(tackQuantity || 0);
 
     if (!quantityNumber || quantityNumber <= 0) {
       Alert.alert("שגיאה", "יש להזין כמות תקינה של תאי ציוד");
-      return;
+      return false;
     }
 
     if (!effectiveTackPayers || effectiveTackPayers.length === 0) {
       Alert.alert("שגיאה", "יש לבחור לפחות משלם אחד עבור תאי ציוד");
-      return;
+      return false;
     }
 
     if (!user || !user.personId) {
       Alert.alert("שגיאה", "לא נמצאו פרטי משתמש מחובר");
-      return;
+      return false;
     }
 
     if (!activeRole || !activeRole.ranchId) {
       Alert.alert("שגיאה", "לא נמצאה חווה פעילה");
-      return;
+      return false;
     }
 
     try {
@@ -275,15 +275,20 @@ export default function useAdminTackStallBookings(params) {
       }
 
       Alert.alert("נשמר", "תאי הציוד הוזמנו בהצלחה");
+
       setTackQuantity("1");
       setTackSplitMode("equal");
       setSelectedTackPayers([]);
       setTackNotes("");
+
+      return true;
     } catch (error) {
       Alert.alert(
         "שגיאה",
         String(error?.response?.data || "אירעה שגיאה בשמירת תאי הציוד"),
       );
+
+      return false;
     } finally {
       setIsSavingTack(false);
     }

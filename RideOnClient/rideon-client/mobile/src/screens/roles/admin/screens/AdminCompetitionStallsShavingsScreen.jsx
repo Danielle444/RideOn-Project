@@ -30,6 +30,8 @@ import ShavingsOrderModal from "../../../../components/competitions/ShavingsOrde
 
 import StallBookingEditModal from "../../../../components/competitions/StallBookingEditModal";
 
+import StallBookingCreateModal from "../../../../components/competitions/StallBookingCreateModal";
+
 import { createStallBookingCancelRequest } from "../../../../services/stallBookingsService";
 
 import styles from "../../../../styles/adminCompetitionStallsStyles";
@@ -42,6 +44,8 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
   var activeRole = activeRoleContext.activeRole;
 
   var activeCompetition = competitionContext.activeCompetition;
+
+  var [showCreateStallModal, setShowCreateStallModal] = useState(false);
 
   var [showShavingsModal, setShowShavingsModal] = useState(false);
 
@@ -66,6 +70,18 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
     await competitionContext.clearCompetition();
 
     props.navigation.navigate("AdminCompetitionsBoard");
+  }
+
+  function handleOpenCreateStallModal() {
+    setShowCreateStallModal(true);
+  }
+
+  function handleCloseCreateStallModal() {
+    setShowCreateStallModal(false);
+  }
+
+  async function handleStallCreated() {
+    await overview.reload();
   }
 
   function handleOpenGeneralShavingsModal() {
@@ -103,7 +119,11 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
       return;
     }
 
-    if (item.isCancelled || item.hasPendingCancellation) {
+    if (
+      item.isCancelled ||
+      item.hasPendingCancellation ||
+      item.hasPendingChange
+    ) {
       Alert.alert("לא ניתן לערוך", "קיימת בקשה פתוחה או שהתא כבר בוטל");
       return;
     }
@@ -132,6 +152,15 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
 
     if (item.isPaid) {
       Alert.alert("לא ניתן לבטל", "לא ניתן לבטל תא שכבר שולם");
+      return;
+    }
+
+    if (
+      item.isCancelled ||
+      item.hasPendingCancellation ||
+      item.hasPendingChange
+    ) {
+      Alert.alert("לא ניתן לבטל", "קיימת בקשה פתוחה או שהתא כבר בוטל");
       return;
     }
 
@@ -248,16 +277,32 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           />
         }
       >
-        <Pressable
-          style={styles.addShavingsTopButton}
-          onPress={handleOpenGeneralShavingsModal}
-        >
-          <Text style={styles.addShavingsTopButtonText}>
-            + הוסף הזמנת נסורת
-          </Text>
-        </Pressable>
+        <View style={styles.topActionsRow}>
+          <Pressable
+            style={styles.addStallTopButton}
+            onPress={handleOpenCreateStallModal}
+          >
+            <Text style={styles.addStallTopButtonText}>+ הוסף תא</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.addShavingsTopButton}
+            onPress={handleOpenGeneralShavingsModal}
+          >
+            <Text style={styles.addShavingsTopButtonText}>
+              + הוסף הזמנת נסורת
+            </Text>
+          </Pressable>
+        </View>
 
         {renderContent()}
+
+        <StallBookingCreateModal
+          visible={showCreateStallModal}
+          competitionId={activeCompetition?.competitionId}
+          onClose={handleCloseCreateStallModal}
+          onCreated={handleStallCreated}
+        />
 
         <ShavingsOrderModal
           visible={showShavingsModal}
