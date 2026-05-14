@@ -127,6 +127,7 @@ export default function CompetitionClassesPage() {
                 label="חזרה למקצים"
                 icon={<ArrowRight size={15} />}
                 onClick={page.backToClasses}
+                disabled={page.savingDrawOrder}
               />
             ) : null}
 
@@ -135,6 +136,7 @@ export default function CompetitionClassesPage() {
               icon={<RefreshCw size={15} />}
               onClick={page.loadPageData}
               loading={page.loadingClasses || page.loadingEntries}
+              disabled={page.savingDrawOrder}
             />
           </div>
         </div>
@@ -369,8 +371,17 @@ export default function CompetitionClassesPage() {
             loading={page.loadingEntries}
             searchText={page.searchText}
             paymentFilter={page.paymentFilter}
+            canEditDrawOrder={page.viewMode === "group"}
+            drawOrderEditMode={page.drawOrderEditMode}
+            savingDrawOrder={page.savingDrawOrder}
+            drawOrderError={page.drawOrderError}
             onSearchTextChange={page.setSearchText}
             onPaymentFilterChange={page.setPaymentFilter}
+            onStartDrawOrderEdit={page.startDrawOrderEditMode}
+            onCancelDrawOrderEdit={page.cancelDrawOrderEditMode}
+            onMoveDrawOrderEntry={page.moveDrawOrderEntry}
+            onShuffleDrawOrder={page.shuffleDrawOrderEntries}
+            onSaveDrawOrder={page.saveDrawOrder}
           />
         )}
       </div>

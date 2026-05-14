@@ -350,5 +350,121 @@ namespace RideOnServer.DAL
 
             return result;
         }
+
+        public void UpdateClassEntriesDrawOrder(
+           UpdateClassEntriesDrawOrderRequest request)
+        {
+            if (request.Entries == null || request.Entries.Count == 0)
+            {
+                throw new Exception("Entries list is empty");
+            }
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    string entriesJson = System.Text.Json.JsonSerializer.Serialize(
+                        request.Entries.Select(item => new
+                        {
+                            entryId = item.EntryId,
+                            drawOrder = item.DrawOrder
+                        })
+                    );
+
+                    using (NpgsqlCommand command = new NpgsqlCommand(@"
+                            SELECT public.usp_updateclassentriesdraworder(
+                                p_competitionid := @competitionId,
+                                p_classincompid := @classInCompId,
+                                p_entries       := @entries::jsonb
+                            );", connection))
+                    {
+                        command.Parameters.Add(
+                            "@competitionId",
+                            NpgsqlDbType.Integer
+                        ).Value = request.CompetitionId;
+
+                        command.Parameters.Add(
+                            "@classInCompId",
+                            NpgsqlDbType.Integer
+                        ).Value = request.ClassInCompId;
+
+                        command.Parameters.Add(
+                            "@entries",
+                            NpgsqlDbType.Jsonb
+                        ).Value = entriesJson;
+
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public void UpdateGroupEntriesDrawOrder(
+          UpdateGroupEntriesDrawOrderRequest request)
+        {
+            if (request.Entries == null || request.Entries.Count == 0)
+            {
+                throw new Exception("Entries list is empty");
+            }
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    string entriesJson = System.Text.Json.JsonSerializer.Serialize(
+                        request.Entries.Select(item => new
+                        {
+                            entryId = item.EntryId,
+                            drawOrder = item.DrawOrder
+                        })
+                    );
+
+                    using (NpgsqlCommand command = new NpgsqlCommand(@"
+                        SELECT public.usp_updategroupentriesdraworder(
+                            p_competitionid := @competitionId,
+                            p_classdate     := @classDate,
+                            p_orderinday    := @orderInDay,
+                            p_entries       := @entries
+                        );", connection))
+                    {
+                        command.Parameters.Add(
+                            "@competitionId",
+                            NpgsqlDbType.Integer
+                        ).Value = request.CompetitionId;
+
+                        command.Parameters.Add(
+                            "@classDate",
+                            NpgsqlDbType.Date
+                        ).Value = request.ClassDate.Date;
+
+                        command.Parameters.Add(
+                            "@orderInDay",
+                            NpgsqlDbType.Smallint
+                        ).Value = request.OrderInDay;
+
+                        command.Parameters.Add(
+                            "@entries",
+                            NpgsqlDbType.Jsonb
+                        ).Value = entriesJson;
+
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+
     }
 }
