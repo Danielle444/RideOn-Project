@@ -58,5 +58,20 @@ namespace RideOnServer.BL
                 ranchId
             );
         }
+
+        public static List<PendingChangeRequestsByCompetitionItem>
+            GetHostSecretaryPendingChangeRequestsByCompetition(int ranchId)
+        {
+            if (ranchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            ChangeTrackingDAL dal = new ChangeTrackingDAL();
+
+            return dal.GetHostSecretaryPendingChangeRequestsByCompetition(
+                ranchId
+            );
+        }
     }
 }

@@ -59,8 +59,9 @@ export default function CompetitionWorkspaceLayout(props) {
   const subtitle = useMemo(
     function () {
       return (
-        [activeRole?.roleName, activeRole?.ranchName].filter(Boolean).join(" · ") ||
-        "לא נבחר תפקיד וחווה"
+        [activeRole?.roleName, activeRole?.ranchName]
+          .filter(Boolean)
+          .join(" · ") || "לא נבחר תפקיד וחווה"
       );
     },
     [activeRole],
@@ -116,9 +117,6 @@ export default function CompetitionWorkspaceLayout(props) {
       menuItems={secretaryCompetitionMenu}
       activeItemKey={props.activeItemKey}
       onNavigate={handleCompetitionMenuNavigate}
-      notificationCount={0}
-      notificationsOpen={false}
-      notificationItems={[]}
     >
       {typeof props.children === "function"
         ? props.children({
