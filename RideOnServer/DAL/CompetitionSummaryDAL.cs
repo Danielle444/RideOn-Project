@@ -132,5 +132,899 @@ namespace RideOnServer.DAL
 
             return reader.GetDecimal(ordinal);
         }
+
+        public List<CompetitionSummaryClassDetailItem> GetCompetitionSummaryClassDetails(
+            int competitionId,
+            int ranchId,
+            string sectionKey)
+        {
+            List<CompetitionSummaryClassDetailItem> items =
+                new List<CompetitionSummaryClassDetailItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getcompetitionsummaryclassdetails(
+                        @competitionId,
+                        @ranchId,
+                        @sectionKey
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = competitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = ranchId;
+
+                        command.Parameters.Add("@sectionKey", NpgsqlDbType.Text)
+                            .Value = sectionKey;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new CompetitionSummaryClassDetailItem
+                                    {
+                                        ClassInCompId = GetInt(reader, "ClassInCompId"),
+                                        ClassDate = GetDateTime(reader, "ClassDate"),
+                                        StartTime = GetNullableTimeSpan(reader, "StartTime"),
+                                        OrderInDay = GetNullableShort(reader, "OrderInDay"),
+                                        ClassName = GetString(reader, "ClassName"),
+                                        EntryCount = GetInt(reader, "EntryCount"),
+                                        PaidCount = GetInt(reader, "PaidCount"),
+                                        UnpaidCount = GetInt(reader, "UnpaidCount"),
+                                        FineCount = GetInt(reader, "FineCount"),
+                                        ExpectedAmount = GetDecimal(reader, "ExpectedAmount"),
+                                        PaidAmount = GetDecimal(reader, "PaidAmount"),
+                                        UnpaidAmount = GetDecimal(reader, "UnpaidAmount")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public List<CompetitionSummaryClassEntryItem> GetCompetitionSummaryClassEntries(
+            int competitionId,
+            int ranchId,
+            int classInCompId,
+            string sectionKey)
+        {
+            List<CompetitionSummaryClassEntryItem> items =
+                new List<CompetitionSummaryClassEntryItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                            select *
+                            from public.usp_getcompetitionsummaryclassentries(
+                                @competitionId,
+                                @ranchId,
+                                @classInCompId,
+                                @sectionKey
+                            );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = competitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = ranchId;
+
+                        command.Parameters.Add("@classInCompId", NpgsqlDbType.Integer)
+                            .Value = classInCompId;
+
+                        command.Parameters.Add("@sectionKey", NpgsqlDbType.Text)
+                            .Value = sectionKey;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new CompetitionSummaryClassEntryItem
+                                    {
+                                        EntryId = GetInt(reader, "EntryId"),
+                                        DrawOrder = GetNullableShort(reader, "DrawOrder"),
+                                        RiderName = GetString(reader, "RiderName"),
+                                        HorseName = GetString(reader, "HorseName"),
+                                        BarnName = GetNullableString(reader, "BarnName"),
+                                        CoachName = GetNullableString(reader, "CoachName"),
+                                        PayerName = GetString(reader, "PayerName"),
+                                        PrizeRecipientName = GetNullableString(reader, "PrizeRecipientName"),
+                                        FineName = GetNullableString(reader, "FineName"),
+                                        FineAmount = GetDecimal(reader, "FineAmount"),
+                                        IsPaid = GetBool(reader, "IsPaid"),
+                                        Amount = GetDecimal(reader, "Amount")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        private static short? GetNullableShort(
+            NpgsqlDataReader reader,
+            string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+
+            if (reader.IsDBNull(ordinal))
+            {
+                return null;
+            }
+
+            return reader.GetInt16(ordinal);
+        }
+
+        private static string? GetNullableString(
+            NpgsqlDataReader reader,
+            string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+
+            if (reader.IsDBNull(ordinal))
+            {
+                return null;
+            }
+
+            return reader.GetString(ordinal);
+        }
+
+        private static DateTime GetDateTime(
+            NpgsqlDataReader reader,
+            string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+
+            if (reader.IsDBNull(ordinal))
+            {
+                return DateTime.MinValue;
+            }
+
+            return reader.GetDateTime(ordinal);
+        }
+
+        private static TimeSpan? GetNullableTimeSpan(
+            NpgsqlDataReader reader,
+            string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+
+            if (reader.IsDBNull(ordinal))
+            {
+                return null;
+            }
+
+            return reader.GetTimeSpan(ordinal);
+        }
+
+        private static bool GetBool(
+            NpgsqlDataReader reader,
+            string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+
+            if (reader.IsDBNull(ordinal))
+            {
+                return false;
+            }
+
+            return reader.GetBoolean(ordinal);
+        }
+
+        public List<CompetitionSummaryPaidTimeDetailItem> GetCompetitionSummaryPaidTimeDetails(
+    int competitionId,
+    int ranchId)
+        {
+            List<CompetitionSummaryPaidTimeDetailItem> items =
+                new List<CompetitionSummaryPaidTimeDetailItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getcompetitionsummarypaidtimedetails(
+                        @competitionId,
+                        @ranchId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = competitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = ranchId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new CompetitionSummaryPaidTimeDetailItem
+                                    {
+                                        PaidTimeSlotInCompId =
+                                            GetInt(reader, "PaidTimeSlotInCompId"),
+
+                                        SlotDate =
+                                            GetDateTime(reader, "SlotDate"),
+
+                                        StartTime =
+                                            GetTimeSpan(reader, "StartTime"),
+
+                                        EndTime =
+                                            GetTimeSpan(reader, "EndTime"),
+
+                                        ArenaName =
+                                            GetString(reader, "ArenaName"),
+
+                                        ProductId =
+                                            GetShort(reader, "ProductId"),
+
+                                        ProductName =
+                                            GetString(reader, "ProductName"),
+
+                                        DurationMinutes =
+                                            GetInt(reader, "DurationMinutes"),
+
+                                        RequestCount =
+                                            GetInt(reader, "RequestCount"),
+
+                                        PaidCount =
+                                            GetInt(reader, "PaidCount"),
+
+                                        UnpaidCount =
+                                            GetInt(reader, "UnpaidCount"),
+
+                                        ExpectedAmount =
+                                            GetDecimal(reader, "ExpectedAmount"),
+
+                                        PaidAmount =
+                                            GetDecimal(reader, "PaidAmount"),
+
+                                        UnpaidAmount =
+                                            GetDecimal(reader, "UnpaidAmount")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public List<CompetitionSummaryPaidTimeEntryItem> GetCompetitionSummaryPaidTimeEntries(
+            int competitionId,
+            int ranchId,
+            int paidTimeSlotInCompId,
+            short productId)
+        {
+            List<CompetitionSummaryPaidTimeEntryItem> items =
+                new List<CompetitionSummaryPaidTimeEntryItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getcompetitionsummarypaidtimeentries(
+                        @competitionId,
+                        @ranchId,
+                        @paidTimeSlotInCompId,
+                        @productId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = competitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = ranchId;
+
+                        command.Parameters.Add("@paidTimeSlotInCompId", NpgsqlDbType.Integer)
+                            .Value = paidTimeSlotInCompId;
+
+                        command.Parameters.Add("@productId", NpgsqlDbType.Smallint)
+                            .Value = productId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new CompetitionSummaryPaidTimeEntryItem
+                                    {
+                                        PaidTimeRequestId =
+                                            GetInt(reader, "PaidTimeRequestId"),
+
+                                        SlotDate =
+                                            GetDateTime(reader, "SlotDate"),
+
+                                        StartTime =
+                                            GetTimeSpan(reader, "StartTime"),
+
+                                        EndTime =
+                                            GetTimeSpan(reader, "EndTime"),
+
+                                        ArenaName =
+                                            GetString(reader, "ArenaName"),
+
+                                        ProductName =
+                                            GetString(reader, "ProductName"),
+
+                                        DurationMinutes =
+                                            GetInt(reader, "DurationMinutes"),
+
+                                        RiderName =
+                                            GetString(reader, "RiderName"),
+
+                                        HorseName =
+                                            GetString(reader, "HorseName"),
+
+                                        BarnName =
+                                            GetNullableString(reader, "BarnName"),
+
+                                        CoachName =
+                                            GetNullableString(reader, "CoachName"),
+
+                                        PayerName =
+                                            GetString(reader, "PayerName"),
+
+                                        Status =
+                                            GetString(reader, "Status"),
+
+                                        IsPaid =
+                                            GetBool(reader, "IsPaid"),
+
+                                        Amount =
+                                            GetDecimal(reader, "Amount")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public List<CompetitionSummaryStallDetailItem> GetCompetitionSummaryStallDetails(
+            int competitionId,
+            int ranchId)
+        {
+            List<CompetitionSummaryStallDetailItem> items =
+                new List<CompetitionSummaryStallDetailItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getcompetitionsummarystalldetails(
+                        @competitionId,
+                        @ranchId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = competitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = ranchId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new CompetitionSummaryStallDetailItem
+                                    {
+                                        BookingRanchId =
+                                            GetInt(reader, "BookingRanchId"),
+
+                                        BookingRanchName =
+                                            GetString(reader, "BookingRanchName"),
+
+                                        ProductId =
+                                            GetShort(reader, "ProductId"),
+
+                                        ProductName =
+                                            GetString(reader, "ProductName"),
+
+                                        IsForTack =
+                                            GetBool(reader, "IsForTack"),
+
+                                        BookingCount =
+                                            GetInt(reader, "BookingCount"),
+
+                                        HorseCount =
+                                            GetInt(reader, "HorseCount"),
+
+                                        TackCount =
+                                            GetInt(reader, "TackCount"),
+
+                                        ExpectedAmount =
+                                            GetDecimal(reader, "ExpectedAmount"),
+
+                                        PaidAmount =
+                                            GetDecimal(reader, "PaidAmount"),
+
+                                        UnpaidAmount =
+                                            GetDecimal(reader, "UnpaidAmount")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public List<CompetitionSummaryStallEntryItem> GetCompetitionSummaryStallEntries(
+            int competitionId,
+            int ranchId,
+            int bookingRanchId,
+            short productId,
+            bool isForTack)
+        {
+            List<CompetitionSummaryStallEntryItem> items =
+                new List<CompetitionSummaryStallEntryItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getcompetitionsummarystallentries(
+                        @competitionId,
+                        @ranchId,
+                        @bookingRanchId,
+                        @productId,
+                        @isForTack
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = competitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = ranchId;
+
+                        command.Parameters.Add("@bookingRanchId", NpgsqlDbType.Integer)
+                            .Value = bookingRanchId;
+
+                        command.Parameters.Add("@productId", NpgsqlDbType.Smallint)
+                            .Value = productId;
+
+                        command.Parameters.Add("@isForTack", NpgsqlDbType.Boolean)
+                            .Value = isForTack;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new CompetitionSummaryStallEntryItem
+                                    {
+                                        StallBookingId =
+                                            GetInt(reader, "StallBookingId"),
+
+                                        BookingRanchName =
+                                            GetString(reader, "BookingRanchName"),
+
+                                        ProductName =
+                                            GetString(reader, "ProductName"),
+
+                                        IsForTack =
+                                            GetBool(reader, "IsForTack"),
+
+                                        HorseName =
+                                            GetNullableString(reader, "HorseName"),
+
+                                        BarnName =
+                                            GetNullableString(reader, "BarnName"),
+
+                                        StartDate =
+                                            GetDateTime(reader, "StartDate"),
+
+                                        EndDate =
+                                            GetDateTime(reader, "EndDate"),
+
+                                        PayerNames =
+                                            GetString(reader, "PayerNames"),
+
+                                        IsPaid =
+                                            GetBool(reader, "IsPaid"),
+
+                                        ExpectedAmount =
+                                            GetDecimal(reader, "ExpectedAmount"),
+
+                                        PaidAmount =
+                                            GetDecimal(reader, "PaidAmount"),
+
+                                        UnpaidAmount =
+                                            GetDecimal(reader, "UnpaidAmount")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public List<CompetitionSummaryShavingsDetailItem> GetCompetitionSummaryShavingsDetails(
+    int competitionId,
+    int ranchId)
+        {
+            List<CompetitionSummaryShavingsDetailItem> items =
+                new List<CompetitionSummaryShavingsDetailItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getcompetitionsummaryshavingsdetails(
+                        @competitionId,
+                        @ranchId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = competitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = ranchId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new CompetitionSummaryShavingsDetailItem
+                                    {
+                                        BookingRanchId =
+                                            GetInt(reader, "BookingRanchId"),
+
+                                        BookingRanchName =
+                                            GetString(reader, "BookingRanchName"),
+
+                                        OrderCount =
+                                            GetInt(reader, "OrderCount"),
+
+                                        StallCount =
+                                            GetInt(reader, "StallCount"),
+
+                                        BagQuantity =
+                                            GetInt(reader, "BagQuantity"),
+
+                                        ExpectedAmount =
+                                            GetDecimal(reader, "ExpectedAmount"),
+
+                                        PaidAmount =
+                                            GetDecimal(reader, "PaidAmount"),
+
+                                        UnpaidAmount =
+                                            GetDecimal(reader, "UnpaidAmount")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public List<CompetitionSummaryShavingsEntryItem> GetCompetitionSummaryShavingsEntries(
+            int competitionId,
+            int ranchId,
+            int bookingRanchId)
+        {
+            List<CompetitionSummaryShavingsEntryItem> items =
+                new List<CompetitionSummaryShavingsEntryItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getcompetitionsummaryshavingsentries(
+                        @competitionId,
+                        @ranchId,
+                        @bookingRanchId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = competitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = ranchId;
+
+                        command.Parameters.Add("@bookingRanchId", NpgsqlDbType.Integer)
+                            .Value = bookingRanchId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new CompetitionSummaryShavingsEntryItem
+                                    {
+                                        ShavingsOrderId =
+                                            GetInt(reader, "ShavingsOrderId"),
+
+                                        BookingRanchName =
+                                            GetString(reader, "BookingRanchName"),
+
+                                        StallCount =
+                                            GetInt(reader, "StallCount"),
+
+                                        BagQuantity =
+                                            GetInt(reader, "BagQuantity"),
+
+                                        RequestedDeliveryTime =
+                                            GetNullableDateTime(reader, "RequestedDeliveryTime"),
+
+                                        DeliveryStatus =
+                                            GetNullableString(reader, "DeliveryStatus"),
+
+                                        HorseNames =
+                                            GetString(reader, "HorseNames"),
+
+                                        PayerNames =
+                                            GetString(reader, "PayerNames"),
+
+                                        IsPaid =
+                                            GetBool(reader, "IsPaid"),
+
+                                        ExpectedAmount =
+                                            GetDecimal(reader, "ExpectedAmount"),
+
+                                        PaidAmount =
+                                            GetDecimal(reader, "PaidAmount"),
+
+                                        UnpaidAmount =
+                                            GetDecimal(reader, "UnpaidAmount")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public List<CompetitionSummaryCashDetailItem> GetCompetitionSummaryCashDetails(
+            int competitionId,
+            int ranchId)
+        {
+            List<CompetitionSummaryCashDetailItem> items =
+                new List<CompetitionSummaryCashDetailItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getcompetitionsummarycashdetails(
+                        @competitionId,
+                        @ranchId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = competitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = ranchId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new CompetitionSummaryCashDetailItem
+                                    {
+                                        PaymentId =
+                                            GetInt(reader, "PaymentId"),
+
+                                        BillId =
+                                            GetInt(reader, "BillId"),
+
+                                        PayerName =
+                                            GetString(reader, "PayerName"),
+
+                                        AmountPaid =
+                                            GetDecimal(reader, "AmountPaid"),
+
+                                        PaymentDate =
+                                            GetDateTime(reader, "PaymentDate"),
+
+                                        PaymentMethodType =
+                                            GetString(reader, "PaymentMethodType"),
+
+                                        TransactionReference =
+                                            GetNullableString(reader, "TransactionReference"),
+
+                                        EnteredByName =
+                                            GetNullableString(reader, "EnteredByName")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        private static short GetShort(
+    NpgsqlDataReader reader,
+    string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+
+            if (reader.IsDBNull(ordinal))
+            {
+                return 0;
+            }
+
+            return reader.GetInt16(ordinal);
+        }
+
+        private static TimeSpan GetTimeSpan(
+            NpgsqlDataReader reader,
+            string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+
+            if (reader.IsDBNull(ordinal))
+            {
+                return TimeSpan.Zero;
+            }
+
+            return reader.GetTimeSpan(ordinal);
+        }
+
+        private static DateTime? GetNullableDateTime(
+            NpgsqlDataReader reader,
+            string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+
+            if (reader.IsDBNull(ordinal))
+            {
+                return null;
+            }
+
+            return reader.GetDateTime(ordinal);
+        }
     }
 }
