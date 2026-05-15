@@ -46,6 +46,7 @@ function getCategoryIcon(categoryKey) {
 
 export default function CompetitionSummarySection(props) {
   var categories = Array.isArray(props.categories) ? props.categories : [];
+  var showCategoriesTable = props.showCategoriesTable !== false;
 
   return (
     <section className="rounded-[28px] border border-[#E6DCD5] bg-white p-8 shadow-sm">
@@ -83,9 +84,13 @@ export default function CompetitionSummarySection(props) {
         ) : null}
       </div>
 
-      <SummaryAmountCards totals={props.totals} />
+      <SummaryAmountCards
+        totals={props.totals}
+        showQuantity={props.showQuantity}
+        quantity={props.quantity}
+      />
 
-      {categories.length > 0 ? (
+      {showCategoriesTable && categories.length > 0 ? (
         <div className="mt-7 overflow-hidden rounded-2xl border border-[#E3D7D0]">
           <table className="w-full border-collapse text-right">
             <thead className="bg-[#F3EEEA] text-sm font-bold text-[#5D4037]">

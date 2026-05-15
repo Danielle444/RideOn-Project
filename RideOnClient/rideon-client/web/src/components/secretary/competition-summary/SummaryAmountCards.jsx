@@ -10,7 +10,9 @@ function AmountCard(props) {
       <p className="text-sm font-bold text-[#6D4C41]">{props.title}</p>
 
       <p className={"mt-3 text-3xl font-black " + colorClass}>
-        {formatMoney(props.amount)}
+        {props.isMoney === false
+          ? Number(props.amount || 0).toLocaleString("he-IL")
+          : formatMoney(props.amount)}
       </p>
     </div>
   );
@@ -18,9 +20,24 @@ function AmountCard(props) {
 
 export default function SummaryAmountCards(props) {
   var totals = props.totals || {};
+  var showQuantity = props.showQuantity === true;
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+    <div
+      className={
+        "grid grid-cols-1 gap-4 " +
+        (showQuantity ? "md:grid-cols-4" : "md:grid-cols-3")
+      }
+    >
+      {showQuantity ? (
+        <AmountCard
+          title="כמות"
+          amount={props.quantity || 0}
+          colorClass="text-[#3F312B]"
+          isMoney={false}
+        />
+      ) : null}
+
       <AmountCard
         title="סה״כ הכנסות צפויות"
         amount={totals.expectedAmount || totals.ExpectedAmount}

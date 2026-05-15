@@ -51,6 +51,18 @@ function SummaryPageContent(props) {
     console.log("summary category clicked", item);
   }
 
+  var federationQuantity = 0;
+
+  if (
+    page.summary.federationCategories &&
+    page.summary.federationCategories.length > 0
+  ) {
+    federationQuantity =
+      page.summary.federationCategories[0].quantity ||
+      page.summary.federationCategories[0].Quantity ||
+      0;
+  }
+
   return (
     <div className="mx-auto max-w-[1450px] space-y-8" dir="rtl">
       <div>
@@ -88,7 +100,9 @@ function SummaryPageContent(props) {
             totals={page.summary.federation}
             categories={page.summary.federationCategories}
             actionType="invoice"
-            onCategoryClick={handleCategoryClick}
+            showQuantity={true}
+            quantity={federationQuantity}
+            showCategoriesTable={false}
           />
         </>
       )}
