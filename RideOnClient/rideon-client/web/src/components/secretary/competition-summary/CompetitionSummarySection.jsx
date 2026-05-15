@@ -62,9 +62,8 @@ export default function CompetitionSummarySection(props) {
         {props.actionType === "cash" ? (
           <button
             type="button"
-            disabled
-            className="flex h-16 items-center justify-center gap-3 rounded-2xl bg-[#8B5E4C] px-6 text-lg font-bold text-white opacity-70"
-            title="קופה תחובר בהמשך"
+            onClick={props.onActionClick}
+            className="flex h-16 items-center justify-center gap-3 rounded-2xl bg-[#8B5E4C] px-6 text-lg font-bold text-white transition-colors hover:bg-[#765041]"
           >
             <WalletCards size={22} />
             קופה
@@ -88,6 +87,7 @@ export default function CompetitionSummarySection(props) {
         totals={props.totals}
         showQuantity={props.showQuantity}
         quantity={props.quantity}
+        onExpectedAmountClick={props.onExpectedAmountClick}
       />
 
       {showCategoriesTable && categories.length > 0 ? (

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import CompetitionSummarySection from "../../components/secretary/competition-summary/CompetitionSummarySection";
+import SummaryDetailsModal from "../../components/secretary/competition-summary/SummaryDetailsModal";
 import { getCompetitionById } from "../../services/competitionService";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import useCompetitionSummaryPage from "../../hooks/secretary/useCompetitionSummaryPage";
@@ -47,10 +48,6 @@ function SummaryPageContent(props) {
     [layout.competitionId, activeRole?.ranchId],
   );
 
-  function handleCategoryClick(item) {
-    console.log("summary category clicked", item);
-  }
-
   var federationQuantity = 0;
 
   if (
@@ -91,7 +88,8 @@ function SummaryPageContent(props) {
             totals={page.summary.organizer}
             categories={page.summary.organizerCategories}
             actionType="cash"
-            onCategoryClick={handleCategoryClick}
+            onActionClick={page.openCashDetails}
+            onCategoryClick={page.openOrganizerCategoryDetails}
           />
 
           <CompetitionSummarySection
@@ -103,9 +101,24 @@ function SummaryPageContent(props) {
             showQuantity={true}
             quantity={federationQuantity}
             showCategoriesTable={false}
+            onExpectedAmountClick={page.openFederationClassesDetails}
           />
         </>
       )}
+
+      <SummaryDetailsModal
+        modal={page.detailsModal}
+        detailsItems={page.detailsItems}
+        detailsLoading={page.detailsLoading}
+        detailsError={page.detailsError}
+        selectedDetailItem={page.selectedDetailItem}
+        entryItems={page.entryItems}
+        entriesLoading={page.entriesLoading}
+        entriesError={page.entriesError}
+        onClose={page.closeDetailsModal}
+        onDetailRowClick={page.openEntriesForDetail}
+        onBackToDetails={page.backToDetailsList}
+      />
     </div>
   );
 }

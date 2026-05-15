@@ -4,9 +4,20 @@ function formatMoney(value) {
 
 function AmountCard(props) {
   var colorClass = props.colorClass || "text-[#7B5A4D]";
+  var clickableClass = props.onClick
+    ? "cursor-pointer transition-colors hover:bg-[#FCF8F5]"
+    : "";
 
   return (
-    <div className="rounded-2xl border border-[#E3D7D0] bg-white px-6 py-5 shadow-sm">
+    <button
+      type="button"
+      onClick={props.onClick}
+      disabled={!props.onClick}
+      className={
+        "rounded-2xl border border-[#E3D7D0] bg-white px-6 py-5 text-right shadow-sm disabled:cursor-default " +
+        clickableClass
+      }
+    >
       <p className="text-sm font-bold text-[#6D4C41]">{props.title}</p>
 
       <p className={"mt-3 text-3xl font-black " + colorClass}>
@@ -14,7 +25,7 @@ function AmountCard(props) {
           ? Number(props.amount || 0).toLocaleString("he-IL")
           : formatMoney(props.amount)}
       </p>
-    </div>
+    </button>
   );
 }
 
@@ -42,6 +53,7 @@ export default function SummaryAmountCards(props) {
         title="סה״כ הכנסות צפויות"
         amount={totals.expectedAmount || totals.ExpectedAmount}
         colorClass="text-[#7B5A4D]"
+        onClick={props.onExpectedAmountClick}
       />
 
       <AmountCard
