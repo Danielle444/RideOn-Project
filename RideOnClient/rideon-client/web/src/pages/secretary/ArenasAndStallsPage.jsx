@@ -52,9 +52,6 @@ export default function ArenasAndStallsPage() {
       subtitle={subtitle}
       menuItems={secretaryGeneralMenu}
       activeItemKey="arenas-and-stalls"
-      notificationCount={0}
-      notificationsOpen={false}
-      notificationItems={[]}
     >
       <div className="overflow-hidden rounded-[26px] border border-[#E6DCD5] bg-white shadow-sm">
         <div className="border-b border-[#EFE5DF] px-8 py-7">
