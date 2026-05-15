@@ -1,105 +1,109 @@
 import { useEffect } from "react";
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
+import CompetitionSummarySection from "../../components/secretary/competition-summary/CompetitionSummarySection";
 import { getCompetitionById } from "../../services/competitionService";
 import { useActiveRole } from "../../context/ActiveRoleContext";
+import useCompetitionSummaryPage from "../../hooks/secretary/useCompetitionSummaryPage";
+
+function SummaryPageContent(props) {
+  var layout = props.layout;
+  var activeRole = props.activeRole;
+
+  var page = useCompetitionSummaryPage({
+    competitionId: Number(layout.competitionId),
+    ranchId: activeRole?.ranchId || null,
+  });
+
+  useEffect(
+    function () {
+      async function loadCompetition() {
+        if (!layout.competitionId || !activeRole?.ranchId) {
+          return;
+        }
+
+        try {
+          var response = await getCompetitionById(
+            layout.competitionId,
+            activeRole.ranchId,
+          );
+
+          var competitionData = response.data || null;
+
+          if (!competitionData) {
+            return;
+          }
+
+          layout.setCurrentCompetition({
+            competitionId: competitionData.competitionId,
+            competitionName: competitionData.competitionName || "",
+          });
+        } catch {
+          return;
+        }
+      }
+
+      loadCompetition();
+    },
+    [layout.competitionId, activeRole?.ranchId],
+  );
+
+  function handleCategoryClick(item) {
+    console.log("summary category clicked", item);
+  }
+
+  return (
+    <div className="mx-auto max-w-[1450px] space-y-8" dir="rtl">
+      <div>
+        <h1 className="text-4xl font-black text-[#3F312B]">סיכום תחרות</h1>
+
+        <p className="mt-2 text-sm text-[#8A7268]">
+          תמונת מצב מרוכזת של הכנסות, תשלומים וקטגוריות בתחרות
+        </p>
+      </div>
+
+      {page.error ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {page.error}
+        </div>
+      ) : null}
+
+      {page.loading ? (
+        <div className="rounded-[28px] border border-[#E6DCD5] bg-white px-8 py-12 text-center text-[#7B5A4D] shadow-sm">
+          טוען סיכום תחרות...
+        </div>
+      ) : (
+        <>
+          <CompetitionSummarySection
+            title="מארגן"
+            description="הכנסות המארגן ממקצים, פייד־טיים, תאים ונסורת"
+            totals={page.summary.organizer}
+            categories={page.summary.organizerCategories}
+            actionType="cash"
+            onCategoryClick={handleCategoryClick}
+          />
+
+          <CompetitionSummarySection
+            title="התאחדות"
+            description="חלק ההתאחדות מתוך הרשמות המקצים"
+            totals={page.summary.federation}
+            categories={page.summary.federationCategories}
+            actionType="invoice"
+            onCategoryClick={handleCategoryClick}
+          />
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function CompetitionSummaryPage() {
-  const activeRoleContext = useActiveRole();
-  const activeRole = activeRoleContext.activeRole;
+  var activeRoleContext = useActiveRole();
+  var activeRole = activeRoleContext.activeRole;
 
   return (
     <CompetitionWorkspaceLayout activeItemKey="competition-summary">
       {function (layout) {
-        useEffect(
-          function () {
-            async function loadCompetition() {
-              if (!layout.competitionId || !activeRole?.ranchId) {
-                return;
-              }
-
-              try {
-                var response = await getCompetitionById(
-                  layout.competitionId,
-                  activeRole.ranchId,
-                );
-
-                var competitionData = response.data || null;
-
-                if (!competitionData) {
-                  return;
-                }
-
-                layout.setCurrentCompetition({
-                  competitionId: competitionData.competitionId,
-                  competitionName: competitionData.competitionName || "",
-                });
-              } catch {
-                return;
-              }
-            }
-
-            loadCompetition();
-          },
-          [layout.competitionId, activeRole],
-        );
-
-        return (
-          <div className="mx-auto max-w-[1450px] space-y-6">
-            <div className="rounded-[28px] border border-[#E6DCD5] bg-white shadow-sm overflow-hidden">
-              <div className="border-b border-[#EFE5DF] px-8 py-7">
-                <h1 className="text-[2rem] font-bold text-[#3F312B]">
-                  סיכום תחרות
-                </h1>
-
-                <p className="mt-2 text-sm text-[#8A7268]">
-                  מסך ברירת המחדל לאחר כניסה לתחרות
-                </p>
-              </div>
-
-              <div className="px-8 py-8 grid grid-cols-1 xl:grid-cols-3 gap-5">
-                <div className="rounded-[24px] border border-[#EADFD8] bg-[#FCFAF8] p-6">
-                  <p className="text-sm font-semibold text-[#7B5A4D]">
-                    שם התחרות
-                  </p>
-                  <p className="mt-2 text-[1.2rem] font-bold text-[#3F312B]">
-                    {layout.currentCompetition?.competitionName || "—"}
-                  </p>
-                </div>
-
-                <div className="rounded-[24px] border border-[#EADFD8] bg-[#FCFAF8] p-6">
-                  <p className="text-sm font-semibold text-[#7B5A4D]">
-                    מזהה תחרות
-                  </p>
-                  <p className="mt-2 text-[1.2rem] font-bold text-[#3F312B]">
-                    {layout.competitionId || "—"}
-                  </p>
-                </div>
-
-                <div className="rounded-[24px] border border-[#EADFD8] bg-[#FCFAF8] p-6">
-                  <p className="text-sm font-semibold text-[#7B5A4D]">
-                    חווה פעילה
-                  </p>
-                  <p className="mt-2 text-[1.2rem] font-bold text-[#3F312B]">
-                    {activeRole?.ranchName || "—"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="px-8 pb-8">
-                <div className="rounded-[24px] border border-dashed border-[#D8CBC3] bg-white px-6 py-10 text-right">
-                  <p className="text-lg font-bold text-[#5D4037]">
-                    בסיס מסך סיכום התחרות הוכן
-                  </p>
-
-                  <p className="mt-2 text-sm leading-7 text-[#8A7268]">
-                    כאן נכניס בהמשך מדדי תחרות, תקציר סטטוסים, חריגים, תשלומים,
-                    מסמכים, מקצים, פייד־טיים ותמונת מצב כללית.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
+        return <SummaryPageContent layout={layout} activeRole={activeRole} />;
       }}
     </CompetitionWorkspaceLayout>
   );
