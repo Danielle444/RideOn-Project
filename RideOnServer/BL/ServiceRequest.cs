@@ -14,8 +14,6 @@
 
         public int BillId { get; set; }
 
-        public int? PaymentId { get; set; }
-
         public DateTime SRequestDateTime { get; set; }
     }
 }

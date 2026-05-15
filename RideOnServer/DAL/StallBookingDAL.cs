@@ -137,7 +137,7 @@ namespace RideOnServer.DAL
                     endDate = Convert.ToDateTime(reader["enddate"]),
                     CompoundId = reader["compoundid"] == DBNull.Value ? null : Convert.ToInt16(reader["compoundid"]),
                     StallId = reader["stallid"] == DBNull.Value ? null : Convert.ToInt16(reader["stallid"]),
-                    PriceCatalogId = Convert.ToInt32(reader["priceCatalogId"]),
+                    PriceCatalogId = Convert.ToInt32(reader["pricecatalogid"]),
                     ItemPrice = Convert.ToDecimal(reader["itemprice"]),
                     Notes = reader["notes"] == DBNull.Value ? null : reader["notes"].ToString(),
                     ApprovalDate = reader["approvaldate"] == DBNull.Value ? null : Convert.ToDateTime(reader["approvaldate"]),
