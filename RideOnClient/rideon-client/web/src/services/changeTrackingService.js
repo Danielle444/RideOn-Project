@@ -33,4 +33,17 @@ function getPendingChangeRequestsCount(ranchId) {
   });
 }
 
-export { getCompetitionChangeRequests, getPendingChangeRequestsCount };
+function getPendingChangeRequestsByCompetition(ranchId) {
+  return axios.get(`${API}/ChangeTracking/pending-by-competition`, {
+    params: {
+      ranchId: ranchId,
+    },
+    ...getAuthHeaders(),
+  });
+}
+
+export {
+  getCompetitionChangeRequests,
+  getPendingChangeRequestsCount,
+  getPendingChangeRequestsByCompetition,
+};

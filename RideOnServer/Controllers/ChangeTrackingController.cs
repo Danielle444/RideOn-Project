@@ -124,5 +124,53 @@ namespace RideOnServer.Controllers
                 );
             }
         }
+
+        [HttpGet("pending-by-competition")]
+        public IActionResult GetHostSecretaryPendingChangeRequestsByCompetition(
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId =
+                    UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                List<PendingChangeRequestsByCompetitionItem> items =
+                    ChangeTracking.GetHostSecretaryPendingChangeRequestsByCompetition(
+                        ranchId
+                    );
+
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ex.Message
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in GetHostSecretaryPendingChangeRequestsByCompetition: {ex.Message}"
+                );
+
+                return BadRequest(
+                    "אירעה שגיאה בשליפת בקשות שינוי לפי תחרות"
+                );
+            }
+        }
+
+
     }
 }

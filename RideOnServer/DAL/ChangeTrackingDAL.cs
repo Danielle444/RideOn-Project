@@ -339,5 +339,67 @@ namespace RideOnServer.DAL
 
             return reader.GetDecimal(ordinal);
         }
+
+        public List<PendingChangeRequestsByCompetitionItem>
+            GetHostSecretaryPendingChangeRequestsByCompetition(int ranchId)
+        {
+            List<PendingChangeRequestsByCompetitionItem> items =
+                new List<PendingChangeRequestsByCompetitionItem>();
+
+            try
+            {
+                using (
+                    NpgsqlConnection connection =
+                        Connect("DefaultConnection")
+                )
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command =
+                            new NpgsqlCommand(
+                                @"
+                        select *
+                        from public.usp_gethostsecretarypendingchangerequestsbycompetition(
+                            @ranchId
+                        );",
+                                connection
+                            )
+                    )
+                    {
+                        command.Parameters.Add(
+                            "@ranchId",
+                            NpgsqlDbType.Integer
+                        ).Value = ranchId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new PendingChangeRequestsByCompetitionItem
+                                    {
+                                        CompetitionId =
+                                            GetInt(reader, "CompetitionId"),
+
+                                        CompetitionName =
+                                            GetString(reader, "CompetitionName"),
+
+                                        PendingCount =
+                                            GetInt(reader, "PendingCount")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
     }
 }
