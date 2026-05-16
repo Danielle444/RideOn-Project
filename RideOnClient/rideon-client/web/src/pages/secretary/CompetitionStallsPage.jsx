@@ -116,16 +116,6 @@ export default function CompetitionStallsPage() {
               <Plus size={16} />
               הוסף תא
             </button>
-
-            <button
-              type="button"
-              disabled
-              className="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl border border-[#E5D9D2] bg-[#F7F1ED] px-4 py-2 text-sm font-semibold text-[#BCAAA4]"
-              title="יפותח בהמשך"
-            >
-              <Plus size={16} />
-              הוסף נסורת
-            </button>
           </div>
         </div>
 
