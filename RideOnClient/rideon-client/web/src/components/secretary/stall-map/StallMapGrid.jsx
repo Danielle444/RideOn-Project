@@ -64,9 +64,9 @@ export default function StallMapGrid({
     .join(" ");
 
   return (
-    <div className="max-w-full overflow-auto rounded-2xl border border-[#EFE5DF] bg-[#FAF5F1] p-3">
+    <div className="h-full max-w-full overflow-auto rounded-2xl border border-[#EFE5DF] bg-[#FAF5F1] p-3">
       <div
-        className="grid gap-[2px]"
+        className="grid gap-[2px] min-h-full"
         style={{
           gridTemplateColumns: columnSizes,
           gridTemplateRows: rowSizes,

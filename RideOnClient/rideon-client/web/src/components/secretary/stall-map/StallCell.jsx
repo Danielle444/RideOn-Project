@@ -1,4 +1,4 @@
-import { DoorOpen, Package, PawPrint, X } from "lucide-react";
+import { DoorOpen, Package, X } from "lucide-react";
 import DroppableBox from "../../common/dnd/DroppableBox";
 
 function getAssignmentTitle(assignment) {
@@ -56,7 +56,7 @@ export default function StallCell({ cell, assignment, onUnassign }) {
               {assignment.isForTack ? (
                 <Package size={9} />
               ) : (
-                <PawPrint size={9} />
+                <span className="text-[10px]">🐴</span>
               )}
             </span>
 
