@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   getCompounds,
   saveLayout,
-  getHorses,
+  getAssignmentOverview,
   getAssignments,
-  assignHorse,
-  unassignHorse,
+  assignStallBooking,
+  unassignStallBooking,
 } from "../../services/stallMapService";
 
 function parseLayout(layoutJson) {
@@ -33,14 +33,49 @@ function normalizeCompounds(compounds) {
   });
 }
 
+function getRanchGroups(items) {
+  const groupsMap = {};
+
+  items.forEach(function (item) {
+    const ranchId = item.bookingRanchId || 0;
+    const ranchName = item.bookingRanchName || "חווה לא ידועה";
+
+    if (!groupsMap[ranchId]) {
+      groupsMap[ranchId] = {
+        ranchId: ranchId,
+        ranchName: ranchName,
+        items: [],
+      };
+    }
+
+    groupsMap[ranchId].items.push(item);
+  });
+
+  return Object.values(groupsMap).sort(function (a, b) {
+    return a.ranchName.localeCompare(b.ranchName, "he");
+  });
+}
+
+function getDefaultSelectedRanchId(items) {
+  if (!Array.isArray(items) || items.length === 0) return null;
+
+  const firstItem = items[0];
+
+  return firstItem.bookingRanchId || null;
+}
+
 export default function useCompetitionStallsPage(competitionId, ranchId) {
   const [compounds, setCompounds] = useState([]);
-  const [horses, setHorses] = useState([]);
+  const [overviewItems, setOverviewItems] = useState([]);
   const [assignments, setAssignments] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
   const [activeCompoundId, setActiveCompoundId] = useState(null);
+  const [mode, setMode] = useState("overview");
+  const [selectedRanchId, setSelectedRanchId] = useState(null);
 
   const load = useCallback(
     async function () {
@@ -50,25 +85,35 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
       setError("");
 
       try {
-        const [compRes, horseRes, assignRes] = await Promise.all([
+        const results = await Promise.all([
           getCompounds(ranchId),
-          getHorses(competitionId, ranchId),
+          getAssignmentOverview(competitionId, ranchId),
           getAssignments(competitionId, ranchId),
         ]);
 
-        const compoundList = normalizeCompounds(compRes.data);
+        const compoundList = normalizeCompounds(results[0].data);
+        const overviewList = Array.isArray(results[1].data)
+          ? results[1].data
+          : [];
+        const assignmentList = Array.isArray(results[2].data)
+          ? results[2].data
+          : [];
 
         setCompounds(compoundList);
-        setHorses(Array.isArray(horseRes.data) ? horseRes.data : []);
-        setAssignments(Array.isArray(assignRes.data) ? assignRes.data : []);
+        setOverviewItems(overviewList);
+        setAssignments(assignmentList);
 
         if (compoundList.length > 0) {
           setActiveCompoundId(function (prev) {
             return prev || compoundList[0].compoundId;
           });
         }
+
+        setSelectedRanchId(function (prev) {
+          return prev || getDefaultSelectedRanchId(overviewList);
+        });
       } catch {
-        setError("שגיאה בטעינת נתוני המפה");
+        setError("שגיאה בטעינת נתוני התאים");
       } finally {
         setLoading(false);
       }
@@ -102,47 +147,35 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
     }
   }
 
-  async function handleAssign(cell, horse) {
+  async function refreshAssignmentsAndOverview() {
+    const results = await Promise.all([
+      getAssignmentOverview(competitionId, ranchId),
+      getAssignments(competitionId, ranchId),
+    ]);
+
+    setOverviewItems(Array.isArray(results[0].data) ? results[0].data : []);
+    setAssignments(Array.isArray(results[1].data) ? results[1].data : []);
+  }
+
+  async function handleAssign(cell, item) {
     const compound = compounds.find(function (c) {
       return c.compoundId === activeCompoundId;
     });
 
-    if (!compound) return;
+    if (!compound || !item || !item.stallBookingId) return;
 
     try {
-      await assignHorse(
+      await assignStallBooking(
         competitionId,
         ranchId,
         compound.compoundId,
         cell.stallId,
-        horse.horseId,
+        item.stallBookingId,
       );
 
-      setAssignments(function (prev) {
-        const filtered = prev
-          .filter(function (a) {
-            return !(
-              a.compoundId === compound.compoundId && a.stallId === cell.stallId
-            );
-          })
-          .filter(function (a) {
-            return a.horseId !== horse.horseId;
-          });
-
-        return [
-          ...filtered,
-          {
-            compoundId: compound.compoundId,
-            stallId: cell.stallId,
-            stallNumber: cell.stallNumber,
-            horseId: horse.horseId,
-            horseName: horse.horseName,
-            barnName: horse.barnName,
-          },
-        ];
-      });
+      await refreshAssignmentsAndOverview();
     } catch {
-      setError("שגיאה בשיבוץ הסוס");
+      setError("שגיאה בשיבוץ הזמנת התא");
     }
   }
 
@@ -154,23 +187,29 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
     if (!compound) return;
 
     try {
-      await unassignHorse(
+      await unassignStallBooking(
         competitionId,
         ranchId,
         compound.compoundId,
         cell.stallId,
       );
 
-      setAssignments(function (prev) {
-        return prev.filter(function (a) {
-          return !(
-            a.compoundId === compound.compoundId && a.stallId === cell.stallId
-          );
-        });
-      });
+      await refreshAssignmentsAndOverview();
     } catch {
       setError("שגיאה בהסרת השיבוץ");
     }
+  }
+
+  function openAssignmentMode() {
+    setMode("assignment");
+
+    if (!selectedRanchId) {
+      setSelectedRanchId(getDefaultSelectedRanchId(overviewItems));
+    }
+  }
+
+  function openOverviewMode() {
+    setMode("overview");
   }
 
   const activeCompound = compounds.find(function (c) {
@@ -181,17 +220,41 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
     return a.compoundId === activeCompoundId;
   });
 
+  const ranchGroups = useMemo(
+    function () {
+      return getRanchGroups(overviewItems);
+    },
+    [overviewItems],
+  );
+
+  const selectedRanchItems = overviewItems.filter(function (item) {
+    return item.bookingRanchId === selectedRanchId;
+  });
+
   return {
     compounds,
-    horses,
+    overviewItems,
     assignments,
+
     loading,
     saving,
     error,
+
     activeCompoundId,
     setActiveCompoundId,
     activeCompound,
     activeAssignments,
+
+    mode,
+    setMode,
+    openAssignmentMode,
+    openOverviewMode,
+
+    ranchGroups,
+    selectedRanchId,
+    setSelectedRanchId,
+    selectedRanchItems,
+
     handleLayoutParsed,
     handleAssign,
     handleUnassign,

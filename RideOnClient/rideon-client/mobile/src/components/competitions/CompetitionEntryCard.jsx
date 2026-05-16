@@ -13,33 +13,24 @@ export default function CompetitionEntryCard(props) {
       <View
         style={[
           styles.paymentBadge,
-          item.isPaid
-            ? styles.paymentPaid
-            : styles.paymentUnpaid,
+          item.isPaid ? styles.paymentPaid : styles.paymentUnpaid,
         ]}
       >
         <Text style={styles.paymentBadgeText}>
-          {item.isPaid
-            ? "שולם"
-            : "לא שולם"}
+          {item.isPaid ? "שולם" : "לא שולם"}
         </Text>
       </View>
     );
   }
 
   function renderFineBadge() {
-    if (
-      !item.fineAmount ||
-      Number(item.fineAmount) <= 0
-    ) {
+    if (!item.fineAmount || Number(item.fineAmount) <= 0) {
       return null;
     }
 
     return (
       <View style={styles.fineBadge}>
-        <Text style={styles.fineBadgeText}>
-          כולל קנס ₪{item.fineAmount}
-        </Text>
+        <Text style={styles.fineBadgeText}>כולל קנס ₪{item.fineAmount}</Text>
       </View>
     );
   }
@@ -53,25 +44,18 @@ export default function CompetitionEntryCard(props) {
     >
       <View style={styles.topRow}>
         <View style={styles.classBlock}>
-          <Text style={styles.className}>
-            {item.className}
-          </Text>
+          <Text style={styles.className}>{item.className}</Text>
 
           <Text style={styles.classDate}>
-            {props.formatDate(
-              item.classDate,
-            )}
+            {props.formatDate(item.classDate)}
           </Text>
         </View>
 
-        <Text style={styles.amountText}>
-          ₪{item.amountToPay}
-        </Text>
+        <Text style={styles.amountText}>₪{item.amountToPay}</Text>
       </View>
 
       <Text style={styles.mainLine}>
-        {item.riderName} •{" "}
-        {item.horseName}
+        {item.riderName} • {item.horseName}
       </Text>
 
       <View style={styles.badgesRow}>
@@ -81,66 +65,47 @@ export default function CompetitionEntryCard(props) {
 
       {expanded ? (
         <View style={styles.detailsBlock}>
-          <Text style={styles.detailText}>
-            מאמן:{" "}
-            {item.coachName || "-"}
-          </Text>
+          <Text style={styles.detailText}>מאמן: {item.coachName || "-"}</Text>
+
+          <Text style={styles.detailText}>משלם: {item.payerName || "-"}</Text>
 
           <Text style={styles.detailText}>
-            משלם:{" "}
-            {item.payerName || "-"}
-          </Text>
-
-          <Text style={styles.detailText}>
-            מקבל פרס:{" "}
-            {item.prizeRecipientName ||
-              "-"}
+            מקבל פרס: {item.prizeRecipientName || "-"}
           </Text>
 
           {item.drawOrder ? (
-            <Text style={styles.detailText}>
-              סדר כניסה:{" "}
-              {item.drawOrder}
-            </Text>
+            <Text style={styles.detailText}>סדר כניסה: {item.drawOrder}</Text>
           ) : null}
 
-          <View style={styles.actionsRow}>
-            <Pressable
-              style={
-                styles.secondaryActionButton
-              }
-              onPress={function () {
-                if (props.onEdit) {
-                  props.onEdit(item);
-                }
-              }}
-            >
-              <Text
-                style={
-                  styles.secondaryActionButtonText
-                }
+          {!item.isPaid ? (
+            <View style={styles.actionsRow}>
+              <Pressable
+                style={styles.secondaryActionButton}
+                onPress={function () {
+                  if (props.onEdit) {
+                    props.onEdit(item);
+                  }
+                }}
               >
-                ערוך הרשמה
-              </Text>
-            </Pressable>
+                <Text style={styles.secondaryActionButtonText}>ערוך הרשמה</Text>
+              </Pressable>
 
-            <Pressable
-              style={styles.dangerActionButton}
-              onPress={function () {
-                if (props.onCancel) {
-                  props.onCancel(item);
-                }
-              }}
-            >
-              <Text
-                style={
-                  styles.dangerActionButtonText
-                }
+              <Pressable
+                style={styles.dangerActionButton}
+                onPress={function () {
+                  if (props.onCancel) {
+                    props.onCancel(item);
+                  }
+                }}
               >
-                בטל הרשמה
-              </Text>
-            </Pressable>
-          </View>
+                <Text style={styles.dangerActionButtonText}>בטל הרשמה</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Text style={styles.detailText}>
+              הרשמה זו כבר שולמה ולכן לא ניתן לערוך או לבטל אותה.
+            </Text>
+          )}
         </View>
       ) : null}
     </Pressable>

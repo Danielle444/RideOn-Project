@@ -5,6 +5,7 @@ const API = import.meta.env.VITE_API_BASE_URL;
 
 function getAuthHeaders() {
   const token = getToken();
+
   return {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -22,41 +23,51 @@ function getCompounds(ranchId) {
 function saveLayout(ranchId, compoundId, layoutJson) {
   return axios.post(
     `${API}/StallCompounds/layout`,
-    { ranchId: ranchId, compoundId: compoundId, layoutJson: layoutJson },
+    {
+      ranchId: ranchId,
+      compoundId: compoundId,
+      layoutJson: layoutJson,
+    },
     getAuthHeaders(),
   );
 }
 
-function getHorses(competitionId, ranchId) {
-  return axios.get(`${API}/StallAssignments/horses`, {
-    params: { competitionId: competitionId, ranchId: ranchId },
+function getAssignmentOverview(competitionId, ranchId) {
+  return axios.get(`${API}/StallAssignments/overview`, {
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
     ...getAuthHeaders(),
   });
 }
 
 function getAssignments(competitionId, ranchId) {
   return axios.get(`${API}/StallAssignments`, {
-    params: { competitionId: competitionId, ranchId: ranchId },
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
     ...getAuthHeaders(),
   });
 }
 
-function assignHorse(competitionId, ranchId, compoundId, stallId, horseId) {
+function assignStallBooking(competitionId, ranchId, compoundId, stallId, stallBookingId) {
   return axios.post(
-    `${API}/StallAssignments`,
+    `${API}/StallAssignments/booking`,
     {
       competitionId: competitionId,
       ranchId: ranchId,
       compoundId: compoundId,
       stallId: stallId,
-      horseId: horseId,
+      stallBookingId: stallBookingId,
     },
     getAuthHeaders(),
   );
 }
 
-function unassignHorse(competitionId, ranchId, compoundId, stallId) {
-  return axios.delete(`${API}/StallAssignments`, {
+function unassignStallBooking(competitionId, ranchId, compoundId, stallId) {
+  return axios.delete(`${API}/StallAssignments/booking`, {
     data: {
       competitionId: competitionId,
       ranchId: ranchId,
@@ -70,8 +81,8 @@ function unassignHorse(competitionId, ranchId, compoundId, stallId) {
 export {
   getCompounds,
   saveLayout,
-  getHorses,
+  getAssignmentOverview,
   getAssignments,
-  assignHorse,
-  unassignHorse,
+  assignStallBooking,
+  unassignStallBooking,
 };
