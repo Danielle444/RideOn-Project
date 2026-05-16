@@ -1,7 +1,20 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { ArrowRight, ClipboardList, MapPinned, Plus } from "lucide-react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  ArrowRight,
+  ClipboardList,
+  Eye,
+  EyeOff,
+  MapPinned,
+  Plus,
+} from "lucide-react";
 
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import ToastMessage from "../../components/common/ToastMessage";
@@ -12,6 +25,7 @@ import StallAssignmentSidebar from "../../components/secretary/stall-map/StallAs
 import StallAssignmentRanchTabs from "../../components/secretary/stall-map/StallAssignmentRanchTabs";
 import useCompetitionStallsPage from "../../hooks/secretary/useCompetitionStallsPage";
 import { useActiveRole } from "../../context/ActiveRoleContext";
+import { useUser } from "../../context/UserContext";
 
 function getDragTitle(item) {
   if (!item) return "";
@@ -23,14 +37,34 @@ function getDragTitle(item) {
   return item.barnName || item.horseName || "פריט לשיבוץ";
 }
 
+function formatPublishDate(value) {
+  if (!value) return "";
+
+  try {
+    return new Date(value).toLocaleString("he-IL", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  } catch {
+    return "";
+  }
+}
+
 export default function CompetitionStallsPage() {
   const { competitionId } = useParams();
   const { activeRole } = useActiveRole();
+  const { user } = useUser();
+
   const ranchId = activeRole?.ranchId || null;
 
   const page = useCompetitionStallsPage(Number(competitionId), ranchId);
+
   const [activeItem, setActiveItem] = useState(null);
-  const [toast, setToast] = useState({ isOpen: false, type: "success", message: "" });
+  const [toast, setToast] = useState({
+    isOpen: false,
+    type: "success",
+    message: "",
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -67,13 +101,29 @@ export default function CompetitionStallsPage() {
 
   return (
     <CompetitionWorkspaceLayout activeItemKey="stalls">
-      <div className="p-6 space-y-5" dir="rtl">
+      <div className="space-y-5 p-6" dir="rtl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-[#3F312B]">תאים</h1>
+
             <p className="text-sm text-[#8D6E63]">
               ניהול הזמנות תאים ושיבוץ במפת התחרות
             </p>
+
+            <div className="mt-2">
+              {page.publishStatus?.isPublished ? (
+                <span className="inline-flex items-center rounded-full border border-[#B9D9C0] bg-[#E7F4EA] px-3 py-1 text-xs font-bold text-[#2F6B3B]">
+                  מפת התאים פורסמה למשתמשים
+                  {page.publishStatus.publishedAt
+                    ? " · " + formatPublishDate(page.publishStatus.publishedAt)
+                    : ""}
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full border border-[#E8C99A] bg-[#F7E7CF] px-3 py-1 text-xs font-bold text-[#9A6700]">
+                  מפת התאים עדיין לא פורסמה למשתמשים
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -97,15 +147,29 @@ export default function CompetitionStallsPage() {
               </button>
             )}
 
-            <button
-              type="button"
-              disabled
-              className="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl border border-[#E5D9D2] bg-[#F7F1ED] px-4 py-2 text-sm font-semibold text-[#BCAAA4]"
-              title="יפותח בהמשך"
-            >
-              <Plus size={16} />
-              הוסף תא
-            </button>
+            {page.publishStatus?.isPublished ? (
+              <button
+                type="button"
+                onClick={page.handleUnpublishStallMap}
+                disabled={page.publishLoading}
+                className="inline-flex items-center gap-2 rounded-2xl border border-[#E7BABA] bg-[#F9E5E5] px-4 py-2 text-sm font-semibold text-[#A54848] transition hover:bg-[#F4D7D7] disabled:opacity-60"
+              >
+                <EyeOff size={16} />
+                בטל פרסום מפה
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={function () {
+                  page.handlePublishStallMap(user?.personId);
+                }}
+                disabled={page.publishLoading}
+                className="inline-flex items-center gap-2 rounded-2xl border border-[#B9D9C0] bg-[#E7F4EA] px-4 py-2 text-sm font-semibold text-[#2F6B3B] transition hover:bg-[#D9EBDD] disabled:opacity-60"
+              >
+                <Eye size={16} />
+                פרסם מפת תאים
+              </button>
+            )}
 
             <button
               type="button"
@@ -114,7 +178,7 @@ export default function CompetitionStallsPage() {
               title="יפותח בהמשך"
             >
               <Plus size={16} />
-              הוסף נסורת
+              הוסף תא
             </button>
           </div>
         </div>
@@ -132,17 +196,27 @@ export default function CompetitionStallsPage() {
               <h2 className="text-base font-bold">רשימת הזמנות תאים</h2>
             </div>
 
-            <StallBookingsOverviewTable items={page.overviewItems} />
+            <StallBookingsOverviewTable
+              items={page.overviewItems}
+              compounds={page.compounds}
+            />
           </div>
         )}
 
         {page.mode === "assignment" && (
-          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <DndContext
+            sensors={sensors}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
             <div className="space-y-4">
               <div className="rounded-2xl border border-[#EFE5DF] bg-white p-4">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h2 className="text-base font-bold text-[#3F312B]">מצב שיבוץ תאים</h2>
+                    <h2 className="text-base font-bold text-[#3F312B]">
+                      מצב שיבוץ תאים
+                    </h2>
+
                     <p className="text-xs text-[#8D6E63]">
                       בחרי חווה, גררי סוס או תא ציוד לתא פנוי במפה
                     </p>
@@ -182,11 +256,17 @@ export default function CompetitionStallsPage() {
 
               {page.compounds.length === 0 ? (
                 <div className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-[#D7CCC8] bg-[#FAF5F1]">
-                  <p className="text-sm text-[#BCAAA4]">לא הוגדרו מתחמים לחווה זו</p>
+                  <p className="text-sm text-[#BCAAA4]">
+                    לא הוגדרו מתחמים לחווה זו
+                  </p>
                 </div>
               ) : (
-                <div className="flex items-start gap-5">
-                  <div className="min-w-0 flex-1 space-y-3">
+                <div className="grid grid-cols-[320px_minmax(0,1fr)] items-stretch gap-5">
+                  <div className="flex h-[70vh] min-h-0 overflow-hidden rounded-2xl border border-[#EFE5DF] bg-white p-3">
+                    <StallAssignmentSidebar items={page.selectedRanchItems} />
+                  </div>
+
+                  <div className="min-w-0 space-y-3">
                     {page.activeCompound && (
                       <>
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -197,22 +277,23 @@ export default function CompetitionStallsPage() {
                           <StallMapUploader
                             compound={page.activeCompound}
                             onLayoutParsed={function (layout) {
-                              page.handleLayoutParsed(page.activeCompound, layout);
+                              page.handleLayoutParsed(
+                                page.activeCompound,
+                                layout,
+                              );
                             }}
                           />
                         </div>
 
-                        <StallMapGrid
-                          compound={page.activeCompound}
-                          assignments={page.activeAssignments}
-                          onUnassign={page.handleUnassign}
-                        />
+                        <div className="h-[70vh] min-h-0">
+                          <StallMapGrid
+                            compound={page.activeCompound}
+                            assignments={page.activeAssignments}
+                            onUnassign={page.handleUnassign}
+                          />
+                        </div>
                       </>
                     )}
-                  </div>
-
-                  <div className="sticky top-6 max-h-[70vh] w-80 shrink-0 rounded-2xl border border-[#EFE5DF] bg-white p-3">
-                    <StallAssignmentSidebar items={page.selectedRanchItems} />
                   </div>
                 </div>
               )}

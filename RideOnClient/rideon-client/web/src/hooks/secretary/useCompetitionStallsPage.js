@@ -6,6 +6,9 @@ import {
   getAssignments,
   assignStallBooking,
   unassignStallBooking,
+  getPublishStatus,
+  publishStallMap,
+  unpublishStallMap,
 } from "../../services/stallMapService";
 
 function parseLayout(layoutJson) {
@@ -69,6 +72,9 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
   const [overviewItems, setOverviewItems] = useState([]);
   const [assignments, setAssignments] = useState([]);
 
+  const [publishStatus, setPublishStatus] = useState(null);
+  const [publishLoading, setPublishLoading] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -89,6 +95,7 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
           getCompounds(ranchId),
           getAssignmentOverview(competitionId, ranchId),
           getAssignments(competitionId, ranchId),
+          getPublishStatus(competitionId, ranchId),
         ]);
 
         const compoundList = normalizeCompounds(results[0].data);
@@ -98,10 +105,12 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
         const assignmentList = Array.isArray(results[2].data)
           ? results[2].data
           : [];
+        const publishStatusData = results[3].data || null;
 
         setCompounds(compoundList);
         setOverviewItems(overviewList);
         setAssignments(assignmentList);
+        setPublishStatus(publishStatusData);
 
         if (compoundList.length > 0) {
           setActiveCompoundId(function (prev) {
@@ -158,8 +167,8 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
   }
 
   async function handleAssign(cell, item) {
-    const compound = compounds.find(function (c) {
-      return c.compoundId === activeCompoundId;
+    const compound = compounds.find(function (currentCompound) {
+      return currentCompound.compoundId === activeCompoundId;
     });
 
     if (!compound || !item || !item.stallBookingId) return;
@@ -180,8 +189,8 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
   }
 
   async function handleUnassign(cell) {
-    const compound = compounds.find(function (c) {
-      return c.compoundId === activeCompoundId;
+    const compound = compounds.find(function (currentCompound) {
+      return currentCompound.compoundId === activeCompoundId;
     });
 
     if (!compound) return;
@@ -200,6 +209,45 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
     }
   }
 
+  async function handlePublishStallMap(systemUserId) {
+    if (!competitionId || !ranchId || !systemUserId) {
+      setError("לא נמצאו פרטי משתמש לפרסום מפת התאים");
+      return;
+    }
+
+    setPublishLoading(true);
+    setError("");
+
+    try {
+      await publishStallMap(competitionId, ranchId, systemUserId);
+
+      const response = await getPublishStatus(competitionId, ranchId);
+      setPublishStatus(response.data || null);
+    } catch {
+      setError("שגיאה בפרסום מפת התאים");
+    } finally {
+      setPublishLoading(false);
+    }
+  }
+
+  async function handleUnpublishStallMap() {
+    if (!competitionId || !ranchId) return;
+
+    setPublishLoading(true);
+    setError("");
+
+    try {
+      await unpublishStallMap(competitionId, ranchId);
+
+      const response = await getPublishStatus(competitionId, ranchId);
+      setPublishStatus(response.data || null);
+    } catch {
+      setError("שגיאה בביטול פרסום מפת התאים");
+    } finally {
+      setPublishLoading(false);
+    }
+  }
+
   function openAssignmentMode() {
     setMode("assignment");
 
@@ -212,12 +260,12 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
     setMode("overview");
   }
 
-  const activeCompound = compounds.find(function (c) {
-    return c.compoundId === activeCompoundId;
+  const activeCompound = compounds.find(function (compound) {
+    return compound.compoundId === activeCompoundId;
   });
 
-  const activeAssignments = assignments.filter(function (a) {
-    return a.compoundId === activeCompoundId;
+  const activeAssignments = assignments.filter(function (assignment) {
+    return assignment.compoundId === activeCompoundId;
   });
 
   const ranchGroups = useMemo(
@@ -235,6 +283,11 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
     compounds,
     overviewItems,
     assignments,
+
+    publishStatus,
+    publishLoading,
+    handlePublishStallMap,
+    handleUnpublishStallMap,
 
     loading,
     saving,

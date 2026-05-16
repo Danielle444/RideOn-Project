@@ -63,4 +63,26 @@ namespace RideOnServer.BL.DTOs.StallMap
 
         public bool IsAssigned { get; set; }
     }
+
+    public class StallMapPublishStatusDto
+    {
+        public int CompetitionId { get; set; }
+        public bool IsPublished { get; set; }
+        public DateTime? PublishedAt { get; set; }
+        public int? PublishedBySystemUserId { get; set; }
+        public string? PublishedByName { get; set; }
+    }
+
+    public class PublishStallMapRequest
+    {
+        public int CompetitionId { get; set; }
+        public int RanchId { get; set; }
+        public int SystemUserId { get; set; }
+    }
+
+    public class UnpublishStallMapRequest
+    {
+        public int CompetitionId { get; set; }
+        public int RanchId { get; set; }
+    }
 }

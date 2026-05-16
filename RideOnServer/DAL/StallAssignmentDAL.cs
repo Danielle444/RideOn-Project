@@ -264,5 +264,103 @@ namespace RideOnServer.DAL
                 throw new Exception($"Database error: {ex.Message}");
             }
         }
+
+        public StallMapPublishStatusDto? GetPublishStatus(int competitionId, int hostRanchId)
+        {
+            var paramDic = new Dictionary<string, object?>
+    {
+        { "@CompetitionId", competitionId },
+        { "@HostRanchId", hostRanchId }
+    };
+
+            try
+            {
+                using var connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using var command = CreateCommandWithStoredProcedure(
+                    "usp_GetStallMapPublishStatus",
+                    connection,
+                    paramDic
+                );
+
+                using var reader = command.ExecuteReader();
+
+                if (!reader.Read())
+                {
+                    return null;
+                }
+
+                return new StallMapPublishStatusDto
+                {
+                    CompetitionId = Convert.ToInt32(reader["CompetitionId"]),
+                    IsPublished = Convert.ToBoolean(reader["IsPublished"]),
+                    PublishedAt = reader["PublishedAt"] == DBNull.Value ? null : Convert.ToDateTime(reader["PublishedAt"]),
+                    PublishedBySystemUserId = reader["PublishedBySystemUserId"] == DBNull.Value ? null : Convert.ToInt32(reader["PublishedBySystemUserId"]),
+                    PublishedByName = reader["PublishedByName"] == DBNull.Value ? null : reader["PublishedByName"].ToString()
+                };
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public void PublishStallMap(int competitionId, int hostRanchId, int publishedBySystemUserId)
+        {
+            var paramDic = new Dictionary<string, object?>
+    {
+        { "@CompetitionId", competitionId },
+        { "@HostRanchId", hostRanchId },
+        { "@PublishedBySystemUserId", publishedBySystemUserId }
+    };
+
+            try
+            {
+                using var connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using var command = CreateCommandWithStoredProcedure(
+                    "usp_PublishStallMap",
+                    connection,
+                    paramDic
+                );
+
+                command.ExecuteNonQuery();
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public void UnpublishStallMap(int competitionId, int hostRanchId)
+        {
+            var paramDic = new Dictionary<string, object?>
+            {
+                { "@CompetitionId", competitionId },
+                { "@HostRanchId", hostRanchId }
+            };
+
+            try
+            {
+                using var connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using var command = CreateCommandWithStoredProcedure(
+                    "usp_UnpublishStallMap",
+                    connection,
+                    paramDic
+                );
+
+                command.ExecuteNonQuery();
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+
     }
 }

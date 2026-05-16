@@ -176,5 +176,120 @@ namespace RideOnServer.Controllers
                 return BadRequest("אירעה שגיאה בביטול שיבוץ התא");
             }
         }
+
+        [HttpGet("publish-status")]
+        public IActionResult GetPublishStatus(
+    [FromQuery] int competitionId,
+    [FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                var dal = new StallAssignmentDAL();
+                var status = dal.GetPublishStatus(competitionId, ranchId);
+
+                if (status == null)
+                {
+                    return NotFound("לא נמצא סטטוס פרסום למפת התאים");
+                }
+
+                return Ok(status);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetPublishStatus: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת סטטוס פרסום מפת התאים");
+            }
+        }
+
+        [HttpPost("publish")]
+        public IActionResult PublishStallMap([FromBody] PublishStallMapRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
+                var dal = new StallAssignmentDAL();
+
+                dal.PublishStallMap(
+                    request.CompetitionId,
+                    request.RanchId,
+                    request.SystemUserId
+                );
+
+                return Ok("Published");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in PublishStallMap: {ex.Message}");
+                return BadRequest("אירעה שגיאה בפרסום מפת התאים");
+            }
+        }
+
+        [HttpPost("unpublish")]
+        public IActionResult UnpublishStallMap([FromBody] UnpublishStallMapRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
+                var dal = new StallAssignmentDAL();
+
+                dal.UnpublishStallMap(
+                    request.CompetitionId,
+                    request.RanchId
+                );
+
+                return Ok("Unpublished");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in UnpublishStallMap: {ex.Message}");
+                return BadRequest("אירעה שגיאה בביטול פרסום מפת התאים");
+            }
+        }
+
+
     }
 }

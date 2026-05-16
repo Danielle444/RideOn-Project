@@ -52,7 +52,13 @@ function getAssignments(competitionId, ranchId) {
   });
 }
 
-function assignStallBooking(competitionId, ranchId, compoundId, stallId, stallBookingId) {
+function assignStallBooking(
+  competitionId,
+  ranchId,
+  compoundId,
+  stallId,
+  stallBookingId,
+) {
   return axios.post(
     `${API}/StallAssignments/booking`,
     {
@@ -78,6 +84,39 @@ function unassignStallBooking(competitionId, ranchId, compoundId, stallId) {
   });
 }
 
+function getPublishStatus(competitionId, ranchId) {
+  return axios.get(`${API}/StallAssignments/publish-status`, {
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
+    ...getAuthHeaders(),
+  });
+}
+
+function publishStallMap(competitionId, ranchId, systemUserId) {
+  return axios.post(
+    `${API}/StallAssignments/publish`,
+    {
+      competitionId: competitionId,
+      ranchId: ranchId,
+      systemUserId: systemUserId,
+    },
+    getAuthHeaders(),
+  );
+}
+
+function unpublishStallMap(competitionId, ranchId) {
+  return axios.post(
+    `${API}/StallAssignments/unpublish`,
+    {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
+    getAuthHeaders(),
+  );
+}
+
 export {
   getCompounds,
   saveLayout,
@@ -85,4 +124,7 @@ export {
   getAssignments,
   assignStallBooking,
   unassignStallBooking,
+  getPublishStatus,
+  publishStallMap,
+  unpublishStallMap,
 };
