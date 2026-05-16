@@ -7,7 +7,14 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { ArrowRight, ClipboardList, MapPinned, Plus } from "lucide-react";
+import {
+  ArrowRight,
+  ClipboardList,
+  Eye,
+  EyeOff,
+  MapPinned,
+  Plus,
+} from "lucide-react";
 
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import ToastMessage from "../../components/common/ToastMessage";
@@ -18,6 +25,7 @@ import StallAssignmentSidebar from "../../components/secretary/stall-map/StallAs
 import StallAssignmentRanchTabs from "../../components/secretary/stall-map/StallAssignmentRanchTabs";
 import useCompetitionStallsPage from "../../hooks/secretary/useCompetitionStallsPage";
 import { useActiveRole } from "../../context/ActiveRoleContext";
+import { useUser } from "../../context/UserContext";
 
 function getDragTitle(item) {
   if (!item) return "";
@@ -29,12 +37,28 @@ function getDragTitle(item) {
   return item.barnName || item.horseName || "פריט לשיבוץ";
 }
 
+function formatPublishDate(value) {
+  if (!value) return "";
+
+  try {
+    return new Date(value).toLocaleString("he-IL", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  } catch {
+    return "";
+  }
+}
+
 export default function CompetitionStallsPage() {
   const { competitionId } = useParams();
   const { activeRole } = useActiveRole();
+  const { user } = useUser();
+
   const ranchId = activeRole?.ranchId || null;
 
   const page = useCompetitionStallsPage(Number(competitionId), ranchId);
+
   const [activeItem, setActiveItem] = useState(null);
   const [toast, setToast] = useState({
     isOpen: false,
@@ -77,13 +101,29 @@ export default function CompetitionStallsPage() {
 
   return (
     <CompetitionWorkspaceLayout activeItemKey="stalls">
-      <div className="p-6 space-y-5" dir="rtl">
+      <div className="space-y-5 p-6" dir="rtl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-[#3F312B]">תאים</h1>
+
             <p className="text-sm text-[#8D6E63]">
               ניהול הזמנות תאים ושיבוץ במפת התחרות
             </p>
+
+            <div className="mt-2">
+              {page.publishStatus?.isPublished ? (
+                <span className="inline-flex items-center rounded-full border border-[#B9D9C0] bg-[#E7F4EA] px-3 py-1 text-xs font-bold text-[#2F6B3B]">
+                  מפת התאים פורסמה למשתמשים
+                  {page.publishStatus.publishedAt
+                    ? " · " + formatPublishDate(page.publishStatus.publishedAt)
+                    : ""}
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full border border-[#E8C99A] bg-[#F7E7CF] px-3 py-1 text-xs font-bold text-[#9A6700]">
+                  מפת התאים עדיין לא פורסמה למשתמשים
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -104,6 +144,30 @@ export default function CompetitionStallsPage() {
               >
                 <ArrowRight size={16} />
                 חזרה לרשימת הזמנות
+              </button>
+            )}
+
+            {page.publishStatus?.isPublished ? (
+              <button
+                type="button"
+                onClick={page.handleUnpublishStallMap}
+                disabled={page.publishLoading}
+                className="inline-flex items-center gap-2 rounded-2xl border border-[#E7BABA] bg-[#F9E5E5] px-4 py-2 text-sm font-semibold text-[#A54848] transition hover:bg-[#F4D7D7] disabled:opacity-60"
+              >
+                <EyeOff size={16} />
+                בטל פרסום מפה
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={function () {
+                  page.handlePublishStallMap(user?.personId);
+                }}
+                disabled={page.publishLoading}
+                className="inline-flex items-center gap-2 rounded-2xl border border-[#B9D9C0] bg-[#E7F4EA] px-4 py-2 text-sm font-semibold text-[#2F6B3B] transition hover:bg-[#D9EBDD] disabled:opacity-60"
+              >
+                <Eye size={16} />
+                פרסם מפת תאים
               </button>
             )}
 
@@ -152,6 +216,7 @@ export default function CompetitionStallsPage() {
                     <h2 className="text-base font-bold text-[#3F312B]">
                       מצב שיבוץ תאים
                     </h2>
+
                     <p className="text-xs text-[#8D6E63]">
                       בחרי חווה, גררי סוס או תא ציוד לתא פנוי במפה
                     </p>

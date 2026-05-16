@@ -93,7 +93,7 @@ function getCompoundName(compounds, compoundId) {
 function renderAssignmentStatus(item, compounds) {
   if (!item.isAssigned) {
     return (
-      <span className="inline-flex rounded-full border border-[#E8C99A] bg-[#F7E7CF] px-3 py-1 text-xs font-bold text-[#9A6700] whitespace-nowrap">
+      <span className="inline-flex whitespace-nowrap rounded-full border border-[#E8C99A] bg-[#F7E7CF] px-3 py-1 text-xs font-bold text-[#9A6700]">
         לא שובץ
       </span>
     );
@@ -103,34 +103,16 @@ function renderAssignmentStatus(item, compounds) {
 
   return (
     <div className="flex min-w-[120px] flex-col gap-1">
-      <span className="inline-flex w-fit rounded-full border border-[#B9D9C0] bg-[#E7F4EA] px-3 py-1 text-xs font-bold text-[#2F6B3B] whitespace-nowrap">
+      <span className="inline-flex w-fit whitespace-nowrap rounded-full border border-[#B9D9C0] bg-[#E7F4EA] px-3 py-1 text-xs font-bold text-[#2F6B3B]">
         תא {item.assignedStallNumber}
       </span>
 
       {compoundName && (
-        <span className="text-[11px] font-semibold text-[#7B5A4D] whitespace-nowrap">
+        <span className="whitespace-nowrap text-[11px] font-semibold text-[#7B5A4D]">
           {compoundName}
         </span>
       )}
     </div>
-  );
-}
-
-function renderBookingType(item) {
-  if (item.isForTack) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-[#DDD1CA] bg-[#F3EEEA] px-3 py-1 text-xs font-semibold text-[#6B574F] whitespace-nowrap">
-        <Package size={13} />
-        ציוד
-      </span>
-    );
-  }
-
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-[#DDD1CA] bg-[#F3EEEA] px-3 py-1 text-xs font-semibold text-[#6B574F] whitespace-nowrap">
-      <span className="text-sm leading-none">🐴</span>
-      סוס
-    </span>
   );
 }
 
@@ -206,7 +188,6 @@ export default function StallBookingsOverviewTable({ items, compounds }) {
         <thead className="bg-[#F3EEEA] text-[#5D4037]">
           <tr>
             <th className="px-4 py-3 text-sm font-bold">חווה</th>
-            <th className="px-4 py-3 text-sm font-bold">סוג</th>
             <th className="px-4 py-3 text-sm font-bold">סוס / ציוד</th>
             <th className="px-4 py-3 text-sm font-bold">תאריכים</th>
             <th className="px-4 py-3 text-sm font-bold">ימים</th>
@@ -226,21 +207,24 @@ export default function StallBookingsOverviewTable({ items, compounds }) {
             return (
               <tr
                 key={item.stallBookingId}
-                className="border-t border-[#EFE5DF] text-[#3F312B] hover:bg-[#FFF9F5]"
+                className="border-t border-[#EFE5DF] bg-white text-[#3F312B] hover:bg-[#FFF9F5]"
               >
                 <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold">
                   {item.bookingRanchName}
                 </td>
 
-                <td className="whitespace-nowrap px-4 py-3">
-                  {renderBookingType(item)}
-                </td>
-
-                <td className="min-w-[190px] px-4 py-3">
+                <td className="min-w-[210px] px-4 py-3">
                   <div className="flex flex-col">
-                    <span className="text-sm font-bold">
-                      {getBookingName(item)}
+                    <span className="flex items-center gap-2 text-sm font-bold">
+                      {item.isForTack ? (
+                        <Package size={15} className="text-[#7B5A4D]" />
+                      ) : (
+                        <span className="text-sm leading-none">🐴</span>
+                      )}
+
+                      <span>{getBookingName(item)}</span>
                     </span>
+
                     <span className="text-xs text-[#8D6E63]">
                       {getBookingSubName(item)}
                     </span>
@@ -263,6 +247,7 @@ export default function StallBookingsOverviewTable({ items, compounds }) {
 
                 <td className="whitespace-nowrap px-4 py-3 text-sm font-bold">
                   {formatMoney(getCalculatedCost(item))}
+
                   <div className="text-[11px] font-normal text-[#8D6E63]">
                     {formatMoney(item.itemPrice)} ליום
                   </div>
