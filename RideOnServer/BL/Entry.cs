@@ -1,5 +1,6 @@
 ﻿using RideOnServer.BL.DTOs.Competition.Entry;
 using RideOnServer.DAL;
+using RideOnServer.BL.Services;
 
 namespace RideOnServer.BL
 {
@@ -207,6 +208,99 @@ namespace RideOnServer.BL
 
             dal.UpdateGroupEntriesDrawOrder(request);
         }
+
+        public static GroupDrawOrderPreviewResponse GenerateGroupDrawOrderPreview(
+    GenerateGroupDrawOrderPreviewRequest request)
+        {
+            if (request == null)
+            {
+                throw new Exception("Invalid request");
+            }
+
+            if (request.CompetitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            if (request.RanchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            if (request.ClassDate == default)
+            {
+                throw new Exception("Invalid ClassDate");
+            }
+
+            if (request.OrderInDay <= 0)
+            {
+                throw new Exception("Invalid OrderInDay");
+            }
+
+            if (request.MinimumGap <= 0)
+            {
+                request.MinimumGap = 7;
+            }
+
+            EntryDAL dal = new EntryDAL();
+
+            List<SecretaryCompetitionEntryItem> allEntries =
+                dal.GetSecretaryCompetitionEntries(request.CompetitionId);
+
+            List<SecretaryCompetitionEntryItem> groupEntries =
+                allEntries
+                    .Where(item =>
+                        item.ClassDate.HasValue &&
+                        item.ClassDate.Value.Date == request.ClassDate.Date &&
+                        item.OrderInDay.HasValue &&
+                        item.OrderInDay.Value == request.OrderInDay
+                    )
+                    .ToList();
+
+            if (groupEntries.Count == 0)
+            {
+                throw new Exception("No entries found for selected draw group");
+            }
+
+            return DrawOrderGenerator.GeneratePreview(
+                groupEntries,
+                request.MinimumGap
+            );
+        }
+
+        public static void ClearGroupEntriesDrawOrder(
+    ClearGroupEntriesDrawOrderRequest request)
+        {
+            if (request == null)
+            {
+                throw new Exception("Invalid request");
+            }
+
+            if (request.CompetitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            if (request.RanchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            if (request.ClassDate == default)
+            {
+                throw new Exception("Invalid ClassDate");
+            }
+
+            if (request.OrderInDay <= 0)
+            {
+                throw new Exception("Invalid OrderInDay");
+            }
+
+            EntryDAL dal = new EntryDAL();
+
+            dal.ClearGroupEntriesDrawOrder(request);
+        }
+
 
 
 

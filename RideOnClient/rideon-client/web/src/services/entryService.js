@@ -27,4 +27,25 @@ function updateGroupEntriesDrawOrder(data) {
   return axios.put(`${API}/Entries/group-draw-order`, data, getAuthHeaders());
 }
 
-export { getSecretaryCompetitionEntries, updateGroupEntriesDrawOrder };
+function previewGroupEntriesDrawOrder(data) {
+  return axios.post(
+    `${API}/Entries/group-draw-order-preview`,
+    data,
+    getAuthHeaders(),
+  );
+}
+
+function clearGroupEntriesDrawOrder(data) {
+  return axios.put(
+    `${API}/Entries/group-draw-order/clear`,
+    data,
+    getAuthHeaders(),
+  );
+}
+
+export {
+  getSecretaryCompetitionEntries,
+  updateGroupEntriesDrawOrder,
+  previewGroupEntriesDrawOrder,
+  clearGroupEntriesDrawOrder,
+};

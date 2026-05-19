@@ -465,6 +465,48 @@ namespace RideOnServer.DAL
             }
         }
 
+        public void ClearGroupEntriesDrawOrder(
+    ClearGroupEntriesDrawOrderRequest request)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = new NpgsqlCommand(@"
+                SELECT public.usp_cleargroupentriesdraworder(
+                    p_competitionid := @competitionId,
+                    p_classdate     := @classDate,
+                    p_orderinday    := @orderInDay
+                );", connection))
+                    {
+                        command.Parameters.Add(
+                            "@competitionId",
+                            NpgsqlDbType.Integer
+                        ).Value = request.CompetitionId;
+
+                        command.Parameters.Add(
+                            "@classDate",
+                            NpgsqlDbType.Date
+                        ).Value = request.ClassDate.Date;
+
+                        command.Parameters.Add(
+                            "@orderInDay",
+                            NpgsqlDbType.Smallint
+                        ).Value = request.OrderInDay;
+
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+
 
     }
 }
