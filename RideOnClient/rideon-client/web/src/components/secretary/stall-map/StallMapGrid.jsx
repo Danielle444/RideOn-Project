@@ -8,7 +8,7 @@ export default function StallMapGrid({
 }) {
   if (!compound.layout) {
     return (
-      <div className="flex items-center justify-center h-32 rounded-2xl border border-dashed border-[#D7CCC8] bg-[#FAF5F1]">
+      <div className="flex h-32 items-center justify-center rounded-2xl border border-dashed border-[#D7CCC8] bg-[#FAF5F1]">
         <p className="text-sm text-[#BCAAA4]">לא הועלתה פריסה עבור מתחם זה</p>
       </div>
     );
@@ -28,8 +28,9 @@ export default function StallMapGrid({
   });
 
   const assignmentMap = {};
-  assignments.forEach(function (a) {
-    assignmentMap[a.stallNumber] = a;
+
+  assignments.forEach(function (assignment) {
+    assignmentMap[assignment.stallNumber] = assignment;
   });
 
   const rows = Array.from({ length: layout.rows }, function (_, r) {
@@ -63,9 +64,9 @@ export default function StallMapGrid({
     .join(" ");
 
   return (
-    <div className="max-w-full overflow-auto rounded-2xl border border-[#EFE5DF] bg-[#FAF5F1] p-3">
+    <div className="h-full max-w-full overflow-auto rounded-2xl border border-[#EFE5DF] bg-[#FAF5F1] p-3">
       <div
-        className="grid gap-[2px]"
+        className="grid gap-[2px] min-h-full"
         style={{
           gridTemplateColumns: columnSizes,
           gridTemplateRows: rowSizes,

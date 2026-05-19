@@ -1,5 +1,15 @@
-import { DoorOpen, X } from "lucide-react";
+import { DoorOpen, Package, X } from "lucide-react";
 import DroppableBox from "../../common/dnd/DroppableBox";
+
+function getAssignmentTitle(assignment) {
+  if (!assignment) return "";
+
+  if (assignment.isForTack) {
+    return "תא ציוד";
+  }
+
+  return assignment.barnName || assignment.horseName || "";
+}
 
 export default function StallCell({ cell, assignment, onUnassign }) {
   const droppableId = `stall-${cell.col}-${cell.row}`;
@@ -17,15 +27,16 @@ export default function StallCell({ cell, assignment, onUnassign }) {
   }
 
   const isOccupied = !!assignment;
-  const isDisabled = cell.isEntrance || cell.stallNumber === null || !cell.stallId;
+  const isDisabled =
+    cell.isEntrance || cell.stallNumber === null || !cell.stallId;
 
   return (
     <DroppableBox
       id={droppableId}
-      data={{ cell }}
+      data={{ cell: cell }}
       disabled={isDisabled}
       className={[
-        "relative flex h-full min-h-[42px] select-none flex-col items-center justify-center rounded-lg border transition-all",
+        "relative flex h-full min-h-[48px] select-none flex-col items-center justify-center rounded-lg border px-1 transition-all",
         isOccupied
           ? "border-[#A5836A] bg-[#EFEBE9]"
           : cell.stallId
@@ -40,9 +51,23 @@ export default function StallCell({ cell, assignment, onUnassign }) {
 
       {isOccupied ? (
         <>
-          <span className="mt-2 max-w-full truncate px-0.5 text-center text-[9px] font-semibold leading-tight text-[#3F312B]">
-            {assignment.barnName || assignment.horseName}
-          </span>
+          <div className="mt-2 flex max-w-full flex-col items-center leading-tight">
+            <span className="mb-0.5 flex items-center gap-1 text-[8px] text-[#7B5A4D]">
+              {assignment.isForTack ? (
+                <Package size={9} />
+              ) : (
+                <span className="text-[10px]">🐴</span>
+              )}
+            </span>
+
+            <span className="max-w-full truncate text-center text-[10px] font-extrabold text-[#3F312B]">
+              {assignment.bookingRanchName || "חווה לא ידועה"}
+            </span>
+
+            <span className="mt-0.5 max-w-full truncate text-center text-[8px] font-semibold text-[#7B5A4D]">
+              {getAssignmentTitle(assignment)}
+            </span>
+          </div>
 
           <button
             type="button"
@@ -52,6 +77,7 @@ export default function StallCell({ cell, assignment, onUnassign }) {
               }
             }}
             className="absolute left-0.5 top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-100 text-red-400 hover:bg-red-200"
+            title="הסר שיבוץ"
           >
             <X size={9} />
           </button>

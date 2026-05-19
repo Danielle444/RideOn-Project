@@ -343,5 +343,43 @@ namespace RideOnServer.BL
             return new string(password);
         }
 
+
+        internal static string GetPayerCompetitionAccount(
+            int systemUserId,
+            int competitionId,
+            int ranchId,
+            int payerPersonId
+        )
+        {
+            if (systemUserId <= 0)
+            {
+                throw new Exception("Invalid SystemUserId");
+            }
+
+            if (competitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            if (ranchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            if (payerPersonId <= 0)
+            {
+                throw new Exception("Invalid PayerPersonId");
+            }
+
+            PayerDAL dal = new PayerDAL();
+
+            return dal.GetPayerCompetitionAccount(
+                systemUserId,
+                competitionId,
+                ranchId,
+                payerPersonId
+            );
+        }
+
     }
 }

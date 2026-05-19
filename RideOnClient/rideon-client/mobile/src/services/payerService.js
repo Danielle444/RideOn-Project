@@ -46,6 +46,16 @@ function getCompetitionPayers(ranchId, competitionId, search) {
   });
 }
 
+function getPayerCompetitionAccount(ranchId, competitionId, payerPersonId) {
+  return axios.get("/Payers/competition-account", {
+    params: {
+      ranchId: ranchId,
+      competitionId: competitionId,
+      payerPersonId: payerPersonId,
+    },
+  });
+}
+
 function createPayerWithCredentials(payload) {
   return axios.post("/Payers/create-with-credentials", payload);
 }
@@ -57,5 +67,6 @@ export {
   updateManagedPayer,
   removeManagedPayer,
   getCompetitionPayers,
+  getPayerCompetitionAccount,
   createPayerWithCredentials,
 };

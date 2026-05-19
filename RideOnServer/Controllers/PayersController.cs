@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.Payers;
 
@@ -430,5 +431,45 @@ namespace RideOnServer.Controllers
                 return BadRequest("אירעה שגיאה בהסרת מנהל ממשלם");
             }
         }
+
+        [HttpGet("competition-account")]
+        public IActionResult GetPayerCompetitionAccount(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId,
+            [FromQuery] int payerPersonId
+        )
+        {
+            try
+            {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                string accountJson = Payer.GetPayerCompetitionAccount(
+                    currentPersonId,
+                    competitionId,
+                    ranchId,
+                    payerPersonId
+                );
+
+                JsonElement account = JsonSerializer.Deserialize<JsonElement>(accountJson);
+
+                return Ok(account);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetPayerCompetitionAccount: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת חשבון המשלם");
+            }
+        }
+
     }
 }

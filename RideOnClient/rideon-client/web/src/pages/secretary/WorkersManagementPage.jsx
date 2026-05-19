@@ -335,9 +335,6 @@ export default function WorkersManagementPage() {
       subtitle={subtitle}
       menuItems={secretaryGeneralMenu}
       activeItemKey="workers-management"
-      notificationCount={0}
-      notificationsOpen={false}
-      notificationItems={[]}
     >
       <div className="rounded-[28px] border border-[#E6DCD5] bg-white shadow-sm overflow-hidden">
         <div className="px-8 pt-8 pb-6 border-b border-[#EFE5DF]">

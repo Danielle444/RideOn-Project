@@ -43,6 +43,18 @@ function createShavingsOrder(payload) {
   return axios.post("/ShavingsOrders", payload);
 }
 
+function getAllShavingsOrderDetailsForCompetitionAndRanch(
+  competitionId,
+  ranchId,
+) {
+  return axios.get("/ShavingsOrders/details/by-competition-and-ranch", {
+    params: {
+      competitionId,
+      ranchId,
+    },
+  });
+}
+
 export {
   getWorkerShavingsOrders,
   getWorkerShavingsOrdersByCompetition,
@@ -51,4 +63,5 @@ export {
   getStallBookingsForShavings,
   getShavingsOrdersForCompetitionAndRanch,
   createShavingsOrder,
+  getAllShavingsOrderDetailsForCompetitionAndRanch,
 };

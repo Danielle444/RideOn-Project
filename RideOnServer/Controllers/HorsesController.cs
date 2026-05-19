@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Net.Http.Headers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.Horses;
@@ -10,6 +11,18 @@ namespace RideOnServer.Controllers
     [Authorize]
     public class HorsesController : ControllerBase
     {
+        private readonly IConfiguration _configuration;
+        private readonly IHttpClientFactory _httpClientFactory;
+
+        public HorsesController(
+            IConfiguration configuration,
+            IHttpClientFactory httpClientFactory
+        )
+        {
+            _configuration = configuration;
+            _httpClientFactory = httpClientFactory;
+        }
+
         [HttpGet]
         public IActionResult GetHorses([FromQuery] int ranchId, [FromQuery] string? search)
         {
@@ -86,10 +99,14 @@ namespace RideOnServer.Controllers
             try
             {
                 if (request == null)
+                {
                     return BadRequest("Invalid request");
+                }
 
                 if (horseId != request.HorseId)
+                {
                     return BadRequest("HorseId mismatch");
+                }
 
                 int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
@@ -129,14 +146,99 @@ namespace RideOnServer.Controllers
                 );
 
                 var certificates =
-                    HorseParticipationInCompetition.GetHealthCertificatesForCompetition(competitionId);
+                    HorseParticipationInCompetition.GetHealthCertificatesForCompetition(
+                        competitionId,
+                        ranchId
+                    );
 
                 return Ok(new { data = certificates });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in GetHealthCertificates: {ex.Message}");
                 return StatusCode(500, "שגיאה בשליפת תעודות הבריאות");
+            }
+        }
+
+        [HttpPost("health-certificates/upload")]
+        [RequestSizeLimit(20_000_000)]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadHealthCertificate(
+            [FromForm] int horseId,
+            [FromForm] int competitionId,
+            [FromForm] int ranchId,
+            IFormFile file
+        )
+        {
+            try
+            {
+                if (horseId <= 0)
+                {
+                    return BadRequest("Invalid horse id");
+                }
+
+                if (competitionId <= 0)
+                {
+                    return BadRequest("Invalid competition id");
+                }
+
+                if (ranchId <= 0)
+                {
+                    return BadRequest("Invalid ranch id");
+                }
+
+                if (file == null || file.Length == 0)
+                {
+                    return BadRequest("File is required");
+                }
+
+                if (!IsPdfFile(file))
+                {
+                    return BadRequest("ניתן להעלות קובץ PDF בלבד");
+                }
+
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                EnsureCanUploadHealthCertificate(
+                    currentPersonId,
+                    ranchId,
+                    competitionId
+                );
+
+                string publicUrl = await UploadPdfToSupabaseStorage(
+                    horseId,
+                    competitionId,
+                    file
+                );
+
+                SaveHealthCertificateRequest request = new SaveHealthCertificateRequest
+                {
+                    HorseId = horseId,
+                    CompetitionId = competitionId,
+                    RanchId = ranchId,
+                    HcPath = publicUrl
+                };
+
+                HorseParticipationInCompetition.SaveHealthCertificate(request);
+
+                return Ok(new
+                {
+                    message = "תעודת הבריאות הועלתה בהצלחה",
+                    hcPath = publicUrl
+                });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in UploadHealthCertificate: {ex.Message}");
+                return StatusCode(500, "שגיאה בהעלאת תעודת הבריאות");
             }
         }
 
@@ -146,11 +248,12 @@ namespace RideOnServer.Controllers
             try
             {
                 if (request == null)
+                {
                     return BadRequest("Invalid request");
+                }
 
                 int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                // ❗ צריך RanchId אמיתי בתוך request
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     currentPersonId,
                     request.RanchId,
@@ -160,6 +263,10 @@ namespace RideOnServer.Controllers
                 HorseParticipationInCompetition.SaveHealthCertificate(request);
 
                 return Ok(new { message = "תעודת הבריאות נשמרה בהצלחה" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
             }
             catch (Exception ex)
             {
@@ -174,7 +281,9 @@ namespace RideOnServer.Controllers
             try
             {
                 if (request == null)
+                {
                     return BadRequest("Invalid request");
+                }
 
                 int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
@@ -187,7 +296,9 @@ namespace RideOnServer.Controllers
                 Competition? competition = Competition.GetCompetitionById(request.CompetitionId);
 
                 if (competition == null)
+                {
                     return NotFound("Competition not found");
+                }
 
                 if (competition.HostRanchId != request.RanchId)
                 {
@@ -207,6 +318,136 @@ namespace RideOnServer.Controllers
                 Console.WriteLine($"Error in ApproveHealthCertificate: {ex.Message}");
                 return StatusCode(500, "שגיאה באישור תעודת הבריאות");
             }
+        }
+
+        private void EnsureCanUploadHealthCertificate(
+            int currentPersonId,
+            int ranchId,
+            int competitionId
+        )
+        {
+            try
+            {
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                return;
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+
+            Competition? competition = Competition.GetCompetitionById(competitionId);
+
+            if (competition == null)
+            {
+                throw new UnauthorizedAccessException("Competition not found");
+            }
+
+            if (competition.HostRanchId == ranchId)
+            {
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                return;
+            }
+
+            throw new UnauthorizedAccessException("אין לך הרשאה להעלות תעודת בריאות עבור סוס זה");
+        }
+
+        private bool IsPdfFile(IFormFile file)
+        {
+            string contentType = file.ContentType?.ToLower() ?? "";
+            string fileName = file.FileName?.ToLower() ?? "";
+
+            return contentType == "application/pdf" || fileName.EndsWith(".pdf");
+        }
+
+        private async Task<string> UploadPdfToSupabaseStorage(
+            int horseId,
+            int competitionId,
+            IFormFile file
+        )
+        {
+            string supabaseUrl = _configuration["Supabase:Url"] ?? "";
+            string serviceRoleKey = _configuration["Supabase:ServiceRoleKey"] ?? "";
+            string bucket = _configuration["Supabase:HealthCertificatesBucket"] ?? "health-certificates";
+
+            if (string.IsNullOrWhiteSpace(supabaseUrl))
+            {
+                throw new Exception("Missing Supabase URL configuration");
+            }
+
+            if (string.IsNullOrWhiteSpace(serviceRoleKey))
+            {
+                throw new Exception("Missing Supabase service role key configuration");
+            }
+
+            string safeFileName =
+                "horse_" +
+                horseId +
+                "_comp_" +
+                competitionId +
+                "_" +
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() +
+                ".pdf";
+
+            string filePath =
+                "competitions/" +
+                competitionId +
+                "/" +
+                safeFileName;
+
+            string uploadUrl =
+                supabaseUrl.TrimEnd('/') +
+                "/storage/v1/object/" +
+                bucket +
+                "/" +
+                filePath;
+
+            HttpClient client = _httpClientFactory.CreateClient();
+
+            using Stream fileStream = file.OpenReadStream();
+
+            using StreamContent content = new StreamContent(fileStream);
+
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+
+            using HttpRequestMessage request = new HttpRequestMessage(
+                HttpMethod.Post,
+                uploadUrl
+            );
+
+            request.Headers.Authorization =
+                new AuthenticationHeaderValue("Bearer", serviceRoleKey);
+
+            request.Headers.Add("apikey", serviceRoleKey);
+            request.Headers.Add("x-upsert", "true");
+            request.Content = content;
+
+            using HttpResponseMessage response = await client.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string errorText = await response.Content.ReadAsStringAsync();
+
+                Console.WriteLine($"Supabase upload failed: {response.StatusCode} {errorText}");
+
+                throw new Exception("Supabase upload failed");
+            }
+
+            return
+                supabaseUrl.TrimEnd('/') +
+                "/storage/v1/object/public/" +
+                bucket +
+                "/" +
+                filePath;
         }
     }
 }

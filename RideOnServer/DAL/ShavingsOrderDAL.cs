@@ -292,9 +292,13 @@ namespace RideOnServer.DAL
             return stalls;
         }
 
-        public static List<CompetitionShavingsOrderListItem> GetShavingsOrdersForCompetitionAndRanch(int competitionId, int ranchId)
+        public static List<CompetitionShavingsOrderListItem> GetShavingsOrdersForCompetitionAndRanch(
+            int competitionId,
+            int ranchId
+        )
         {
-            List<CompetitionShavingsOrderListItem> orders = new List<CompetitionShavingsOrderListItem>();
+            List<CompetitionShavingsOrderListItem> orders =
+                new List<CompetitionShavingsOrderListItem>();
 
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();
             conn.Open();
@@ -308,18 +312,65 @@ namespace RideOnServer.DAL
             cmd.Parameters.AddWithValue("@ranchId", ranchId);
 
             using NpgsqlDataReader reader = cmd.ExecuteReader();
+
             while (reader.Read())
             {
                 orders.Add(new CompetitionShavingsOrderListItem
                 {
                     ShavingsOrderId = Convert.ToInt32(reader["shavingsorderid"]),
-                    RequestedDeliveryTime = reader["requesteddeliverytime"] == DBNull.Value ? null : Convert.ToDateTime(reader["requesteddeliverytime"]),
-                    BagQuantity = reader["bagquantity"] == DBNull.Value ? null : Convert.ToInt16(reader["bagquantity"]),
-                    DeliveryStatus = reader["deliverystatus"]?.ToString() ?? string.Empty,
-                    Notes = reader["notes"] == DBNull.Value ? null : reader["notes"].ToString(),
-                    WorkerSystemUserId = reader["workersystemuserid"] == DBNull.Value ? null : Convert.ToInt32(reader["workersystemuserid"]),
-                    ApprovedByPersonId = reader["approvedbypersonid"] == DBNull.Value ? null : Convert.ToInt32(reader["approvedbypersonid"]),
-                    ApprovedAt = reader["approvedat"] == DBNull.Value ? null : Convert.ToDateTime(reader["approvedat"])
+
+                    RequestedDeliveryTime =
+                        reader["requesteddeliverytime"] == DBNull.Value
+                            ? null
+                            : Convert.ToDateTime(reader["requesteddeliverytime"]),
+
+                    BagQuantity =
+                        reader["bagquantity"] == DBNull.Value
+                            ? null
+                            : Convert.ToInt16(reader["bagquantity"]),
+
+                    DeliveryStatus =
+                        reader["deliverystatus"]?.ToString() ?? string.Empty,
+
+                    Notes =
+                        reader["notes"] == DBNull.Value
+                            ? null
+                            : reader["notes"].ToString(),
+
+                    WorkerSystemUserId =
+                        reader["workersystemuserid"] == DBNull.Value
+                            ? null
+                            : Convert.ToInt32(reader["workersystemuserid"]),
+
+                    ApprovedByPersonId =
+                        reader["approvedbypersonid"] == DBNull.Value
+                            ? null
+                            : Convert.ToInt32(reader["approvedbypersonid"]),
+
+                    ApprovedAt =
+                        reader["approvedat"] == DBNull.Value
+                            ? null
+                            : Convert.ToDateTime(reader["approvedat"]),
+
+                    OrderedByName =
+                        reader["orderedbyname"] == DBNull.Value
+                            ? null
+                            : reader["orderedbyname"].ToString(),
+
+                    PriceCatalogId =
+                        reader["pricecatalogid"] == DBNull.Value
+                            ? null
+                            : Convert.ToInt32(reader["pricecatalogid"]),
+
+                    ItemPrice =
+                        reader["itemprice"] == DBNull.Value
+                            ? 0
+                            : Convert.ToDecimal(reader["itemprice"]),
+
+                    TotalAmount =
+                        reader["totalamount"] == DBNull.Value
+                            ? 0
+                            : Convert.ToDecimal(reader["totalamount"])
                 });
             }
 
@@ -418,6 +469,81 @@ namespace RideOnServer.DAL
             }
 
             return payers;
+        }
+
+        public static List<CompetitionShavingsOrderDetailsItem>
+    GetAllShavingsOrderDetailsForCompetitionAndRanch(
+        int competitionId,
+        int ranchId
+    )
+        {
+            List<CompetitionShavingsOrderDetailsItem>
+                details =
+                    new List<CompetitionShavingsOrderDetailsItem>();
+
+            using NpgsqlConnection conn =
+                DBServices.GetDefaultConnection();
+
+            conn.Open();
+
+            using NpgsqlCommand cmd =
+                new NpgsqlCommand(
+                    "SELECT * FROM usp_getallshavingsorderdetailsforcompetitionandranch(@competitionId, @ranchId)",
+                    conn
+                );
+
+            cmd.Parameters.AddWithValue(
+                "@competitionId",
+                competitionId
+            );
+
+            cmd.Parameters.AddWithValue(
+                "@ranchId",
+                ranchId
+            );
+
+            using NpgsqlDataReader reader =
+                cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                details.Add(
+                    new CompetitionShavingsOrderDetailsItem
+                    {
+                        ShavingsOrderId =
+                            Convert.ToInt32(
+                                reader["shavingsorderid"]
+                            ),
+
+                        StallBookingId =
+                            Convert.ToInt32(
+                                reader["stallbookingid"]
+                            ),
+
+                        HorseId =
+                            reader["horseid"] == DBNull.Value
+                                ? null
+                                : Convert.ToInt32(
+                                    reader["horseid"]
+                                ),
+
+                        HorseName =
+                            reader["horsename"] == DBNull.Value
+                                ? null
+                                : reader["horsename"]
+                                    .ToString(),
+
+                        BagQuantityPerStall =
+                            Convert.ToInt16(
+                                reader[
+                                    "bagquantityperstall"
+                                ]
+                            )
+                    }
+                );
+            }
+
+            return details;
         }
     }
 }

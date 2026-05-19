@@ -137,12 +137,16 @@ namespace RideOnServer.DAL
                     endDate = Convert.ToDateTime(reader["enddate"]),
                     CompoundId = reader["compoundid"] == DBNull.Value ? null : Convert.ToInt16(reader["compoundid"]),
                     StallId = reader["stallid"] == DBNull.Value ? null : Convert.ToInt16(reader["stallid"]),
-                    PriceCatalogId = Convert.ToInt32(reader["priceCatalogId"]),
+                    PriceCatalogId = Convert.ToInt32(reader["pricecatalogid"]),
                     ItemPrice = Convert.ToDecimal(reader["itemprice"]),
                     Notes = reader["notes"] == DBNull.Value ? null : reader["notes"].ToString(),
                     ApprovalDate = reader["approvaldate"] == DBNull.Value ? null : Convert.ToDateTime(reader["approvaldate"]),
                     IsCancelled = Convert.ToBoolean(reader["iscancelled"]),
-                    HasApprovedChange = Convert.ToBoolean(reader["hasapprovedchange"])
+                    HasPendingCancellation = reader["haspendingcancellation"] != DBNull.Value && Convert.ToBoolean(reader["haspendingcancellation"]),
+                    HasPendingChange = reader["haspendingchange"] != DBNull.Value && Convert.ToBoolean(reader["haspendingchange"]),
+                    HasApprovedChange = Convert.ToBoolean(reader["hasapprovedchange"]),
+                    TotalAmount = reader["totalamount"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["totalamount"]),
+                    IsPaid = reader["ispaid"] != DBNull.Value && Convert.ToBoolean( reader["ispaid"]),
                 });
             }
 
@@ -177,29 +181,45 @@ namespace RideOnServer.DAL
             return payers;
         }
 
-        public static List<StallBookingPayerItem> GetAllStallBookingPayersForCompetitionAndRanch(int competitionId, int ranchId)
+        public static List<StallBookingPayerItem> GetAllStallBookingPayersForCompetitionAndRanch(
+            int competitionId,
+            int ranchId
+        )
         {
             List<StallBookingPayerItem> payers = new List<StallBookingPayerItem>();
 
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();
             conn.Open();
 
-            using NpgsqlCommand cmd = new NpgsqlCommand("SELECT * FROM usp_getallstallbookingpayersforcompetitionandranch(@competitionId, @ranchId)", conn);
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT * FROM usp_getallstallbookingpayersforcompetitionandranch(@competitionId, @ranchId)",
+                conn
+            );
+
             cmd.Parameters.AddWithValue("@competitionId", competitionId);
             cmd.Parameters.AddWithValue("@ranchId", ranchId);
 
             using NpgsqlDataReader reader = cmd.ExecuteReader();
+
             while (reader.Read())
             {
                 payers.Add(new StallBookingPayerItem
                 {
                     StallBookingId = Convert.ToInt32(reader["stallbookingid"]),
+
                     BillId = Convert.ToInt32(reader["billid"]),
-                    payerPersonId = Convert.ToInt32(reader["payerPersonId"]),
+
+                    payerPersonId = Convert.ToInt32(reader["paidbypersonid"]),
+
                     PayerFullName = reader["payerfullname"]?.ToString() ?? string.Empty,
+
                     AmountToPay = Convert.ToDecimal(reader["amounttopay"]),
+
                     DateOpened = Convert.ToDateTime(reader["dateopened"]),
-                    DateClosed = reader["dateclosed"] == DBNull.Value ? null : Convert.ToDateTime(reader["dateclosed"])
+
+                    DateClosed = reader["dateclosed"] == DBNull.Value
+                        ? null
+                        : Convert.ToDateTime(reader["dateclosed"])
                 });
             }
 
@@ -252,6 +272,91 @@ namespace RideOnServer.DAL
             return createdIds;
         }
 
+        public static int CreateStallBookingCancelRequest(
+            int stallBookingId,
+            int ranchId
+        )
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT usp_createstallbookingcancelrequest(@stallBookingId, @ranchId)",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
+            cmd.Parameters.AddWithValue("@ranchId", ranchId);
+
+            object? result = cmd.ExecuteScalar();
+
+            if (result == null || result == DBNull.Value)
+            {
+                throw new Exception("Failed to create stall booking cancellation request.");
+            }
+
+            return Convert.ToInt32(result);
+        }
+
+        public static int CreateStallBookingChangeRequest(
+            CreateStallBookingChangeRequest request,
+            int orderedBySystemUserId
+        )
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                @"SELECT usp_createstallbookingchangerequest(
+                    @originalStallBookingId,
+                    @ranchId,
+                    @orderedBySystemUserId,
+                    @newStartDate::date,
+                    @newEndDate::date,
+                    @notes::text
+                )",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue(
+                "@originalStallBookingId",
+                request.OriginalStallBookingId
+            );
+
+            cmd.Parameters.AddWithValue(
+                "@ranchId",
+                request.RanchId
+            );
+
+            cmd.Parameters.AddWithValue(
+                "@orderedBySystemUserId",
+                orderedBySystemUserId
+            );
+
+            cmd.Parameters.Add(
+                "@newStartDate",
+                NpgsqlDbType.Date
+            ).Value = request.NewStartDate.Date;
+
+            cmd.Parameters.Add(
+                "@newEndDate",
+                NpgsqlDbType.Date
+            ).Value = request.NewEndDate.Date;
+
+            cmd.Parameters.AddWithValue(
+                "@notes",
+                (object?)request.Notes ?? DBNull.Value
+            );
+
+            object? result = cmd.ExecuteScalar();
+
+            if (result == null || result == DBNull.Value)
+            {
+                throw new Exception("Failed to create stall booking change request.");
+            }
+
+            return Convert.ToInt32(result);
+        }
 
     }
 }

@@ -17,7 +17,12 @@ namespace RideOnServer.DAL
                 using var connection = Connect("DefaultConnection");
                 connection.Open();
 
-                using var command = CreateCommandWithStoredProcedure("usp_GetCompoundsWithLayout", connection, paramDic);
+                using var command = CreateCommandWithStoredProcedure(
+                    "usp_GetCompoundsWithLayout",
+                    connection,
+                    paramDic
+                );
+
                 using var reader = command.ExecuteReader();
 
                 var list = new List<StallMapCompoundDto>();
@@ -68,12 +73,12 @@ namespace RideOnServer.DAL
             }
         }
 
-        public List<HorseForMapDto> GetHorsesForCompetition(int competitionId, int ranchId)
+        public List<StallAssignmentOverviewItemDto> GetAssignmentOverview(int competitionId, int hostRanchId)
         {
             var paramDic = new Dictionary<string, object?>
             {
                 { "@CompetitionId", competitionId },
-                { "@RanchId", ranchId }
+                { "@HostRanchId", hostRanchId }
             };
 
             try
@@ -81,18 +86,53 @@ namespace RideOnServer.DAL
                 using var connection = Connect("DefaultConnection");
                 connection.Open();
 
-                using var command = CreateCommandWithStoredProcedure("usp_GetHorsesForCompetition", connection, paramDic);
+                using var command = CreateCommandWithStoredProcedure(
+                    "usp_GetStallBookingAssignmentOverview",
+                    connection,
+                    paramDic
+                );
+
                 using var reader = command.ExecuteReader();
 
-                var list = new List<HorseForMapDto>();
+                var list = new List<StallAssignmentOverviewItemDto>();
 
                 while (reader.Read())
                 {
-                    list.Add(new HorseForMapDto
+                    list.Add(new StallAssignmentOverviewItemDto
                     {
-                        HorseId = Convert.ToInt32(reader["HorseId"]),
-                        HorseName = reader["HorseName"].ToString()!,
-                        BarnName = reader["BarnName"] == DBNull.Value ? null : reader["BarnName"].ToString()
+                        StallBookingId = Convert.ToInt32(reader["StallBookingId"]),
+
+                        BookingRanchId = Convert.ToInt32(reader["BookingRanchId"]),
+                        BookingRanchName = reader["BookingRanchName"].ToString()!,
+
+                        HorseId = reader["HorseId"] == DBNull.Value ? null : Convert.ToInt32(reader["HorseId"]),
+                        HorseName = reader["HorseName"] == DBNull.Value ? null : reader["HorseName"].ToString(),
+                        BarnName = reader["BarnName"] == DBNull.Value ? null : reader["BarnName"].ToString(),
+
+                        IsForTack = Convert.ToBoolean(reader["IsForTack"]),
+
+                        StartDate = Convert.ToDateTime(reader["StartDate"]),
+                        EndDate = Convert.ToDateTime(reader["EndDate"]),
+                        StayDays = Convert.ToInt32(reader["StayDays"]),
+
+                        PriceCatalogId = Convert.ToInt32(reader["PriceCatalogId"]),
+                        ProductId = Convert.ToInt16(reader["ProductId"]),
+                        ProductName = reader["ProductName"].ToString()!,
+
+                        ItemPrice = Convert.ToDecimal(reader["ItemPrice"]),
+                        TotalAmount = Convert.ToDecimal(reader["TotalAmount"]),
+
+                        IsPaid = Convert.ToBoolean(reader["IsPaid"]),
+                        PaymentStatus = reader["PaymentStatus"].ToString()!,
+
+                        PayerNames = reader["PayerNames"] == DBNull.Value ? string.Empty : reader["PayerNames"].ToString()!,
+                        Notes = reader["Notes"] == DBNull.Value ? null : reader["Notes"].ToString(),
+
+                        AssignedCompoundId = reader["AssignedCompoundId"] == DBNull.Value ? null : Convert.ToInt16(reader["AssignedCompoundId"]),
+                        AssignedStallId = reader["AssignedStallId"] == DBNull.Value ? null : Convert.ToInt16(reader["AssignedStallId"]),
+                        AssignedStallNumber = reader["AssignedStallNumber"] == DBNull.Value ? null : reader["AssignedStallNumber"].ToString(),
+
+                        IsAssigned = Convert.ToBoolean(reader["IsAssigned"])
                     });
                 }
 
@@ -116,7 +156,12 @@ namespace RideOnServer.DAL
                 using var connection = Connect("DefaultConnection");
                 connection.Open();
 
-                using var command = CreateCommandWithStoredProcedure("usp_GetStallAssignmentsForCompetition", connection, paramDic);
+                using var command = CreateCommandWithStoredProcedure(
+                    "usp_GetStallAssignmentsForCompetition",
+                    connection,
+                    paramDic
+                );
+
                 using var reader = command.ExecuteReader();
 
                 var list = new List<StallAssignmentDto>();
@@ -125,12 +170,22 @@ namespace RideOnServer.DAL
                 {
                     list.Add(new StallAssignmentDto
                     {
+                        AssignmentId = Convert.ToInt32(reader["AssignmentId"]),
+                        StallBookingId = Convert.ToInt32(reader["StallBookingId"]),
+
                         CompoundId = Convert.ToInt16(reader["CompoundId"]),
                         StallId = Convert.ToInt16(reader["StallId"]),
                         StallNumber = reader["StallNumber"] == DBNull.Value ? null : reader["StallNumber"].ToString(),
-                        HorseId = Convert.ToInt32(reader["HorseId"]),
-                        HorseName = reader["HorseName"].ToString()!,
-                        BarnName = reader["BarnName"] == DBNull.Value ? null : reader["BarnName"].ToString()
+
+                        BookingRanchId = Convert.ToInt32(reader["BookingRanchId"]),
+                        BookingRanchName = reader["BookingRanchName"].ToString()!,
+
+                        HorseId = reader["HorseId"] == DBNull.Value ? null : Convert.ToInt32(reader["HorseId"]),
+                        HorseName = reader["HorseName"] == DBNull.Value ? null : reader["HorseName"].ToString(),
+                        BarnName = reader["BarnName"] == DBNull.Value ? null : reader["BarnName"].ToString(),
+
+                        IsForTack = Convert.ToBoolean(reader["IsForTack"]),
+                        ProductName = reader["ProductName"].ToString()!
                     });
                 }
 
@@ -142,15 +197,20 @@ namespace RideOnServer.DAL
             }
         }
 
-        public void AssignHorse(int competitionId, int ranchId, short compoundId, short stallId, int horseId)
+        public void AssignStallBooking(
+            int competitionId,
+            int hostRanchId,
+            short compoundId,
+            short stallId,
+            int stallBookingId)
         {
             var paramDic = new Dictionary<string, object?>
             {
                 { "@CompetitionId", competitionId },
-                { "@RanchId", ranchId },
+                { "@HostRanchId", hostRanchId },
                 { "@CompoundId", compoundId },
                 { "@StallId", stallId },
-                { "@HorseId", horseId }
+                { "@StallBookingId", stallBookingId }
             };
 
             try
@@ -158,7 +218,12 @@ namespace RideOnServer.DAL
                 using var connection = Connect("DefaultConnection");
                 connection.Open();
 
-                using var command = CreateCommandWithStoredProcedure("usp_AssignHorseToStall", connection, paramDic);
+                using var command = CreateCommandWithStoredProcedure(
+                    "usp_AssignStallBookingToStall",
+                    connection,
+                    paramDic
+                );
+
                 command.ExecuteNonQuery();
             }
             catch (NpgsqlException ex)
@@ -167,12 +232,16 @@ namespace RideOnServer.DAL
             }
         }
 
-        public void UnassignHorse(int competitionId, int ranchId, short compoundId, short stallId)
+        public void UnassignStallBooking(
+            int competitionId,
+            int hostRanchId,
+            short compoundId,
+            short stallId)
         {
             var paramDic = new Dictionary<string, object?>
             {
                 { "@CompetitionId", competitionId },
-                { "@RanchId", ranchId },
+                { "@HostRanchId", hostRanchId },
                 { "@CompoundId", compoundId },
                 { "@StallId", stallId }
             };
@@ -182,7 +251,12 @@ namespace RideOnServer.DAL
                 using var connection = Connect("DefaultConnection");
                 connection.Open();
 
-                using var command = CreateCommandWithStoredProcedure("usp_UnassignHorseFromStall", connection, paramDic);
+                using var command = CreateCommandWithStoredProcedure(
+                    "usp_UnassignStallBookingFromStall",
+                    connection,
+                    paramDic
+                );
+
                 command.ExecuteNonQuery();
             }
             catch (NpgsqlException ex)
@@ -190,5 +264,103 @@ namespace RideOnServer.DAL
                 throw new Exception($"Database error: {ex.Message}");
             }
         }
+
+        public StallMapPublishStatusDto? GetPublishStatus(int competitionId, int hostRanchId)
+        {
+            var paramDic = new Dictionary<string, object?>
+    {
+        { "@CompetitionId", competitionId },
+        { "@HostRanchId", hostRanchId }
+    };
+
+            try
+            {
+                using var connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using var command = CreateCommandWithStoredProcedure(
+                    "usp_GetStallMapPublishStatus",
+                    connection,
+                    paramDic
+                );
+
+                using var reader = command.ExecuteReader();
+
+                if (!reader.Read())
+                {
+                    return null;
+                }
+
+                return new StallMapPublishStatusDto
+                {
+                    CompetitionId = Convert.ToInt32(reader["CompetitionId"]),
+                    IsPublished = Convert.ToBoolean(reader["IsPublished"]),
+                    PublishedAt = reader["PublishedAt"] == DBNull.Value ? null : Convert.ToDateTime(reader["PublishedAt"]),
+                    PublishedBySystemUserId = reader["PublishedBySystemUserId"] == DBNull.Value ? null : Convert.ToInt32(reader["PublishedBySystemUserId"]),
+                    PublishedByName = reader["PublishedByName"] == DBNull.Value ? null : reader["PublishedByName"].ToString()
+                };
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public void PublishStallMap(int competitionId, int hostRanchId, int publishedBySystemUserId)
+        {
+            var paramDic = new Dictionary<string, object?>
+    {
+        { "@CompetitionId", competitionId },
+        { "@HostRanchId", hostRanchId },
+        { "@PublishedBySystemUserId", publishedBySystemUserId }
+    };
+
+            try
+            {
+                using var connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using var command = CreateCommandWithStoredProcedure(
+                    "usp_PublishStallMap",
+                    connection,
+                    paramDic
+                );
+
+                command.ExecuteNonQuery();
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public void UnpublishStallMap(int competitionId, int hostRanchId)
+        {
+            var paramDic = new Dictionary<string, object?>
+            {
+                { "@CompetitionId", competitionId },
+                { "@HostRanchId", hostRanchId }
+            };
+
+            try
+            {
+                using var connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using var command = CreateCommandWithStoredProcedure(
+                    "usp_UnpublishStallMap",
+                    connection,
+                    paramDic
+                );
+
+                command.ExecuteNonQuery();
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+
     }
 }

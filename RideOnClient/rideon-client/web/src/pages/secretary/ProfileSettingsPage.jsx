@@ -379,9 +379,6 @@ export default function ProfileSettingsPage() {
         subtitle={subtitle}
         menuItems={secretaryGeneralMenu}
         activeItemKey="profile-settings"
-        notificationCount={0}
-        notificationsOpen={false}
-        notificationItems={[]}
       >
         <div className="rounded-[26px] border border-[#E6DCD5] bg-white shadow-sm px-8 py-10 text-right">
           <p className="text-[#6D4C41] text-lg">טוענת נתונים...</p>
@@ -396,9 +393,6 @@ export default function ProfileSettingsPage() {
       subtitle={subtitle}
       menuItems={secretaryGeneralMenu}
       activeItemKey="profile-settings"
-      notificationCount={0}
-      notificationsOpen={false}
-      notificationItems={[]}
     >
       <div className="space-y-6">
         <div className="rounded-[26px] border border-[#E6DCD5] bg-white shadow-sm overflow-hidden">
