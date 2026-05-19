@@ -414,8 +414,120 @@ namespace RideOnServer.DAL
                 HorseId = reader["horseid"] == DBNull.Value ? 0 : Convert.ToInt32(reader["horseid"]),
                 CoachFederationMemberId = reader["coachfederationmemberid"] == DBNull.Value
                     ? (int?)null
-                    : Convert.ToInt32(reader["coachfederationmemberid"])
+                    : Convert.ToInt32(reader["coachfederationmemberid"]),
+                AssignedStartTimeActual = reader["assignedstarttimeactual"] == DBNull.Value
+                    ? (DateTime?)null
+                    : Convert.ToDateTime(reader["assignedstarttimeactual"]),
+                AssignedOrder = reader["assignedorder"] == DBNull.Value
+                    ? (int?)null
+                    : Convert.ToInt32(reader["assignedorder"]),
+                AssignedSlotIsPublished = reader["assignedslotispublished"] != DBNull.Value
+                    && Convert.ToBoolean(reader["assignedslotispublished"])
             };
+        }
+
+        public List<SlotScheduleItem> GetSlotScheduleForViewing(int slotId, int competitionId, int ranchId)
+        {
+            List<SlotScheduleItem> result = new List<SlotScheduleItem>();
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+                    using (NpgsqlCommand command = new NpgsqlCommand(@"
+                        SELECT *
+                        FROM public.usp_getslotscheduleforviewing(
+                            p_paidtimeslotincompid := @slotId,
+                            p_competitionid        := @competitionId,
+                            p_ranchid              := @ranchId
+                        );", connection))
+                    {
+                        command.Parameters.Add("@slotId", NpgsqlDbType.Integer).Value = slotId;
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer).Value = competitionId;
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer).Value = ranchId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                result.Add(new SlotScheduleItem
+                                {
+                                    PaidTimeRequestId = Convert.ToInt32(reader["PaidTimeRequestId"]),
+                                    HorseId = Convert.ToInt32(reader["HorseId"]),
+                                    HorseName = reader["HorseName"]?.ToString() ?? string.Empty,
+                                    BarnName = reader["BarnName"] == DBNull.Value ? null : reader["BarnName"].ToString(),
+                                    CoachName = reader["CoachName"] == DBNull.Value ? null : reader["CoachName"].ToString(),
+                                    RiderName = reader["RiderName"]?.ToString() ?? string.Empty,
+                                    ProductName = reader["ProductName"]?.ToString() ?? string.Empty,
+                                    DurationMinutes = Convert.ToInt32(reader["DurationMinutes"]),
+                                    AssignedStartTime = reader["AssignedStartTime"] == DBNull.Value
+                                        ? (DateTime?)null
+                                        : Convert.ToDateTime(reader["AssignedStartTime"]),
+                                    AssignedOrder = reader["AssignedOrder"] == DBNull.Value
+                                        ? (int?)null
+                                        : Convert.ToInt32(reader["AssignedOrder"]),
+                                    SlotDate = DateOnly.FromDateTime(Convert.ToDateTime(reader["SlotDate"])),
+                                    SlotStartTime = TimeOnly.FromTimeSpan((TimeSpan)reader["SlotStartTime"]),
+                                    SlotEndTime = TimeOnly.FromTimeSpan((TimeSpan)reader["SlotEndTime"]),
+                                    ArenaName = reader["ArenaName"]?.ToString() ?? string.Empty,
+                                    IsPublished = Convert.ToBoolean(reader["IsPublished"]),
+                                    IsMine = Convert.ToBoolean(reader["IsMine"])
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+            return result;
+        }
+
+        public List<PublishedSlotItem> GetPublishedSlotsForCompetition(int competitionId, int ranchId)
+        {
+            List<PublishedSlotItem> result = new List<PublishedSlotItem>();
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+                    using (NpgsqlCommand command = new NpgsqlCommand(@"
+                        SELECT *
+                        FROM public.usp_getpublishedslotsforcompetition(
+                            p_competitionid := @competitionId,
+                            p_ranchid       := @ranchId
+                        );", connection))
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer).Value = competitionId;
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer).Value = ranchId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                result.Add(new PublishedSlotItem
+                                {
+                                    PaidTimeSlotInCompId = Convert.ToInt32(reader["PaidTimeSlotInCompId"]),
+                                    SlotDate = DateOnly.FromDateTime(Convert.ToDateTime(reader["SlotDate"])),
+                                    StartTime = TimeOnly.FromTimeSpan((TimeSpan)reader["StartTime"]),
+                                    EndTime = TimeOnly.FromTimeSpan((TimeSpan)reader["EndTime"]),
+                                    ArenaName = reader["ArenaName"]?.ToString() ?? string.Empty,
+                                    SlotStatus = reader["SlotStatus"] == DBNull.Value ? null : reader["SlotStatus"].ToString(),
+                                    AssignedCount = Convert.ToInt32(reader["AssignedCount"]),
+                                    MyAssignedCount = Convert.ToInt32(reader["MyAssignedCount"])
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+            return result;
         }
 
         public void CancelPaidTimeRequest(int paidTimeRequestId, int orderedBySystemUserId)
@@ -443,7 +555,13 @@ namespace RideOnServer.DAL
             }
         }
 
-        public void UpdatePaidTimeRequestNotes(int paidTimeRequestId, int orderedBySystemUserId, string? notes)
+        public void UpdatePaidTimeRequest(
+            int paidTimeRequestId,
+            int orderedBySystemUserId,
+            string? notes,
+            bool notesProvided,
+            int? priceCatalogId,
+            int? requestedCompSlotId)
         {
             try
             {
@@ -451,16 +569,32 @@ namespace RideOnServer.DAL
                 {
                     connection.Open();
                     using (NpgsqlCommand command = new NpgsqlCommand(@"
-                        SELECT public.usp_updatepaidtimerequestnotes(
+                        SELECT public.usp_updatepaidtimerequest(
                             p_paidtimerequestid     := @id,
                             p_orderedbysystemuserid := @orderedBy,
-                            p_notes                 := @notes
+                            p_notes                 := @notes,
+                            p_pricecatalogid        := @priceCatalogId,
+                            p_requestedcompslotid   := @requestedCompSlotId
                         );", connection))
                     {
                         command.Parameters.Add("@id", NpgsqlDbType.Integer).Value = paidTimeRequestId;
                         command.Parameters.Add("@orderedBy", NpgsqlDbType.Integer).Value = orderedBySystemUserId;
-                        command.Parameters.Add("@notes", NpgsqlDbType.Text).Value =
-                            string.IsNullOrWhiteSpace(notes) ? (object)DBNull.Value : notes;
+
+                        // NULL = USP מבין כ"אל תשנה"; '' = "נקה הערות".
+                        if (!notesProvided)
+                        {
+                            command.Parameters.Add("@notes", NpgsqlDbType.Text).Value = DBNull.Value;
+                        }
+                        else
+                        {
+                            command.Parameters.Add("@notes", NpgsqlDbType.Text).Value = (object?)notes ?? "";
+                        }
+
+                        command.Parameters.Add("@priceCatalogId", NpgsqlDbType.Integer).Value =
+                            priceCatalogId.HasValue ? (object)priceCatalogId.Value : DBNull.Value;
+                        command.Parameters.Add("@requestedCompSlotId", NpgsqlDbType.Integer).Value =
+                            requestedCompSlotId.HasValue ? (object)requestedCompSlotId.Value : DBNull.Value;
+
                         command.ExecuteNonQuery();
                     }
                 }

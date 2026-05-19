@@ -109,8 +109,12 @@ function RegistrationsTabs(props) {
 }
 
 export default function AdminCompetitionRegistrationsScreen(props) {
-  var [activeTab, setActiveTab] = useState("classes");
-  var [isChatbotOpen, setIsChatbotOpen] = useState(false);
+  var routeParams = props.route?.params || {};
+  var initialTab = routeParams.initialTab === "paidTimes" ? "paidTimes" : "classes";
+  var shouldAutoOpenChatbot = !!routeParams.openSmartBooking;
+
+  var [activeTab, setActiveTab] = useState(initialTab);
+  var [isChatbotOpen, setIsChatbotOpen] = useState(shouldAutoOpenChatbot);
 
   var userContext = useUser();
   var activeRoleContext = useActiveRole();

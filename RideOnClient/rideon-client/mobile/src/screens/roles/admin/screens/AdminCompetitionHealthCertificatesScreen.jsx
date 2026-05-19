@@ -10,6 +10,8 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
+import { decode as decodeBase64 } from "base64-arraybuffer";
 import { Ionicons } from "@expo/vector-icons";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
@@ -55,22 +57,35 @@ export default function AdminCompetitionHealthCertificatesScreen(props) {
       setLoading(true);
       const response = await getHealthCertificates(activeCompetition.competitionId);
       setCertificates(response.data?.data || []);
-    } catch {
-      Alert.alert("שגיאה", "לא ניתן לטעון את תעודות הבריאות");
+    } catch (err) {
+      console.warn("loadCertificates failed:", err);
+      const detail = err?.response?.data || err?.message || "שגיאה לא ידועה";
+      Alert.alert("שגיאה", "לא ניתן לטעון את תעודות הבריאות\n" + String(detail));
     } finally {
       setLoading(false);
     }
   }
 
   async function handleUploadPdf(horse) {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: "application/pdf",
-      copyToCacheDirectory: true,
-    });
+    let pickerResult;
+    try {
+      pickerResult = await DocumentPicker.getDocumentAsync({
+        type: "application/pdf",
+        copyToCacheDirectory: true,
+      });
+    } catch (err) {
+      console.warn("DocumentPicker failed:", err);
+      Alert.alert("שגיאה", "בחירת קובץ נכשלה: " + String(err?.message || err));
+      return;
+    }
 
-    if (result.canceled) return;
+    if (pickerResult.canceled) return;
 
-    const file = result.assets[0];
+    const file = pickerResult.assets && pickerResult.assets[0];
+    if (!file || !file.uri) {
+      Alert.alert("שגיאה", "לא נבחר קובץ תקין");
+      return;
+    }
 
     try {
       setUploadingHorseId(horse.horseId);
@@ -78,18 +93,37 @@ export default function AdminCompetitionHealthCertificatesScreen(props) {
       const fileName = `horse_${horse.horseId}_comp_${activeCompetition.competitionId}_${Date.now()}.pdf`;
       const filePath = `competitions/${activeCompetition.competitionId}/${fileName}`;
 
-      const response = await fetch(file.uri);
-      const blob = await response.blob();
+      // RN's fetch().blob() returns empty/broken blob with Supabase storage.
+      // Fix: read file as base64 via expo-file-system, decode to ArrayBuffer, upload that.
+      const base64 = await FileSystem.readAsStringAsync(file.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      if (!base64 || base64.length === 0) {
+        throw new Error("הקובץ ריק או לא נקרא כראוי");
+      }
+
+      const arrayBuffer = decodeBase64(base64);
 
       const { error: uploadError } = await supabase.storage
         .from(HC_BUCKET)
-        .upload(filePath, blob, { contentType: "application/pdf", upsert: true });
+        .upload(filePath, arrayBuffer, {
+          contentType: "application/pdf",
+          upsert: true,
+        });
 
-      if (uploadError) throw new Error(uploadError.message);
+      if (uploadError) {
+        console.warn("Supabase upload error:", uploadError);
+        throw new Error("העלאה ל-Storage נכשלה: " + uploadError.message);
+      }
 
       const { data: urlData } = supabase.storage
         .from(HC_BUCKET)
         .getPublicUrl(filePath);
+
+      if (!urlData?.publicUrl) {
+        throw new Error("לא התקבל URL ציבורי לקובץ");
+      }
 
       await saveHealthCertificate(
         horse.horseId,
@@ -99,8 +133,10 @@ export default function AdminCompetitionHealthCertificatesScreen(props) {
 
       Alert.alert("בוצע", `תעודת הבריאות של ${horse.horseName} הועלתה בהצלחה`);
       await loadCertificates();
-    } catch {
-      Alert.alert("שגיאה", "לא ניתן להעלות את הקובץ. נסה שוב.");
+    } catch (err) {
+      console.warn("handleUploadPdf failed:", err);
+      const detail = err?.response?.data || err?.message || "שגיאה לא ידועה";
+      Alert.alert("שגיאה בהעלאה", String(detail));
     } finally {
       setUploadingHorseId(null);
     }
