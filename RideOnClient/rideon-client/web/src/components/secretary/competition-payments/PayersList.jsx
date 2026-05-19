@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { ArrowDownUp, Search, RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
 import PaymentStatusBadge from "./PaymentStatusBadge";
 
@@ -27,27 +27,236 @@ function formatDateTime(value) {
     return "-";
   }
 
-  return new Date(value).toLocaleString("he-IL");
+  var date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return date.toLocaleString("he-IL");
+}
+
+function normalizeStatus(payer) {
+  var totalAmount = Number(getValue(payer, "totalAmount", "TotalAmount", 0));
+  var paidAmount = Number(getValue(payer, "paidAmount", "PaidAmount", 0));
+  var unpaidAmount = Number(getValue(payer, "unpaidAmount", "UnpaidAmount", 0));
+  var status = getValue(payer, "paymentStatus", "PaymentStatus", "");
+
+  if (totalAmount <= 0) {
+    return "NoCharges";
+  }
+
+  if (unpaidAmount <= 0) {
+    return "Paid";
+  }
+
+  if (paidAmount > 0 && unpaidAmount > 0) {
+    return "Partial";
+  }
+
+  if (status) {
+    return status;
+  }
+
+  return "Unpaid";
+}
+
+function getStatusPriority(status) {
+  if (status === "Unpaid") {
+    return 1;
+  }
+
+  if (status === "Partial") {
+    return 2;
+  }
+
+  if (status === "Paid") {
+    return 3;
+  }
+
+  return 4;
+}
+
+function getSortValue(payer, sortKey) {
+  if (sortKey === "payerName") {
+    return getValue(payer, "payerName", "PayerName", "");
+  }
+
+  if (sortKey === "totalAmount") {
+    return Number(getValue(payer, "totalAmount", "TotalAmount", 0));
+  }
+
+  if (sortKey === "paidAmount") {
+    return Number(getValue(payer, "paidAmount", "PaidAmount", 0));
+  }
+
+  if (sortKey === "unpaidAmount") {
+    return Number(getValue(payer, "unpaidAmount", "UnpaidAmount", 0));
+  }
+
+  if (sortKey === "paymentStatus") {
+    return getStatusPriority(normalizeStatus(payer));
+  }
+
+  if (sortKey === "lastUpdatedAt") {
+    var value = getValue(payer, "lastUpdatedAt", "LastUpdatedAt", null);
+    var date = value ? new Date(value) : null;
+
+    return date && !Number.isNaN(date.getTime()) ? date.getTime() : 0;
+  }
+
+  return "";
+}
+
+function compareValues(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    return a - b;
+  }
+
+  return String(a || "").localeCompare(String(b || ""), "he");
+}
+
+function getHeaderClass(active) {
+  return (
+    "px-6 py-4 text-right transition-colors " +
+    (active ? "text-[#3F312B]" : "text-[#5D4037] hover:text-[#3F312B]")
+  );
+}
+
+function HeaderButton(props) {
+  var isActive = props.sortKey === props.columnKey;
+
+  return (
+    <button
+      type="button"
+      onClick={function () {
+        props.onSort(props.columnKey);
+      }}
+      className="inline-flex items-center gap-2 font-black"
+    >
+      <span>{props.label}</span>
+
+      <ArrowDownUp
+        size={14}
+        className={isActive ? "text-[#8B5E4C]" : "text-[#BCAAA4]"}
+      />
+
+      {isActive ? (
+        <span className="text-xs text-[#8B5E4C]">
+          {props.sortDirection === "asc" ? "↑" : "↓"}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function getFilterButtonClass(active) {
+  return (
+    "rounded-2xl border px-4 py-2 text-sm font-bold transition-colors " +
+    (active
+      ? "border-[#8B5E4C] bg-[#8B5E4C] text-white"
+      : "border-[#E3D7D0] bg-white text-[#6D4C41] hover:bg-[#FCFAF8]")
+  );
 }
 
 export default function PayersList(props) {
   var [searchText, setSearchText] = useState("");
+  var [statusFilter, setStatusFilter] = useState("all");
+  var [balanceFilter, setBalanceFilter] = useState("all");
+  var [sortKey, setSortKey] = useState("paymentStatus");
+  var [sortDirection, setSortDirection] = useState("asc");
+
+  function handleSort(columnKey) {
+    if (sortKey === columnKey) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+      return;
+    }
+
+    setSortKey(columnKey);
+
+    if (
+      columnKey === "totalAmount" ||
+      columnKey === "paidAmount" ||
+      columnKey === "unpaidAmount" ||
+      columnKey === "lastUpdatedAt"
+    ) {
+      setSortDirection("desc");
+      return;
+    }
+
+    setSortDirection("asc");
+  }
+
+  function clearFilters() {
+    setSearchText("");
+    setStatusFilter("all");
+    setBalanceFilter("all");
+    setSortKey("paymentStatus");
+    setSortDirection("asc");
+  }
 
   var filteredPayers = useMemo(
     function () {
       var text = searchText.trim().toLowerCase();
 
-      if (!text) {
-        return props.items || [];
-      }
-
-      return (props.items || []).filter(function (payer) {
+      var filtered = (props.items || []).filter(function (payer) {
         var name = getValue(payer, "payerName", "PayerName", "").toLowerCase();
+        var totalAmount = Number(
+          getValue(payer, "totalAmount", "TotalAmount", 0),
+        );
+        var unpaidAmount = Number(
+          getValue(payer, "unpaidAmount", "UnpaidAmount", 0),
+        );
+        var status = normalizeStatus(payer);
 
-        return name.includes(text);
+        if (text && !name.includes(text)) {
+          return false;
+        }
+
+        if (statusFilter !== "all" && status !== statusFilter) {
+          return false;
+        }
+
+        if (balanceFilter === "openOnly" && unpaidAmount <= 0) {
+          return false;
+        }
+
+        if (balanceFilter === "noBalance" && unpaidAmount > 0) {
+          return false;
+        }
+
+        if (balanceFilter === "withAmount" && totalAmount <= 0) {
+          return false;
+        }
+
+        return true;
       });
+
+      filtered.sort(function (a, b) {
+        var aValue = getSortValue(a, sortKey);
+        var bValue = getSortValue(b, sortKey);
+        var result = compareValues(aValue, bValue);
+
+        if (result === 0 && sortKey !== "payerName") {
+          result = compareValues(
+            getValue(a, "payerName", "PayerName", ""),
+            getValue(b, "payerName", "PayerName", ""),
+          );
+        }
+
+        return sortDirection === "asc" ? result : result * -1;
+      });
+
+      return filtered;
     },
-    [props.items, searchText],
+    [
+      props.items,
+      searchText,
+      statusFilter,
+      balanceFilter,
+      sortKey,
+      sortDirection,
+    ],
   );
 
   if (props.loading) {
@@ -87,6 +296,77 @@ export default function PayersList(props) {
             />
           </div>
         </div>
+
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={function () {
+              setStatusFilter("all");
+            }}
+            className={getFilterButtonClass(statusFilter === "all")}
+          >
+            כל הסטטוסים
+          </button>
+
+          <button
+            type="button"
+            onClick={function () {
+              setStatusFilter("Unpaid");
+            }}
+            className={getFilterButtonClass(statusFilter === "Unpaid")}
+          >
+            לא שולם
+          </button>
+
+          <button
+            type="button"
+            onClick={function () {
+              setStatusFilter("Partial");
+            }}
+            className={getFilterButtonClass(statusFilter === "Partial")}
+          >
+            חלקי
+          </button>
+
+          <button
+            type="button"
+            onClick={function () {
+              setStatusFilter("Paid");
+            }}
+            className={getFilterButtonClass(statusFilter === "Paid")}
+          >
+            שולם
+          </button>
+
+          <button
+            type="button"
+            onClick={function () {
+              setBalanceFilter("openOnly");
+            }}
+            className={getFilterButtonClass(balanceFilter === "openOnly")}
+          >
+            יתרה פתוחה בלבד
+          </button>
+
+          <button
+            type="button"
+            onClick={function () {
+              setBalanceFilter("noBalance");
+            }}
+            className={getFilterButtonClass(balanceFilter === "noBalance")}
+          >
+            ללא יתרה
+          </button>
+
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="inline-flex items-center gap-2 rounded-2xl border border-[#E3D7D0] bg-white px-4 py-2 text-sm font-bold text-[#6D4C41] transition-colors hover:bg-[#FCFAF8]"
+          >
+            <RotateCcw size={15} />
+            ניקוי
+          </button>
+        </div>
       </div>
 
       {props.error ? (
@@ -100,16 +380,70 @@ export default function PayersList(props) {
           אין משלמים להצגה
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="max-w-full overflow-x-auto">
           <table className="w-full min-w-[980px] border-collapse text-right">
             <thead className="bg-[#F3EEEA] text-sm font-bold text-[#5D4037]">
               <tr>
-                <th className="px-6 py-4">משלם</th>
-                <th className="px-6 py-4">סה״כ</th>
-                <th className="px-6 py-4">שולם</th>
-                <th className="px-6 py-4">יתרה</th>
-                <th className="px-6 py-4">סטטוס</th>
-                <th className="px-6 py-4">עדכון אחרון</th>
+                <th className={getHeaderClass(sortKey === "payerName")}>
+                  <HeaderButton
+                    label="משלם"
+                    columnKey="payerName"
+                    sortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                </th>
+
+                <th className={getHeaderClass(sortKey === "totalAmount")}>
+                  <HeaderButton
+                    label="סה״כ"
+                    columnKey="totalAmount"
+                    sortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                </th>
+
+                <th className={getHeaderClass(sortKey === "paidAmount")}>
+                  <HeaderButton
+                    label="שולם"
+                    columnKey="paidAmount"
+                    sortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                </th>
+
+                <th className={getHeaderClass(sortKey === "unpaidAmount")}>
+                  <HeaderButton
+                    label="יתרה"
+                    columnKey="unpaidAmount"
+                    sortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                </th>
+
+                <th className={getHeaderClass(sortKey === "paymentStatus")}>
+                  <HeaderButton
+                    label="סטטוס"
+                    columnKey="paymentStatus"
+                    sortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                </th>
+
+                <th className={getHeaderClass(sortKey === "lastUpdatedAt")}>
+                  <HeaderButton
+                    label="עדכון אחרון"
+                    columnKey="lastUpdatedAt"
+                    sortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                </th>
+
                 <th className="px-6 py-4">פעולה</th>
               </tr>
             </thead>
@@ -122,12 +456,16 @@ export default function PayersList(props) {
                   "PayerPersonId",
                   0,
                 );
-                var status = getValue(
-                  payer,
-                  "paymentStatus",
-                  "PaymentStatus",
-                  "",
+
+                var totalAmount = Number(
+                  getValue(payer, "totalAmount", "TotalAmount", 0),
                 );
+
+                var unpaidAmount = Number(
+                  getValue(payer, "unpaidAmount", "UnpaidAmount", 0),
+                );
+
+                var status = normalizeStatus(payer);
 
                 return (
                   <tr
@@ -139,9 +477,7 @@ export default function PayersList(props) {
                     </td>
 
                     <td className="px-6 py-5 font-bold">
-                      {formatMoney(
-                        getValue(payer, "totalAmount", "TotalAmount", 0),
-                      )}
+                      {formatMoney(totalAmount)}
                     </td>
 
                     <td className="px-6 py-5 font-bold text-[#2E7D32]">
@@ -150,14 +486,21 @@ export default function PayersList(props) {
                       )}
                     </td>
 
-                    <td className="px-6 py-5 font-bold text-[#C62828]">
-                      {formatMoney(
-                        getValue(payer, "unpaidAmount", "UnpaidAmount", 0),
-                      )}
+                    <td
+                      className={
+                        "px-6 py-5 font-bold " +
+                        (unpaidAmount > 0 ? "text-[#C62828]" : "text-[#2E7D32]")
+                      }
+                    >
+                      {formatMoney(unpaidAmount)}
                     </td>
 
                     <td className="px-6 py-5">
-                      <PaymentStatusBadge status={status} />
+                      <PaymentStatusBadge
+                        status={status}
+                        totalAmount={totalAmount}
+                        unpaidAmount={unpaidAmount}
+                      />
                     </td>
 
                     <td className="px-6 py-5 text-[#7A655C]">

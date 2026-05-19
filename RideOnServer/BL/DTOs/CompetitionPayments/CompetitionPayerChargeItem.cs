@@ -16,6 +16,10 @@
 
         public DateTime? DisplayDate { get; set; }
 
+        public DateTime? StartDate { get; set; }
+
+        public DateTime? EndDate { get; set; }
+
         public string MainName { get; set; } = string.Empty;
 
         public string? RiderName { get; set; }
@@ -27,6 +31,20 @@
         public string? CoachName { get; set; }
 
         public string PayerName { get; set; } = string.Empty;
+
+        public string? StallTypeName { get; set; }
+
+        public string? StallNumber { get; set; }
+
+        public string? CompoundName { get; set; }
+
+        public int? BagQuantity { get; set; }
+
+        public int? SplitPayersCount { get; set; }
+
+        public string? SplitPaymentText { get; set; }
+
+        public string? StallAssignmentText { get; set; }
 
         public decimal AmountToPay { get; set; }
 
