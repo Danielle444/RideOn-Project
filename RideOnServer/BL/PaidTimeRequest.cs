@@ -333,6 +333,26 @@ namespace RideOnServer.BL
             return dal.GetMyPaidTimeRequestsForCompetition(competitionId, orderedBySystemUserId);
         }
 
+        internal static List<SlotScheduleItem> GetSlotScheduleForViewing(int slotId, int competitionId, int ranchId)
+        {
+            if (slotId <= 0 || competitionId <= 0 || ranchId <= 0)
+            {
+                throw new Exception("Invalid request");
+            }
+            PaidTimeRequestDAL dal = new PaidTimeRequestDAL();
+            return dal.GetSlotScheduleForViewing(slotId, competitionId, ranchId);
+        }
+
+        internal static List<PublishedSlotItem> GetPublishedSlotsForCompetition(int competitionId, int ranchId)
+        {
+            if (competitionId <= 0 || ranchId <= 0)
+            {
+                throw new Exception("Invalid request");
+            }
+            PaidTimeRequestDAL dal = new PaidTimeRequestDAL();
+            return dal.GetPublishedSlotsForCompetition(competitionId, ranchId);
+        }
+
         internal static void CancelMyPaidTimeRequest(int paidTimeRequestId, int orderedBySystemUserId)
         {
             if (paidTimeRequestId <= 0)
@@ -348,9 +368,13 @@ namespace RideOnServer.BL
             dal.CancelPaidTimeRequest(paidTimeRequestId, orderedBySystemUserId);
         }
 
-        internal static void UpdateMyPaidTimeRequestNotes(int paidTimeRequestId, int orderedBySystemUserId, string? notes)
+        internal static void UpdateMyPaidTimeRequest(UpdatePaidTimeRequestNotesRequest request, int orderedBySystemUserId)
         {
-            if (paidTimeRequestId <= 0)
+            if (request == null)
+            {
+                throw new Exception("Request is required");
+            }
+            if (request.PaidTimeRequestId <= 0)
             {
                 throw new Exception("Invalid PaidTimeRequestId");
             }
@@ -359,8 +383,28 @@ namespace RideOnServer.BL
                 throw new Exception("Invalid OrderedBySystemUserId");
             }
 
+            bool notesProvided = request.Notes != null;
+            int? pcId = request.PriceCatalogId.HasValue && request.PriceCatalogId.Value > 0
+                ? request.PriceCatalogId
+                : null;
+            int? slotId = request.RequestedCompSlotId.HasValue && request.RequestedCompSlotId.Value > 0
+                ? request.RequestedCompSlotId
+                : null;
+
+            if (!notesProvided && !pcId.HasValue && !slotId.HasValue)
+            {
+                throw new Exception("No fields to update");
+            }
+
             PaidTimeRequestDAL dal = new PaidTimeRequestDAL();
-            dal.UpdatePaidTimeRequestNotes(paidTimeRequestId, orderedBySystemUserId, notes);
+            dal.UpdatePaidTimeRequest(
+                request.PaidTimeRequestId,
+                orderedBySystemUserId,
+                request.Notes,
+                notesProvided,
+                pcId,
+                slotId
+            );
         }
     }
 }

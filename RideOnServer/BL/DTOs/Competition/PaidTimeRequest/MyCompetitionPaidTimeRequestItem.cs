@@ -44,6 +44,9 @@
         public int? BatchId { get; set; }
         public int HorseId { get; set; }
         public int? CoachFederationMemberId { get; set; }
+        public DateTime? AssignedStartTimeActual { get; set; }
+        public int? AssignedOrder { get; set; }
+        public bool AssignedSlotIsPublished { get; set; }
     }
 
     public class CancelPaidTimeRequestRequest
@@ -57,5 +60,7 @@
         public int PaidTimeRequestId { get; set; }
         public int RanchId { get; set; }
         public string? Notes { get; set; }
+        public int? PriceCatalogId { get; set; }
+        public int? RequestedCompSlotId { get; set; }
     }
 }

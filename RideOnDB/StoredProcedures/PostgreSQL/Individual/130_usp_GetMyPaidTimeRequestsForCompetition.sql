@@ -41,7 +41,10 @@ RETURNS TABLE(
     "cancancel"              BOOLEAN,
     "batchid"                INTEGER,
     "horseid"                INTEGER,
-    "coachfederationmemberid" INTEGER
+    "coachfederationmemberid" INTEGER,
+    "assignedstarttimeactual" TIMESTAMP WITH TIME ZONE,
+    "assignedorder"          INTEGER,
+    "assignedslotispublished" BOOLEAN
 )
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -78,7 +81,9 @@ BEGIN
             ass_slot.starttime         AS ass_start,
             ass_slot.endtime           AS ass_end,
             ass_arena.arenaname::TEXT  AS ass_arena,
-            ptr.assignedstarttime      AS assigned_ts
+            COALESCE(ass_slot.ispublished, FALSE) AS ass_ispublished,
+            ptr.assignedstarttime      AS assigned_ts,
+            ptr.assignedorder          AS assigned_order
 
         FROM paidtimerequest ptr
         INNER JOIN servicerequest sr ON sr.srequestid = ptr.paidtimerequestid
@@ -157,11 +162,15 @@ BEGIN
         ) AS cancancel,
         b.batchid,
         b.horseid,
-        b.coachfederationmemberid
+        b.coachfederationmemberid,
+        b.assigned_ts,
+        b.assigned_order,
+        b.ass_ispublished
     FROM base b
     ORDER BY
         COALESCE(b.ass_date,  b.req_date),
         COALESCE(b.ass_start, b.req_start),
+        b.assigned_order NULLS LAST,
         b.createdat;
 END;
 $$;

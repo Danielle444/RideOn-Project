@@ -1,7 +1,6 @@
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -23,10 +22,14 @@ import { useCompetition } from "../../../../context/CompetitionContext";
 
 import useAdminCompetitionPaidTimesList from "../../../../hooks/useAdminCompetitionPaidTimesList";
 
-import {
-  cancelPaidTimeRequest,
-  updatePaidTimeRequestNotes,
-} from "../../../../services/paidTimeRequestsService";
+import { cancelPaidTimeRequest } from "../../../../services/paidTimeRequestsService";
+
+import PaidTimeListItemCard from "../../../../components/competitions/adminPaidTimes/PaidTimeListItemCard";
+import PaidTimeScheduleView from "../../../../components/competitions/adminPaidTimes/PaidTimeScheduleView";
+import PaidTimeEditModal from "../../../../components/competitions/adminPaidTimes/PaidTimeEditModal";
+import AddPaidTimeButton from "../../../../components/competitions/adminPaidTimes/AddPaidTimeButton";
+import SlotScheduleModal from "../../../../components/competitions/adminPaidTimes/SlotScheduleModal";
+import PublishedSlotsModal from "../../../../components/competitions/adminPaidTimes/PublishedSlotsModal";
 
 import styles from "../../../../styles/adminCompetitionPaidTimesStyles";
 
@@ -44,37 +47,59 @@ export default function AdminCompetitionPaidTimesScreen(props) {
 
   var [showFilters, setShowFilters] = useState(false);
   var [editingItem, setEditingItem] = useState(null);
-  var [editNotes, setEditNotes] = useState("");
-  var [savingNotes, setSavingNotes] = useState(false);
   var [cancellingId, setCancellingId] = useState(null);
+  var [viewMode, setViewMode] = useState("list");
+  var [expandedIds, setExpandedIds] = useState({});
+  var [viewingSlotId, setViewingSlotId] = useState(null);
+  var [publishedSlotsOpen, setPublishedSlotsOpen] = useState(false);
 
-  function openEditNotes(item) {
+  function handleViewSlotSchedule(slotId) {
+    setViewingSlotId(slotId);
+  }
+
+  function isExpanded(id) {
+    return !!expandedIds[id];
+  }
+
+  function toggleExpand(id) {
+    setExpandedIds(function (prev) {
+      var next = Object.assign({}, prev);
+      if (next[id]) {
+        delete next[id];
+      } else {
+        next[id] = true;
+      }
+      return next;
+    });
+  }
+
+  function expandAll() {
+    var next = {};
+    paidTimes.filteredItems.forEach(function (it) {
+      next[it.paidTimeRequestId] = true;
+    });
+    setExpandedIds(next);
+  }
+
+  function collapseAll() {
+    setExpandedIds({});
+  }
+
+  function handleCompetitionMenuPress(item) {
+    props.navigation.navigate(item.screen);
+  }
+
+  async function handleExitCompetition() {
+    await competitionContext.clearCompetition();
+    props.navigation.navigate("AdminCompetitionsBoard");
+  }
+
+  function openEdit(item) {
     setEditingItem(item);
-    setEditNotes(item.notes || "");
   }
 
-  function closeEditNotes() {
+  function closeEdit() {
     setEditingItem(null);
-    setEditNotes("");
-  }
-
-  async function handleSaveNotes() {
-    if (!editingItem) return;
-    try {
-      setSavingNotes(true);
-      await updatePaidTimeRequestNotes({
-        paidTimeRequestId: editingItem.paidTimeRequestId,
-        ranchId: activeRole?.ranchId,
-        notes: editNotes,
-      });
-      closeEditNotes();
-      await paidTimes.handleRefresh();
-    } catch (err) {
-      var msg = err?.response?.data || err?.message || "אירעה שגיאה";
-      Alert.alert("שגיאה", String(msg));
-    } finally {
-      setSavingNotes(false);
-    }
   }
 
   function confirmCancel(item) {
@@ -83,7 +108,7 @@ export default function AdminCompetitionPaidTimesScreen(props) {
       ? "ביטול בתוך 24 שעות - חיוב מלא"
       : "ביטול פייד טיים";
     var body = withinDay
-      ? "שים לב: הביטול מתבצע פחות מ-24 שעות לפני המועד. במידה ותאשר, תחויב בתשלום מלא של הפייד טיים. הסלוט יתפנה לרוכב אחר. להמשיך?"
+      ? "שים לב: הביטול מתבצע פחות מ-24 שעות לפני המועד. במידה ותאשר, תחויב בתשלום מלא. הסלוט יתפנה לרוכב אחר."
       : "ביטול הבקשה ישחרר את הסלוט לרוכב אחר. עפ\"י כללי העסק חיוב מלא חל. להמשיך?";
 
     Alert.alert(
@@ -119,15 +144,6 @@ export default function AdminCompetitionPaidTimesScreen(props) {
     }
   }
 
-  function handleCompetitionMenuPress(item) {
-    props.navigation.navigate(item.screen);
-  }
-
-  async function handleExitCompetition() {
-    await competitionContext.clearCompetition();
-    props.navigation.navigate("AdminCompetitionsBoard");
-  }
-
   function renderFilterChip(label, isActive, onPress, keyValue) {
     return (
       <Pressable
@@ -149,7 +165,6 @@ export default function AdminCompetitionPaidTimesScreen(props) {
 
   function renderSummaryBox(label, number, filterValue) {
     var isActive = paidTimes.statusFilter === filterValue;
-
     return (
       <Pressable
         style={[styles.summaryBox, isActive ? styles.summaryBoxActive : null]}
@@ -177,249 +192,40 @@ export default function AdminCompetitionPaidTimesScreen(props) {
     );
   }
 
-  function renderStatusBadge(item) {
-    var badgeStyle = [styles.statusBadge];
-
-    if (item.isAssigned) {
-      badgeStyle.push(styles.statusAssigned);
-    } else {
-      badgeStyle.push(styles.statusPending);
-    }
-
-    return (
-      <View style={badgeStyle}>
-        <Text style={styles.statusBadgeText}>{item.displayStatus}</Text>
-      </View>
-    );
-  }
-
-  function renderPaymentBadge(item) {
-    return (
-      <View
-        style={[
-          styles.paymentBadge,
-          item.isPaid ? styles.paymentPaid : styles.paymentUnpaid,
-        ]}
-      >
-        <Text style={styles.paymentBadgeText}>
-          {item.isPaid ? "שולם" : "לא שולם"}
-        </Text>
-      </View>
-    );
-  }
-
-  function renderPaidTimeCard(item) {
-    return (
-      <View key={String(item.paidTimeRequestId)} style={styles.requestCard}>
-        <View style={styles.cardTopRow}>
-          <Text style={styles.priceText}>{item.amountToPay} ₪</Text>
-        </View>
-
-        <Text style={styles.horseName}>{item.horseName}</Text>
-
-        <View style={styles.badgesRow}>
-          {renderStatusBadge(item)}
-          {renderPaymentBadge(item)}
-        </View>
-
-        {item.barnName ? (
-          <Text style={styles.barnName}>{item.barnName}</Text>
-        ) : null}
-
-        <View style={styles.detailsBlock}>
-          <Text style={styles.detailText}>מאמן: {item.coachName || "-"}</Text>
-          <Text style={styles.detailText}>משלם: {item.payerName || "-"}</Text>
-          <Text style={styles.detailText}>סוג: {item.productName || "-"}</Text>
-        </View>
-
-        <View style={styles.slotCard}>
-          <Text style={styles.slotTitle}>
-            {item.isAssigned ? "שיבוץ בפועל" : "סלוט מבוקש"}
-          </Text>
-
-          <Text style={styles.slotDateText}>
-            {paidTimes.formatDate(item.displaySlotDate)}
-          </Text>
-
-          <Text style={styles.slotText}>
-            {paidTimes.formatTime(item.displayStartTime)} -{" "}
-            {paidTimes.formatTime(item.displayEndTime)}
-          </Text>
-
-          <Text style={styles.slotText}>{item.displayArenaName}</Text>
-        </View>
-
-        {item.notes ? (
-          <View style={styles.notesBox}>
-            <Text style={styles.notesTitle}>הערות</Text>
-            <Text style={styles.notesText}>{item.notes}</Text>
-          </View>
-        ) : null}
-
-        {renderCardActions(item)}
-      </View>
-    );
-  }
-
-  function renderCardActions(item) {
-    var isCancelling = cancellingId === item.paidTimeRequestId;
-    var canEdit = !!item.canModify;
-    var canCancel = !!item.canCancel;
-    var isCancelled = item.status === "Cancelled";
-
-    if (!canEdit && !canCancel) {
-      var lockReason = "";
-      if (isCancelled) {
-        lockReason = "הבקשה בוטלה";
-      } else if (item.isPaid) {
-        lockReason = "הבקשה כבר שולמה - לא ניתן לערוך או לבטל";
-      } else {
-        lockReason = "לא ניתן לבצע פעולות על בקשה זו";
-      }
-
-      return (
-        <View
-          style={{
-            marginTop: 10,
-            paddingTop: 10,
-            borderTopWidth: 1,
-            borderTopColor: "#EFE5DF",
-          }}
-        >
-          <Text
-            style={{
-              textAlign: "right",
-              fontSize: 12,
-              color: "#8D6E63",
-            }}
-          >
-            {lockReason}
-          </Text>
-        </View>
-      );
-    }
-
-    return (
-      <View
-        style={{
-          flexDirection: "row-reverse",
-          gap: 8,
-          marginTop: 10,
-          paddingTop: 10,
-          borderTopWidth: 1,
-          borderTopColor: "#EFE5DF",
-        }}
-      >
-        {canEdit ? (
-          <Pressable
-            onPress={function () {
-              openEditNotes(item);
-            }}
-            style={{
-              flex: 1,
-              paddingVertical: 10,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: "#7B5A4D",
-              alignItems: "center",
-            }}
-          >
-            <Text style={{ color: "#7B5A4D", fontWeight: "600" }}>
-              ערוך הערות
-            </Text>
-          </Pressable>
-        ) : null}
-
-        {canCancel ? (
-          <Pressable
-            onPress={function () {
-              confirmCancel(item);
-            }}
-            disabled={isCancelling}
-            style={{
-              flex: 1,
-              paddingVertical: 10,
-              borderRadius: 8,
-              backgroundColor: isCancelling ? "#C4B5AA" : "#B45454",
-              alignItems: "center",
-            }}
-          >
-            {isCancelling ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>
-                בטל פייד טיים
-              </Text>
-            )}
-          </Pressable>
-        ) : null}
-      </View>
-    );
-  }
-
   function renderFilters() {
     return (
       <View style={styles.filterSection}>
         <Text style={styles.filterTitle}>סינון מהיר</Text>
 
         <View style={styles.chipsRow}>
-          {renderFilterChip(
-            "כל התשלומים",
-            paidTimes.paymentFilter === "all",
-            function () {
-              paidTimes.setPaymentFilter("all");
-            },
-          )}
-          {renderFilterChip(
-            "שולם",
-            paidTimes.paymentFilter === "paid",
-            function () {
-              paidTimes.setPaymentFilter("paid");
-            },
-          )}
-          {renderFilterChip(
-            "לא שולם",
-            paidTimes.paymentFilter === "unpaid",
-            function () {
-              paidTimes.setPaymentFilter("unpaid");
-            },
-          )}
+          {renderFilterChip("כל התשלומים", paidTimes.paymentFilter === "all", function () {
+            paidTimes.setPaymentFilter("all");
+          })}
+          {renderFilterChip("שולם", paidTimes.paymentFilter === "paid", function () {
+            paidTimes.setPaymentFilter("paid");
+          })}
+          {renderFilterChip("לא שולם", paidTimes.paymentFilter === "unpaid", function () {
+            paidTimes.setPaymentFilter("unpaid");
+          })}
         </View>
 
         <View style={styles.chipsRow}>
-          {renderFilterChip(
-            "כל הסוגים",
-            paidTimes.productFilter === "all",
-            function () {
-              paidTimes.setProductFilter("all");
-            },
-          )}
-          {renderFilterChip(
-            "קצר",
-            paidTimes.productFilter === "short",
-            function () {
-              paidTimes.setProductFilter("short");
-            },
-          )}
-          {renderFilterChip(
-            "ארוך",
-            paidTimes.productFilter === "long",
-            function () {
-              paidTimes.setProductFilter("long");
-            },
-          )}
+          {renderFilterChip("כל הסוגים", paidTimes.productFilter === "all", function () {
+            paidTimes.setProductFilter("all");
+          })}
+          {renderFilterChip("קצר", paidTimes.productFilter === "short", function () {
+            paidTimes.setProductFilter("short");
+          })}
+          {renderFilterChip("ארוך", paidTimes.productFilter === "long", function () {
+            paidTimes.setProductFilter("long");
+          })}
         </View>
 
         <Text style={styles.filterTitle}>ימים</Text>
         <View style={styles.chipsRow}>
-          {renderFilterChip(
-            "כל הימים",
-            paidTimes.dateFilter === "all",
-            function () {
-              paidTimes.setDateFilter("all");
-            },
-          )}
-
+          {renderFilterChip("כל הימים", paidTimes.dateFilter === "all", function () {
+            paidTimes.setDateFilter("all");
+          })}
           {paidTimes.availableDates.map(function (dateItem) {
             return renderFilterChip(
               dateItem.label,
@@ -427,21 +233,16 @@ export default function AdminCompetitionPaidTimesScreen(props) {
               function () {
                 paidTimes.setDateFilter(dateItem.value);
               },
-              "date-" + dateItem.value,
+              "date-" + dateItem.value
             );
           })}
         </View>
 
         <Text style={styles.filterTitle}>סלוטים</Text>
         <View style={styles.chipsRow}>
-          {renderFilterChip(
-            "כל הסלוטים",
-            paidTimes.slotFilter === "all",
-            function () {
-              paidTimes.setSlotFilter("all");
-            },
-          )}
-
+          {renderFilterChip("כל הסלוטים", paidTimes.slotFilter === "all", function () {
+            paidTimes.setSlotFilter("all");
+          })}
           {paidTimes.availableSlots.map(function (slotItem) {
             return renderFilterChip(
               slotItem.label,
@@ -449,15 +250,12 @@ export default function AdminCompetitionPaidTimesScreen(props) {
               function () {
                 paidTimes.setSlotFilter(slotItem.value);
               },
-              "slot-" + slotItem.value,
+              "slot-" + slotItem.value
             );
           })}
         </View>
 
-        <Pressable
-          style={styles.clearFiltersButton}
-          onPress={paidTimes.resetFilters}
-        >
+        <Pressable style={styles.clearFiltersButton} onPress={paidTimes.resetFilters}>
           <Text style={styles.clearFiltersText}>ניקוי כל הסינונים</Text>
         </Pressable>
       </View>
@@ -493,8 +291,39 @@ export default function AdminCompetitionPaidTimesScreen(props) {
       );
     }
 
+    if (viewMode === "schedule") {
+      return (
+        <PaidTimeScheduleView
+          items={paidTimes.filteredItems}
+          isExpanded={isExpanded}
+          onToggleExpand={toggleExpand}
+          onEdit={openEdit}
+          onCancel={confirmCancel}
+          cancellingId={cancellingId}
+          formatDate={paidTimes.formatDate}
+          formatTime={paidTimes.formatTime}
+          onViewSlotSchedule={handleViewSlotSchedule}
+        />
+      );
+    }
+
     return paidTimes.filteredItems.map(function (item) {
-      return renderPaidTimeCard(item);
+      return (
+        <PaidTimeListItemCard
+          key={String(item.paidTimeRequestId)}
+          item={item}
+          isExpanded={isExpanded(item.paidTimeRequestId)}
+          onToggleExpand={function () {
+            toggleExpand(item.paidTimeRequestId);
+          }}
+          onEdit={openEdit}
+          onCancel={confirmCancel}
+          cancellingId={cancellingId}
+          formatDate={paidTimes.formatDate}
+          formatTime={paidTimes.formatTime}
+          onViewSlotSchedule={handleViewSlotSchedule}
+        />
+      );
     });
   }
 
@@ -537,24 +366,50 @@ export default function AdminCompetitionPaidTimesScreen(props) {
 
           <View style={styles.summaryRow}>
             {renderSummaryBox("סה״כ בקשות", paidTimes.items.length, "all")}
-
             {renderSummaryBox(
               "שובצו",
               paidTimes.items.filter(function (item) {
                 return item.isAssigned;
               }).length,
-              "assigned",
+              "assigned"
             )}
-
             {renderSummaryBox(
               "טרם שובצו",
               paidTimes.items.filter(function (item) {
                 return !item.isAssigned;
               }).length,
-              "pending",
+              "pending"
             )}
           </View>
         </View>
+
+        <AddPaidTimeButton
+          navigation={props.navigation}
+          competitionId={activeCompetition?.competitionId}
+        />
+
+        <Pressable
+          onPress={function () {
+            setPublishedSlotsOpen(true);
+          }}
+          style={{
+            flexDirection: "row-reverse",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "#FFFFFF",
+            borderWidth: 1,
+            borderColor: "#7B5A4D",
+            paddingVertical: 10,
+            paddingHorizontal: 14,
+            borderRadius: 10,
+            gap: 8,
+            marginBottom: 12,
+          }}
+        >
+          <Text style={{ color: "#7B5A4D", fontWeight: "700", fontSize: 14 }}>
+            כל הסלוטים שפורסמו
+          </Text>
+        </Pressable>
 
         <View style={styles.searchCard}>
           <Text style={styles.fieldLabel}>חיפוש</Text>
@@ -578,7 +433,6 @@ export default function AdminCompetitionPaidTimesScreen(props) {
             <Text style={styles.filterToggleText}>
               {showFilters ? "הסתר סינונים" : "הצג סינונים"}
             </Text>
-
             <Text style={styles.filterToggleIcon}>
               {showFilters ? "▲" : "▼"}
             </Text>
@@ -587,116 +441,128 @@ export default function AdminCompetitionPaidTimesScreen(props) {
           {showFilters ? renderFilters() : null}
         </View>
 
-        <Text style={styles.resultsText}>
-          מוצגות {paidTimes.filteredItems.length} מתוך {paidTimes.items.length}{" "}
-          בקשות
-        </Text>
-
-        {renderContent()}
-      </ScrollView>
-
-      <Modal
-        visible={!!editingItem}
-        transparent
-        animationType="fade"
-        onRequestClose={closeEditNotes}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.4)",
-            justifyContent: "center",
-            padding: 20,
-          }}
-        >
-          <View
+        <View style={{ flexDirection: "row-reverse", gap: 8, marginBottom: 10 }}>
+          <Pressable
+            onPress={function () {
+              setViewMode("list");
+            }}
             style={{
-              backgroundColor: "#FFFFFF",
-              borderRadius: 14,
-              padding: 18,
+              flex: 1,
+              paddingVertical: 10,
+              borderRadius: 8,
+              backgroundColor: viewMode === "list" ? "#7B5A4D" : "#FFFFFF",
+              borderWidth: 1,
+              borderColor: "#7B5A4D",
+              alignItems: "center",
             }}
           >
             <Text
               style={{
-                fontSize: 17,
+                color: viewMode === "list" ? "#FFFFFF" : "#7B5A4D",
                 fontWeight: "700",
-                color: "#3F312B",
-                textAlign: "right",
-                marginBottom: 12,
               }}
             >
-              עריכת הערות
+              רשימה
             </Text>
-            {editingItem ? (
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: "#8D6E63",
-                  textAlign: "right",
-                  marginBottom: 10,
-                }}
-              >
-                {editingItem.horseName}
-                {editingItem.barnName ? " (" + editingItem.barnName + ")" : ""}
-              </Text>
-            ) : null}
-            <TextInput
-              value={editNotes}
-              onChangeText={setEditNotes}
-              placeholder="הערות לבקשה"
-              placeholderTextColor="#9E8A7F"
-              multiline
+          </Pressable>
+          <Pressable
+            onPress={function () {
+              setViewMode("schedule");
+            }}
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              borderRadius: 8,
+              backgroundColor: viewMode === "schedule" ? "#7B5A4D" : "#FFFFFF",
+              borderWidth: 1,
+              borderColor: "#7B5A4D",
+              alignItems: "center",
+            }}
+          >
+            <Text
               style={{
+                color: viewMode === "schedule" ? "#FFFFFF" : "#7B5A4D",
+                fontWeight: "700",
+              }}
+            >
+              לו"ז שיבוצים
+            </Text>
+          </Pressable>
+        </View>
+
+        <View
+          style={{
+            flexDirection: "row-reverse",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 8,
+          }}
+        >
+          <Text style={styles.resultsText}>
+            מוצגות {paidTimes.filteredItems.length} מתוך{" "}
+            {paidTimes.items.length} בקשות
+          </Text>
+          <View style={{ flexDirection: "row-reverse", gap: 6 }}>
+            <Pressable
+              onPress={expandAll}
+              style={{
+                paddingVertical: 6,
+                paddingHorizontal: 10,
+                borderRadius: 6,
                 borderWidth: 1,
                 borderColor: "#D9CFC2",
-                borderRadius: 8,
-                padding: 10,
-                minHeight: 90,
-                textAlign: "right",
-                color: "#3F312B",
-                marginBottom: 12,
               }}
-            />
-            <View style={{ flexDirection: "row-reverse", gap: 8 }}>
-              <Pressable
-                onPress={handleSaveNotes}
-                disabled={savingNotes}
-                style={{
-                  flex: 1,
-                  paddingVertical: 10,
-                  borderRadius: 8,
-                  backgroundColor: savingNotes ? "#C4B5AA" : "#7B5A4D",
-                  alignItems: "center",
-                }}
-              >
-                {savingNotes ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>
-                    שמור
-                  </Text>
-                )}
-              </Pressable>
-              <Pressable
-                onPress={closeEditNotes}
-                disabled={savingNotes}
-                style={{
-                  flex: 1,
-                  paddingVertical: 10,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: "#7B5A4D",
-                  alignItems: "center",
-                }}
-              >
-                <Text style={{ color: "#7B5A4D", fontWeight: "600" }}>
-                  ביטול
-                </Text>
-              </Pressable>
-            </View>
+            >
+              <Text style={{ fontSize: 12, color: "#5A4036" }}>הרחב הכל</Text>
+            </Pressable>
+            <Pressable
+              onPress={collapseAll}
+              style={{
+                paddingVertical: 6,
+                paddingHorizontal: 10,
+                borderRadius: 6,
+                borderWidth: 1,
+                borderColor: "#D9CFC2",
+              }}
+            >
+              <Text style={{ fontSize: 12, color: "#5A4036" }}>מזער הכל</Text>
+            </Pressable>
           </View>
         </View>
-      </Modal>
+
+        {renderContent()}
+      </ScrollView>
+
+      {editingItem ? (
+        <PaidTimeEditModal
+          item={editingItem}
+          competitionId={activeCompetition?.competitionId}
+          ranchId={activeRole?.ranchId}
+          roleId={activeRole?.roleId}
+          onClose={closeEdit}
+          onSaved={paidTimes.handleRefresh}
+        />
+      ) : null}
+
+      {viewingSlotId ? (
+        <SlotScheduleModal
+          slotId={viewingSlotId}
+          competitionId={activeCompetition?.competitionId}
+          ranchId={activeRole?.ranchId}
+          onClose={function () {
+            setViewingSlotId(null);
+          }}
+        />
+      ) : null}
+
+      <PublishedSlotsModal
+        isOpen={publishedSlotsOpen}
+        competitionId={activeCompetition?.competitionId}
+        ranchId={activeRole?.ranchId}
+        onClose={function () {
+          setPublishedSlotsOpen(false);
+        }}
+      />
     </MobileScreenLayout>
   );
 }

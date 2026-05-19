@@ -265,6 +265,69 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("slot-schedule")]
+        public IActionResult GetSlotScheduleForViewing(
+            [FromQuery] int slotId,
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (slotId <= 0 || competitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+                UserAccessValidator.EnsureUserHasRoleInRanch(personId, ranchId, RoleNames.RanchAdmin);
+
+                List<SlotScheduleItem> items =
+                    PaidTimeRequest.GetSlotScheduleForViewing(slotId, competitionId, ranchId);
+
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetSlotScheduleForViewing: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("published-slots")]
+        public IActionResult GetPublishedSlotsForCompetition(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (competitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+                UserAccessValidator.EnsureUserHasRoleInRanch(personId, ranchId, RoleNames.RanchAdmin);
+
+                List<PublishedSlotItem> items =
+                    PaidTimeRequest.GetPublishedSlotsForCompetition(competitionId, ranchId);
+
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetPublishedSlotsForCompetition: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpPost("cancel")]
         public IActionResult CancelPaidTimeRequest([FromBody] CancelPaidTimeRequestRequest request)
         {
@@ -316,7 +379,7 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin
                 );
 
-                PaidTimeRequest.UpdateMyPaidTimeRequestNotes(request.PaidTimeRequestId, personId, request.Notes);
+                PaidTimeRequest.UpdateMyPaidTimeRequest(request, personId);
 
                 return Ok("ההערות עודכנו בהצלחה");
             }
