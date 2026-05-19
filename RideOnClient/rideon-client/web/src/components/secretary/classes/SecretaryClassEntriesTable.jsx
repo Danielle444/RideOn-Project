@@ -1,13 +1,22 @@
 import {
-  ArrowDown,
-  ArrowUp,
+  DndContext,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import {
   Dice5,
+  GripVertical,
   Pencil,
   Save,
   Shuffle,
   Trash2,
   X,
 } from "lucide-react";
+
 import DataTableShell from "../../common/table/DataTableShell";
 import DataTableEmptyState from "../../common/table/DataTableEmptyState";
 import DataTableLoadingState from "../../common/table/DataTableLoadingState";
@@ -77,10 +86,208 @@ function getEntryWarningText(item) {
   return messages.join(" · ");
 }
 
+function getDragId(entryId) {
+  return "draw-entry-" + entryId;
+}
+
+function getEntryIdFromDragId(value) {
+  return String(value || "").replace("draw-entry-", "");
+}
+
+function DragHandle(props) {
+  var entryId = props.entryId;
+  var disabled = !!props.disabled;
+
+  var draggable = useDraggable({
+    id: getDragId(entryId),
+    data: {
+      entryId: entryId,
+    },
+    disabled: disabled,
+  });
+
+  var style = draggable.transform
+    ? {
+        transform: CSS.Translate.toString(draggable.transform),
+      }
+    : undefined;
+
+  return (
+    <button
+      ref={draggable.setNodeRef}
+      type="button"
+      style={style}
+      {...draggable.attributes}
+      {...draggable.listeners}
+      disabled={disabled}
+      className={[
+        "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#E2D5CE] bg-white text-[#7B5A4D] transition-colors",
+        disabled
+          ? "cursor-not-allowed opacity-40"
+          : "cursor-grab hover:bg-[#FAF5F1] active:cursor-grabbing",
+        draggable.isDragging ? "z-50 shadow-lg opacity-80" : "",
+      ].join(" ")}
+      title="גרירה לשינוי סדר"
+    >
+      <GripVertical size={17} />
+    </button>
+  );
+}
+
+function SortableEntryRow(props) {
+  var item = props.item;
+  var index = props.index;
+  var drawOrderEditMode = !!props.drawOrderEditMode;
+  var canEditEntry = !!props.canEditEntry;
+  var savingDrawOrder = !!props.savingDrawOrder;
+
+  var horseName = getValue(item, "horseName", "HorseName", "");
+  var barnName = getValue(item, "barnName", "BarnName", "");
+  var entryId = getEntryId(item);
+  var drawOrder = getEntryDrawOrder(item);
+  var warningText = getEntryWarningText(item);
+
+  var droppable = useDroppable({
+    id: getDragId(entryId),
+    data: {
+      entryId: entryId,
+    },
+    disabled: !drawOrderEditMode || savingDrawOrder,
+  });
+
+  return (
+    <tr
+      ref={droppable.setNodeRef}
+      className={[
+        "border-t border-[#F1E7E1] text-sm text-[#4A3A34]",
+        drawOrderEditMode ? "bg-white" : "",
+        droppable.isOver && drawOrderEditMode ? "bg-[#FAF5F1]" : "",
+      ].join(" ")}
+    >
+      <td className="px-4 py-3 font-bold text-[#7B5A4D]">
+        {drawOrderEditMode ? (
+          <input
+            type="number"
+            min="1"
+            value={drawOrder || ""}
+            onChange={function (event) {
+              props.onUpdateDraftDrawOrder(entryId, event.target.value);
+            }}
+            disabled={savingDrawOrder}
+            className="h-10 w-20 rounded-xl border border-[#E2D5CE] bg-white px-3 text-center text-sm font-bold text-[#3F312B] outline-none transition-colors focus:border-[#8B6352]"
+          />
+        ) : (
+          drawOrder || "-"
+        )}
+      </td>
+
+      <td className="px-4 py-3 font-semibold">
+        {getValue(item, "className", "ClassName", "-")}
+      </td>
+
+      <td className="px-4 py-3 font-semibold">
+        {getValue(item, "riderName", "RiderName", "-")}
+      </td>
+
+      <td className="px-4 py-3">
+        <div className="flex flex-col gap-1">
+          <span className="font-semibold">{horseName || "-"}</span>
+
+          {barnName ? (
+            <span className="text-xs text-[#8D6E63]">{barnName}</span>
+          ) : null}
+        </div>
+      </td>
+
+      <td className="px-4 py-3">
+        {getValue(item, "coachName", "CoachName", "-") || "-"}
+      </td>
+
+      <td className="px-4 py-3">
+        {getValue(item, "payerName", "PayerName", "-")}
+      </td>
+
+      <td className="px-4 py-3">
+        {getValue(
+          item,
+          "prizeRecipientName",
+          "PrizeRecipientName",
+          "-",
+        ) || "-"}
+      </td>
+
+      {canEditEntry && !drawOrderEditMode ? (
+        <td className="px-4 py-3">
+          <div className="flex justify-end gap-2">
+            <TableActionButton
+              icon={<Pencil size={15} />}
+              iconOnly
+              title="עריכת כניסה"
+              onClick={function () {
+                if (props.onEditEntry) {
+                  props.onEditEntry(item);
+                }
+              }}
+              disabled={!props.onEditEntry}
+            />
+
+            <TableActionButton
+              icon={<Trash2 size={15} />}
+              iconOnly
+              title="מחיקת כניסה"
+              variant="danger"
+              onClick={function () {
+                if (props.onDeleteEntry) {
+                  props.onDeleteEntry(item);
+                }
+              }}
+              disabled={!props.onDeleteEntry}
+            />
+          </div>
+        </td>
+      ) : null}
+
+      {drawOrderEditMode ? (
+        <>
+          <td className="px-4 py-3">
+            {warningText ? (
+              <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-bold text-orange-800">
+                {warningText}
+              </span>
+            ) : (
+              <span className="rounded-full bg-[#EEF8F0] px-3 py-1 text-xs font-bold text-[#2F6B3B]">
+                תקין
+              </span>
+            )}
+          </td>
+
+          <td className="px-4 py-3">
+            <div className="flex justify-end">
+              <DragHandle
+                entryId={entryId}
+                disabled={savingDrawOrder}
+                index={index}
+              />
+            </div>
+          </td>
+        </>
+      ) : null}
+    </tr>
+  );
+}
+
 export default function SecretaryClassEntriesTable(props) {
   var items = Array.isArray(props.items) ? props.items : [];
   var canEditDrawOrder = !!props.canEditDrawOrder;
   var canEditEntry = !!props.canEditEntry;
+
+  var sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 6,
+      },
+    }),
+  );
 
   var colSpan = 7;
 
@@ -90,6 +297,19 @@ export default function SecretaryClassEntriesTable(props) {
 
   if (canEditEntry && !props.drawOrderEditMode) {
     colSpan += 1;
+  }
+
+  function handleDragEnd(event) {
+    if (!event || !event.active || !event.over) {
+      return;
+    }
+
+    var activeEntryId = getEntryIdFromDragId(event.active.id);
+    var overEntryId = getEntryIdFromDragId(event.over.id);
+
+    if (props.onMoveDrawOrderEntryToEntry) {
+      props.onMoveDrawOrderEntryToEntry(activeEntryId, overEntryId);
+    }
   }
 
   return (
@@ -105,7 +325,7 @@ export default function SecretaryClassEntriesTable(props) {
             <h2 className="text-lg font-bold text-[#3F312B]">כניסות למקצה</h2>
             <p className="text-xs text-[#8D6E63]">
               {props.drawOrderEditMode
-                ? "מצב עריכת סדר פעיל - אפשר להזיז כניסות או להזין מספר הגרלה ידנית"
+                ? "מצב עריכת סדר פעיל - אפשר לגרור כניסות או להזין מספר הגרלה ידנית"
                 : items.length + " כניסות מוצגות כרגע"}
             </p>
           </div>
@@ -147,7 +367,9 @@ export default function SecretaryClassEntriesTable(props) {
                   icon={<Shuffle size={15} />}
                   onClick={props.onStartDrawOrderEdit}
                   disabled={
-                    props.savingDrawOrder || props.generatingDrawPreview
+                    !props.hasDrawOrder ||
+                    props.savingDrawOrder ||
+                    props.generatingDrawPreview
                   }
                 />
 
@@ -157,7 +379,9 @@ export default function SecretaryClassEntriesTable(props) {
                   variant="danger"
                   onClick={props.onClearDrawOrder}
                   disabled={
-                    props.savingDrawOrder || props.generatingDrawPreview
+                    !props.hasDrawOrder ||
+                    props.savingDrawOrder ||
+                    props.generatingDrawPreview
                   }
                 />
               </>
@@ -279,203 +503,66 @@ export default function SecretaryClassEntriesTable(props) {
           </div>
         ) : null}
 
-        <DataTableShell>
-          <thead className="bg-[#FAF5F1] text-sm text-[#6B574F]">
-            <tr>
-              <th className="px-4 py-3">סדר הגרלה</th>
-              <th className="px-4 py-3">מקצה</th>
-              <th className="px-4 py-3">רוכב</th>
-              <th className="px-4 py-3">סוס</th>
-              <th className="px-4 py-3">מאמן</th>
-              <th className="px-4 py-3">משלם</th>
-              <th className="px-4 py-3">מקבל פרס</th>
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <DataTableShell>
+            <thead className="bg-[#FAF5F1] text-sm text-[#6B574F]">
+              <tr>
+                <th className="px-4 py-3">סדר הגרלה</th>
+                <th className="px-4 py-3">מקצה</th>
+                <th className="px-4 py-3">רוכב</th>
+                <th className="px-4 py-3">סוס</th>
+                <th className="px-4 py-3">מאמן</th>
+                <th className="px-4 py-3">משלם</th>
+                <th className="px-4 py-3">מקבל פרס</th>
 
-              {canEditEntry && !props.drawOrderEditMode ? (
-                <th className="px-4 py-3">פעולות</th>
+                {canEditEntry && !props.drawOrderEditMode ? (
+                  <th className="px-4 py-3">פעולות</th>
+                ) : null}
+
+                {props.drawOrderEditMode ? (
+                  <>
+                    <th className="px-4 py-3">התראות</th>
+                    <th className="px-4 py-3">גרירה</th>
+                  </>
+                ) : null}
+              </tr>
+            </thead>
+
+            <tbody>
+              {props.loading ? (
+                <DataTableLoadingState
+                  colSpan={colSpan}
+                  message="טוען כניסות..."
+                />
               ) : null}
 
-              {props.drawOrderEditMode ? (
-                <>
-                  <th className="px-4 py-3">התראות</th>
-                  <th className="px-4 py-3">סידור</th>
-                </>
+              {!props.loading && items.length === 0 ? (
+                <DataTableEmptyState
+                  colSpan={colSpan}
+                  message="לא נמצאו כניסות להצגה"
+                />
               ) : null}
-            </tr>
-          </thead>
 
-          <tbody>
-            {props.loading ? (
-              <DataTableLoadingState
-                colSpan={colSpan}
-                message="טוען כניסות..."
-              />
-            ) : null}
-
-            {!props.loading && items.length === 0 ? (
-              <DataTableEmptyState
-                colSpan={colSpan}
-                message="לא נמצאו כניסות להצגה"
-              />
-            ) : null}
-
-            {!props.loading
-              ? items.map(function (item, index) {
-                  var horseName = getValue(item, "horseName", "HorseName", "");
-                  var barnName = getValue(item, "barnName", "BarnName", "");
-                  var entryId = getEntryId(item);
-                  var drawOrder = getEntryDrawOrder(item);
-                  var warningText = getEntryWarningText(item);
-
-                  return (
-                    <tr
-                      key={entryId || index}
-                      className={
-                        "border-t border-[#F1E7E1] text-sm text-[#4A3A34] " +
-                        (props.drawOrderEditMode ? "bg-white" : "")
-                      }
-                    >
-                      <td className="px-4 py-3 font-bold text-[#7B5A4D]">
-                        {props.drawOrderEditMode ? (
-                          <input
-                            type="number"
-                            min="1"
-                            value={drawOrder || ""}
-                            onChange={function (event) {
-                              props.onUpdateDraftDrawOrder(
-                                entryId,
-                                event.target.value,
-                              );
-                            }}
-                            disabled={props.savingDrawOrder}
-                            className="h-10 w-20 rounded-xl border border-[#E2D5CE] bg-white px-3 text-center text-sm font-bold text-[#3F312B] outline-none transition-colors focus:border-[#8B6352]"
-                          />
-                        ) : (
-                          drawOrder || "-"
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3 font-semibold">
-                        {getValue(item, "className", "ClassName", "-")}
-                      </td>
-
-                      <td className="px-4 py-3 font-semibold">
-                        {getValue(item, "riderName", "RiderName", "-")}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col gap-1">
-                          <span className="font-semibold">
-                            {horseName || "-"}
-                          </span>
-
-                          {barnName ? (
-                            <span className="text-xs text-[#8D6E63]">
-                              {barnName}
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3">
-                        {getValue(item, "coachName", "CoachName", "-") || "-"}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        {getValue(item, "payerName", "PayerName", "-")}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        {getValue(
-                          item,
-                          "prizeRecipientName",
-                          "PrizeRecipientName",
-                          "-",
-                        ) || "-"}
-                      </td>
-
-                      {canEditEntry && !props.drawOrderEditMode ? (
-                        <td className="px-4 py-3">
-                          <div className="flex justify-end gap-2">
-                            <TableActionButton
-                              icon={<Pencil size={15} />}
-                              iconOnly
-                              title="עריכת כניסה"
-                              onClick={function () {
-                                if (props.onEditEntry) {
-                                  props.onEditEntry(item);
-                                }
-                              }}
-                              disabled={!props.onEditEntry}
-                            />
-
-                            <TableActionButton
-                              icon={<Trash2 size={15} />}
-                              iconOnly
-                              title="מחיקת כניסה"
-                              variant="danger"
-                              onClick={function () {
-                                if (props.onDeleteEntry) {
-                                  props.onDeleteEntry(item);
-                                }
-                              }}
-                              disabled={!props.onDeleteEntry}
-                            />
-                          </div>
-                        </td>
-                      ) : null}
-
-                      {props.drawOrderEditMode ? (
-                        <>
-                          <td className="px-4 py-3">
-                            {warningText ? (
-                              <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-bold text-orange-800">
-                                {warningText}
-                              </span>
-                            ) : (
-                              <span className="rounded-full bg-[#EEF8F0] px-3 py-1 text-xs font-bold text-[#2F6B3B]">
-                                תקין
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3">
-                            <div className="flex justify-end gap-2">
-                              <button
-                                type="button"
-                                disabled={index === 0 || props.savingDrawOrder}
-                                onClick={function () {
-                                  props.onMoveDrawOrderEntry(entryId, -1);
-                                }}
-                                className="rounded-xl border border-[#E2D5CE] bg-white p-2 text-[#7B5A4D] transition-colors hover:bg-[#FAF5F1] disabled:cursor-not-allowed disabled:opacity-40"
-                                title="הזזה למעלה"
-                              >
-                                <ArrowUp size={16} />
-                              </button>
-
-                              <button
-                                type="button"
-                                disabled={
-                                  index === items.length - 1 ||
-                                  props.savingDrawOrder
-                                }
-                                onClick={function () {
-                                  props.onMoveDrawOrderEntry(entryId, 1);
-                                }}
-                                className="rounded-xl border border-[#E2D5CE] bg-white p-2 text-[#7B5A4D] transition-colors hover:bg-[#FAF5F1] disabled:cursor-not-allowed disabled:opacity-40"
-                                title="הזזה למטה"
-                              >
-                                <ArrowDown size={16} />
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      ) : null}
-                    </tr>
-                  );
-                })
-              : null}
-          </tbody>
-        </DataTableShell>
+              {!props.loading
+                ? items.map(function (item, index) {
+                    return (
+                      <SortableEntryRow
+                        key={getEntryId(item) || index}
+                        item={item}
+                        index={index}
+                        drawOrderEditMode={props.drawOrderEditMode}
+                        canEditEntry={canEditEntry}
+                        savingDrawOrder={props.savingDrawOrder}
+                        onUpdateDraftDrawOrder={props.onUpdateDraftDrawOrder}
+                        onEditEntry={props.onEditEntry}
+                        onDeleteEntry={props.onDeleteEntry}
+                      />
+                    );
+                  })
+                : null}
+            </tbody>
+          </DataTableShell>
+        </DndContext>
       </section>
     </div>
   );

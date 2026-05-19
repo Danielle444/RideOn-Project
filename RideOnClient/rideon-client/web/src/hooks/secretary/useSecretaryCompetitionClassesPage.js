@@ -176,6 +176,15 @@ function normalizeDraftEntries(items) {
   });
 }
 
+function moveItemInArray(items, fromIndex, toIndex) {
+  var nextItems = [...items];
+  var item = nextItems.splice(fromIndex, 1)[0];
+
+  nextItems.splice(toIndex, 0, item);
+
+  return nextItems;
+}
+
 function validateDrawOrderDraft(items) {
   if (!items || items.length === 0) {
     return "אין כניסות לשמירה";
@@ -323,6 +332,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
 
     return classEntries.some(function (entry) {
       var drawOrder = getEntryDrawOrder(entry);
+
       return drawOrder !== null && drawOrder !== undefined && drawOrder !== "";
     });
   }
@@ -479,6 +489,19 @@ export default function useSecretaryCompetitionClassesPage(options) {
     [entries, viewMode, selectedClass, selectedGroup],
   );
 
+  var selectedGroupHasDrawOrder = useMemo(
+    function () {
+      return selectedEntriesBase.some(function (entry) {
+        var drawOrder = getEntryDrawOrder(entry);
+
+        return (
+          drawOrder !== null && drawOrder !== undefined && drawOrder !== ""
+        );
+      });
+    },
+    [selectedEntriesBase],
+  );
+
   var entriesSummary = useMemo(
     function () {
       return buildEntriesSummary(selectedEntriesBase);
@@ -590,6 +613,11 @@ export default function useSecretaryCompetitionClassesPage(options) {
       return;
     }
 
+    if (!selectedGroupHasDrawOrder) {
+      setDrawOrderError("אין הגרלה קיימת לעריכה. קודם יש ליצור הגרלה חכמה.");
+      return;
+    }
+
     setDrawOrderError("");
     setDrawOrderWarnings([]);
     setDrawOrderSummaryMessage("");
@@ -625,29 +653,68 @@ export default function useSecretaryCompetitionClassesPage(options) {
         return prev;
       }
 
-      var nextItems = [...prev];
-      var temp = nextItems[currentIndex];
+      return normalizeDraftEntries(
+        moveItemInArray(prev, currentIndex, targetIndex),
+      );
+    });
+  }
 
-      nextItems[currentIndex] = nextItems[targetIndex];
-      nextItems[targetIndex] = temp;
+  function moveDrawOrderEntryToEntry(activeEntryId, overEntryId) {
+    if (!activeEntryId || !overEntryId) {
+      return;
+    }
 
-      return normalizeDraftEntries(nextItems);
+    if (Number(activeEntryId) === Number(overEntryId)) {
+      return;
+    }
+
+    setDrawOrderDraftEntries(function (prev) {
+      var activeIndex = prev.findIndex(function (entry) {
+        return Number(getEntryId(entry)) === Number(activeEntryId);
+      });
+
+      var overIndex = prev.findIndex(function (entry) {
+        return Number(getEntryId(entry)) === Number(overEntryId);
+      });
+
+      if (activeIndex < 0 || overIndex < 0) {
+        return prev;
+      }
+
+      return normalizeDraftEntries(
+        moveItemInArray(prev, activeIndex, overIndex),
+      );
     });
   }
 
   function updateDraftDrawOrder(entryId, value) {
-    setDrawOrderDraftEntries(function (prev) {
-      return prev.map(function (entry) {
-        if (Number(getEntryId(entry)) !== Number(entryId)) {
-          return entry;
-        }
+    var targetDrawOrder = Number(value);
 
-        return {
-          ...entry,
-          drawOrder: value,
-          DrawOrder: value,
-        };
+    if (!targetDrawOrder || targetDrawOrder <= 0) {
+      return;
+    }
+
+    setDrawOrderDraftEntries(function (prev) {
+      var currentIndex = prev.findIndex(function (entry) {
+        return Number(getEntryId(entry)) === Number(entryId);
       });
+
+      if (currentIndex < 0) {
+        return prev;
+      }
+
+      var targetIndex = Math.min(
+        Math.max(targetDrawOrder - 1, 0),
+        prev.length - 1,
+      );
+
+      if (currentIndex === targetIndex) {
+        return normalizeDraftEntries(prev);
+      }
+
+      return normalizeDraftEntries(
+        moveItemInArray(prev, currentIndex, targetIndex),
+      );
     });
   }
 
@@ -777,13 +844,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
       return;
     }
 
-    var hasDrawOrder = selectedEntriesBase.some(function (entry) {
-      var drawOrder = getEntryDrawOrder(entry);
-
-      return drawOrder !== null && drawOrder !== undefined && drawOrder !== "";
-    });
-
-    if (!hasDrawOrder) {
+    if (!selectedGroupHasDrawOrder) {
       setDrawOrderError("אין הגרלה קיימת למחיקה");
       return;
     }
@@ -839,6 +900,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
     viewMode,
     selectedClass,
     selectedGroup,
+    selectedGroupHasDrawOrder,
     searchText,
     paymentFilter,
 
@@ -878,6 +940,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
     startDrawOrderEditMode,
     cancelDrawOrderEditMode,
     moveDrawOrderEntry,
+    moveDrawOrderEntryToEntry,
     updateDraftDrawOrder,
     generateSmartDrawOrderPreview,
     saveDrawOrder,
