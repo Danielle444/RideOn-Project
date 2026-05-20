@@ -185,7 +185,8 @@ function PaymentsPageContent(props) {
 
                   <p className="mt-1 text-sm text-[#8A7268]">
                     בחירת שורת מקצה תבחר אוטומטית גם את חלק המארגן וגם את חלק
-                    ההתאחדות של אותו מקצה
+                    ההתאחדות של אותו מקצה. בנסורת, בחירת שורה אחת בוחרת את כל
+                    חיוב הנסורת של אותו משלם.
                   </p>
                 </div>
 
@@ -213,7 +214,12 @@ function PaymentsPageContent(props) {
               <PaymentChargesTable
                 items={page.visibleCharges}
                 selectedChargeIds={page.selectedChargeIds}
+                visibleSelectableChargeIds={page.visibleSelectableChargeIds}
+                allVisibleChargesSelected={page.allVisibleChargesSelected}
                 onToggleCharge={page.toggleCharge}
+                onToggleSelectAllVisibleCharges={
+                  page.toggleSelectAllVisibleCharges
+                }
               />
             </div>
           </div>

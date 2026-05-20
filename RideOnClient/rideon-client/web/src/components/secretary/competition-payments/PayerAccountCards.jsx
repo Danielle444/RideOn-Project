@@ -71,6 +71,8 @@ function AccountCard(props) {
 
         <PaymentStatusBadge
           status={getValue(item, "paymentStatus", "PaymentStatus", "NoCharges")}
+          totalAmount={getValue(item, "totalAmount", "TotalAmount", 0)}
+          unpaidAmount={getValue(item, "unpaidAmount", "UnpaidAmount", 0)}
         />
       </div>
 
