@@ -287,13 +287,11 @@ export default function useCompetitionPaymentsPage(options) {
   function selectOwner(owner) {
     setSelectedOwner(owner);
     setSelectedCategoryKey("");
-    setSelectedChargeIds([]);
   }
 
   function selectCategory(owner, categoryKey) {
     setSelectedOwner(owner);
     setSelectedCategoryKey(categoryKey || "");
-    setSelectedChargeIds([]);
   }
 
   function getRelatedChargeIds(charge) {
