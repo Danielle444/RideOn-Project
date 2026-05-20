@@ -42,6 +42,26 @@ function getChargeId(charge) {
   return getValue(charge, "billChargeId", "BillChargeId", 0);
 }
 
+function getDisplayRowKey(charge) {
+  return String(
+    getValue(charge, "displayRowKey", "DisplayRowKey", getChargeId(charge)),
+  );
+}
+
+function getUniqueBillChargeIdsFromRows(rows) {
+  var ids = [];
+
+  rows.forEach(function (charge) {
+    var id = getChargeId(charge);
+
+    if (id && !ids.includes(id)) {
+      ids.push(id);
+    }
+  });
+
+  return ids;
+}
+
 function isChargeOpen(charge) {
   var status = getValue(charge, "chargeStatus", "ChargeStatus", "");
   var canSelect = getValue(
@@ -111,8 +131,22 @@ export default function useCompetitionPaymentsPage(options) {
 
   var selectedCharges = useMemo(
     function () {
+      var selectedRowKeys = [];
+
       return charges.filter(function (charge) {
-        return selectedChargeIds.includes(getChargeId(charge));
+        var billChargeId = getChargeId(charge);
+        var rowKey = getDisplayRowKey(charge);
+
+        if (!selectedChargeIds.includes(billChargeId)) {
+          return false;
+        }
+
+        if (selectedRowKeys.includes(rowKey)) {
+          return false;
+        }
+
+        selectedRowKeys.push(rowKey);
+        return true;
       });
     },
     [charges, selectedChargeIds],
@@ -125,6 +159,30 @@ export default function useCompetitionPaymentsPage(options) {
       }, 0);
     },
     [selectedCharges],
+  );
+
+  var visibleSelectableChargeIds = useMemo(
+    function () {
+      return getUniqueBillChargeIdsFromRows(
+        visibleCharges.filter(function (charge) {
+          return isChargeOpen(charge);
+        }),
+      );
+    },
+    [visibleCharges],
+  );
+
+  var allVisibleChargesSelected = useMemo(
+    function () {
+      if (visibleSelectableChargeIds.length === 0) {
+        return false;
+      }
+
+      return visibleSelectableChargeIds.every(function (id) {
+        return selectedChargeIds.includes(id);
+      });
+    },
+    [visibleSelectableChargeIds, selectedChargeIds],
   );
 
   async function loadPayers() {
@@ -259,6 +317,7 @@ export default function useCompetitionPaymentsPage(options) {
             "SourceId",
             0,
           );
+
           var candidateCategoryKey = getValue(
             candidate,
             "categoryKey",
@@ -287,6 +346,12 @@ export default function useCompetitionPaymentsPage(options) {
     }
 
     var relatedIds = getRelatedChargeIds(charge);
+    var billChargeId = getChargeId(charge);
+    var categoryKey = getValue(charge, "categoryKey", "CategoryKey", "");
+
+    if (categoryKey === "shavings") {
+      relatedIds = [billChargeId];
+    }
 
     setSelectedChargeIds(function (previous) {
       var allSelected = relatedIds.every(function (id) {
@@ -302,6 +367,34 @@ export default function useCompetitionPaymentsPage(options) {
       var next = previous.slice();
 
       relatedIds.forEach(function (id) {
+        if (!next.includes(id)) {
+          next.push(id);
+        }
+      });
+
+      return next;
+    });
+  }
+
+  function toggleSelectAllVisibleCharges() {
+    if (visibleSelectableChargeIds.length === 0) {
+      return;
+    }
+
+    setSelectedChargeIds(function (previous) {
+      var allSelected = visibleSelectableChargeIds.every(function (id) {
+        return previous.includes(id);
+      });
+
+      if (allSelected) {
+        return previous.filter(function (id) {
+          return !visibleSelectableChargeIds.includes(id);
+        });
+      }
+
+      var next = previous.slice();
+
+      visibleSelectableChargeIds.forEach(function (id) {
         if (!next.includes(id)) {
           next.push(id);
         }
@@ -351,13 +444,15 @@ export default function useCompetitionPaymentsPage(options) {
       setPaymentError("");
       setPaymentSuccess("");
 
+      var uniqueBillChargeIds = getUniqueBillChargeIdsFromRows(selectedCharges);
+
       var request = {
         competitionId: Number(competitionId),
         ranchId: Number(ranchId),
         payerPersonId: payerPersonId,
         invoiceNumber: formData.invoiceNumber,
         notes: formData.notes || null,
-        selectedCharges: selectedChargeIds.map(function (id) {
+        selectedCharges: uniqueBillChargeIds.map(function (id) {
           return {
             billChargeId: id,
           };
@@ -413,7 +508,10 @@ export default function useCompetitionPaymentsPage(options) {
     selectedChargeIds: selectedChargeIds,
     selectedCharges: selectedCharges,
     selectedTotal: selectedTotal,
+    visibleSelectableChargeIds: visibleSelectableChargeIds,
+    allVisibleChargesSelected: allVisibleChargesSelected,
     toggleCharge: toggleCharge,
+    toggleSelectAllVisibleCharges: toggleSelectAllVisibleCharges,
     clearSelectedCharges: clearSelectedCharges,
 
     paymentMethods: paymentMethods,
