@@ -1545,6 +1545,20 @@ namespace RideOnServer.DAL
             }
         }
 
+        private static int? GetNullableInt(
+    NpgsqlDataReader reader,
+    string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+
+            if (reader.IsDBNull(ordinal))
+            {
+                return null;
+            }
+
+            return reader.GetInt32(ordinal);
+        }
+
         private static TimeSpan GetTimeSpan(
             NpgsqlDataReader reader,
             string columnName)

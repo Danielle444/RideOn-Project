@@ -14,6 +14,9 @@ import {
   getCompetitionSummaryPaymentBatches,
   getCompetitionSummaryPaymentBatchMethods,
   getCompetitionSummaryPaymentBatchCharges,
+  getCompetitionCashDeskOverview,
+  saveCompetitionCashCount,
+  saveCompetitionCashSafeTransfer,
 } from "../../services/competitionSummaryService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
 
@@ -81,6 +84,7 @@ function buildDetailsTitle(type, sectionKey) {
 export default function useCompetitionSummaryPage(options) {
   var competitionId = options.competitionId;
   var ranchId = options.ranchId;
+  var systemUserId = options.systemUserId || null;
 
   var [summary, setSummary] = useState(getEmptySummary());
   var [loading, setLoading] = useState(false);
@@ -103,6 +107,13 @@ export default function useCompetitionSummaryPage(options) {
   var [paymentBatchCharges, setPaymentBatchCharges] = useState([]);
   var [paymentsLoading, setPaymentsLoading] = useState(false);
   var [paymentsError, setPaymentsError] = useState("");
+
+  var [cashDeskOpen, setCashDeskOpen] = useState(false);
+  var [cashDeskOverview, setCashDeskOverview] = useState(null);
+  var [cashDeskLoading, setCashDeskLoading] = useState(false);
+  var [cashDeskSaving, setCashDeskSaving] = useState(false);
+  var [cashDeskError, setCashDeskError] = useState("");
+  var [cashDeskSuccess, setCashDeskSuccess] = useState("");
 
   useEffect(
     function () {
@@ -235,8 +246,119 @@ export default function useCompetitionSummaryPage(options) {
     openDetails("classes", "federation");
   }
 
-  function openCashDetails() {
-    openDetails("cash", "organizer");
+  async function openCashDetails() {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    setCashDeskOpen(true);
+    await loadCashDeskOverview();
+  }
+
+  async function loadCashDeskOverview() {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    try {
+      setCashDeskLoading(true);
+      setCashDeskError("");
+      setCashDeskSuccess("");
+
+      var response = await getCompetitionCashDeskOverview(
+        competitionId,
+        ranchId,
+      );
+
+      setCashDeskOverview(response.data || null);
+    } catch (error) {
+      console.error(error);
+      setCashDeskError(getErrorMessage(error, "שגיאה בטעינת נתוני קופה"));
+      setCashDeskOverview(null);
+    } finally {
+      setCashDeskLoading(false);
+    }
+  }
+
+  function closeCashDesk() {
+    if (cashDeskSaving) {
+      return;
+    }
+
+    setCashDeskOpen(false);
+    setCashDeskOverview(null);
+    setCashDeskError("");
+    setCashDeskSuccess("");
+  }
+
+  async function saveCashCount(formData) {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    if (!systemUserId) {
+      setCashDeskError("לא נמצא מזהה משתמש מחובר לשמירת ספירת קופה");
+      return;
+    }
+
+    try {
+      setCashDeskSaving(true);
+      setCashDeskError("");
+      setCashDeskSuccess("");
+
+      await saveCompetitionCashCount({
+        competitionId: Number(competitionId),
+        ranchId: Number(ranchId),
+        countedBySystemUserId: Number(systemUserId),
+        lines: formData.lines || [],
+        notes: formData.notes || null,
+      });
+
+      setCashDeskSuccess("ספירת הקופה נשמרה בהצלחה");
+      await loadCashDeskOverview();
+      await loadSummary();
+    } catch (error) {
+      console.error(error);
+      setCashDeskError(getErrorMessage(error, "שגיאה בשמירת ספירת קופה"));
+    } finally {
+      setCashDeskSaving(false);
+    }
+  }
+
+  async function saveCashSafeTransfer(formData) {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    if (!systemUserId) {
+      setCashDeskError("לא נמצא מזהה משתמש מחובר לשמירת העברה לכספת");
+      return;
+    }
+
+    try {
+      setCashDeskSaving(true);
+      setCashDeskError("");
+      setCashDeskSuccess("");
+
+      await saveCompetitionCashSafeTransfer({
+        competitionId: Number(competitionId),
+        ranchId: Number(ranchId),
+        transferredBySystemUserId: Number(systemUserId),
+        amount: Number(formData.amount || 0),
+        notes: formData.notes || null,
+      });
+
+      setCashDeskSuccess(
+        "העברה לכספת נשמרה בהצלחה. מומלץ לבצע ספירת קופה חדשה.",
+      );
+      await loadCashDeskOverview();
+      await loadSummary();
+    } catch (error) {
+      console.error(error);
+      setCashDeskError(getErrorMessage(error, "שגיאה בשמירת העברה לכספת"));
+    } finally {
+      setCashDeskSaving(false);
+    }
   }
 
   function closeDetailsModal() {
@@ -552,9 +674,22 @@ export default function useCompetitionSummaryPage(options) {
     paymentsLoading: paymentsLoading,
     paymentsError: paymentsError,
 
+    cashDeskOpen: cashDeskOpen,
+    cashDeskOverview: cashDeskOverview,
+    cashDeskLoading: cashDeskLoading,
+    cashDeskSaving: cashDeskSaving,
+    cashDeskError: cashDeskError,
+    cashDeskSuccess: cashDeskSuccess,
+    systemUserId: systemUserId,
+
     openOrganizerCategoryDetails: openOrganizerCategoryDetails,
     openFederationClassesDetails: openFederationClassesDetails,
     openCashDetails: openCashDetails,
+    closeCashDesk: closeCashDesk,
+    loadCashDeskOverview: loadCashDeskOverview,
+    saveCashCount: saveCashCount,
+    saveCashSafeTransfer: saveCashSafeTransfer,
+
     closeDetailsModal: closeDetailsModal,
     openEntriesForDetail: openEntriesForDetail,
     backToDetailsList: backToDetailsList,
