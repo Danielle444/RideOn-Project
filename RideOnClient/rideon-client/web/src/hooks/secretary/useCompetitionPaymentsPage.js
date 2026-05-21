@@ -48,6 +48,10 @@ function getDisplayRowKey(charge) {
   );
 }
 
+function getChargeOwner(charge) {
+  return getValue(charge, "chargeOwner", "ChargeOwner", "");
+}
+
 function getUniqueBillChargeIdsFromRows(rows) {
   var ids = [];
 
@@ -112,7 +116,7 @@ export default function useCompetitionPaymentsPage(options) {
   var visibleCharges = useMemo(
     function () {
       return charges.filter(function (charge) {
-        var owner = getValue(charge, "chargeOwner", "ChargeOwner", "");
+        var owner = getChargeOwner(charge);
         var categoryKey = getValue(charge, "categoryKey", "CategoryKey", "");
 
         if (selectedOwner && owner !== selectedOwner) {
@@ -141,6 +145,10 @@ export default function useCompetitionPaymentsPage(options) {
           return false;
         }
 
+        if (getChargeOwner(charge) !== selectedOwner) {
+          return false;
+        }
+
         if (selectedRowKeys.includes(rowKey)) {
           return false;
         }
@@ -149,7 +157,7 @@ export default function useCompetitionPaymentsPage(options) {
         return true;
       });
     },
-    [charges, selectedChargeIds],
+    [charges, selectedChargeIds, selectedOwner],
   );
 
   var selectedTotal = useMemo(
@@ -285,21 +293,28 @@ export default function useCompetitionPaymentsPage(options) {
   }
 
   function selectOwner(owner) {
+    if (owner !== selectedOwner) {
+      setSelectedChargeIds([]);
+    }
+
     setSelectedOwner(owner);
     setSelectedCategoryKey("");
-    setSelectedChargeIds([]);
   }
 
   function selectCategory(owner, categoryKey) {
+    if (owner !== selectedOwner) {
+      setSelectedChargeIds([]);
+    }
+
     setSelectedOwner(owner);
     setSelectedCategoryKey(categoryKey || "");
-    setSelectedChargeIds([]);
   }
 
   function getRelatedChargeIds(charge) {
     var sourceType = getValue(charge, "sourceType", "SourceType", "");
     var sourceId = getValue(charge, "sourceId", "SourceId", 0);
     var categoryKey = getValue(charge, "categoryKey", "CategoryKey", "");
+    var chargeOwner = getChargeOwner(charge);
 
     if (sourceType === "Entry" && categoryKey === "classes") {
       return charges
@@ -329,6 +344,7 @@ export default function useCompetitionPaymentsPage(options) {
             candidateSourceType === "Entry" &&
             candidateCategoryKey === "classes" &&
             candidateSourceId === sourceId &&
+            getChargeOwner(candidate) === chargeOwner &&
             isChargeOpen(candidate)
           );
         })
@@ -342,6 +358,10 @@ export default function useCompetitionPaymentsPage(options) {
 
   function toggleCharge(charge) {
     if (!isChargeOpen(charge)) {
+      return;
+    }
+
+    if (getChargeOwner(charge) !== selectedOwner) {
       return;
     }
 
@@ -409,7 +429,7 @@ export default function useCompetitionPaymentsPage(options) {
   }
 
   function openPaymentModal() {
-    if (selectedChargeIds.length === 0) {
+    if (selectedChargeIds.length === 0 || selectedCharges.length === 0) {
       return;
     }
 
@@ -450,6 +470,7 @@ export default function useCompetitionPaymentsPage(options) {
         competitionId: Number(competitionId),
         ranchId: Number(ranchId),
         payerPersonId: payerPersonId,
+        chargeOwner: selectedOwner,
         invoiceNumber: formData.invoiceNumber,
         notes: formData.notes || null,
         selectedCharges: uniqueBillChargeIds.map(function (id) {

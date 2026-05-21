@@ -228,6 +228,7 @@ function PaymentsPageContent(props) {
 
       <CreatePaymentModal
         open={page.paymentModalOpen}
+        chargeOwner={page.selectedOwner}
         selectedCharges={page.selectedCharges}
         selectedTotal={page.selectedTotal}
         paymentMethods={page.paymentMethods}

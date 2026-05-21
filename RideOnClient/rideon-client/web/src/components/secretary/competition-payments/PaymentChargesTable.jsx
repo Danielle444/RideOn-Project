@@ -79,7 +79,7 @@ function getStatusLabel(status) {
   }
 
   if (status === "Open") {
-    return "פתוח";
+    return "לא שולם";
   }
 
   return status || "-";

@@ -105,6 +105,8 @@ namespace RideOnServer.BL
                 throw new Exception("Invalid EnteredBySystemUserId");
             }
 
+            request.ChargeOwner = NormalizeRequiredChargeOwner(request.ChargeOwner);
+
             if (string.IsNullOrWhiteSpace(request.InvoiceNumber))
             {
                 throw new Exception("Invoice number is required");
@@ -145,6 +147,14 @@ namespace RideOnServer.BL
                 {
                     throw new Exception("Payment amount must be greater than zero");
                 }
+
+                if (
+                    request.ChargeOwner == "Federation" &&
+                    method.PaymentMethodId != 1
+                )
+                {
+                    throw new Exception("Federation payments must use credit card only");
+                }
             }
 
             CompetitionPaymentDAL dal = new CompetitionPaymentDAL();
@@ -183,6 +193,23 @@ namespace RideOnServer.BL
             }
 
             return value.Trim();
+        }
+
+        private static string NormalizeRequiredChargeOwner(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new Exception("ChargeOwner is required");
+            }
+
+            string normalized = value.Trim();
+
+            if (normalized != "Organizer" && normalized != "Federation")
+            {
+                throw new Exception("ChargeOwner must be Organizer or Federation");
+            }
+
+            return normalized;
         }
     }
 }
