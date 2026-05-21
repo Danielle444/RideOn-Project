@@ -108,11 +108,6 @@ export default function CashDeskModal(props) {
   function submitCount() {
     setLocalError("");
 
-    if (!props.systemUserId) {
-      setLocalError("לא נמצא מזהה משתמש מחובר. אי אפשר לשמור ספירת קופה.");
-      return;
-    }
-
     var lines = countLines.map(function (line) {
       return {
         denominationValue: Number(line.denominationValue),
@@ -128,11 +123,6 @@ export default function CashDeskModal(props) {
 
   function submitSafeTransfer() {
     setLocalError("");
-
-    if (!props.systemUserId) {
-      setLocalError("לא נמצא מזהה משתמש מחובר. אי אפשר לשמור העברה לכספת.");
-      return;
-    }
 
     var amount = Number(safeTransferAmount || 0);
 

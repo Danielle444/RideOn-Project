@@ -629,14 +629,24 @@ namespace RideOnServer.Controllers
 
         [HttpPost("cash-desk/count")]
         public IActionResult SaveCashCount(
-            [FromBody] SaveCompetitionCashCountRequest request)
+    [FromBody] SaveCompetitionCashCountRequest request)
         {
             try
             {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 ValidateHostSecretarySummaryAccess(
                     request.CompetitionId,
                     request.RanchId
                 );
+
+                int personId =
+                    UserAccessValidator.GetPersonIdFromClaims(User);
+
+                request.CountedBySystemUserId = personId;
 
                 int cashCountId =
                     CompetitionSummary.SaveCashCount(request);
@@ -665,14 +675,24 @@ namespace RideOnServer.Controllers
 
         [HttpPost("cash-desk/safe-transfer")]
         public IActionResult SaveCashSafeTransfer(
-            [FromBody] SaveCompetitionCashSafeTransferRequest request)
+    [FromBody] SaveCompetitionCashSafeTransferRequest request)
         {
             try
             {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
                 ValidateHostSecretarySummaryAccess(
                     request.CompetitionId,
                     request.RanchId
                 );
+
+                int personId =
+                    UserAccessValidator.GetPersonIdFromClaims(User);
+
+                request.TransferredBySystemUserId = personId;
 
                 int transferId =
                     CompetitionSummary.SaveCashSafeTransfer(request);

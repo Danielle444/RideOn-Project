@@ -84,7 +84,6 @@ function buildDetailsTitle(type, sectionKey) {
 export default function useCompetitionSummaryPage(options) {
   var competitionId = options.competitionId;
   var ranchId = options.ranchId;
-  var systemUserId = options.systemUserId || null;
 
   var [summary, setSummary] = useState(getEmptySummary());
   var [loading, setLoading] = useState(false);
@@ -296,11 +295,6 @@ export default function useCompetitionSummaryPage(options) {
       return;
     }
 
-    if (!systemUserId) {
-      setCashDeskError("לא נמצא מזהה משתמש מחובר לשמירת ספירת קופה");
-      return;
-    }
-
     try {
       setCashDeskSaving(true);
       setCashDeskError("");
@@ -309,7 +303,6 @@ export default function useCompetitionSummaryPage(options) {
       await saveCompetitionCashCount({
         competitionId: Number(competitionId),
         ranchId: Number(ranchId),
-        countedBySystemUserId: Number(systemUserId),
         lines: formData.lines || [],
         notes: formData.notes || null,
       });
@@ -330,11 +323,6 @@ export default function useCompetitionSummaryPage(options) {
       return;
     }
 
-    if (!systemUserId) {
-      setCashDeskError("לא נמצא מזהה משתמש מחובר לשמירת העברה לכספת");
-      return;
-    }
-
     try {
       setCashDeskSaving(true);
       setCashDeskError("");
@@ -343,7 +331,6 @@ export default function useCompetitionSummaryPage(options) {
       await saveCompetitionCashSafeTransfer({
         competitionId: Number(competitionId),
         ranchId: Number(ranchId),
-        transferredBySystemUserId: Number(systemUserId),
         amount: Number(formData.amount || 0),
         notes: formData.notes || null,
       });
@@ -680,7 +667,6 @@ export default function useCompetitionSummaryPage(options) {
     cashDeskSaving: cashDeskSaving,
     cashDeskError: cashDeskError,
     cashDeskSuccess: cashDeskSuccess,
-    systemUserId: systemUserId,
 
     openOrganizerCategoryDetails: openOrganizerCategoryDetails,
     openFederationClassesDetails: openFederationClassesDetails,

@@ -6,46 +6,15 @@ import SummaryPaymentsBreakdownModal from "../../components/secretary/competitio
 import CashDeskModal from "../../components/secretary/competition-summary/CashDeskModal";
 import { getCompetitionById } from "../../services/competitionService";
 import { useActiveRole } from "../../context/ActiveRoleContext";
-import { useUser } from "../../context/UserContext";
 import useCompetitionSummaryPage from "../../hooks/secretary/useCompetitionSummaryPage";
-
-function resolveSystemUserId(user) {
-  if (!user) {
-    return null;
-  }
-
-  if (user.systemUserId !== null && user.systemUserId !== undefined) {
-    return user.systemUserId;
-  }
-
-  if (user.SystemUserId !== null && user.SystemUserId !== undefined) {
-    return user.SystemUserId;
-  }
-
-  if (user.systemuserid !== null && user.systemuserid !== undefined) {
-    return user.systemuserid;
-  }
-
-  if (user.userId !== null && user.userId !== undefined) {
-    return user.userId;
-  }
-
-  if (user.UserId !== null && user.UserId !== undefined) {
-    return user.UserId;
-  }
-
-  return null;
-}
 
 function SummaryPageContent(props) {
   var layout = props.layout;
   var activeRole = props.activeRole;
-  var systemUserId = props.systemUserId;
 
   var page = useCompetitionSummaryPage({
     competitionId: Number(layout.competitionId),
     ranchId: activeRole?.ranchId || null,
-    systemUserId: systemUserId,
   });
 
   useEffect(
@@ -178,7 +147,6 @@ function SummaryPageContent(props) {
         saving={page.cashDeskSaving}
         error={page.cashDeskError}
         success={page.cashDeskSuccess}
-        systemUserId={page.systemUserId}
         onClose={page.closeCashDesk}
         onSaveCount={page.saveCashCount}
         onSaveSafeTransfer={page.saveCashSafeTransfer}
@@ -191,19 +159,10 @@ export default function CompetitionSummaryPage() {
   var activeRoleContext = useActiveRole();
   var activeRole = activeRoleContext.activeRole;
 
-  var userContext = useUser();
-  var systemUserId = resolveSystemUserId(userContext.user);
-
   return (
     <CompetitionWorkspaceLayout activeItemKey="competition-summary">
       {function (layout) {
-        return (
-          <SummaryPageContent
-            layout={layout}
-            activeRole={activeRole}
-            systemUserId={systemUserId}
-          />
-        );
+        return <SummaryPageContent layout={layout} activeRole={activeRole} />;
       }}
     </CompetitionWorkspaceLayout>
   );
