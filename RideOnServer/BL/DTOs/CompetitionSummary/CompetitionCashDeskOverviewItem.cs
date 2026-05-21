@@ -22,6 +22,8 @@
 
         public decimal LastDifferenceAmount { get; set; }
 
+        public string LastCountLinesJson { get; set; } = "[]";
+
         public DateTime? LastSafeTransferAt { get; set; }
 
         public bool IsCountRequired { get; set; }

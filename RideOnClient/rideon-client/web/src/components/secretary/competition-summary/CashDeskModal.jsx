@@ -46,6 +46,75 @@ function buildDefaultLines() {
   });
 }
 
+function normalizeDenominationValue(value) {
+  return Number(value || 0);
+}
+
+function parseLastCountLines(overview) {
+  var rawValue = getValue(
+    overview,
+    "lastCountLinesJson",
+    "LastCountLinesJson",
+    "[]",
+  );
+
+  if (!rawValue) {
+    return [];
+  }
+
+  if (Array.isArray(rawValue)) {
+    return rawValue;
+  }
+
+  try {
+    var parsed = JSON.parse(rawValue);
+
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch {
+    return [];
+  }
+
+  return [];
+}
+
+function buildLinesFromLastCount(overview) {
+  var isCountRequired = getValue(
+    overview,
+    "isCountRequired",
+    "IsCountRequired",
+    true,
+  );
+
+  if (isCountRequired) {
+    return buildDefaultLines();
+  }
+
+  var lastLines = parseLastCountLines(overview);
+
+  if (!lastLines || lastLines.length === 0) {
+    return buildDefaultLines();
+  }
+
+  return DEFAULT_DENOMINATIONS.map(function (denomination) {
+    var matchingLine = lastLines.find(function (line) {
+      return (
+        normalizeDenominationValue(
+          getValue(line, "denominationValue", "DenominationValue", 0),
+        ) === denomination
+      );
+    });
+
+    return {
+      denominationValue: denomination,
+      quantity: matchingLine
+        ? String(getValue(matchingLine, "quantity", "Quantity", 0))
+        : "",
+    };
+  });
+}
+
 export default function CashDeskModal(props) {
   var [countLines, setCountLines] = useState(buildDefaultLines());
   var [countNotes, setCountNotes] = useState("");
@@ -59,13 +128,18 @@ export default function CashDeskModal(props) {
         return;
       }
 
-      setCountLines(buildDefaultLines());
       setCountNotes("");
       setSafeTransferAmount("");
       setSafeTransferNotes("");
       setLocalError("");
+
+      if (props.overview) {
+        setCountLines(buildLinesFromLastCount(props.overview));
+      } else {
+        setCountLines(buildDefaultLines());
+      }
     },
-    [props.open],
+    [props.open, props.overview],
   );
 
   var countedTotal = useMemo(
@@ -196,9 +270,14 @@ export default function CashDeskModal(props) {
                 false,
               ) ? (
                 <div className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-800">
-                  נדרשת ספירת קופה עדכנית.
+                  נדרשת ספירת קופה עדכנית. אם בוצעה העברה לכספת אחרי הספירה
+                  האחרונה, פירוט השטרות והמטבעות אופס.
                 </div>
-              ) : null}
+              ) : (
+                <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-bold text-green-700">
+                  הטופס נטען לפי ספירת הקופה האחרונה.
+                </div>
+              )}
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                 <div className="rounded-2xl border border-[#E6DCD5] bg-white p-5 shadow-sm">
@@ -278,7 +357,8 @@ export default function CashDeskModal(props) {
                       </h3>
 
                       <p className="mt-1 text-sm text-[#8A7268]">
-                        הזיני כמות לכל שטר/מטבע. הסכום והפער יחושבו אוטומטית.
+                        הזיני כמות לכל שטר/מטבע. אם אין העברה לכספת אחרי הספירה
+                        האחרונה, הכמויות נטענות אוטומטית מהספירה הקודמת.
                       </p>
                     </div>
 
@@ -411,7 +491,8 @@ export default function CashDeskModal(props) {
                     </h3>
 
                     <p className="mt-1 text-sm text-[#8A7268]">
-                      אחרי העברה לכספת, המזומן שאמור להישאר בקופה יתעדכן.
+                      אחרי העברה לכספת, המזומן שאמור להישאר בקופה יתעדכן והטופס
+                      יתאפס לספירה חדשה.
                     </p>
                   </div>
 
@@ -470,7 +551,8 @@ export default function CashDeskModal(props) {
                   </button>
 
                   <div className="mt-5 rounded-2xl border border-[#EFE5DF] bg-[#FCFAF8] p-4 text-sm text-[#7B5A4D]">
-                    לאחר העברה לכספת, המערכת תסמן שנדרשת ספירת קופה עדכנית.
+                    לאחר העברה לכספת, המערכת תסמן שנדרשת ספירת קופה עדכנית ותאפס
+                    את פירוט השטרות/מטבעות.
                   </div>
                 </section>
               </div>
