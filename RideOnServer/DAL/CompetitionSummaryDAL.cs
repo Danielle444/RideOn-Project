@@ -1405,6 +1405,9 @@ namespace RideOnServer.DAL
                                     LastDifferenceAmount =
                                         GetDecimal(reader, "LastDifferenceAmount"),
 
+                                    LastCountLinesJson =
+                                        GetString(reader, "LastCountLinesJson"),
+
                                     LastSafeTransferAt =
                                         GetNullableDateTime(reader, "LastSafeTransferAt"),
 
