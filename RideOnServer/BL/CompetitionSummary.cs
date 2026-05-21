@@ -359,6 +359,89 @@ namespace RideOnServer.BL
             );
         }
 
+        public static CompetitionCashDeskOverviewItem GetCashDeskOverview(
+    int competitionId,
+    int ranchId)
+        {
+            ValidateBasicSummaryRequest(competitionId, ranchId);
+
+            CompetitionSummaryDAL dal = new CompetitionSummaryDAL();
+
+            return dal.GetCashDeskOverview(
+                competitionId,
+                ranchId
+            );
+        }
+
+        public static int SaveCashCount(
+            SaveCompetitionCashCountRequest request)
+        {
+            if (request == null)
+            {
+                throw new Exception("Invalid cash count request");
+            }
+
+            ValidateBasicSummaryRequest(
+                request.CompetitionId,
+                request.RanchId
+            );
+
+            if (request.CountedBySystemUserId <= 0)
+            {
+                throw new Exception("Invalid CountedBySystemUserId");
+            }
+
+            if (request.Lines == null || request.Lines.Count == 0)
+            {
+                throw new Exception("Cash count lines are required");
+            }
+
+            foreach (SaveCompetitionCashCountLineItem line in request.Lines)
+            {
+                if (line.DenominationValue <= 0)
+                {
+                    throw new Exception("Invalid denomination value");
+                }
+
+                if (line.Quantity < 0)
+                {
+                    throw new Exception("Invalid quantity");
+                }
+            }
+
+            CompetitionSummaryDAL dal = new CompetitionSummaryDAL();
+
+            return dal.SaveCashCount(request);
+        }
+
+        public static int SaveCashSafeTransfer(
+            SaveCompetitionCashSafeTransferRequest request)
+        {
+            if (request == null)
+            {
+                throw new Exception("Invalid safe transfer request");
+            }
+
+            ValidateBasicSummaryRequest(
+                request.CompetitionId,
+                request.RanchId
+            );
+
+            if (request.TransferredBySystemUserId <= 0)
+            {
+                throw new Exception("Invalid TransferredBySystemUserId");
+            }
+
+            if (request.Amount <= 0)
+            {
+                throw new Exception("Transfer amount must be greater than zero");
+            }
+
+            CompetitionSummaryDAL dal = new CompetitionSummaryDAL();
+
+            return dal.SaveCashSafeTransfer(request);
+        }
+
         private static void ValidateChargeOwner(string chargeOwner)
         {
             if (

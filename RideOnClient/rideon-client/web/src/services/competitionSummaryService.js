@@ -217,6 +217,32 @@ function getCompetitionSummaryPaymentBatchCharges(
   );
 }
 
+function getCompetitionCashDeskOverview(competitionId, ranchId) {
+  return axios.get(`${API}/CompetitionSummary/cash-desk/overview`, {
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
+    ...getAuthHeaders(),
+  });
+}
+
+function saveCompetitionCashCount(data) {
+  return axios.post(
+    `${API}/CompetitionSummary/cash-desk/count`,
+    data,
+    getAuthHeaders(),
+  );
+}
+
+function saveCompetitionCashSafeTransfer(data) {
+  return axios.post(
+    `${API}/CompetitionSummary/cash-desk/safe-transfer`,
+    data,
+    getAuthHeaders(),
+  );
+}
+
 export {
   getCompetitionSummary,
   getCompetitionSummaryClassDetails,
@@ -232,4 +258,7 @@ export {
   getCompetitionSummaryPaymentBatches,
   getCompetitionSummaryPaymentBatchMethods,
   getCompetitionSummaryPaymentBatchCharges,
+  getCompetitionCashDeskOverview,
+  saveCompetitionCashCount,
+  saveCompetitionCashSafeTransfer,
 };
