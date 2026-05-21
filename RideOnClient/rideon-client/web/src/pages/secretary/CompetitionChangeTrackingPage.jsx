@@ -25,7 +25,7 @@ export default function CompetitionChangeTrackingPage() {
 
   return (
     <CompetitionWorkspaceLayout activeItemKey="change-tracking">
-      <div className="p-6 space-y-6" dir="rtl">
+      <div className="space-y-6 p-6" dir="rtl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-[#3F312B]">מעקב שינויים</h1>
@@ -54,6 +54,18 @@ export default function CompetitionChangeTrackingPage() {
           </div>
         ) : null}
 
+        {page.actionError ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {page.actionError}
+          </div>
+        ) : null}
+
+        {page.actionSuccess ? (
+          <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-bold text-green-700">
+            {page.actionSuccess}
+          </div>
+        ) : null}
+
         <ChangeRequestsTabs
           tabs={page.tabs}
           activeStatus={page.activeStatus}
@@ -76,12 +88,18 @@ export default function CompetitionChangeTrackingPage() {
           items={page.visibleItems}
           loading={page.loading}
           activeStatus={page.activeStatus}
+          answeringRequestKey={page.answeringRequestKey}
           onViewDetails={page.openRequestDetails}
+          onApprove={page.approveRequest}
+          onReject={page.rejectRequest}
         />
 
         <ChangeRequestDetailsModal
           item={page.selectedRequest}
+          answeringRequestKey={page.answeringRequestKey}
           onClose={page.closeRequestDetails}
+          onApprove={page.approveRequest}
+          onReject={page.rejectRequest}
         />
       </div>
     </CompetitionWorkspaceLayout>
