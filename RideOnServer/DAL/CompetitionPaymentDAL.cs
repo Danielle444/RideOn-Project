@@ -352,7 +352,7 @@ namespace RideOnServer.DAL
         }
 
         public int CreateCompetitionPayment(
-            CreateCompetitionPaymentRequest request)
+    CreateCompetitionPaymentRequest request)
         {
             try
             {
@@ -384,15 +384,16 @@ namespace RideOnServer.DAL
                     using (
                         NpgsqlCommand command = new NpgsqlCommand(
                             @"
-                            select public.usp_createcompetitionpayerpayment(
-                                @competitionId,
-                                @payerPersonId,
-                                @enteredBySystemUserId,
-                                @invoiceNumber,
-                                @selectedCharges::jsonb,
-                                @paymentMethods::jsonb,
-                                @notes
-                            );",
+                    select public.usp_createcompetitionpayerpayment(
+                        @competitionId,
+                        @payerPersonId,
+                        @enteredBySystemUserId,
+                        @chargeOwner,
+                        @invoiceNumber,
+                        @selectedCharges::jsonb,
+                        @paymentMethods::jsonb,
+                        @notes
+                    );",
                             connection
                         )
                     )
@@ -411,6 +412,11 @@ namespace RideOnServer.DAL
                             "@enteredBySystemUserId",
                             NpgsqlDbType.Integer
                         ).Value = request.EnteredBySystemUserId;
+
+                        command.Parameters.Add(
+                            "@chargeOwner",
+                            NpgsqlDbType.Text
+                        ).Value = request.ChargeOwner;
 
                         command.Parameters.Add(
                             "@invoiceNumber",

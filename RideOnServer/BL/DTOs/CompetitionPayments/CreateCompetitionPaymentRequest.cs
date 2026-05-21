@@ -10,6 +10,8 @@
 
         public int EnteredBySystemUserId { get; set; }
 
+        public string ChargeOwner { get; set; } = string.Empty;
+
         public string InvoiceNumber { get; set; } = string.Empty;
 
         public List<CreateCompetitionPaymentChargeItem> SelectedCharges { get; set; } =

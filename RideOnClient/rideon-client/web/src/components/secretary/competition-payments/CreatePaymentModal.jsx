@@ -243,16 +243,50 @@ export default function CreatePaymentModal(props) {
   var [notes, setNotes] = useState("");
   var [methodRows, setMethodRows] = useState([]);
 
+  var isFederationPayment = props.chargeOwner === "Federation";
+
+  function getCreditMethod() {
+    var methods = props.paymentMethods || [];
+
+    var credit = methods.find(function (method) {
+      return (
+        Number(getValue(method, "paymentMethodId", "PaymentMethodId", 0)) === 1
+      );
+    });
+
+    return credit || null;
+  }
+
+  function getAvailablePaymentMethods() {
+    if (isFederationPayment) {
+      var creditMethod = getCreditMethod();
+
+      if (!creditMethod) {
+        return [];
+      }
+
+      return [creditMethod];
+    }
+
+    return props.paymentMethods || [];
+  }
+
   useEffect(
     function () {
       if (!props.open) {
         return;
       }
 
-      var firstMethod =
-        props.paymentMethods && props.paymentMethods.length > 0
-          ? props.paymentMethods[0]
-          : null;
+      var firstMethod = null;
+
+      if (isFederationPayment) {
+        firstMethod = getCreditMethod();
+      } else {
+        firstMethod =
+          props.paymentMethods && props.paymentMethods.length > 0
+            ? props.paymentMethods[0]
+            : null;
+      }
 
       setInvoiceNumber("");
       setNotes("");
@@ -275,7 +309,7 @@ export default function CreatePaymentModal(props) {
         setMethodRows([]);
       }
     },
-    [props.open, props.selectedTotal, props.paymentMethods],
+    [props.open, props.selectedTotal, props.paymentMethods, props.chargeOwner],
   );
 
   var methodsTotal = useMemo(
@@ -294,6 +328,10 @@ export default function CreatePaymentModal(props) {
   }
 
   function addMethodRow() {
+    if (isFederationPayment) {
+      return;
+    }
+
     var firstMethod =
       props.paymentMethods && props.paymentMethods.length > 0
         ? props.paymentMethods[0]
@@ -323,6 +361,10 @@ export default function CreatePaymentModal(props) {
   }
 
   function removeMethodRow(rowId) {
+    if (isFederationPayment) {
+      return;
+    }
+
     setMethodRows(function (previous) {
       var next = previous.filter(function (row) {
         return row.id !== rowId;
@@ -370,12 +412,16 @@ export default function CreatePaymentModal(props) {
     return Number(row.amount || 0) <= 0;
   });
 
+  var hasMissingFederationCreditMethod =
+    isFederationPayment && getCreditMethod() === null;
+
   var canSubmit =
     invoiceNumber.trim().length > 0 &&
     methodRows.length > 0 &&
     roundedMethodsTotal === roundedSelectedTotal &&
     !hasOverPayment &&
     !hasInvalidAmount &&
+    !hasMissingFederationCreditMethod &&
     !props.loading;
 
   return (
@@ -388,6 +434,12 @@ export default function CreatePaymentModal(props) {
             <p className="mt-1 text-sm text-[#8A7268]">
               סכום לתשלום: {formatMoney(props.selectedTotal)}
             </p>
+
+            {isFederationPayment ? (
+              <p className="mt-1 text-xs font-bold text-[#8A7268]">
+                תשלום התאחדות נסגר ידנית באשראי בלבד
+              </p>
+            ) : null}
           </div>
 
           <button
@@ -406,10 +458,17 @@ export default function CreatePaymentModal(props) {
             </div>
           ) : null}
 
+          {hasMissingFederationCreditMethod ? (
+            <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+              לא נמצא אמצעי תשלום אשראי. צריך לוודא שבטבלת אמצעי התשלום קיים
+              paymentMethodId מספר 1 עבור אשראי.
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
             <label className="block">
               <span className="text-sm font-bold text-[#5D4037]">
-                מספר חשבונית
+                {isFederationPayment ? "מספר חשבונית התאחדות" : "מספר חשבונית"}
               </span>
 
               <input
@@ -419,7 +478,9 @@ export default function CreatePaymentModal(props) {
                   setInvoiceNumber(event.target.value);
                 }}
                 className="mt-2 h-12 w-full rounded-2xl border border-[#E3D7D0] bg-[#FCFAF8] px-4 text-right outline-none focus:border-[#8B5E4C]"
-                placeholder="לדוגמה: INV-1001"
+                placeholder={
+                  isFederationPayment ? "לדוגמה: FED-1001" : "לדוגמה: INV-1001"
+                }
               />
             </label>
 
@@ -446,24 +507,29 @@ export default function CreatePaymentModal(props) {
                 </h3>
 
                 <p className="mt-1 text-xs text-[#8A7268]">
-                  השורה האחרונה משלימה אוטומטית את ההפרש לסכום הכולל.
+                  {isFederationPayment
+                    ? "תשלום התאחדות נסגר ידנית באשראי בלבד."
+                    : "השורה האחרונה משלימה אוטומטית את ההפרש לסכום הכולל."}
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={addMethodRow}
-                className="flex items-center gap-2 rounded-xl border border-[#D8CBC3] bg-white px-3 py-2 text-sm font-bold text-[#6D4C41] transition-colors hover:bg-[#F8F3EF]"
-              >
-                <Plus size={16} />
-                הוספת אמצעי
-              </button>
+              {!isFederationPayment ? (
+                <button
+                  type="button"
+                  onClick={addMethodRow}
+                  className="flex items-center gap-2 rounded-xl border border-[#D8CBC3] bg-white px-3 py-2 text-sm font-bold text-[#6D4C41] transition-colors hover:bg-[#F8F3EF]"
+                >
+                  <Plus size={16} />
+                  הוספת אמצעי
+                </button>
+              ) : null}
             </div>
 
             <div className="space-y-3">
               {methodRows.map(function (row, index) {
                 var isLastRow = index === methodRows.length - 1;
-                var amountReadOnly = methodRows.length > 1 && isLastRow;
+                var amountReadOnly =
+                  isFederationPayment || (methodRows.length > 1 && isLastRow);
 
                 return (
                   <div
@@ -472,6 +538,7 @@ export default function CreatePaymentModal(props) {
                   >
                     <select
                       value={row.paymentMethodId}
+                      disabled={isFederationPayment}
                       onChange={function (event) {
                         updateMethodRow(
                           row.id,
@@ -479,9 +546,14 @@ export default function CreatePaymentModal(props) {
                           Number(event.target.value),
                         );
                       }}
-                      className="h-11 rounded-xl border border-[#E3D7D0] bg-white px-3 text-right outline-none"
+                      className={
+                        "h-11 rounded-xl border border-[#E3D7D0] px-3 text-right outline-none " +
+                        (isFederationPayment
+                          ? "bg-[#F5EFEA] text-[#7A655C]"
+                          : "bg-white")
+                      }
                     >
-                      {(props.paymentMethods || []).map(function (method) {
+                      {getAvailablePaymentMethods().map(function (method) {
                         return (
                           <option
                             key={getValue(
@@ -528,7 +600,9 @@ export default function CreatePaymentModal(props) {
 
                       {amountReadOnly ? (
                         <p className="mt-1 text-xs font-bold text-[#8A7268]">
-                          השלמה אוטומטית
+                          {isFederationPayment
+                            ? "התאחדות באשראי בלבד"
+                            : "השלמה אוטומטית"}
                         </p>
                       ) : null}
                     </div>
@@ -538,7 +612,7 @@ export default function CreatePaymentModal(props) {
                       onClick={function () {
                         removeMethodRow(row.id);
                       }}
-                      disabled={methodRows.length === 1}
+                      disabled={methodRows.length === 1 || isFederationPayment}
                       className="flex h-11 w-11 items-center justify-center rounded-xl text-red-600 transition-colors hover:bg-red-50 disabled:opacity-30"
                     >
                       <Trash2 size={18} />
