@@ -53,6 +53,85 @@ function getRequestKey(item) {
   );
 }
 
+function splitDetailsText(text) {
+  if (!text) {
+    return [];
+  }
+
+  return String(text)
+    .split("|")
+    .map(function (part) {
+      return part.trim();
+    })
+    .filter(function (part) {
+      return part.length > 0;
+    });
+}
+
+function getDetailLabel(part) {
+  var index = part.indexOf(":");
+
+  if (index === -1) {
+    return part.trim();
+  }
+
+  return part.substring(0, index).trim();
+}
+
+function getDetailValue(part) {
+  var index = part.indexOf(":");
+
+  if (index === -1) {
+    return "";
+  }
+
+  return part.substring(index + 1).trim();
+}
+
+function buildChangedFields(beforeText, afterText) {
+  var beforeParts = splitDetailsText(beforeText);
+  var afterParts = splitDetailsText(afterText);
+  var changes = [];
+
+  beforeParts.forEach(function (beforePart) {
+    var beforeLabel = getDetailLabel(beforePart);
+    var beforeValue = getDetailValue(beforePart);
+
+    var matchingAfterPart = afterParts.find(function (afterPart) {
+      return getDetailLabel(afterPart) === beforeLabel;
+    });
+
+    if (!matchingAfterPart) {
+      return;
+    }
+
+    var afterValue = getDetailValue(matchingAfterPart);
+
+    var isMissingAfterValue =
+      afterValue === "" ||
+      afterValue === "-" ||
+      afterValue === "₪" ||
+      afterValue === "₪0" ||
+      afterValue === "₪0.00";
+
+    var isPayerField = beforeLabel === "משלם" || beforeLabel === "משלמים";
+
+    if (isPayerField && isMissingAfterValue) {
+      return;
+    }
+
+    if (beforeValue !== afterValue) {
+      changes.push({
+        label: beforeLabel,
+        beforeValue: beforeValue || "-",
+        afterValue: afterValue || "-",
+      });
+    }
+  });
+
+  return changes;
+}
+
 function DetailRow(props) {
   return (
     <div>
@@ -62,14 +141,91 @@ function DetailRow(props) {
   );
 }
 
-function TextBox(props) {
-  return (
-    <div className="rounded-2xl border border-[#EFE5DF] bg-[#FAF7F5] p-4">
-      <p className="text-xs font-bold text-[#8D6E63]">{props.title}</p>
+function ChangeSummaryBox(props) {
+  var item = props.item;
 
-      <p className="mt-2 whitespace-pre-line text-sm leading-7 text-[#3F312B]">
-        {props.text || "-"}
-      </p>
+  var beforeText = getValue(item, "beforeText", "BeforeText", "");
+  var afterText = getValue(item, "afterText", "AfterText", "");
+  var isCancelled = getValue(item, "isCancelled", "IsCancelled", false);
+  var amountBefore = getValue(item, "amountBefore", "AmountBefore", null);
+  var amountAfter = getValue(item, "amountAfter", "AmountAfter", null);
+  var fineAmount = getValue(
+    item,
+    "fineAmountSnapshot",
+    "FineAmountSnapshot",
+    null,
+  );
+
+  var changes = buildChangedFields(beforeText, afterText);
+
+  return (
+    <div className="rounded-3xl border border-[#EFE5DF] bg-[#FAF7F5] p-5">
+      <p className="text-sm font-black text-[#3F312B]">מה שונה</p>
+
+      <div className="mt-4 space-y-3">
+        {isCancelled ? (
+          <>
+            <div className="rounded-2xl bg-white p-4">
+              <p className="text-xs font-bold text-[#8D6E63]">בקשה לביטול</p>
+
+              <p className="mt-2 text-sm leading-7 text-[#3F312B]">
+                {beforeText || "ביטול הרשמה"}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-white p-4">
+              <p className="text-xs font-bold text-[#8D6E63]">לאחר אישור</p>
+
+              <p className="mt-2 text-sm font-bold text-[#3F312B]">
+                {afterText || "ביטול הרשמה למקצה"}
+              </p>
+            </div>
+          </>
+        ) : changes.length > 0 ? (
+          changes.map(function (change, index) {
+            return (
+              <div key={index} className="rounded-2xl bg-white p-4">
+                <p className="text-xs font-bold text-[#8D6E63]">
+                  {change.label}
+                </p>
+
+                <p className="mt-2 text-sm font-bold text-[#3F312B]">
+                  {change.beforeValue} ← {change.afterValue}
+                </p>
+              </div>
+            );
+          })
+        ) : (
+          <div className="rounded-2xl bg-white p-4">
+            <p className="text-sm leading-7 text-[#3F312B]">
+              {afterText || "לא נמצאו שדות שונים להצגה"}
+            </p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="rounded-2xl bg-white p-4">
+            <p className="text-xs font-bold text-[#8D6E63]">סכום לפני</p>
+            <p className="mt-2 text-lg font-black text-[#3F312B]">
+              {formatMoney(amountBefore)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-white p-4">
+            <p className="text-xs font-bold text-[#8D6E63]">סכום אחרי</p>
+            <p className="mt-2 text-lg font-black text-[#3F312B]">
+              {formatMoney(amountAfter)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-white p-4">
+            <p className="text-xs font-bold text-[#8D6E63]">קנס</p>
+            <p className="mt-2 text-lg font-black text-[#B26A00]">
+              {formatMoney(fineAmount)}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -140,44 +296,10 @@ export default function ChangeRequestDetailsModal(props) {
               label="ישות"
               value={getValue(item, "entityName", "EntityName", "-")}
             />
-
-            <DetailRow
-              label="סכום לפני"
-              value={formatMoney(
-                getValue(item, "amountBefore", "AmountBefore", null),
-              )}
-            />
-
-            <DetailRow
-              label="סכום אחרי"
-              value={formatMoney(
-                getValue(item, "amountAfter", "AmountAfter", null),
-              )}
-            />
-
-            <DetailRow
-              label="קנס"
-              value={formatMoney(
-                getValue(
-                  item,
-                  "fineAmountSnapshot",
-                  "FineAmountSnapshot",
-                  null,
-                ),
-              )}
-            />
           </section>
 
-          <section className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <TextBox
-              title="לפני השינוי"
-              text={getValue(item, "beforeText", "BeforeText", "-")}
-            />
-
-            <TextBox
-              title="אחרי השינוי"
-              text={getValue(item, "afterText", "AfterText", "-")}
-            />
+          <section className="mt-5">
+            <ChangeSummaryBox item={item} />
           </section>
         </div>
 
