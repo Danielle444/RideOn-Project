@@ -5,6 +5,10 @@ import DataTableLoadingState from "../../common/table/DataTableLoadingState";
 import TableActionButton from "../../common/table/TableActionButton";
 
 function getValue(item, camelKey, pascalKey, fallback) {
+  if (!item) {
+    return fallback;
+  }
+
   if (item[camelKey] !== null && item[camelKey] !== undefined) {
     return item[camelKey];
   }
@@ -22,14 +26,6 @@ function formatDate(value) {
   }
 
   return new Date(value).toLocaleDateString("he-IL");
-}
-
-function formatMoney(value) {
-  if (value === null || value === undefined || value === "") {
-    return "-";
-  }
-
-  return "₪" + Number(value).toLocaleString("he-IL");
 }
 
 function getSourceLabel(source) {
@@ -72,6 +68,14 @@ function getStatusClass(status) {
   return "bg-[#FFF4E5] text-[#9A5B00]";
 }
 
+function getRequestKey(item) {
+  return (
+    getValue(item, "requestSource", "RequestSource", "") +
+    "-" +
+    getValue(item, "requestId", "RequestId", "")
+  );
+}
+
 export default function ChangeRequestsTable(props) {
   var items = Array.isArray(props.items) ? props.items : [];
   var isPendingTab = props.activeStatus === "Pending";
@@ -81,6 +85,7 @@ export default function ChangeRequestsTable(props) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-[#3F312B]">בקשות שינוי</h2>
+
           <p className="text-xs text-[#8D6E63]">
             {items.length} בקשות מוצגות כרגע
           </p>
@@ -113,11 +118,7 @@ export default function ChangeRequestsTable(props) {
 
           {!props.loading
             ? items.map(function (item) {
-                var key =
-                  getValue(item, "requestSource", "RequestSource", "") +
-                  "-" +
-                  getValue(item, "requestId", "RequestId", "");
-
+                var requestKey = getRequestKey(item);
                 var status = getValue(item, "status", "Status", "");
                 var source = getValue(
                   item,
@@ -126,9 +127,11 @@ export default function ChangeRequestsTable(props) {
                   "",
                 );
 
+                var isAnswering = props.answeringRequestKey === requestKey;
+
                 return (
                   <tr
-                    key={key}
+                    key={requestKey}
                     className="border-t border-[#F1E7E1] text-sm text-[#4A3A34]"
                   >
                     <td className="px-4 py-3">
@@ -157,6 +160,7 @@ export default function ChangeRequestsTable(props) {
                         <span className="font-bold">
                           {getValue(item, "entityName", "EntityName", "-")}
                         </span>
+
                         <span className="text-xs text-[#8D6E63]">
                           {getValue(item, "entityType", "EntityType", "-")}
                         </span>
@@ -191,18 +195,22 @@ export default function ChangeRequestsTable(props) {
                         {isPendingTab ? (
                           <>
                             <TableActionButton
-                              label="אשר"
+                              label={isAnswering ? "מאשר..." : "אשר"}
                               icon={<Check size={15} />}
-                              disabled
-                              title="אישור יחובר אחרי בניית לוגיקת חיובים"
+                              disabled={isAnswering}
+                              onClick={function () {
+                                props.onApprove(item);
+                              }}
                             />
 
                             <TableActionButton
-                              label="דחה"
+                              label={isAnswering ? "דוחה..." : "דחה"}
                               icon={<X size={15} />}
                               variant="danger"
-                              disabled
-                              title="דחייה תחובר בשלב הבא"
+                              disabled={isAnswering}
+                              onClick={function () {
+                                props.onReject(item);
+                              }}
                             />
                           </>
                         ) : null}

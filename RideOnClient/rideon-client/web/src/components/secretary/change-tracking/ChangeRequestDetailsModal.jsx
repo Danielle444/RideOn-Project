@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import TableActionButton from "../../common/table/TableActionButton";
 
 function getValue(item, camelKey, pascalKey, fallback) {
@@ -45,6 +45,14 @@ function getSourceLabel(source) {
   return source || "-";
 }
 
+function getRequestKey(item) {
+  return (
+    getValue(item, "requestSource", "RequestSource", "") +
+    "-" +
+    getValue(item, "requestId", "RequestId", "")
+  );
+}
+
 function DetailRow(props) {
   return (
     <div>
@@ -58,6 +66,7 @@ function TextBox(props) {
   return (
     <div className="rounded-2xl border border-[#EFE5DF] bg-[#FAF7F5] p-4">
       <p className="text-xs font-bold text-[#8D6E63]">{props.title}</p>
+
       <p className="mt-2 whitespace-pre-line text-sm leading-7 text-[#3F312B]">
         {props.text || "-"}
       </p>
@@ -74,6 +83,8 @@ export default function ChangeRequestDetailsModal(props) {
 
   var source = getValue(item, "requestSource", "RequestSource", "");
   var isPending = getValue(item, "status", "Status", "") === "Pending";
+  var requestKey = getRequestKey(item);
+  var isAnswering = props.answeringRequestKey === requestKey;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
@@ -83,6 +94,7 @@ export default function ChangeRequestDetailsModal(props) {
             <h2 className="text-xl font-bold text-[#3F312B]">
               פרטי בקשת שינוי
             </h2>
+
             <p className="mt-1 text-sm text-[#8D6E63]">
               {getValue(item, "requestType", "RequestType", "-")}
             </p>
@@ -91,7 +103,8 @@ export default function ChangeRequestDetailsModal(props) {
           <button
             type="button"
             onClick={props.onClose}
-            className="rounded-full p-2 text-[#6D4C41] transition-colors hover:bg-[#F5EDE8]"
+            disabled={isAnswering}
+            className="rounded-full p-2 text-[#6D4C41] transition-colors hover:bg-[#F5EDE8] disabled:opacity-50"
           >
             <X size={20} />
           </button>
@@ -172,21 +185,31 @@ export default function ChangeRequestDetailsModal(props) {
           {isPending ? (
             <>
               <TableActionButton
-                label="אשר"
-                disabled
-                title="אישור יחובר אחרי בניית לוגיקת חיובים"
+                label={isAnswering ? "מאשר..." : "אשר"}
+                icon={<Check size={15} />}
+                disabled={isAnswering}
+                onClick={function () {
+                  props.onApprove(item);
+                }}
               />
 
               <TableActionButton
-                label="דחה"
+                label={isAnswering ? "דוחה..." : "דחה"}
+                icon={<X size={15} />}
                 variant="danger"
-                disabled
-                title="דחייה תחובר בשלב הבא"
+                disabled={isAnswering}
+                onClick={function () {
+                  props.onReject(item);
+                }}
               />
             </>
           ) : null}
 
-          <TableActionButton label="סגור" onClick={props.onClose} />
+          <TableActionButton
+            label="סגור"
+            disabled={isAnswering}
+            onClick={props.onClose}
+          />
         </div>
       </div>
     </div>

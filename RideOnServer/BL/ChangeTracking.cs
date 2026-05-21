@@ -44,6 +44,55 @@ namespace RideOnServer.BL
             );
         }
 
+        public static int AnswerSecretaryChangeRequest(
+            AnswerChangeRequestRequest request)
+        {
+            if (request == null)
+            {
+                throw new Exception("Invalid request");
+            }
+
+            if (request.CompetitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            if (request.RanchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            if (request.RequestId <= 0)
+            {
+                throw new Exception("Invalid RequestId");
+            }
+
+            if (
+                request.RequestSource != "Entry" &&
+                request.RequestSource != "Product"
+            )
+            {
+                throw new Exception("Invalid RequestSource");
+            }
+
+            if (
+                request.AnswerStatus != "Approved" &&
+                request.AnswerStatus != "Rejected"
+            )
+            {
+                throw new Exception("Invalid AnswerStatus");
+            }
+
+            if (request.AnsweredBySystemUserId <= 0)
+            {
+                throw new Exception("Invalid AnsweredBySystemUserId");
+            }
+
+            ChangeTrackingDAL dal = new ChangeTrackingDAL();
+
+            return dal.AnswerSecretaryChangeRequest(request);
+        }
+
         public static int GetHostSecretaryPendingChangeRequestsCount(
             int ranchId)
         {
