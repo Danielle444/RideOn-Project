@@ -43,6 +43,29 @@ function getEntryDrawOrder(item) {
   return getValue(item, "drawOrder", "DrawOrder", "");
 }
 
+function getEntryStatus(item) {
+  return getValue(item, "entryStatus", "EntryStatus", "Active");
+}
+
+function getIsCancelledAfterStart(item) {
+  var status = String(getEntryStatus(item) || "").toLowerCase();
+
+  var rawValue = getValue(
+    item,
+    "isCancelledAfterStart",
+    "IsCancelledAfterStart",
+    false,
+  );
+
+  return (
+    rawValue === true ||
+    rawValue === "true" ||
+    rawValue === 1 ||
+    rawValue === "1" ||
+    status === "cancelledafterstart"
+  );
+}
+
 function getFilterButtonClass(isActive) {
   return (
     "rounded-2xl border px-4 py-2 text-sm font-semibold transition-colors " +
@@ -67,11 +90,9 @@ function getEntryWarningText(item) {
   var hasHorseWarning =
     item.hasHorseGapWarning || item.HasHorseGapWarning || false;
 
-  var riderGap =
-    item.riderGapFromPrevious || item.RiderGapFromPrevious || null;
+  var riderGap = item.riderGapFromPrevious || item.RiderGapFromPrevious || null;
 
-  var horseGap =
-    item.horseGapFromPrevious || item.HorseGapFromPrevious || null;
+  var horseGap = item.horseGapFromPrevious || item.HorseGapFromPrevious || null;
 
   var messages = [];
 
@@ -92,6 +113,14 @@ function getDragId(entryId) {
 
 function getEntryIdFromDragId(value) {
   return String(value || "").replace("draw-entry-", "");
+}
+
+function CancelledAfterStartBadge() {
+  return (
+    <span className="inline-flex w-fit rounded-full border border-[#D8CBC3] bg-[#F4F0ED] px-3 py-1 text-xs font-bold text-[#7A655C]">
+      בוטל אחרי תחילת התחרות
+    </span>
+  );
 }
 
 function DragHandle(props) {
@@ -127,7 +156,7 @@ function DragHandle(props) {
           : "cursor-grab hover:bg-[#FAF5F1] active:cursor-grabbing",
         draggable.isDragging ? "z-50 shadow-lg opacity-80" : "",
       ].join(" ")}
-      title="גרירה לשינוי סדר"
+      title={disabled ? "לא ניתן לגרור כניסה מבוטלת" : "גרירה לשינוי סדר"}
     >
       <GripVertical size={17} />
     </button>
@@ -143,25 +172,39 @@ function SortableEntryRow(props) {
 
   var horseName = getValue(item, "horseName", "HorseName", "");
   var barnName = getValue(item, "barnName", "BarnName", "");
+  var riderName = getValue(item, "riderName", "RiderName", "-");
+  var coachName = getValue(item, "coachName", "CoachName", "-") || "-";
+  var payerName = getValue(item, "payerName", "PayerName", "-");
+  var prizeRecipientName =
+    getValue(item, "prizeRecipientName", "PrizeRecipientName", "-") || "-";
+
   var entryId = getEntryId(item);
   var drawOrder = getEntryDrawOrder(item);
   var warningText = getEntryWarningText(item);
+  var isCancelledAfterStart = getIsCancelledAfterStart(item);
+
+  var disableDrawActions = savingDrawOrder || isCancelledAfterStart;
 
   var droppable = useDroppable({
     id: getDragId(entryId),
     data: {
       entryId: entryId,
     },
-    disabled: !drawOrderEditMode || savingDrawOrder,
+    disabled: !drawOrderEditMode || savingDrawOrder || isCancelledAfterStart,
   });
 
   return (
     <tr
       ref={droppable.setNodeRef}
       className={[
-        "border-t border-[#F1E7E1] text-sm text-[#4A3A34]",
-        drawOrderEditMode ? "bg-white" : "",
-        droppable.isOver && drawOrderEditMode ? "bg-[#FAF5F1]" : "",
+        "border-t border-[#F1E7E1] text-sm",
+        isCancelledAfterStart
+          ? "bg-[#F4F0ED] text-[#8B7A72] opacity-80"
+          : "text-[#4A3A34]",
+        drawOrderEditMode && !isCancelledAfterStart ? "bg-white" : "",
+        droppable.isOver && drawOrderEditMode && !isCancelledAfterStart
+          ? "bg-[#FAF5F1]"
+          : "",
       ].join(" ")}
     >
       <td className="px-4 py-3 font-bold text-[#7B5A4D]">
@@ -169,24 +212,36 @@ function SortableEntryRow(props) {
           <input
             type="number"
             min="1"
-            value={drawOrder || ""}
+            value={isCancelledAfterStart ? "" : drawOrder || ""}
             onChange={function (event) {
               props.onUpdateDraftDrawOrder(entryId, event.target.value);
             }}
-            disabled={savingDrawOrder}
-            className="h-10 w-20 rounded-xl border border-[#E2D5CE] bg-white px-3 text-center text-sm font-bold text-[#3F312B] outline-none transition-colors focus:border-[#8B6352]"
+            disabled={disableDrawActions}
+            className="h-10 w-20 rounded-xl border border-[#E2D5CE] bg-white px-3 text-center text-sm font-bold text-[#3F312B] outline-none transition-colors focus:border-[#8B6352] disabled:bg-[#F4F0ED] disabled:text-[#9B8A82]"
           />
         ) : (
-          drawOrder || "-"
+          <span>{isCancelledAfterStart ? "-" : drawOrder || "-"}</span>
         )}
       </td>
 
       <td className="px-4 py-3 font-semibold">
-        {getValue(item, "className", "ClassName", "-")}
+        <div className="flex flex-col gap-1">
+          <span>{getValue(item, "className", "ClassName", "-")}</span>
+
+          {isCancelledAfterStart ? <CancelledAfterStartBadge /> : null}
+        </div>
       </td>
 
       <td className="px-4 py-3 font-semibold">
-        {getValue(item, "riderName", "RiderName", "-")}
+        <div className="flex flex-col gap-1">
+          <span>{riderName}</span>
+
+          {isCancelledAfterStart ? (
+            <span className="text-xs font-semibold text-[#9A5B00]">
+              הכניסה נשמרת לתיעוד בלבד
+            </span>
+          ) : null}
+        </div>
       </td>
 
       <td className="px-4 py-3">
@@ -199,22 +254,11 @@ function SortableEntryRow(props) {
         </div>
       </td>
 
-      <td className="px-4 py-3">
-        {getValue(item, "coachName", "CoachName", "-") || "-"}
-      </td>
+      <td className="px-4 py-3">{coachName}</td>
 
-      <td className="px-4 py-3">
-        {getValue(item, "payerName", "PayerName", "-")}
-      </td>
+      <td className="px-4 py-3">{payerName}</td>
 
-      <td className="px-4 py-3">
-        {getValue(
-          item,
-          "prizeRecipientName",
-          "PrizeRecipientName",
-          "-",
-        ) || "-"}
-      </td>
+      <td className="px-4 py-3">{prizeRecipientName}</td>
 
       {canEditEntry && !drawOrderEditMode ? (
         <td className="px-4 py-3">
@@ -222,26 +266,30 @@ function SortableEntryRow(props) {
             <TableActionButton
               icon={<Pencil size={15} />}
               iconOnly
-              title="עריכת כניסה"
+              title={
+                isCancelledAfterStart
+                  ? "לא ניתן לערוך כניסה שבוטלה אחרי תחילת התחרות"
+                  : "עריכת כניסה"
+              }
               onClick={function () {
-                if (props.onEditEntry) {
+                if (props.onEditEntry && !isCancelledAfterStart) {
                   props.onEditEntry(item);
                 }
               }}
-              disabled={!props.onEditEntry}
+              disabled={!props.onEditEntry || isCancelledAfterStart}
             />
 
             <TableActionButton
               icon={<Trash2 size={15} />}
               iconOnly
-              title="מחיקת כניסה"
+              title={isCancelledAfterStart ? "הכניסה כבר בוטלה" : "מחיקת כניסה"}
               variant="danger"
               onClick={function () {
-                if (props.onDeleteEntry) {
+                if (props.onDeleteEntry && !isCancelledAfterStart) {
                   props.onDeleteEntry(item);
                 }
               }}
-              disabled={!props.onDeleteEntry}
+              disabled={!props.onDeleteEntry || isCancelledAfterStart}
             />
           </div>
         </td>
@@ -250,7 +298,11 @@ function SortableEntryRow(props) {
       {drawOrderEditMode ? (
         <>
           <td className="px-4 py-3">
-            {warningText ? (
+            {isCancelledAfterStart ? (
+              <span className="rounded-full bg-[#F4F0ED] px-3 py-1 text-xs font-bold text-[#7A655C]">
+                לא משתתף בהגרלה
+              </span>
+            ) : warningText ? (
               <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-bold text-orange-800">
                 {warningText}
               </span>
@@ -265,7 +317,7 @@ function SortableEntryRow(props) {
             <div className="flex justify-end">
               <DragHandle
                 entryId={entryId}
-                disabled={savingDrawOrder}
+                disabled={disableDrawActions}
                 index={index}
               />
             </div>
@@ -307,6 +359,21 @@ export default function SecretaryClassEntriesTable(props) {
     var activeEntryId = getEntryIdFromDragId(event.active.id);
     var overEntryId = getEntryIdFromDragId(event.over.id);
 
+    var activeItem = items.find(function (item) {
+      return String(getEntryId(item)) === String(activeEntryId);
+    });
+
+    var overItem = items.find(function (item) {
+      return String(getEntryId(item)) === String(overEntryId);
+    });
+
+    if (
+      getIsCancelledAfterStart(activeItem) ||
+      getIsCancelledAfterStart(overItem)
+    ) {
+      return;
+    }
+
     if (props.onMoveDrawOrderEntryToEntry) {
       props.onMoveDrawOrderEntryToEntry(activeEntryId, overEntryId);
     }
@@ -325,7 +392,7 @@ export default function SecretaryClassEntriesTable(props) {
             <h2 className="text-lg font-bold text-[#3F312B]">כניסות למקצה</h2>
             <p className="text-xs text-[#8D6E63]">
               {props.drawOrderEditMode
-                ? "מצב עריכת סדר פעיל - אפשר לגרור כניסות או להזין מספר הגרלה ידנית"
+                ? "מצב עריכת סדר פעיל - אפשר לגרור כניסות פעילות או להזין מספר הגרלה ידנית"
                 : items.length + " כניסות מוצגות כרגע"}
             </p>
           </div>
@@ -489,8 +556,7 @@ export default function SecretaryClassEntriesTable(props) {
 
             {props.drawOrderWarnings.length > 6 ? (
               <p className="mt-2 text-xs font-semibold">
-                מוצגות 6 התראות ראשונות מתוך{" "}
-                {props.drawOrderWarnings.length}
+                מוצגות 6 התראות ראשונות מתוך {props.drawOrderWarnings.length}
               </p>
             ) : null}
           </div>
@@ -499,7 +565,8 @@ export default function SecretaryClassEntriesTable(props) {
         {props.drawOrderEditMode ? (
           <div className="mb-4 rounded-2xl border border-[#EFE5DF] bg-[#FAF5F1] px-4 py-3 text-sm text-[#7A655C]">
             שימי לב: שמירה תעדכן את סדר ההגרלה של כל המקצים באותו יום ובאותו
-            מספר.
+            מספר. כניסות שבוטלו אחרי תחילת התחרות מוצגות לתיעוד בלבד ולא משתתפות
+            בהגרלה.
           </div>
         ) : null}
 

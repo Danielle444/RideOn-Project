@@ -336,7 +336,16 @@ namespace RideOnServer.DAL
                                         Convert.ToInt32(reader["orderedbysystemuserid"]),
 
                                     BillId =
-                                        Convert.ToInt32(reader["billid"])
+                                        Convert.ToInt32(reader["billid"]),
+
+                                    EntryStatus =
+                                        reader["entrystatus"] == DBNull.Value
+                                            ? "Active"
+                                            : reader["entrystatus"].ToString() ?? "Active",
+
+                                    IsCancelledAfterStart =
+                                        reader["iscancelledafterstart"] != DBNull.Value &&
+                                        Convert.ToBoolean(reader["iscancelledafterstart"])
                                 });
                             }
                         }
