@@ -10,6 +10,10 @@ import {
   getCompetitionSummaryShavingsDetails,
   getCompetitionSummaryShavingsEntries,
   getCompetitionSummaryCashDetails,
+  getCompetitionSummaryPaymentMethodBreakdown,
+  getCompetitionSummaryPaymentBatches,
+  getCompetitionSummaryPaymentBatchMethods,
+  getCompetitionSummaryPaymentBatchCharges,
 } from "../../services/competitionSummaryService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
 
@@ -91,6 +95,14 @@ export default function useCompetitionSummaryPage(options) {
   var [entryItems, setEntryItems] = useState([]);
   var [entriesLoading, setEntriesLoading] = useState(false);
   var [entriesError, setEntriesError] = useState("");
+
+  var [paymentsModal, setPaymentsModal] = useState(null);
+  var [paymentBreakdownItems, setPaymentBreakdownItems] = useState([]);
+  var [paymentBatchItems, setPaymentBatchItems] = useState([]);
+  var [paymentBatchMethods, setPaymentBatchMethods] = useState([]);
+  var [paymentBatchCharges, setPaymentBatchCharges] = useState([]);
+  var [paymentsLoading, setPaymentsLoading] = useState(false);
+  var [paymentsError, setPaymentsError] = useState("");
 
   useEffect(
     function () {
@@ -333,6 +345,189 @@ export default function useCompetitionSummaryPage(options) {
     }
   }
 
+  async function openOrganizerPaidBreakdown() {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    try {
+      setPaymentsLoading(true);
+      setPaymentsError("");
+      setPaymentBreakdownItems([]);
+      setPaymentBatchItems([]);
+      setPaymentBatchMethods([]);
+      setPaymentBatchCharges([]);
+
+      setPaymentsModal({
+        mode: "breakdown",
+        chargeOwner: "Organizer",
+        selectedPaymentMethod: null,
+        selectedPaymentBatch: null,
+      });
+
+      var response = await getCompetitionSummaryPaymentMethodBreakdown(
+        competitionId,
+        ranchId,
+        "Organizer",
+      );
+
+      setPaymentBreakdownItems(
+        Array.isArray(response.data) ? response.data : [],
+      );
+    } catch (error) {
+      console.error(error);
+      setPaymentsError(getErrorMessage(error, "שגיאה בטעינת פילוח תשלומים"));
+      setPaymentBreakdownItems([]);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }
+
+  async function openPaymentBatches(paymentMethodItem) {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    try {
+      setPaymentsLoading(true);
+      setPaymentsError("");
+      setPaymentBatchItems([]);
+      setPaymentBatchMethods([]);
+      setPaymentBatchCharges([]);
+
+      var paymentMethodId = null;
+
+      if (paymentMethodItem) {
+        paymentMethodId = getValue(
+          paymentMethodItem,
+          "paymentMethodId",
+          "PaymentMethodId",
+          null,
+        );
+      }
+
+      setPaymentsModal({
+        mode: "batches",
+        chargeOwner: "Organizer",
+        selectedPaymentMethod: paymentMethodItem || null,
+        selectedPaymentBatch: null,
+      });
+
+      var response = await getCompetitionSummaryPaymentBatches(
+        competitionId,
+        ranchId,
+        "Organizer",
+        paymentMethodId,
+      );
+
+      setPaymentBatchItems(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error(error);
+      setPaymentsError(getErrorMessage(error, "שגיאה בטעינת חשבוניות"));
+      setPaymentBatchItems([]);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }
+
+  async function openPaymentBatchDetails(batchItem) {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    var paymentBatchId = getValue(
+      batchItem,
+      "paymentBatchId",
+      "PaymentBatchId",
+      0,
+    );
+
+    if (!paymentBatchId) {
+      return;
+    }
+
+    try {
+      setPaymentsLoading(true);
+      setPaymentsError("");
+      setPaymentBatchMethods([]);
+      setPaymentBatchCharges([]);
+
+      setPaymentsModal({
+        mode: "batch-details",
+        chargeOwner: "Organizer",
+        selectedPaymentMethod: paymentsModal?.selectedPaymentMethod || null,
+        selectedPaymentBatch: batchItem,
+      });
+
+      var methodsResponse = await getCompetitionSummaryPaymentBatchMethods(
+        competitionId,
+        ranchId,
+        paymentBatchId,
+      );
+
+      var chargesResponse = await getCompetitionSummaryPaymentBatchCharges(
+        competitionId,
+        ranchId,
+        paymentBatchId,
+      );
+
+      setPaymentBatchMethods(
+        Array.isArray(methodsResponse.data) ? methodsResponse.data : [],
+      );
+
+      setPaymentBatchCharges(
+        Array.isArray(chargesResponse.data) ? chargesResponse.data : [],
+      );
+    } catch (error) {
+      console.error(error);
+      setPaymentsError(getErrorMessage(error, "שגיאה בטעינת פירוט חשבונית"));
+      setPaymentBatchMethods([]);
+      setPaymentBatchCharges([]);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }
+
+  function backInPaymentsModal() {
+    if (!paymentsModal) {
+      return;
+    }
+
+    if (paymentsModal.mode === "batch-details") {
+      setPaymentsModal({
+        mode: "batches",
+        chargeOwner: "Organizer",
+        selectedPaymentMethod: paymentsModal.selectedPaymentMethod || null,
+        selectedPaymentBatch: null,
+      });
+
+      setPaymentBatchMethods([]);
+      setPaymentBatchCharges([]);
+      return;
+    }
+
+    if (paymentsModal.mode === "batches") {
+      setPaymentsModal({
+        mode: "breakdown",
+        chargeOwner: "Organizer",
+        selectedPaymentMethod: null,
+        selectedPaymentBatch: null,
+      });
+
+      setPaymentBatchItems([]);
+      return;
+    }
+  }
+
+  function closePaymentsModal() {
+    setPaymentsModal(null);
+    setPaymentBreakdownItems([]);
+    setPaymentBatchItems([]);
+    setPaymentBatchMethods([]);
+    setPaymentBatchCharges([]);
+    setPaymentsError("");
+  }
+
   return {
     summary: summary,
     loading: loading,
@@ -349,11 +544,25 @@ export default function useCompetitionSummaryPage(options) {
     entriesLoading: entriesLoading,
     entriesError: entriesError,
 
+    paymentsModal: paymentsModal,
+    paymentBreakdownItems: paymentBreakdownItems,
+    paymentBatchItems: paymentBatchItems,
+    paymentBatchMethods: paymentBatchMethods,
+    paymentBatchCharges: paymentBatchCharges,
+    paymentsLoading: paymentsLoading,
+    paymentsError: paymentsError,
+
     openOrganizerCategoryDetails: openOrganizerCategoryDetails,
     openFederationClassesDetails: openFederationClassesDetails,
     openCashDetails: openCashDetails,
     closeDetailsModal: closeDetailsModal,
     openEntriesForDetail: openEntriesForDetail,
     backToDetailsList: backToDetailsList,
+
+    openOrganizerPaidBreakdown: openOrganizerPaidBreakdown,
+    openPaymentBatches: openPaymentBatches,
+    openPaymentBatchDetails: openPaymentBatchDetails,
+    backInPaymentsModal: backInPaymentsModal,
+    closePaymentsModal: closePaymentsModal,
   };
 }

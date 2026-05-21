@@ -452,6 +452,150 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("payments/method-breakdown")]
+        public IActionResult GetPaymentMethodBreakdown(
+    [FromQuery] int competitionId,
+    [FromQuery] int ranchId,
+    [FromQuery] string chargeOwner = "Organizer")
+        {
+            try
+            {
+                ValidateHostSecretarySummaryAccess(competitionId, ranchId);
+
+                List<CompetitionSummaryPaymentMethodBreakdownItem> items =
+                    CompetitionSummary.GetPaymentMethodBreakdown(
+                        competitionId,
+                        ranchId,
+                        chargeOwner
+                    );
+
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in GetPaymentMethodBreakdown: {ex.Message}"
+                );
+
+                return BadRequest("אירעה שגיאה בשליפת פילוח תשלומים");
+            }
+        }
+
+        [HttpGet("payments/batches")]
+        public IActionResult GetPaymentBatches(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId,
+            [FromQuery] string chargeOwner = "Organizer",
+            [FromQuery] int? paymentMethodId = null)
+        {
+            try
+            {
+                ValidateHostSecretarySummaryAccess(competitionId, ranchId);
+
+                List<CompetitionSummaryPaymentBatchItem> items =
+                    CompetitionSummary.GetPaymentBatches(
+                        competitionId,
+                        ranchId,
+                        chargeOwner,
+                        paymentMethodId
+                    );
+
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in GetPaymentBatches: {ex.Message}"
+                );
+
+                return BadRequest("אירעה שגיאה בשליפת חשבוניות תשלום");
+            }
+        }
+
+        [HttpGet("payments/batches/{paymentBatchId}/methods")]
+        public IActionResult GetPaymentBatchMethods(
+            int paymentBatchId,
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                ValidateHostSecretarySummaryAccess(competitionId, ranchId);
+
+                if (paymentBatchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                List<CompetitionSummaryPaymentBatchMethodItem> items =
+                    CompetitionSummary.GetPaymentBatchMethods(
+                        competitionId,
+                        ranchId,
+                        paymentBatchId
+                    );
+
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in GetPaymentBatchMethods: {ex.Message}"
+                );
+
+                return BadRequest("אירעה שגיאה בשליפת אמצעי התשלום לחשבונית");
+            }
+        }
+
+        [HttpGet("payments/batches/{paymentBatchId}/charges")]
+        public IActionResult GetPaymentBatchCharges(
+            int paymentBatchId,
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                ValidateHostSecretarySummaryAccess(competitionId, ranchId);
+
+                if (paymentBatchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                List<CompetitionSummaryPaymentBatchChargeItem> items =
+                    CompetitionSummary.GetPaymentBatchCharges(
+                        competitionId,
+                        ranchId,
+                        paymentBatchId
+                    );
+
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in GetPaymentBatchCharges: {ex.Message}"
+                );
+
+                return BadRequest("אירעה שגיאה בשליפת פריטי החשבונית");
+            }
+        }
+
         private void ValidateHostSecretarySummaryAccess(
     int competitionId,
     int ranchId)
