@@ -272,6 +272,104 @@ namespace RideOnServer.BL
             );
         }
 
+        public static List<CompetitionSummaryPaymentMethodBreakdownItem>
+    GetPaymentMethodBreakdown(
+        int competitionId,
+        int ranchId,
+        string chargeOwner)
+        {
+            ValidateBasicSummaryRequest(competitionId, ranchId);
+            ValidateChargeOwner(chargeOwner);
+
+            CompetitionSummaryDAL dal = new CompetitionSummaryDAL();
+
+            return dal.GetPaymentMethodBreakdown(
+                competitionId,
+                ranchId,
+                chargeOwner
+            );
+        }
+
+        public static List<CompetitionSummaryPaymentBatchItem>
+            GetPaymentBatches(
+                int competitionId,
+                int ranchId,
+                string chargeOwner,
+                int? paymentMethodId)
+        {
+            ValidateBasicSummaryRequest(competitionId, ranchId);
+            ValidateChargeOwner(chargeOwner);
+
+            if (paymentMethodId != null && paymentMethodId <= 0)
+            {
+                throw new Exception("Invalid PaymentMethodId");
+            }
+
+            CompetitionSummaryDAL dal = new CompetitionSummaryDAL();
+
+            return dal.GetPaymentBatches(
+                competitionId,
+                ranchId,
+                chargeOwner,
+                paymentMethodId
+            );
+        }
+
+        public static List<CompetitionSummaryPaymentBatchMethodItem>
+            GetPaymentBatchMethods(
+                int competitionId,
+                int ranchId,
+                int paymentBatchId)
+        {
+            ValidateBasicSummaryRequest(competitionId, ranchId);
+
+            if (paymentBatchId <= 0)
+            {
+                throw new Exception("Invalid PaymentBatchId");
+            }
+
+            CompetitionSummaryDAL dal = new CompetitionSummaryDAL();
+
+            return dal.GetPaymentBatchMethods(
+                competitionId,
+                ranchId,
+                paymentBatchId
+            );
+        }
+
+        public static List<CompetitionSummaryPaymentBatchChargeItem>
+            GetPaymentBatchCharges(
+                int competitionId,
+                int ranchId,
+                int paymentBatchId)
+        {
+            ValidateBasicSummaryRequest(competitionId, ranchId);
+
+            if (paymentBatchId <= 0)
+            {
+                throw new Exception("Invalid PaymentBatchId");
+            }
+
+            CompetitionSummaryDAL dal = new CompetitionSummaryDAL();
+
+            return dal.GetPaymentBatchCharges(
+                competitionId,
+                ranchId,
+                paymentBatchId
+            );
+        }
+
+        private static void ValidateChargeOwner(string chargeOwner)
+        {
+            if (
+                chargeOwner != "Organizer" &&
+                chargeOwner != "Federation"
+            )
+            {
+                throw new Exception("Invalid ChargeOwner");
+            }
+        }
+
         private static void ValidateBasicSummaryRequest(
             int competitionId,
             int ranchId)

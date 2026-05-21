@@ -13,6 +13,10 @@ function formatMoney(value) {
 }
 
 function getValue(item, camelKey, pascalKey, fallback) {
+  if (!item) {
+    return fallback;
+  }
+
   if (item[camelKey] !== null && item[camelKey] !== undefined) {
     return item[camelKey];
   }
@@ -88,6 +92,7 @@ export default function CompetitionSummarySection(props) {
         showQuantity={props.showQuantity}
         quantity={props.quantity}
         onExpectedAmountClick={props.onExpectedAmountClick}
+        onPaidAmountClick={props.onPaidAmountClick}
       />
 
       {showCategoriesTable && categories.length > 0 ? (
