@@ -596,6 +596,109 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("cash-desk/overview")]
+        public IActionResult GetCashDeskOverview(
+    [FromQuery] int competitionId,
+    [FromQuery] int ranchId)
+        {
+            try
+            {
+                ValidateHostSecretarySummaryAccess(competitionId, ranchId);
+
+                CompetitionCashDeskOverviewItem item =
+                    CompetitionSummary.GetCashDeskOverview(
+                        competitionId,
+                        ranchId
+                    );
+
+                return Ok(item);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in GetCashDeskOverview: {ex.Message}"
+                );
+
+                return BadRequest("אירעה שגיאה בשליפת נתוני קופה");
+            }
+        }
+
+        [HttpPost("cash-desk/count")]
+        public IActionResult SaveCashCount(
+            [FromBody] SaveCompetitionCashCountRequest request)
+        {
+            try
+            {
+                ValidateHostSecretarySummaryAccess(
+                    request.CompetitionId,
+                    request.RanchId
+                );
+
+                int cashCountId =
+                    CompetitionSummary.SaveCashCount(request);
+
+                return Ok(
+                    new SaveCompetitionCashActionResponse
+                    {
+                        Id = cashCountId,
+                        Message = "ספירת הקופה נשמרה בהצלחה"
+                    }
+                );
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in SaveCashCount: {ex.Message}"
+                );
+
+                return BadRequest("אירעה שגיאה בשמירת ספירת הקופה");
+            }
+        }
+
+        [HttpPost("cash-desk/safe-transfer")]
+        public IActionResult SaveCashSafeTransfer(
+            [FromBody] SaveCompetitionCashSafeTransferRequest request)
+        {
+            try
+            {
+                ValidateHostSecretarySummaryAccess(
+                    request.CompetitionId,
+                    request.RanchId
+                );
+
+                int transferId =
+                    CompetitionSummary.SaveCashSafeTransfer(request);
+
+                return Ok(
+                    new SaveCompetitionCashActionResponse
+                    {
+                        Id = transferId,
+                        Message = "העברה לכספת נשמרה בהצלחה"
+                    }
+                );
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in SaveCashSafeTransfer: {ex.Message}"
+                );
+
+                return BadRequest("אירעה שגיאה בשמירת העברה לכספת");
+            }
+        }
+
         private void ValidateHostSecretarySummaryAccess(
     int competitionId,
     int ranchId)

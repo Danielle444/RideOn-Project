@@ -1,5 +1,6 @@
 ﻿using Npgsql;
 using NpgsqlTypes;
+using System.Text.Json;
 using RideOnServer.BL.DTOs.CompetitionSummary;
 
 namespace RideOnServer.DAL
@@ -1338,6 +1339,210 @@ namespace RideOnServer.DAL
             }
 
             return reader.GetInt16(ordinal);
+        }
+
+        public CompetitionCashDeskOverviewItem GetCashDeskOverview(
+    int competitionId,
+    int ranchId)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getcompetitioncashdeskoverview(
+                        @competitionId,
+                        @ranchId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = competitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = ranchId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                return new CompetitionCashDeskOverviewItem
+                                {
+                                    CompetitionId =
+                                        GetInt(reader, "CompetitionId"),
+
+                                    RanchId =
+                                        GetInt(reader, "RanchId"),
+
+                                    ExpectedCashAmount =
+                                        GetDecimal(reader, "ExpectedCashAmount"),
+
+                                    TransferredToSafeAmount =
+                                        GetDecimal(reader, "TransferredToSafeAmount"),
+
+                                    CurrentCashInDeskAmount =
+                                        GetDecimal(reader, "CurrentCashInDeskAmount"),
+
+                                    LastCountId =
+                                        GetNullableInt(reader, "LastCountId"),
+
+                                    LastCountedAt =
+                                        GetNullableDateTime(reader, "LastCountedAt"),
+
+                                    LastCountedByName =
+                                        GetNullableString(reader, "LastCountedByName"),
+
+                                    LastCountedAmount =
+                                        GetDecimal(reader, "LastCountedAmount"),
+
+                                    LastDifferenceAmount =
+                                        GetDecimal(reader, "LastDifferenceAmount"),
+
+                                    LastSafeTransferAt =
+                                        GetNullableDateTime(reader, "LastSafeTransferAt"),
+
+                                    IsCountRequired =
+                                        GetBool(reader, "IsCountRequired")
+                                };
+                            }
+                        }
+                    }
+                }
+
+                return new CompetitionCashDeskOverviewItem
+                {
+                    CompetitionId = competitionId,
+                    RanchId = ranchId
+                };
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public int SaveCashCount(
+            SaveCompetitionCashCountRequest request)
+        {
+            try
+            {
+                string linesJson =
+                    JsonSerializer.Serialize(
+                        request.Lines.Select(
+                            line => new
+                            {
+                                denominationValue = line.DenominationValue,
+                                quantity = line.Quantity
+                            }
+                        )
+                    );
+
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select public.usp_savecompetitioncashcount(
+                        @competitionId,
+                        @ranchId,
+                        @countedBySystemUserId,
+                        @lines::jsonb,
+                        @notes
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = request.CompetitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = request.RanchId;
+
+                        command.Parameters.Add("@countedBySystemUserId", NpgsqlDbType.Integer)
+                            .Value = request.CountedBySystemUserId;
+
+                        command.Parameters.Add("@lines", NpgsqlDbType.Jsonb)
+                            .Value = linesJson;
+
+                        command.Parameters.Add("@notes", NpgsqlDbType.Text)
+                            .Value =
+                                request.Notes == null
+                                    ? DBNull.Value
+                                    : request.Notes;
+
+                        object result = command.ExecuteScalar()!;
+
+                        return Convert.ToInt32(result);
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public int SaveCashSafeTransfer(
+            SaveCompetitionCashSafeTransferRequest request)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select public.usp_savecompetitioncashsafetransfer(
+                        @competitionId,
+                        @ranchId,
+                        @transferredBySystemUserId,
+                        @amount,
+                        @notes
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = request.CompetitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = request.RanchId;
+
+                        command.Parameters.Add("@transferredBySystemUserId", NpgsqlDbType.Integer)
+                            .Value = request.TransferredBySystemUserId;
+
+                        command.Parameters.Add("@amount", NpgsqlDbType.Numeric)
+                            .Value = request.Amount;
+
+                        command.Parameters.Add("@notes", NpgsqlDbType.Text)
+                            .Value =
+                                request.Notes == null
+                                    ? DBNull.Value
+                                    : request.Notes;
+
+                        object result = command.ExecuteScalar()!;
+
+                        return Convert.ToInt32(result);
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
         }
 
         private static TimeSpan GetTimeSpan(
