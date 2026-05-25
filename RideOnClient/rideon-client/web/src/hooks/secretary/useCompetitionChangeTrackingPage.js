@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getCompetitionChangeRequests,
   getPendingChangeRequestsCount,
+  answerChangeRequest,
 } from "../../services/changeTrackingService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
 
@@ -28,6 +29,38 @@ function normalizeText(value) {
   return String(value).toLowerCase();
 }
 
+function getValue(item, camelKey, pascalKey, fallback) {
+  if (!item) {
+    return fallback;
+  }
+
+  if (item[camelKey] !== null && item[camelKey] !== undefined) {
+    return item[camelKey];
+  }
+
+  if (item[pascalKey] !== null && item[pascalKey] !== undefined) {
+    return item[pascalKey];
+  }
+
+  return fallback;
+}
+
+function getRequestId(item) {
+  return getValue(item, "requestId", "RequestId", 0);
+}
+
+function getRequestSource(item) {
+  return getValue(item, "requestSource", "RequestSource", "");
+}
+
+function getRequestType(item) {
+  return getValue(item, "requestType", "RequestType", "");
+}
+
+function getRequestKey(item) {
+  return getRequestSource(item) + "-" + getRequestId(item);
+}
+
 function getRequestSearchText(item) {
   return [
     item.requestType,
@@ -50,14 +83,6 @@ function getRequestSearchText(item) {
     .toLowerCase();
 }
 
-function getRequestSource(item) {
-  return item.requestSource || item.RequestSource || "";
-}
-
-function getRequestType(item) {
-  return item.requestType || item.RequestType || "";
-}
-
 export default function useCompetitionChangeTrackingPage(options) {
   var competitionId = options.competitionId;
   var ranchId = options.ranchId;
@@ -75,6 +100,10 @@ export default function useCompetitionChangeTrackingPage(options) {
   var [typeFilter, setTypeFilter] = useState("all");
 
   var [selectedRequest, setSelectedRequest] = useState(null);
+
+  var [answeringRequestKey, setAnsweringRequestKey] = useState(null);
+  var [actionError, setActionError] = useState("");
+  var [actionSuccess, setActionSuccess] = useState("");
 
   useEffect(
     function () {
@@ -169,7 +198,7 @@ export default function useCompetitionChangeTrackingPage(options) {
 
       items.forEach(function (item) {
         var source = getRequestSource(item);
-        var isCancelled = item.isCancelled || item.IsCancelled;
+        var isCancelled = getValue(item, "isCancelled", "IsCancelled", false);
 
         if (source === "Entry") {
           entryCount += 1;
@@ -203,6 +232,8 @@ export default function useCompetitionChangeTrackingPage(options) {
     setSourceFilter("all");
     setTypeFilter("all");
     setSelectedRequest(null);
+    setActionError("");
+    setActionSuccess("");
   }
 
   function clearFilters() {
@@ -219,32 +250,94 @@ export default function useCompetitionChangeTrackingPage(options) {
     setSelectedRequest(null);
   }
 
+  async function answerRequest(item, answerStatus) {
+    var requestId = getRequestId(item);
+    var requestSource = getRequestSource(item);
+    var requestKey = getRequestKey(item);
+
+    if (!requestId || !requestSource) {
+      setActionError("לא ניתן לזהות את בקשת השינוי");
+      return;
+    }
+
+    if (answerStatus !== "Approved" && answerStatus !== "Rejected") {
+      setActionError("סטטוס טיפול לא תקין");
+      return;
+    }
+
+    try {
+      setAnsweringRequestKey(requestKey);
+      setActionError("");
+      setActionSuccess("");
+
+      await answerChangeRequest({
+        competitionId: Number(competitionId),
+        ranchId: Number(ranchId),
+        requestId: requestId,
+        requestSource: requestSource,
+        answerStatus: answerStatus,
+        notes: null,
+      });
+
+      if (answerStatus === "Approved") {
+        setActionSuccess("בקשת השינוי אושרה בהצלחה");
+      } else {
+        setActionSuccess("בקשת השינוי נדחתה בהצלחה");
+      }
+
+      setSelectedRequest(null);
+
+      await loadPageData();
+    } catch (error) {
+      console.error(error);
+      setActionError(getErrorMessage(error, "שגיאה בטיפול בבקשת השינוי"));
+    } finally {
+      setAnsweringRequestKey(null);
+    }
+  }
+
+  function approveRequest(item) {
+    answerRequest(item, "Approved");
+  }
+
+  function rejectRequest(item) {
+    answerRequest(item, "Rejected");
+  }
+
   return {
     tabs: CHANGE_REQUEST_TABS,
 
-    activeStatus,
-    items,
-    visibleItems,
-    summary,
-    pendingCount,
+    activeStatus: activeStatus,
+    items: items,
+    visibleItems: visibleItems,
+    summary: summary,
+    pendingCount: pendingCount,
 
-    loading,
-    loadingCount,
-    error,
+    loading: loading,
+    loadingCount: loadingCount,
+    error: error,
 
-    searchText,
-    sourceFilter,
-    typeFilter,
-    selectedRequest,
+    actionError: actionError,
+    actionSuccess: actionSuccess,
+    answeringRequestKey: answeringRequestKey,
 
-    setSearchText,
-    setSourceFilter,
-    setTypeFilter,
+    searchText: searchText,
+    sourceFilter: sourceFilter,
+    typeFilter: typeFilter,
+    selectedRequest: selectedRequest,
 
-    changeStatus,
-    clearFilters,
-    openRequestDetails,
-    closeRequestDetails,
-    loadPageData,
+    setSearchText: setSearchText,
+    setSourceFilter: setSourceFilter,
+    setTypeFilter: setTypeFilter,
+
+    changeStatus: changeStatus,
+    clearFilters: clearFilters,
+    openRequestDetails: openRequestDetails,
+    closeRequestDetails: closeRequestDetails,
+    loadPageData: loadPageData,
+
+    answerRequest: answerRequest,
+    approveRequest: approveRequest,
+    rejectRequest: rejectRequest,
   };
 }

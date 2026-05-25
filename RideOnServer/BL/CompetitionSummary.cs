@@ -272,6 +272,187 @@ namespace RideOnServer.BL
             );
         }
 
+        public static List<CompetitionSummaryPaymentMethodBreakdownItem>
+    GetPaymentMethodBreakdown(
+        int competitionId,
+        int ranchId,
+        string chargeOwner)
+        {
+            ValidateBasicSummaryRequest(competitionId, ranchId);
+            ValidateChargeOwner(chargeOwner);
+
+            CompetitionSummaryDAL dal = new CompetitionSummaryDAL();
+
+            return dal.GetPaymentMethodBreakdown(
+                competitionId,
+                ranchId,
+                chargeOwner
+            );
+        }
+
+        public static List<CompetitionSummaryPaymentBatchItem>
+            GetPaymentBatches(
+                int competitionId,
+                int ranchId,
+                string chargeOwner,
+                int? paymentMethodId)
+        {
+            ValidateBasicSummaryRequest(competitionId, ranchId);
+            ValidateChargeOwner(chargeOwner);
+
+            if (paymentMethodId != null && paymentMethodId <= 0)
+            {
+                throw new Exception("Invalid PaymentMethodId");
+            }
+
+            CompetitionSummaryDAL dal = new CompetitionSummaryDAL();
+
+            return dal.GetPaymentBatches(
+                competitionId,
+                ranchId,
+                chargeOwner,
+                paymentMethodId
+            );
+        }
+
+        public static List<CompetitionSummaryPaymentBatchMethodItem>
+            GetPaymentBatchMethods(
+                int competitionId,
+                int ranchId,
+                int paymentBatchId)
+        {
+            ValidateBasicSummaryRequest(competitionId, ranchId);
+
+            if (paymentBatchId <= 0)
+            {
+                throw new Exception("Invalid PaymentBatchId");
+            }
+
+            CompetitionSummaryDAL dal = new CompetitionSummaryDAL();
+
+            return dal.GetPaymentBatchMethods(
+                competitionId,
+                ranchId,
+                paymentBatchId
+            );
+        }
+
+        public static List<CompetitionSummaryPaymentBatchChargeItem>
+            GetPaymentBatchCharges(
+                int competitionId,
+                int ranchId,
+                int paymentBatchId)
+        {
+            ValidateBasicSummaryRequest(competitionId, ranchId);
+
+            if (paymentBatchId <= 0)
+            {
+                throw new Exception("Invalid PaymentBatchId");
+            }
+
+            CompetitionSummaryDAL dal = new CompetitionSummaryDAL();
+
+            return dal.GetPaymentBatchCharges(
+                competitionId,
+                ranchId,
+                paymentBatchId
+            );
+        }
+
+        public static CompetitionCashDeskOverviewItem GetCashDeskOverview(
+    int competitionId,
+    int ranchId)
+        {
+            ValidateBasicSummaryRequest(competitionId, ranchId);
+
+            CompetitionSummaryDAL dal = new CompetitionSummaryDAL();
+
+            return dal.GetCashDeskOverview(
+                competitionId,
+                ranchId
+            );
+        }
+
+        public static int SaveCashCount(
+            SaveCompetitionCashCountRequest request)
+        {
+            if (request == null)
+            {
+                throw new Exception("Invalid cash count request");
+            }
+
+            ValidateBasicSummaryRequest(
+                request.CompetitionId,
+                request.RanchId
+            );
+
+            if (request.CountedBySystemUserId <= 0)
+            {
+                throw new Exception("Invalid CountedBySystemUserId");
+            }
+
+            if (request.Lines == null || request.Lines.Count == 0)
+            {
+                throw new Exception("Cash count lines are required");
+            }
+
+            foreach (SaveCompetitionCashCountLineItem line in request.Lines)
+            {
+                if (line.DenominationValue <= 0)
+                {
+                    throw new Exception("Invalid denomination value");
+                }
+
+                if (line.Quantity < 0)
+                {
+                    throw new Exception("Invalid quantity");
+                }
+            }
+
+            CompetitionSummaryDAL dal = new CompetitionSummaryDAL();
+
+            return dal.SaveCashCount(request);
+        }
+
+        public static int SaveCashSafeTransfer(
+            SaveCompetitionCashSafeTransferRequest request)
+        {
+            if (request == null)
+            {
+                throw new Exception("Invalid safe transfer request");
+            }
+
+            ValidateBasicSummaryRequest(
+                request.CompetitionId,
+                request.RanchId
+            );
+
+            if (request.TransferredBySystemUserId <= 0)
+            {
+                throw new Exception("Invalid TransferredBySystemUserId");
+            }
+
+            if (request.Amount <= 0)
+            {
+                throw new Exception("Transfer amount must be greater than zero");
+            }
+
+            CompetitionSummaryDAL dal = new CompetitionSummaryDAL();
+
+            return dal.SaveCashSafeTransfer(request);
+        }
+
+        private static void ValidateChargeOwner(string chargeOwner)
+        {
+            if (
+                chargeOwner != "Organizer" &&
+                chargeOwner != "Federation"
+            )
+            {
+                throw new Exception("Invalid ChargeOwner");
+            }
+        }
+
         private static void ValidateBasicSummaryRequest(
             int competitionId,
             int ranchId)

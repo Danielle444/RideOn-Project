@@ -363,6 +363,143 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("group-draw-order-preview")]
+        public IActionResult GenerateGroupDrawOrderPreview(
+    [FromBody] GenerateGroupDrawOrderPreviewRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                if (request.CompetitionId <= 0 ||
+                    request.RanchId <= 0 ||
+                    request.OrderInDay <= 0 ||
+                    request.ClassDate == default)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                if (request.MinimumGap <= 0)
+                {
+                    request.MinimumGap = 7;
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
+                Competition? competition =
+                    Competition.GetCompetitionById(request.CompetitionId);
+
+                if (competition == null)
+                {
+                    return NotFound("Competition not found");
+                }
+
+                if (competition.HostRanchId != request.RanchId)
+                {
+                    return StatusCode(
+                        StatusCodes.Status403Forbidden,
+                        "אין לך הרשאה ליצור הגרלה לתחרות זו"
+                    );
+                }
+
+                GroupDrawOrderPreviewResponse response =
+                    Entry.GenerateGroupDrawOrderPreview(request);
+
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ex.Message
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in GenerateGroupDrawOrderPreview: {ex.Message}"
+                );
+
+                return BadRequest("אירעה שגיאה ביצירת תצוגת הגרלה");
+            }
+        }
+
+        [HttpPut("group-draw-order/clear")]
+        public IActionResult ClearGroupEntriesDrawOrder(
+    [FromBody] ClearGroupEntriesDrawOrderRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                if (request.CompetitionId <= 0 ||
+                    request.RanchId <= 0 ||
+                    request.OrderInDay <= 0 ||
+                    request.ClassDate == default)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
+                Competition? competition =
+                    Competition.GetCompetitionById(request.CompetitionId);
+
+                if (competition == null)
+                {
+                    return NotFound("Competition not found");
+                }
+
+                if (competition.HostRanchId != request.RanchId)
+                {
+                    return StatusCode(
+                        StatusCodes.Status403Forbidden,
+                        "אין לך הרשאה למחוק הגרלה בתחרות זו"
+                    );
+                }
+
+                Entry.ClearGroupEntriesDrawOrder(request);
+
+                return Ok(new
+                {
+                    Message = "Group draw order cleared successfully"
+                });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ex.Message
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in ClearGroupEntriesDrawOrder: {ex.Message}"
+                );
+
+                return BadRequest("אירעה שגיאה במחיקת ההגרלה");
+            }
+        }
+
 
 
     }

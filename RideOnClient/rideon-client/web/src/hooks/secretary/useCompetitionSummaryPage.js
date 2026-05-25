@@ -10,6 +10,13 @@ import {
   getCompetitionSummaryShavingsDetails,
   getCompetitionSummaryShavingsEntries,
   getCompetitionSummaryCashDetails,
+  getCompetitionSummaryPaymentMethodBreakdown,
+  getCompetitionSummaryPaymentBatches,
+  getCompetitionSummaryPaymentBatchMethods,
+  getCompetitionSummaryPaymentBatchCharges,
+  getCompetitionCashDeskOverview,
+  saveCompetitionCashCount,
+  saveCompetitionCashSafeTransfer,
 } from "../../services/competitionSummaryService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
 
@@ -91,6 +98,21 @@ export default function useCompetitionSummaryPage(options) {
   var [entryItems, setEntryItems] = useState([]);
   var [entriesLoading, setEntriesLoading] = useState(false);
   var [entriesError, setEntriesError] = useState("");
+
+  var [paymentsModal, setPaymentsModal] = useState(null);
+  var [paymentBreakdownItems, setPaymentBreakdownItems] = useState([]);
+  var [paymentBatchItems, setPaymentBatchItems] = useState([]);
+  var [paymentBatchMethods, setPaymentBatchMethods] = useState([]);
+  var [paymentBatchCharges, setPaymentBatchCharges] = useState([]);
+  var [paymentsLoading, setPaymentsLoading] = useState(false);
+  var [paymentsError, setPaymentsError] = useState("");
+
+  var [cashDeskOpen, setCashDeskOpen] = useState(false);
+  var [cashDeskOverview, setCashDeskOverview] = useState(null);
+  var [cashDeskLoading, setCashDeskLoading] = useState(false);
+  var [cashDeskSaving, setCashDeskSaving] = useState(false);
+  var [cashDeskError, setCashDeskError] = useState("");
+  var [cashDeskSuccess, setCashDeskSuccess] = useState("");
 
   useEffect(
     function () {
@@ -223,8 +245,107 @@ export default function useCompetitionSummaryPage(options) {
     openDetails("classes", "federation");
   }
 
-  function openCashDetails() {
-    openDetails("cash", "organizer");
+  async function openCashDetails() {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    setCashDeskOpen(true);
+    await loadCashDeskOverview();
+  }
+
+  async function loadCashDeskOverview() {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    try {
+      setCashDeskLoading(true);
+      setCashDeskError("");
+      setCashDeskSuccess("");
+
+      var response = await getCompetitionCashDeskOverview(
+        competitionId,
+        ranchId,
+      );
+
+      setCashDeskOverview(response.data || null);
+    } catch (error) {
+      console.error(error);
+      setCashDeskError(getErrorMessage(error, "שגיאה בטעינת נתוני קופה"));
+      setCashDeskOverview(null);
+    } finally {
+      setCashDeskLoading(false);
+    }
+  }
+
+  function closeCashDesk() {
+    if (cashDeskSaving) {
+      return;
+    }
+
+    setCashDeskOpen(false);
+    setCashDeskOverview(null);
+    setCashDeskError("");
+    setCashDeskSuccess("");
+  }
+
+  async function saveCashCount(formData) {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    try {
+      setCashDeskSaving(true);
+      setCashDeskError("");
+      setCashDeskSuccess("");
+
+      await saveCompetitionCashCount({
+        competitionId: Number(competitionId),
+        ranchId: Number(ranchId),
+        lines: formData.lines || [],
+        notes: formData.notes || null,
+      });
+
+      setCashDeskSuccess("ספירת הקופה נשמרה בהצלחה");
+      await loadCashDeskOverview();
+      await loadSummary();
+    } catch (error) {
+      console.error(error);
+      setCashDeskError(getErrorMessage(error, "שגיאה בשמירת ספירת קופה"));
+    } finally {
+      setCashDeskSaving(false);
+    }
+  }
+
+  async function saveCashSafeTransfer(formData) {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    try {
+      setCashDeskSaving(true);
+      setCashDeskError("");
+      setCashDeskSuccess("");
+
+      await saveCompetitionCashSafeTransfer({
+        competitionId: Number(competitionId),
+        ranchId: Number(ranchId),
+        amount: Number(formData.amount || 0),
+        notes: formData.notes || null,
+      });
+
+      setCashDeskSuccess(
+        "העברה לכספת נשמרה בהצלחה. מומלץ לבצע ספירת קופה חדשה.",
+      );
+      await loadCashDeskOverview();
+      await loadSummary();
+    } catch (error) {
+      console.error(error);
+      setCashDeskError(getErrorMessage(error, "שגיאה בשמירת העברה לכספת"));
+    } finally {
+      setCashDeskSaving(false);
+    }
   }
 
   function closeDetailsModal() {
@@ -333,6 +454,189 @@ export default function useCompetitionSummaryPage(options) {
     }
   }
 
+  async function openOrganizerPaidBreakdown() {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    try {
+      setPaymentsLoading(true);
+      setPaymentsError("");
+      setPaymentBreakdownItems([]);
+      setPaymentBatchItems([]);
+      setPaymentBatchMethods([]);
+      setPaymentBatchCharges([]);
+
+      setPaymentsModal({
+        mode: "breakdown",
+        chargeOwner: "Organizer",
+        selectedPaymentMethod: null,
+        selectedPaymentBatch: null,
+      });
+
+      var response = await getCompetitionSummaryPaymentMethodBreakdown(
+        competitionId,
+        ranchId,
+        "Organizer",
+      );
+
+      setPaymentBreakdownItems(
+        Array.isArray(response.data) ? response.data : [],
+      );
+    } catch (error) {
+      console.error(error);
+      setPaymentsError(getErrorMessage(error, "שגיאה בטעינת פילוח תשלומים"));
+      setPaymentBreakdownItems([]);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }
+
+  async function openPaymentBatches(paymentMethodItem) {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    try {
+      setPaymentsLoading(true);
+      setPaymentsError("");
+      setPaymentBatchItems([]);
+      setPaymentBatchMethods([]);
+      setPaymentBatchCharges([]);
+
+      var paymentMethodId = null;
+
+      if (paymentMethodItem) {
+        paymentMethodId = getValue(
+          paymentMethodItem,
+          "paymentMethodId",
+          "PaymentMethodId",
+          null,
+        );
+      }
+
+      setPaymentsModal({
+        mode: "batches",
+        chargeOwner: "Organizer",
+        selectedPaymentMethod: paymentMethodItem || null,
+        selectedPaymentBatch: null,
+      });
+
+      var response = await getCompetitionSummaryPaymentBatches(
+        competitionId,
+        ranchId,
+        "Organizer",
+        paymentMethodId,
+      );
+
+      setPaymentBatchItems(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error(error);
+      setPaymentsError(getErrorMessage(error, "שגיאה בטעינת חשבוניות"));
+      setPaymentBatchItems([]);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }
+
+  async function openPaymentBatchDetails(batchItem) {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    var paymentBatchId = getValue(
+      batchItem,
+      "paymentBatchId",
+      "PaymentBatchId",
+      0,
+    );
+
+    if (!paymentBatchId) {
+      return;
+    }
+
+    try {
+      setPaymentsLoading(true);
+      setPaymentsError("");
+      setPaymentBatchMethods([]);
+      setPaymentBatchCharges([]);
+
+      setPaymentsModal({
+        mode: "batch-details",
+        chargeOwner: "Organizer",
+        selectedPaymentMethod: paymentsModal?.selectedPaymentMethod || null,
+        selectedPaymentBatch: batchItem,
+      });
+
+      var methodsResponse = await getCompetitionSummaryPaymentBatchMethods(
+        competitionId,
+        ranchId,
+        paymentBatchId,
+      );
+
+      var chargesResponse = await getCompetitionSummaryPaymentBatchCharges(
+        competitionId,
+        ranchId,
+        paymentBatchId,
+      );
+
+      setPaymentBatchMethods(
+        Array.isArray(methodsResponse.data) ? methodsResponse.data : [],
+      );
+
+      setPaymentBatchCharges(
+        Array.isArray(chargesResponse.data) ? chargesResponse.data : [],
+      );
+    } catch (error) {
+      console.error(error);
+      setPaymentsError(getErrorMessage(error, "שגיאה בטעינת פירוט חשבונית"));
+      setPaymentBatchMethods([]);
+      setPaymentBatchCharges([]);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }
+
+  function backInPaymentsModal() {
+    if (!paymentsModal) {
+      return;
+    }
+
+    if (paymentsModal.mode === "batch-details") {
+      setPaymentsModal({
+        mode: "batches",
+        chargeOwner: "Organizer",
+        selectedPaymentMethod: paymentsModal.selectedPaymentMethod || null,
+        selectedPaymentBatch: null,
+      });
+
+      setPaymentBatchMethods([]);
+      setPaymentBatchCharges([]);
+      return;
+    }
+
+    if (paymentsModal.mode === "batches") {
+      setPaymentsModal({
+        mode: "breakdown",
+        chargeOwner: "Organizer",
+        selectedPaymentMethod: null,
+        selectedPaymentBatch: null,
+      });
+
+      setPaymentBatchItems([]);
+      return;
+    }
+  }
+
+  function closePaymentsModal() {
+    setPaymentsModal(null);
+    setPaymentBreakdownItems([]);
+    setPaymentBatchItems([]);
+    setPaymentBatchMethods([]);
+    setPaymentBatchCharges([]);
+    setPaymentsError("");
+  }
+
   return {
     summary: summary,
     loading: loading,
@@ -349,11 +653,37 @@ export default function useCompetitionSummaryPage(options) {
     entriesLoading: entriesLoading,
     entriesError: entriesError,
 
+    paymentsModal: paymentsModal,
+    paymentBreakdownItems: paymentBreakdownItems,
+    paymentBatchItems: paymentBatchItems,
+    paymentBatchMethods: paymentBatchMethods,
+    paymentBatchCharges: paymentBatchCharges,
+    paymentsLoading: paymentsLoading,
+    paymentsError: paymentsError,
+
+    cashDeskOpen: cashDeskOpen,
+    cashDeskOverview: cashDeskOverview,
+    cashDeskLoading: cashDeskLoading,
+    cashDeskSaving: cashDeskSaving,
+    cashDeskError: cashDeskError,
+    cashDeskSuccess: cashDeskSuccess,
+
     openOrganizerCategoryDetails: openOrganizerCategoryDetails,
     openFederationClassesDetails: openFederationClassesDetails,
     openCashDetails: openCashDetails,
+    closeCashDesk: closeCashDesk,
+    loadCashDeskOverview: loadCashDeskOverview,
+    saveCashCount: saveCashCount,
+    saveCashSafeTransfer: saveCashSafeTransfer,
+
     closeDetailsModal: closeDetailsModal,
     openEntriesForDetail: openEntriesForDetail,
     backToDetailsList: backToDetailsList,
+
+    openOrganizerPaidBreakdown: openOrganizerPaidBreakdown,
+    openPaymentBatches: openPaymentBatches,
+    openPaymentBatchDetails: openPaymentBatchDetails,
+    backInPaymentsModal: backInPaymentsModal,
+    closePaymentsModal: closePaymentsModal,
   };
 }

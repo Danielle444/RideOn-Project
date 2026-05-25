@@ -18,35 +18,11 @@ namespace RideOnServer.Controllers
         {
             try
             {
-                if (competitionId <= 0 || ranchId <= 0)
-                {
-                    return BadRequest("Invalid request");
-                }
-
-                int personId =
-                    UserAccessValidator.GetPersonIdFromClaims(User);
-
-                UserAccessValidator.EnsureUserHasRoleInRanch(
-                    personId,
+                ValidateHostSecretaryCompetitionAccess(
+                    competitionId,
                     ranchId,
-                    RoleNames.HostSecretary
+                    "אין לך הרשאה לצפות בבקשות שינוי של תחרות זו"
                 );
-
-                Competition? competition =
-                    Competition.GetCompetitionById(competitionId);
-
-                if (competition == null)
-                {
-                    return NotFound("Competition not found");
-                }
-
-                if (competition.HostRanchId != ranchId)
-                {
-                    return StatusCode(
-                        StatusCodes.Status403Forbidden,
-                        "אין לך הרשאה לצפות בבקשות שינוי של תחרות זו"
-                    );
-                }
 
                 List<SecretaryChangeRequestItem> items =
                     ChangeTracking.GetSecretaryCompetitionChangeRequests(
@@ -76,6 +52,56 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("answer")]
+        public IActionResult AnswerSecretaryChangeRequest(
+            [FromBody] AnswerChangeRequestRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                ValidateHostSecretaryCompetitionAccess(
+                    request.CompetitionId,
+                    request.RanchId,
+                    "אין לך הרשאה לטפל בבקשות שינוי של תחרות זו"
+                );
+
+                int personId =
+                    UserAccessValidator.GetPersonIdFromClaims(User);
+
+                request.AnsweredBySystemUserId = personId;
+
+                int requestId =
+                    ChangeTracking.AnswerSecretaryChangeRequest(request);
+
+                return Ok(
+                    new
+                    {
+                        RequestId = requestId,
+                        Message = "בקשת השינוי טופלה בהצלחה"
+                    }
+                );
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ex.Message
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in AnswerSecretaryChangeRequest: {ex.Message}"
+                );
+
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpGet("pending-count")]
         public IActionResult GetHostSecretaryPendingChangeRequestsCount(
             [FromQuery] int ranchId)
@@ -101,10 +127,12 @@ namespace RideOnServer.Controllers
                         ranchId
                     );
 
-                return Ok(new
-                {
-                    PendingCount = pendingCount
-                });
+                return Ok(
+                    new
+                    {
+                        PendingCount = pendingCount
+                    }
+                );
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -171,6 +199,39 @@ namespace RideOnServer.Controllers
             }
         }
 
+        private void ValidateHostSecretaryCompetitionAccess(
+            int competitionId,
+            int ranchId,
+            string forbiddenMessage)
+        {
+            if (competitionId <= 0 || ranchId <= 0)
+            {
+                throw new Exception("Invalid request");
+            }
 
+            int personId =
+                UserAccessValidator.GetPersonIdFromClaims(User);
+
+            UserAccessValidator.EnsureUserHasRoleInRanch(
+                personId,
+                ranchId,
+                RoleNames.HostSecretary
+            );
+
+            Competition? competition =
+                Competition.GetCompetitionById(competitionId);
+
+            if (competition == null)
+            {
+                throw new Exception("Competition not found");
+            }
+
+            if (competition.HostRanchId != ranchId)
+            {
+                throw new UnauthorizedAccessException(
+                    forbiddenMessage
+                );
+            }
+        }
     }
 }

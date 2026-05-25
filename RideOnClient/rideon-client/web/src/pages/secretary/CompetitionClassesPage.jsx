@@ -1,5 +1,5 @@
-import { ArrowRight, RefreshCw, RotateCcw } from "lucide-react";
 import { useParams } from "react-router-dom";
+import { ArrowRight, RefreshCw, RotateCcw } from "lucide-react";
 
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import TableActionButton from "../../components/common/table/TableActionButton";
@@ -127,7 +127,7 @@ export default function CompetitionClassesPage() {
                 label="חזרה למקצים"
                 icon={<ArrowRight size={15} />}
                 onClick={page.backToClasses}
-                disabled={page.savingDrawOrder}
+                disabled={page.savingDrawOrder || page.generatingDrawPreview}
               />
             ) : null}
 
@@ -136,7 +136,7 @@ export default function CompetitionClassesPage() {
               icon={<RefreshCw size={15} />}
               onClick={page.loadPageData}
               loading={page.loadingClasses || page.loadingEntries}
-              disabled={page.savingDrawOrder}
+              disabled={page.savingDrawOrder || page.generatingDrawPreview}
             />
           </div>
         </div>
@@ -373,17 +373,25 @@ export default function CompetitionClassesPage() {
             paymentFilter={page.paymentFilter}
             canEditDrawOrder={page.viewMode === "group"}
             canEditEntry={page.viewMode === "class"}
+            hasDrawOrder={page.selectedGroupHasDrawOrder}
             drawOrderEditMode={page.drawOrderEditMode}
             savingDrawOrder={page.savingDrawOrder}
             drawOrderError={page.drawOrderError}
+            minimumGap={page.minimumGap}
+            drawOrderWarnings={page.drawOrderWarnings}
+            drawOrderSummaryMessage={page.drawOrderSummaryMessage}
+            generatingDrawPreview={page.generatingDrawPreview}
+            onMinimumGapChange={page.setMinimumGap}
             onSearchTextChange={page.setSearchText}
             onPaymentFilterChange={page.setPaymentFilter}
             onStartDrawOrderEdit={page.startDrawOrderEditMode}
             onCancelDrawOrderEdit={page.cancelDrawOrderEditMode}
             onMoveDrawOrderEntry={page.moveDrawOrderEntry}
+            onMoveDrawOrderEntryToEntry={page.moveDrawOrderEntryToEntry}
             onUpdateDraftDrawOrder={page.updateDraftDrawOrder}
-            onRandomizeAndSaveDrawOrder={page.randomizeAndSaveDrawOrder}
+            onGenerateSmartDrawOrderPreview={page.generateSmartDrawOrderPreview}
             onSaveDrawOrder={page.saveDrawOrder}
+            onClearDrawOrder={page.clearDrawOrder}
           />
         )}
       </div>

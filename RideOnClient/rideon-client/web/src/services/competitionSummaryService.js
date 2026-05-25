@@ -146,6 +146,103 @@ function getCompetitionSummaryCashDetails(competitionId, ranchId) {
   });
 }
 
+function getCompetitionSummaryPaymentMethodBreakdown(
+  competitionId,
+  ranchId,
+  chargeOwner,
+) {
+  return axios.get(`${API}/CompetitionSummary/payments/method-breakdown`, {
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+      chargeOwner: chargeOwner,
+    },
+    ...getAuthHeaders(),
+  });
+}
+
+function getCompetitionSummaryPaymentBatches(
+  competitionId,
+  ranchId,
+  chargeOwner,
+  paymentMethodId,
+) {
+  var params = {
+    competitionId: competitionId,
+    ranchId: ranchId,
+    chargeOwner: chargeOwner,
+  };
+
+  if (paymentMethodId !== null && paymentMethodId !== undefined) {
+    params.paymentMethodId = paymentMethodId;
+  }
+
+  return axios.get(`${API}/CompetitionSummary/payments/batches`, {
+    params: params,
+    ...getAuthHeaders(),
+  });
+}
+
+function getCompetitionSummaryPaymentBatchMethods(
+  competitionId,
+  ranchId,
+  paymentBatchId,
+) {
+  return axios.get(
+    `${API}/CompetitionSummary/payments/batches/${paymentBatchId}/methods`,
+    {
+      params: {
+        competitionId: competitionId,
+        ranchId: ranchId,
+      },
+      ...getAuthHeaders(),
+    },
+  );
+}
+
+function getCompetitionSummaryPaymentBatchCharges(
+  competitionId,
+  ranchId,
+  paymentBatchId,
+) {
+  return axios.get(
+    `${API}/CompetitionSummary/payments/batches/${paymentBatchId}/charges`,
+    {
+      params: {
+        competitionId: competitionId,
+        ranchId: ranchId,
+      },
+      ...getAuthHeaders(),
+    },
+  );
+}
+
+function getCompetitionCashDeskOverview(competitionId, ranchId) {
+  return axios.get(`${API}/CompetitionSummary/cash-desk/overview`, {
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
+    ...getAuthHeaders(),
+  });
+}
+
+function saveCompetitionCashCount(data) {
+  return axios.post(
+    `${API}/CompetitionSummary/cash-desk/count`,
+    data,
+    getAuthHeaders(),
+  );
+}
+
+function saveCompetitionCashSafeTransfer(data) {
+  return axios.post(
+    `${API}/CompetitionSummary/cash-desk/safe-transfer`,
+    data,
+    getAuthHeaders(),
+  );
+}
+
 export {
   getCompetitionSummary,
   getCompetitionSummaryClassDetails,
@@ -157,4 +254,11 @@ export {
   getCompetitionSummaryShavingsDetails,
   getCompetitionSummaryShavingsEntries,
   getCompetitionSummaryCashDetails,
+  getCompetitionSummaryPaymentMethodBreakdown,
+  getCompetitionSummaryPaymentBatches,
+  getCompetitionSummaryPaymentBatchMethods,
+  getCompetitionSummaryPaymentBatchCharges,
+  getCompetitionCashDeskOverview,
+  saveCompetitionCashCount,
+  saveCompetitionCashSafeTransfer,
 };

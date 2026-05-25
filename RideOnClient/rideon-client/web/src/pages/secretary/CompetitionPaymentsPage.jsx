@@ -74,7 +74,10 @@ function PaymentsPageContent(props) {
 
   if (!page.selectedPayer) {
     return (
-      <div className="mx-auto max-w-[1450px] space-y-8" dir="rtl">
+      <div
+        className="mx-auto max-w-[1450px] space-y-8 overflow-hidden"
+        dir="rtl"
+      >
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h1 className="text-4xl font-black text-[#3F312B]">תשלומים</h1>
@@ -105,9 +108,9 @@ function PaymentsPageContent(props) {
   }
 
   return (
-    <div className="mx-auto max-w-[1450px] space-y-8" dir="rtl">
+    <div className="mx-auto max-w-[1450px] space-y-8 overflow-hidden" dir="rtl">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div>
+        <div className="min-w-0">
           <button
             type="button"
             onClick={page.closePayerAccount}
@@ -117,7 +120,7 @@ function PaymentsPageContent(props) {
             חזרה לרשימת משלמים
           </button>
 
-          <h1 className="text-4xl font-black text-[#3F312B]">
+          <h1 className="break-words text-4xl font-black text-[#3F312B]">
             {getValue(
               page.selectedPayer,
               "payerName",
@@ -131,7 +134,7 @@ function PaymentsPageContent(props) {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-[#E6DCD5] bg-white px-6 py-4 text-right shadow-sm">
+        <div className="shrink-0 rounded-2xl border border-[#E6DCD5] bg-white px-6 py-4 text-right shadow-sm">
           <p className="text-xs font-bold text-[#8A7268]">נבחר לתשלום</p>
           <p className="mt-1 text-2xl font-black text-[#3F312B]">
             {formatMoney(page.selectedTotal)}
@@ -163,28 +166,31 @@ function PaymentsPageContent(props) {
             onSelectOwner={page.selectOwner}
           />
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[340px_1fr]">
-            <PaymentCategoriesSidebar
-              items={page.categorySummary}
-              activeOwner={page.selectedOwner}
-              activeCategoryKey={page.selectedCategoryKey}
-              onSelectCategory={page.selectCategory}
-            />
+          <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
+            <div className="min-w-0">
+              <PaymentCategoriesSidebar
+                items={page.categorySummary}
+                activeOwner={page.selectedOwner}
+                activeCategoryKey={page.selectedCategoryKey}
+                onSelectCategory={page.selectCategory}
+              />
+            </div>
 
-            <div className="space-y-4">
-              <div className="flex flex-col gap-3 rounded-[24px] border border-[#E6DCD5] bg-white p-5 shadow-sm xl:flex-row xl:items-center xl:justify-between">
-                <div>
+            <div className="min-w-0 space-y-4 overflow-hidden">
+              <div className="flex min-w-0 flex-col gap-3 rounded-[24px] border border-[#E6DCD5] bg-white p-5 shadow-sm xl:flex-row xl:items-center xl:justify-between">
+                <div className="min-w-0">
                   <h2 className="text-xl font-black text-[#3F312B]">
                     שורות חיוב
                   </h2>
 
                   <p className="mt-1 text-sm text-[#8A7268]">
                     בחירת שורת מקצה תבחר אוטומטית גם את חלק המארגן וגם את חלק
-                    ההתאחדות של אותו מקצה
+                    ההתאחדות של אותו מקצה. בנסורת, בחירת שורה אחת בוחרת את כל
+                    חיוב הנסורת של אותו משלם.
                   </p>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
+                <div className="flex shrink-0 flex-wrap gap-3">
                   <button
                     type="button"
                     onClick={page.clearSelectedCharges}
@@ -208,7 +214,12 @@ function PaymentsPageContent(props) {
               <PaymentChargesTable
                 items={page.visibleCharges}
                 selectedChargeIds={page.selectedChargeIds}
+                visibleSelectableChargeIds={page.visibleSelectableChargeIds}
+                allVisibleChargesSelected={page.allVisibleChargesSelected}
                 onToggleCharge={page.toggleCharge}
+                onToggleSelectAllVisibleCharges={
+                  page.toggleSelectAllVisibleCharges
+                }
               />
             </div>
           </div>
@@ -217,6 +228,7 @@ function PaymentsPageContent(props) {
 
       <CreatePaymentModal
         open={page.paymentModalOpen}
+        chargeOwner={page.selectedOwner}
         selectedCharges={page.selectedCharges}
         selectedTotal={page.selectedTotal}
         paymentMethods={page.paymentMethods}

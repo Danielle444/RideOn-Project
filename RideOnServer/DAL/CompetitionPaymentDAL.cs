@@ -260,13 +260,33 @@ namespace RideOnServer.DAL
                                         CategoryKey = GetString(reader, "CategoryKey"),
                                         SourceType = GetString(reader, "SourceType"),
                                         SourceId = GetInt(reader, "SourceId"),
+
+                                        DisplayRowKey = GetString(reader, "DisplayRowKey"),
+                                        StallBookingId = GetNullableInt(reader, "StallBookingId"),
+
                                         DisplayDate = GetNullableDateTime(reader, "DisplayDate"),
+                                        StartDate = GetNullableDateTime(reader, "StartDate"),
+                                        EndDate = GetNullableDateTime(reader, "EndDate"),
+                                        RequestedDeliveryTime = GetNullableDateTime(reader, "RequestedDeliveryTime"),
+
                                         MainName = GetString(reader, "MainName"),
                                         RiderName = GetNullableString(reader, "RiderName"),
                                         HorseName = GetNullableString(reader, "HorseName"),
                                         BarnName = GetNullableString(reader, "BarnName"),
                                         CoachName = GetNullableString(reader, "CoachName"),
                                         PayerName = GetString(reader, "PayerName"),
+                                        OrderedByName = GetNullableString(reader, "OrderedByName"),
+
+                                        StallTypeName = GetNullableString(reader, "StallTypeName"),
+                                        StallNumber = GetNullableString(reader, "StallNumber"),
+                                        CompoundName = GetNullableString(reader, "CompoundName"),
+                                        BagQuantity = GetNullableInt(reader, "BagQuantity"),
+
+                                        SplitPayersCount = GetNullableInt(reader, "SplitPayersCount"),
+                                        SplitPaymentText = GetNullableString(reader, "SplitPaymentText"),
+                                        SplitPayersJson = GetNullableString(reader, "SplitPayersJson"),
+                                        StallAssignmentText = GetNullableString(reader, "StallAssignmentText"),
+
                                         AmountToPay = GetDecimal(reader, "AmountToPay"),
                                         ChargeStatus = GetString(reader, "ChargeStatus"),
                                         PaymentBatchId = GetNullableInt(reader, "PaymentBatchId"),
@@ -332,7 +352,7 @@ namespace RideOnServer.DAL
         }
 
         public int CreateCompetitionPayment(
-            CreateCompetitionPaymentRequest request)
+    CreateCompetitionPaymentRequest request)
         {
             try
             {
@@ -364,15 +384,16 @@ namespace RideOnServer.DAL
                     using (
                         NpgsqlCommand command = new NpgsqlCommand(
                             @"
-                            select public.usp_createcompetitionpayerpayment(
-                                @competitionId,
-                                @payerPersonId,
-                                @enteredBySystemUserId,
-                                @invoiceNumber,
-                                @selectedCharges::jsonb,
-                                @paymentMethods::jsonb,
-                                @notes
-                            );",
+                    select public.usp_createcompetitionpayerpayment(
+                        @competitionId,
+                        @payerPersonId,
+                        @enteredBySystemUserId,
+                        @chargeOwner,
+                        @invoiceNumber,
+                        @selectedCharges::jsonb,
+                        @paymentMethods::jsonb,
+                        @notes
+                    );",
                             connection
                         )
                     )
@@ -391,6 +412,11 @@ namespace RideOnServer.DAL
                             "@enteredBySystemUserId",
                             NpgsqlDbType.Integer
                         ).Value = request.EnteredBySystemUserId;
+
+                        command.Parameters.Add(
+                            "@chargeOwner",
+                            NpgsqlDbType.Text
+                        ).Value = request.ChargeOwner;
 
                         command.Parameters.Add(
                             "@invoiceNumber",

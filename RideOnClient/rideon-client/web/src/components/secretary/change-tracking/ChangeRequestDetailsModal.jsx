@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import TableActionButton from "../../common/table/TableActionButton";
 
 function getValue(item, camelKey, pascalKey, fallback) {
@@ -45,6 +45,93 @@ function getSourceLabel(source) {
   return source || "-";
 }
 
+function getRequestKey(item) {
+  return (
+    getValue(item, "requestSource", "RequestSource", "") +
+    "-" +
+    getValue(item, "requestId", "RequestId", "")
+  );
+}
+
+function splitDetailsText(text) {
+  if (!text) {
+    return [];
+  }
+
+  return String(text)
+    .split("|")
+    .map(function (part) {
+      return part.trim();
+    })
+    .filter(function (part) {
+      return part.length > 0;
+    });
+}
+
+function getDetailLabel(part) {
+  var index = part.indexOf(":");
+
+  if (index === -1) {
+    return part.trim();
+  }
+
+  return part.substring(0, index).trim();
+}
+
+function getDetailValue(part) {
+  var index = part.indexOf(":");
+
+  if (index === -1) {
+    return "";
+  }
+
+  return part.substring(index + 1).trim();
+}
+
+function buildChangedFields(beforeText, afterText) {
+  var beforeParts = splitDetailsText(beforeText);
+  var afterParts = splitDetailsText(afterText);
+  var changes = [];
+
+  beforeParts.forEach(function (beforePart) {
+    var beforeLabel = getDetailLabel(beforePart);
+    var beforeValue = getDetailValue(beforePart);
+
+    var matchingAfterPart = afterParts.find(function (afterPart) {
+      return getDetailLabel(afterPart) === beforeLabel;
+    });
+
+    if (!matchingAfterPart) {
+      return;
+    }
+
+    var afterValue = getDetailValue(matchingAfterPart);
+
+    var isMissingAfterValue =
+      afterValue === "" ||
+      afterValue === "-" ||
+      afterValue === "₪" ||
+      afterValue === "₪0" ||
+      afterValue === "₪0.00";
+
+    var isPayerField = beforeLabel === "משלם" || beforeLabel === "משלמים";
+
+    if (isPayerField && isMissingAfterValue) {
+      return;
+    }
+
+    if (beforeValue !== afterValue) {
+      changes.push({
+        label: beforeLabel,
+        beforeValue: beforeValue || "-",
+        afterValue: afterValue || "-",
+      });
+    }
+  });
+
+  return changes;
+}
+
 function DetailRow(props) {
   return (
     <div>
@@ -54,13 +141,91 @@ function DetailRow(props) {
   );
 }
 
-function TextBox(props) {
+function ChangeSummaryBox(props) {
+  var item = props.item;
+
+  var beforeText = getValue(item, "beforeText", "BeforeText", "");
+  var afterText = getValue(item, "afterText", "AfterText", "");
+  var isCancelled = getValue(item, "isCancelled", "IsCancelled", false);
+  var amountBefore = getValue(item, "amountBefore", "AmountBefore", null);
+  var amountAfter = getValue(item, "amountAfter", "AmountAfter", null);
+  var fineAmount = getValue(
+    item,
+    "fineAmountSnapshot",
+    "FineAmountSnapshot",
+    null,
+  );
+
+  var changes = buildChangedFields(beforeText, afterText);
+
   return (
-    <div className="rounded-2xl border border-[#EFE5DF] bg-[#FAF7F5] p-4">
-      <p className="text-xs font-bold text-[#8D6E63]">{props.title}</p>
-      <p className="mt-2 whitespace-pre-line text-sm leading-7 text-[#3F312B]">
-        {props.text || "-"}
-      </p>
+    <div className="rounded-3xl border border-[#EFE5DF] bg-[#FAF7F5] p-5">
+      <p className="text-sm font-black text-[#3F312B]">מה שונה</p>
+
+      <div className="mt-4 space-y-3">
+        {isCancelled ? (
+          <>
+            <div className="rounded-2xl bg-white p-4">
+              <p className="text-xs font-bold text-[#8D6E63]">בקשה לביטול</p>
+
+              <p className="mt-2 text-sm leading-7 text-[#3F312B]">
+                {beforeText || "ביטול הרשמה"}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-white p-4">
+              <p className="text-xs font-bold text-[#8D6E63]">לאחר אישור</p>
+
+              <p className="mt-2 text-sm font-bold text-[#3F312B]">
+                {afterText || "ביטול הרשמה למקצה"}
+              </p>
+            </div>
+          </>
+        ) : changes.length > 0 ? (
+          changes.map(function (change, index) {
+            return (
+              <div key={index} className="rounded-2xl bg-white p-4">
+                <p className="text-xs font-bold text-[#8D6E63]">
+                  {change.label}
+                </p>
+
+                <p className="mt-2 text-sm font-bold text-[#3F312B]">
+                  {change.beforeValue} ← {change.afterValue}
+                </p>
+              </div>
+            );
+          })
+        ) : (
+          <div className="rounded-2xl bg-white p-4">
+            <p className="text-sm leading-7 text-[#3F312B]">
+              {afterText || "לא נמצאו שדות שונים להצגה"}
+            </p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="rounded-2xl bg-white p-4">
+            <p className="text-xs font-bold text-[#8D6E63]">סכום לפני</p>
+            <p className="mt-2 text-lg font-black text-[#3F312B]">
+              {formatMoney(amountBefore)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-white p-4">
+            <p className="text-xs font-bold text-[#8D6E63]">סכום אחרי</p>
+            <p className="mt-2 text-lg font-black text-[#3F312B]">
+              {formatMoney(amountAfter)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-white p-4">
+            <p className="text-xs font-bold text-[#8D6E63]">קנס</p>
+            <p className="mt-2 text-lg font-black text-[#B26A00]">
+              {formatMoney(fineAmount)}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -74,6 +239,8 @@ export default function ChangeRequestDetailsModal(props) {
 
   var source = getValue(item, "requestSource", "RequestSource", "");
   var isPending = getValue(item, "status", "Status", "") === "Pending";
+  var requestKey = getRequestKey(item);
+  var isAnswering = props.answeringRequestKey === requestKey;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
@@ -83,6 +250,7 @@ export default function ChangeRequestDetailsModal(props) {
             <h2 className="text-xl font-bold text-[#3F312B]">
               פרטי בקשת שינוי
             </h2>
+
             <p className="mt-1 text-sm text-[#8D6E63]">
               {getValue(item, "requestType", "RequestType", "-")}
             </p>
@@ -91,7 +259,8 @@ export default function ChangeRequestDetailsModal(props) {
           <button
             type="button"
             onClick={props.onClose}
-            className="rounded-full p-2 text-[#6D4C41] transition-colors hover:bg-[#F5EDE8]"
+            disabled={isAnswering}
+            className="rounded-full p-2 text-[#6D4C41] transition-colors hover:bg-[#F5EDE8] disabled:opacity-50"
           >
             <X size={20} />
           </button>
@@ -127,44 +296,10 @@ export default function ChangeRequestDetailsModal(props) {
               label="ישות"
               value={getValue(item, "entityName", "EntityName", "-")}
             />
-
-            <DetailRow
-              label="סכום לפני"
-              value={formatMoney(
-                getValue(item, "amountBefore", "AmountBefore", null),
-              )}
-            />
-
-            <DetailRow
-              label="סכום אחרי"
-              value={formatMoney(
-                getValue(item, "amountAfter", "AmountAfter", null),
-              )}
-            />
-
-            <DetailRow
-              label="קנס"
-              value={formatMoney(
-                getValue(
-                  item,
-                  "fineAmountSnapshot",
-                  "FineAmountSnapshot",
-                  null,
-                ),
-              )}
-            />
           </section>
 
-          <section className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <TextBox
-              title="לפני השינוי"
-              text={getValue(item, "beforeText", "BeforeText", "-")}
-            />
-
-            <TextBox
-              title="אחרי השינוי"
-              text={getValue(item, "afterText", "AfterText", "-")}
-            />
+          <section className="mt-5">
+            <ChangeSummaryBox item={item} />
           </section>
         </div>
 
@@ -172,21 +307,31 @@ export default function ChangeRequestDetailsModal(props) {
           {isPending ? (
             <>
               <TableActionButton
-                label="אשר"
-                disabled
-                title="אישור יחובר אחרי בניית לוגיקת חיובים"
+                label={isAnswering ? "מאשר..." : "אשר"}
+                icon={<Check size={15} />}
+                disabled={isAnswering}
+                onClick={function () {
+                  props.onApprove(item);
+                }}
               />
 
               <TableActionButton
-                label="דחה"
+                label={isAnswering ? "דוחה..." : "דחה"}
+                icon={<X size={15} />}
                 variant="danger"
-                disabled
-                title="דחייה תחובר בשלב הבא"
+                disabled={isAnswering}
+                onClick={function () {
+                  props.onReject(item);
+                }}
               />
             </>
           ) : null}
 
-          <TableActionButton label="סגור" onClick={props.onClose} />
+          <TableActionButton
+            label="סגור"
+            disabled={isAnswering}
+            onClick={props.onClose}
+          />
         </div>
       </div>
     </div>

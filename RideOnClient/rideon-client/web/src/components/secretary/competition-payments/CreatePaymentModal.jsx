@@ -21,10 +21,255 @@ function formatMoney(value) {
   return "₪" + Number(value || 0).toLocaleString("he-IL");
 }
 
+function formatDate(value) {
+  if (!value) {
+    return "-";
+  }
+
+  var date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return date.toLocaleDateString("he-IL");
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return "-";
+  }
+
+  var date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return date.toLocaleString("he-IL", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
+
+function getDaysCount(startDate, endDate) {
+  if (!startDate || !endDate) {
+    return null;
+  }
+
+  var start = new Date(startDate);
+  var end = new Date(endDate);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return null;
+  }
+
+  var diff = end.getTime() - start.getTime();
+  var days = Math.round(diff / (1000 * 60 * 60 * 24)) + 1;
+
+  if (days <= 0) {
+    return null;
+  }
+
+  return days;
+}
+
+function getHorseDisplay(charge) {
+  var horseName = getValue(charge, "horseName", "HorseName", "");
+  var barnName = getValue(charge, "barnName", "BarnName", "");
+
+  if (!horseName && !barnName) {
+    return "-";
+  }
+
+  if (barnName && horseName && barnName !== horseName) {
+    return horseName + " (" + barnName + ")";
+  }
+
+  return barnName || horseName;
+}
+
+function getSelectedChargeTitle(charge) {
+  var categoryKey = getValue(charge, "categoryKey", "CategoryKey", "");
+  var mainName = getValue(charge, "mainName", "MainName", "-");
+  var displayDate = getValue(charge, "displayDate", "DisplayDate", null);
+
+  if (categoryKey === "shavings") {
+    var bagQuantity = getValue(charge, "bagQuantity", "BagQuantity", "-");
+    var horse = getHorseDisplay(charge);
+    var deliveryTime = getValue(
+      charge,
+      "requestedDeliveryTime",
+      "RequestedDeliveryTime",
+      null,
+    );
+
+    var text =
+      mainName +
+      " · " +
+      bagQuantity +
+      " שקים" +
+      " · לסוס " +
+      horse +
+      " · הוזמן " +
+      formatDate(displayDate);
+
+    if (deliveryTime) {
+      text += " · אספקה " + formatDateTime(deliveryTime);
+    }
+
+    return text;
+  }
+
+  if (categoryKey === "stalls") {
+    var stallTypeName = getValue(
+      charge,
+      "stallTypeName",
+      "StallTypeName",
+      mainName,
+    );
+
+    var startDate = getValue(charge, "startDate", "StartDate", null);
+    var endDate = getValue(charge, "endDate", "EndDate", null);
+    var daysCount = getDaysCount(startDate, endDate);
+    var horseName = getHorseDisplay(charge);
+
+    var stallText = stallTypeName || mainName || "תא";
+
+    if (daysCount) {
+      stallText += " ל־" + daysCount + " ימים";
+    }
+
+    if (horseName && horseName !== "-") {
+      stallText += " לסוס " + horseName;
+    }
+
+    if (startDate || endDate) {
+      stallText += " · " + formatDate(startDate) + " - " + formatDate(endDate);
+    }
+
+    return stallText;
+  }
+
+  if (categoryKey === "classes") {
+    var riderName = getValue(charge, "riderName", "RiderName", "-");
+    var classHorse = getHorseDisplay(charge);
+
+    return (
+      mainName +
+      " · " +
+      formatDate(displayDate) +
+      " · רוכב/ת " +
+      riderName +
+      " · סוס " +
+      classHorse
+    );
+  }
+
+  if (categoryKey === "paid-time") {
+    var paidTimeRider = getValue(charge, "riderName", "RiderName", "-");
+    var paidTimeHorse = getHorseDisplay(charge);
+
+    return (
+      mainName +
+      " · " +
+      formatDate(displayDate) +
+      " · רוכב/ת " +
+      paidTimeRider +
+      " · סוס " +
+      paidTimeHorse
+    );
+  }
+
+  return mainName;
+}
+
+function normalizePaymentRows(rows, selectedTotal, changedRowId) {
+  var total = Number(selectedTotal || 0);
+
+  if (!rows || rows.length === 0) {
+    return [];
+  }
+
+  if (rows.length === 1) {
+    return rows.map(function (row) {
+      return {
+        ...row,
+        amount: total,
+      };
+    });
+  }
+
+  var lastIndex = rows.length - 1;
+  var previousRowsTotal = 0;
+
+  rows.forEach(function (row, index) {
+    if (index < lastIndex) {
+      previousRowsTotal += Number(row.amount || 0);
+    }
+  });
+
+  var remaining = total - previousRowsTotal;
+
+  if (remaining < 0) {
+    remaining = 0;
+  }
+
+  return rows.map(function (row, index) {
+    if (index === lastIndex) {
+      return {
+        ...row,
+        amount: Number(remaining.toFixed(2)),
+        isAutoBalance: true,
+      };
+    }
+
+    if (row.id === changedRowId) {
+      return {
+        ...row,
+        isAutoBalance: false,
+      };
+    }
+
+    return {
+      ...row,
+      isAutoBalance: false,
+    };
+  });
+}
+
 export default function CreatePaymentModal(props) {
   var [invoiceNumber, setInvoiceNumber] = useState("");
   var [notes, setNotes] = useState("");
   var [methodRows, setMethodRows] = useState([]);
+
+  var isFederationPayment = props.chargeOwner === "Federation";
+
+  function getCreditMethod() {
+    var methods = props.paymentMethods || [];
+
+    var credit = methods.find(function (method) {
+      return (
+        Number(getValue(method, "paymentMethodId", "PaymentMethodId", 0)) === 1
+      );
+    });
+
+    return credit || null;
+  }
+
+  function getAvailablePaymentMethods() {
+    if (isFederationPayment) {
+      var creditMethod = getCreditMethod();
+
+      if (!creditMethod) {
+        return [];
+      }
+
+      return [creditMethod];
+    }
+
+    return props.paymentMethods || [];
+  }
 
   useEffect(
     function () {
@@ -32,10 +277,16 @@ export default function CreatePaymentModal(props) {
         return;
       }
 
-      var firstMethod =
-        props.paymentMethods && props.paymentMethods.length > 0
-          ? props.paymentMethods[0]
-          : null;
+      var firstMethod = null;
+
+      if (isFederationPayment) {
+        firstMethod = getCreditMethod();
+      } else {
+        firstMethod =
+          props.paymentMethods && props.paymentMethods.length > 0
+            ? props.paymentMethods[0]
+            : null;
+      }
 
       setInvoiceNumber("");
       setNotes("");
@@ -51,13 +302,14 @@ export default function CreatePaymentModal(props) {
               0,
             ),
             amount: Number(props.selectedTotal || 0),
+            isAutoBalance: true,
           },
         ]);
       } else {
         setMethodRows([]);
       }
     },
-    [props.open, props.selectedTotal, props.paymentMethods],
+    [props.open, props.selectedTotal, props.paymentMethods, props.chargeOwner],
   );
 
   var methodsTotal = useMemo(
@@ -76,6 +328,10 @@ export default function CreatePaymentModal(props) {
   }
 
   function addMethodRow() {
+    if (isFederationPayment) {
+      return;
+    }
+
     var firstMethod =
       props.paymentMethods && props.paymentMethods.length > 0
         ? props.paymentMethods[0]
@@ -86,7 +342,7 @@ export default function CreatePaymentModal(props) {
     }
 
     setMethodRows(function (previous) {
-      return previous.concat([
+      var next = previous.concat([
         {
           id: Date.now(),
           paymentMethodId: getValue(
@@ -96,22 +352,31 @@ export default function CreatePaymentModal(props) {
             0,
           ),
           amount: 0,
+          isAutoBalance: true,
         },
       ]);
+
+      return normalizePaymentRows(next, props.selectedTotal, null);
     });
   }
 
   function removeMethodRow(rowId) {
+    if (isFederationPayment) {
+      return;
+    }
+
     setMethodRows(function (previous) {
-      return previous.filter(function (row) {
+      var next = previous.filter(function (row) {
         return row.id !== rowId;
       });
+
+      return normalizePaymentRows(next, props.selectedTotal, null);
     });
   }
 
   function updateMethodRow(rowId, field, value) {
     setMethodRows(function (previous) {
-      return previous.map(function (row) {
+      var next = previous.map(function (row) {
         if (row.id !== rowId) {
           return row;
         }
@@ -121,6 +386,12 @@ export default function CreatePaymentModal(props) {
           [field]: value,
         };
       });
+
+      if (field === "amount") {
+        return normalizePaymentRows(next, props.selectedTotal, rowId);
+      }
+
+      return next;
     });
   }
 
@@ -132,11 +403,25 @@ export default function CreatePaymentModal(props) {
     });
   }
 
+  var roundedMethodsTotal = Math.round(methodsTotal * 100);
+  var roundedSelectedTotal = Math.round(Number(props.selectedTotal || 0) * 100);
+  var roundedDifference = Math.round(difference * 100);
+
+  var hasOverPayment = methodsTotal > Number(props.selectedTotal || 0);
+  var hasInvalidAmount = methodRows.some(function (row) {
+    return Number(row.amount || 0) <= 0;
+  });
+
+  var hasMissingFederationCreditMethod =
+    isFederationPayment && getCreditMethod() === null;
+
   var canSubmit =
     invoiceNumber.trim().length > 0 &&
     methodRows.length > 0 &&
-    Math.round(methodsTotal * 100) ===
-      Math.round(Number(props.selectedTotal || 0) * 100) &&
+    roundedMethodsTotal === roundedSelectedTotal &&
+    !hasOverPayment &&
+    !hasInvalidAmount &&
+    !hasMissingFederationCreditMethod &&
     !props.loading;
 
   return (
@@ -149,6 +434,12 @@ export default function CreatePaymentModal(props) {
             <p className="mt-1 text-sm text-[#8A7268]">
               סכום לתשלום: {formatMoney(props.selectedTotal)}
             </p>
+
+            {isFederationPayment ? (
+              <p className="mt-1 text-xs font-bold text-[#8A7268]">
+                תשלום התאחדות נסגר ידנית באשראי בלבד
+              </p>
+            ) : null}
           </div>
 
           <button
@@ -167,10 +458,17 @@ export default function CreatePaymentModal(props) {
             </div>
           ) : null}
 
+          {hasMissingFederationCreditMethod ? (
+            <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+              לא נמצא אמצעי תשלום אשראי. צריך לוודא שבטבלת אמצעי התשלום קיים
+              paymentMethodId מספר 1 עבור אשראי.
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
             <label className="block">
               <span className="text-sm font-bold text-[#5D4037]">
-                מספר חשבונית
+                {isFederationPayment ? "מספר חשבונית התאחדות" : "מספר חשבונית"}
               </span>
 
               <input
@@ -180,7 +478,9 @@ export default function CreatePaymentModal(props) {
                   setInvoiceNumber(event.target.value);
                 }}
                 className="mt-2 h-12 w-full rounded-2xl border border-[#E3D7D0] bg-[#FCFAF8] px-4 text-right outline-none focus:border-[#8B5E4C]"
-                placeholder="לדוגמה: INV-1001"
+                placeholder={
+                  isFederationPayment ? "לדוגמה: FED-1001" : "לדוגמה: INV-1001"
+                }
               />
             </label>
 
@@ -201,20 +501,36 @@ export default function CreatePaymentModal(props) {
 
           <div className="mt-6 rounded-2xl border border-[#E6DCD5] bg-[#FCFAF8] p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-black text-[#3F312B]">אמצעי תשלום</h3>
+              <div>
+                <h3 className="text-lg font-black text-[#3F312B]">
+                  אמצעי תשלום
+                </h3>
 
-              <button
-                type="button"
-                onClick={addMethodRow}
-                className="flex items-center gap-2 rounded-xl border border-[#D8CBC3] bg-white px-3 py-2 text-sm font-bold text-[#6D4C41] transition-colors hover:bg-[#F8F3EF]"
-              >
-                <Plus size={16} />
-                הוספת אמצעי
-              </button>
+                <p className="mt-1 text-xs text-[#8A7268]">
+                  {isFederationPayment
+                    ? "תשלום התאחדות נסגר ידנית באשראי בלבד."
+                    : "השורה האחרונה משלימה אוטומטית את ההפרש לסכום הכולל."}
+                </p>
+              </div>
+
+              {!isFederationPayment ? (
+                <button
+                  type="button"
+                  onClick={addMethodRow}
+                  className="flex items-center gap-2 rounded-xl border border-[#D8CBC3] bg-white px-3 py-2 text-sm font-bold text-[#6D4C41] transition-colors hover:bg-[#F8F3EF]"
+                >
+                  <Plus size={16} />
+                  הוספת אמצעי
+                </button>
+              ) : null}
             </div>
 
             <div className="space-y-3">
-              {methodRows.map(function (row) {
+              {methodRows.map(function (row, index) {
+                var isLastRow = index === methodRows.length - 1;
+                var amountReadOnly =
+                  isFederationPayment || (methodRows.length > 1 && isLastRow);
+
                 return (
                   <div
                     key={row.id}
@@ -222,6 +538,7 @@ export default function CreatePaymentModal(props) {
                   >
                     <select
                       value={row.paymentMethodId}
+                      disabled={isFederationPayment}
                       onChange={function (event) {
                         updateMethodRow(
                           row.id,
@@ -229,9 +546,14 @@ export default function CreatePaymentModal(props) {
                           Number(event.target.value),
                         );
                       }}
-                      className="h-11 rounded-xl border border-[#E3D7D0] bg-white px-3 text-right outline-none"
+                      className={
+                        "h-11 rounded-xl border border-[#E3D7D0] px-3 text-right outline-none " +
+                        (isFederationPayment
+                          ? "bg-[#F5EFEA] text-[#7A655C]"
+                          : "bg-white")
+                      }
                     >
-                      {(props.paymentMethods || []).map(function (method) {
+                      {getAvailablePaymentMethods().map(function (method) {
                         return (
                           <option
                             key={getValue(
@@ -258,23 +580,39 @@ export default function CreatePaymentModal(props) {
                       })}
                     </select>
 
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={row.amount}
-                      onChange={function (event) {
-                        updateMethodRow(row.id, "amount", event.target.value);
-                      }}
-                      className="h-11 rounded-xl border border-[#E3D7D0] bg-white px-3 text-right outline-none"
-                    />
+                    <div>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={row.amount}
+                        readOnly={amountReadOnly}
+                        onChange={function (event) {
+                          updateMethodRow(row.id, "amount", event.target.value);
+                        }}
+                        className={
+                          "h-11 w-full rounded-xl border border-[#E3D7D0] px-3 text-right outline-none " +
+                          (amountReadOnly
+                            ? "bg-[#F5EFEA] text-[#7A655C]"
+                            : "bg-white")
+                        }
+                      />
+
+                      {amountReadOnly ? (
+                        <p className="mt-1 text-xs font-bold text-[#8A7268]">
+                          {isFederationPayment
+                            ? "התאחדות באשראי בלבד"
+                            : "השלמה אוטומטית"}
+                        </p>
+                      ) : null}
+                    </div>
 
                     <button
                       type="button"
                       onClick={function () {
                         removeMethodRow(row.id);
                       }}
-                      disabled={methodRows.length === 1}
+                      disabled={methodRows.length === 1 || isFederationPayment}
                       className="flex h-11 w-11 items-center justify-center rounded-xl text-red-600 transition-colors hover:bg-red-50 disabled:opacity-30"
                     >
                       <Trash2 size={18} />
@@ -283,6 +621,18 @@ export default function CreatePaymentModal(props) {
                 );
               })}
             </div>
+
+            {hasOverPayment ? (
+              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                סכום אמצעי התשלום גבוה מהסכום שנבחר לתשלום.
+              </div>
+            ) : null}
+
+            {hasInvalidAmount ? (
+              <div className="mt-4 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-800">
+                כל אמצעי תשלום חייב להיות עם סכום גדול מ־0.
+              </div>
+            ) : null}
 
             <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
               <div className="rounded-2xl bg-white p-4">
@@ -306,7 +656,7 @@ export default function CreatePaymentModal(props) {
                 <p
                   className={
                     "mt-1 text-xl font-black " +
-                    (Math.round(difference * 100) === 0
+                    (roundedDifference === 0
                       ? "text-[#2E7D32]"
                       : "text-[#C62828]")
                   }
@@ -324,16 +674,23 @@ export default function CreatePaymentModal(props) {
 
             <div className="space-y-2">
               {(props.selectedCharges || []).map(function (charge) {
+                var rowKey = getValue(
+                  charge,
+                  "displayRowKey",
+                  "DisplayRowKey",
+                  getValue(charge, "billChargeId", "BillChargeId", 0),
+                );
+
                 return (
                   <div
-                    key={getValue(charge, "billChargeId", "BillChargeId", 0)}
-                    className="flex items-center justify-between rounded-xl bg-[#FCFAF8] px-4 py-3 text-sm"
+                    key={rowKey}
+                    className="flex flex-col gap-2 rounded-xl bg-[#FCFAF8] px-4 py-3 text-sm md:flex-row md:items-center md:justify-between"
                   >
                     <span className="font-bold text-[#3F312B]">
-                      {getValue(charge, "mainName", "MainName", "-")}
+                      {getSelectedChargeTitle(charge)}
                     </span>
 
-                    <span className="font-black text-[#7B5A4D]">
+                    <span className="shrink-0 font-black text-[#7B5A4D]">
                       {formatMoney(
                         getValue(charge, "amountToPay", "AmountToPay", 0),
                       )}

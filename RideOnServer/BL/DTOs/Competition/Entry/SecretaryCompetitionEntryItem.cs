@@ -55,5 +55,9 @@
         public int OrderedBySystemUserId { get; set; }
 
         public int BillId { get; set; }
+
+        public string EntryStatus { get; set; } = "Active";
+
+        public bool IsCancelledAfterStart { get; set; }
     }
 }
