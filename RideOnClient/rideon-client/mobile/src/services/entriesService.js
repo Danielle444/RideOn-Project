@@ -28,6 +28,18 @@ function getMyCompetitionEntries(
   });
 }
 
+function getCompetitionEntriesView(
+  competitionId,
+  ranchId
+) {
+  return axios.get("/Entries/competition-view", {
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
+  });
+}
+
 function createChangeEntryRequest(payload) {
   return axios.post(
     "/ChangeEntryRequests",
@@ -39,5 +51,6 @@ export {
   createEntry,
   getPaidTimeCandidatesByRanch,
   getMyCompetitionEntries,
+  getCompetitionEntriesView,
   createChangeEntryRequest,
 };

@@ -192,6 +192,43 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("competition-view")]
+        public IActionResult GetCompetitionEntriesView(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (competitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin,
+                    RoleNames.HostSecretary
+                );
+
+                List<SecretaryCompetitionEntryItem> items =
+                    Entry.GetSecretaryCompetitionEntries(competitionId);
+
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetCompetitionEntriesView: {ex.Message}");
+                return BadRequest("שגיאה בשליפת הרשמות לתצוגה");
+            }
+        }
+
         [HttpPut("draw-order")]
         public IActionResult UpdateClassEntriesDrawOrder(
           [FromBody] UpdateClassEntriesDrawOrderRequest request)

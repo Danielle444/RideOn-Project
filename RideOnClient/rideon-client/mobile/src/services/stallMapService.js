@@ -18,4 +18,22 @@ function getHorses(competitionId, ranchId) {
   });
 }
 
-export { getCompounds, getAssignments, getHorses };
+function getAssignedStallPrices(competitionId, ranchId) {
+  return apiClient.get("/StallAssignments/assigned-prices", {
+    params: { competitionId: competitionId, ranchId: ranchId },
+  });
+}
+
+function getStallMapPublishStatus(competitionId, ranchId) {
+  return apiClient.get("/StallAssignments/publish-status", {
+    params: { competitionId: competitionId, ranchId: ranchId },
+  });
+}
+
+export {
+  getCompounds,
+  getAssignments,
+  getHorses,
+  getAssignedStallPrices,
+  getStallMapPublishStatus,
+};

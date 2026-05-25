@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import { useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 
 import styles from "../../styles/adminCompetitionClassesStyles";
 
@@ -44,7 +45,29 @@ export default function CompetitionEntryCard(props) {
     >
       <View style={styles.topRow}>
         <View style={styles.classBlock}>
-          <Text style={styles.className}>{item.className}</Text>
+          <View
+            style={{
+              flexDirection: "row-reverse",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <Text style={styles.className}>{item.className}</Text>
+
+            {typeof props.onViewEntries === "function" &&
+            item.classInCompId ? (
+              <Pressable
+                onPress={function (e) {
+                  if (e && e.stopPropagation) e.stopPropagation();
+                  props.onViewEntries(item);
+                }}
+                hitSlop={8}
+                style={{ padding: 2 }}
+              >
+                <Ionicons name="eye-outline" size={18} color="#5A4036" />
+              </Pressable>
+            ) : null}
+          </View>
 
           <Text style={styles.classDate}>
             {props.formatDate(item.classDate)}

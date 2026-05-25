@@ -18,10 +18,11 @@ namespace RideOnServer.Controllers
             {
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                UserAccessValidator.EnsureUserHasRoleInRanch(
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
                     ranchId,
-                    RoleNames.HostSecretary
+                    RoleNames.HostSecretary,
+                    RoleNames.RanchAdmin
                 );
 
                 var dal = new StallAssignmentDAL();
@@ -34,7 +35,7 @@ namespace RideOnServer.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in GetCompounds: {ex.Message}");
-                return BadRequest("айштд щвйад бщмйфъ оъзой дъайн");
+                return BadRequest("пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ");
             }
         }
 
@@ -63,7 +64,7 @@ namespace RideOnServer.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in GetAssignmentOverview: {ex.Message}");
-                return BadRequest("айштд щвйад бщмйфъ счйшъ джореъ дъайн");
+                return BadRequest("пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ");
             }
         }
 
@@ -76,10 +77,11 @@ namespace RideOnServer.Controllers
             {
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                UserAccessValidator.EnsureUserHasRoleInRanch(
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
                     ranchId,
-                    RoleNames.HostSecretary
+                    RoleNames.HostSecretary,
+                    RoleNames.RanchAdmin
                 );
 
                 var dal = new StallAssignmentDAL();
@@ -92,7 +94,37 @@ namespace RideOnServer.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in GetAssignments: {ex.Message}");
-                return BadRequest("айштд щвйад бщмйфъ щйбецй дъайн");
+                return BadRequest("пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ");
+            }
+        }
+
+        [HttpGet("assigned-prices")]
+        public IActionResult GetAssignedStallPrices(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary,
+                    RoleNames.RanchAdmin
+                );
+
+                var dal = new StallAssignmentDAL();
+                return Ok(dal.GetAssignedStallPrices(competitionId, ranchId));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetAssignedStallPrices: {ex.Message}");
+                return BadRequest("Ч©Ч’Ч™ЧђЧ” Ч‘Ч©ЧњЧ™Ч¤ЧЄ ЧћЧ—Ч™ЧЁЧ™ ЧЄЧђЧ™Чќ ЧћЧ©Ч•Ч‘Ч¦Ч™Чќ");
             }
         }
 
@@ -133,7 +165,7 @@ namespace RideOnServer.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in AssignStallBooking: {ex.Message}");
-                return BadRequest("айштд щвйад бщйбех джоръ дъа");
+                return BadRequest("пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ");
             }
         }
 
@@ -173,7 +205,7 @@ namespace RideOnServer.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in UnassignStallBooking: {ex.Message}");
-                return BadRequest("айштд щвйад ббйием щйбех дъа");
+                return BadRequest("пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ");
             }
         }
 
@@ -186,10 +218,11 @@ namespace RideOnServer.Controllers
             {
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                UserAccessValidator.EnsureUserHasRoleInRanch(
+                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
                     ranchId,
-                    RoleNames.HostSecretary
+                    RoleNames.HostSecretary,
+                    RoleNames.RanchAdmin
                 );
 
                 var dal = new StallAssignmentDAL();
@@ -197,7 +230,7 @@ namespace RideOnServer.Controllers
 
                 if (status == null)
                 {
-                    return NotFound("ма роца сииес фшсен мофъ дъайн");
+                    return NotFound("пїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ");
                 }
 
                 return Ok(status);
@@ -209,7 +242,7 @@ namespace RideOnServer.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in GetPublishStatus: {ex.Message}");
-                return BadRequest("айштд щвйад бщмйфъ сииес фшсен офъ дъайн");
+                return BadRequest("пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ");
             }
         }
 
@@ -248,7 +281,7 @@ namespace RideOnServer.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in PublishStallMap: {ex.Message}");
-                return BadRequest("айштд щвйад бфшсен офъ дъайн");
+                return BadRequest("пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ");
             }
         }
 
@@ -286,7 +319,7 @@ namespace RideOnServer.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in UnpublishStallMap: {ex.Message}");
-                return BadRequest("айштд щвйад ббйием фшсен офъ дъайн");
+                return BadRequest("пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ");
             }
         }
 
