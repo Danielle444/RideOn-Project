@@ -47,10 +47,40 @@ function createChangeEntryRequest(payload) {
   );
 }
 
+function getMyPastCompetitionsWithEntries(excludeCompetitionId, ranchId) {
+  return axios.get("/Entries/my-past-competitions", {
+    params: {
+      excludeCompetitionId: excludeCompetitionId,
+      ranchId: ranchId,
+    },
+  });
+}
+
+function getDuplicatableEntriesFromCompetition(
+  sourceCompetitionId,
+  targetCompetitionId,
+  ranchId,
+) {
+  return axios.get("/Entries/duplicatable-from-competition", {
+    params: {
+      sourceCompetitionId: sourceCompetitionId,
+      targetCompetitionId: targetCompetitionId,
+      ranchId: ranchId,
+    },
+  });
+}
+
+function bulkDuplicateEntries(payload) {
+  return axios.post("/Entries/bulk-duplicate", payload);
+}
+
 export {
   createEntry,
   getPaidTimeCandidatesByRanch,
   getMyCompetitionEntries,
   getCompetitionEntriesView,
   createChangeEntryRequest,
+  getMyPastCompetitionsWithEntries,
+  getDuplicatableEntriesFromCompetition,
+  bulkDuplicateEntries,
 };

@@ -500,7 +500,121 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("my-past-competitions")]
+        public IActionResult GetMyPastCompetitionsWithEntries(
+            [FromQuery] int excludeCompetitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (excludeCompetitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
 
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                List<PastCompetitionWithEntriesItem> items =
+                    Entry.GetMyPastCompetitionsWithEntries(personId, excludeCompetitionId);
+
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetMyPastCompetitionsWithEntries: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת תחרויות קודמות");
+            }
+        }
+
+        [HttpGet("duplicatable-from-competition")]
+        public IActionResult GetDuplicatableEntriesFromCompetition(
+            [FromQuery] int sourceCompetitionId,
+            [FromQuery] int targetCompetitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (sourceCompetitionId <= 0 ||
+                    targetCompetitionId <= 0 ||
+                    ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                List<DuplicatableEntryItem> items =
+                    Entry.GetDuplicatableEntriesFromCompetition(
+                        sourceCompetitionId,
+                        targetCompetitionId,
+                        personId
+                    );
+
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetDuplicatableEntriesFromCompetition: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת הרשמות לשכפול");
+            }
+        }
+
+        [HttpPost("bulk-duplicate")]
+        public IActionResult BulkDuplicateEntries(
+            [FromBody] BulkDuplicateEntriesRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.RanchAdmin
+                );
+
+                request.OrderedBySystemUserId = personId;
+
+                BulkDuplicateEntriesResponse response =
+                    Entry.BulkDuplicateEntries(request);
+
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in BulkDuplicateEntries: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשכפול הרשמות");
+            }
+        }
 
     }
 }
