@@ -6,6 +6,9 @@ import {
   getCompetitionPayerCharges,
   getCompetitionPaymentMethods,
   getCompetitionPaymentPayers,
+  getFederationCoverageStatusForPayer,
+  getFederationChargesForPayer,
+  validateFederationCoverageBeforeOrganizerPayment,
 } from "../../services/competitionPaymentsService";
 
 function getValue(item, camelKey, pascalKey, fallback) {
@@ -104,6 +107,13 @@ export default function useCompetitionPaymentsPage(options) {
   var [creatingPayment, setCreatingPayment] = useState(false);
   var [paymentError, setPaymentError] = useState("");
   var [paymentSuccess, setPaymentSuccess] = useState("");
+
+  var [federationCoverageStatus, setFederationCoverageStatus] = useState(null);
+  var [federationCharges, setFederationCharges] = useState([]);
+  var [federationCoverageLoading, setFederationCoverageLoading] =
+    useState(false);
+  var [federationCoverageError, setFederationCoverageError] = useState("");
+  var [federationValidation, setFederationValidation] = useState(null);
 
   useEffect(
     function () {
@@ -225,6 +235,55 @@ export default function useCompetitionPaymentsPage(options) {
     }
   }
 
+  async function loadFederationCoverageData(payerPersonId) {
+    if (!competitionId || !ranchId || !payerPersonId) {
+      return;
+    }
+
+    try {
+      setFederationCoverageLoading(true);
+      setFederationCoverageError("");
+      setFederationCoverageStatus(null);
+      setFederationCharges([]);
+      setFederationValidation(null);
+
+      var coverageResponse = await getFederationCoverageStatusForPayer(
+        competitionId,
+        ranchId,
+        payerPersonId,
+      );
+
+      var chargesResponse = await getFederationChargesForPayer(
+        competitionId,
+        ranchId,
+        payerPersonId,
+      );
+
+      var validationResponse =
+        await validateFederationCoverageBeforeOrganizerPayment(
+          competitionId,
+          ranchId,
+          payerPersonId,
+        );
+
+      setFederationCoverageStatus(coverageResponse.data || null);
+      setFederationCharges(
+        Array.isArray(chargesResponse.data) ? chargesResponse.data : [],
+      );
+      setFederationValidation(validationResponse.data || null);
+    } catch (error) {
+      console.error(error);
+      setFederationCoverageError(
+        getErrorMessage(error, "שגיאה בטעינת נתוני התאחדות"),
+      );
+      setFederationCoverageStatus(null);
+      setFederationCharges([]);
+      setFederationValidation(null);
+    } finally {
+      setFederationCoverageLoading(false);
+    }
+  }
+
   async function openPayerAccount(payer) {
     var payerPersonId = getValue(payer, "payerPersonId", "PayerPersonId", 0);
 
@@ -241,6 +300,10 @@ export default function useCompetitionPaymentsPage(options) {
       setSelectedChargeIds([]);
       setSelectedOwner("Organizer");
       setSelectedCategoryKey("");
+      setFederationCoverageStatus(null);
+      setFederationCharges([]);
+      setFederationCoverageError("");
+      setFederationValidation(null);
 
       var accountResponse = await getCompetitionPayerAccountSummary(
         competitionId,
@@ -271,6 +334,8 @@ export default function useCompetitionPaymentsPage(options) {
       setCharges(
         Array.isArray(chargesResponse.data) ? chargesResponse.data : [],
       );
+
+      await loadFederationCoverageData(payerPersonId);
     } catch (error) {
       console.error(error);
       setAccountError(getErrorMessage(error, "שגיאה בטעינת חשבון משלם"));
@@ -290,6 +355,10 @@ export default function useCompetitionPaymentsPage(options) {
     setSelectedChargeIds([]);
     setPaymentError("");
     setPaymentSuccess("");
+    setFederationCoverageStatus(null);
+    setFederationCharges([]);
+    setFederationCoverageError("");
+    setFederationValidation(null);
   }
 
   function selectOwner(owner) {
@@ -543,6 +612,13 @@ export default function useCompetitionPaymentsPage(options) {
     openPaymentModal: openPaymentModal,
     closePaymentModal: closePaymentModal,
     submitPayment: submitPayment,
+
+    federationCoverageStatus: federationCoverageStatus,
+    federationCharges: federationCharges,
+    federationCoverageLoading: federationCoverageLoading,
+    federationCoverageError: federationCoverageError,
+    federationValidation: federationValidation,
+    loadFederationCoverageData: loadFederationCoverageData,
 
     openPayerAccount: openPayerAccount,
     closePayerAccount: closePayerAccount,
