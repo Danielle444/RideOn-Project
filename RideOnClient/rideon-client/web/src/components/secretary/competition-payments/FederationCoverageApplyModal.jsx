@@ -321,6 +321,115 @@ export default function FederationCoverageApplyModal(props) {
             ) : null}
           </div>
 
+          <div className="mt-5 rounded-2xl border border-[#E6DCD5] bg-white p-4">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div>
+                <h3 className="text-lg font-black text-[#3F312B]">
+                  ייבוא אקסל התאחדות
+                </h3>
+
+                <p className="mt-1 text-sm font-bold text-[#8A7268]">
+                  הייבוא יקלוט רק עמודות שהכותרת שלהן כוללת את המילה “שולם”.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center">
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={function (event) {
+                  var file =
+                    event.target.files && event.target.files.length > 0
+                      ? event.target.files[0]
+                      : null;
+
+                  props.onExcelFileChange(file);
+                }}
+                className="min-w-0 flex-1 rounded-2xl border border-[#D8CBC3] bg-white px-4 py-3 text-sm font-bold text-[#6D4C41]"
+              />
+
+              <button
+                type="button"
+                onClick={props.onSubmitExcelImport}
+                disabled={props.importingExcel || !props.selectedExcelFile}
+                className="rounded-2xl bg-[#8B5E4C] px-6 py-3 font-bold text-white transition-colors hover:bg-[#765041] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {props.importingExcel ? "מייבא..." : "ייבוא אקסל"}
+              </button>
+            </div>
+
+            {props.selectedExcelFile ? (
+              <p className="mt-2 text-xs font-bold text-[#8A7268]">
+                נבחר קובץ: {props.selectedExcelFile.name}
+              </p>
+            ) : null}
+
+            {props.excelImportResult ? (
+              <div className="mt-4 grid grid-cols-2 gap-3 rounded-2xl border border-[#E6DCD5] bg-[#FCFAF8] p-4 text-sm xl:grid-cols-5">
+                <div>
+                  <p className="text-xs font-bold text-[#8A7268]">שורות</p>
+                  <p className="mt-1 font-black text-[#3F312B]">
+                    {getValue(
+                      props.excelImportResult,
+                      "totalRows",
+                      "TotalRows",
+                      0,
+                    )}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold text-[#8A7268]">נקלטו</p>
+                  <p className="mt-1 font-black text-[#2E7D32]">
+                    {getValue(
+                      props.excelImportResult,
+                      "importedCreditsCount",
+                      "ImportedCreditsCount",
+                      0,
+                    )}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold text-[#8A7268]">כפילויות</p>
+                  <p className="mt-1 font-black text-[#7B5A4D]">
+                    {getValue(
+                      props.excelImportResult,
+                      "skippedDuplicatesCount",
+                      "SkippedDuplicatesCount",
+                      0,
+                    )}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold text-[#8A7268]">ללא סכום</p>
+                  <p className="mt-1 font-black text-[#7B5A4D]">
+                    {getValue(
+                      props.excelImportResult,
+                      "skippedZeroAmountCount",
+                      "SkippedZeroAmountCount",
+                      0,
+                    )}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold text-[#8A7268]">שגיאות</p>
+                  <p className="mt-1 font-black text-[#C62828]">
+                    {getValue(
+                      props.excelImportResult,
+                      "failedRowsCount",
+                      "FailedRowsCount",
+                      0,
+                    )}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
           <div className="mt-5 overflow-hidden rounded-2xl border border-[#E6DCD5] bg-white">
             <div className="border-b border-[#E6DCD5] px-4 py-3">
               <h3 className="text-lg font-black text-[#3F312B]">
