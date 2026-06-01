@@ -25,6 +25,10 @@ function cancelPaidTimeRequestByPayer(payload) {
   return axios.post("/PaidTimeRequests/cancel-by-payer", payload);
 }
 
+function updatePaidTimeNotesByPayer(payload) {
+  return axios.post("/PaidTimeRequests/update-notes-by-payer", payload);
+}
+
 function updatePaidTimeRequestNotes(payload) {
   return axios.post("/PaidTimeRequests/update-notes", payload);
 }
@@ -54,6 +58,7 @@ export {
   getMyCompetitionPaidTimeRequests,
   cancelPaidTimeRequest,
   cancelPaidTimeRequestByPayer,
+  updatePaidTimeNotesByPayer,
   updatePaidTimeRequestNotes,
   getSlotScheduleForViewing,
   getPublishedSlotsForCompetition,

@@ -383,6 +383,21 @@ namespace RideOnServer.BL
             dal.CancelPaidTimeRequestByPayer(paidTimeRequestId, payerPersonId);
         }
 
+        internal static void UpdateNotesByPayer(int paidTimeRequestId, int payerPersonId, string? notes)
+        {
+            if (paidTimeRequestId <= 0)
+            {
+                throw new Exception("Invalid PaidTimeRequestId");
+            }
+            if (payerPersonId <= 0)
+            {
+                throw new Exception("Invalid PayerPersonId");
+            }
+
+            PaidTimeRequestDAL dal = new PaidTimeRequestDAL();
+            dal.UpdatePaidTimeNotesByPayer(paidTimeRequestId, payerPersonId, notes);
+        }
+
         internal static void UpdateMyPaidTimeRequest(UpdatePaidTimeRequestNotesRequest request, int orderedBySystemUserId)
         {
             if (request == null)

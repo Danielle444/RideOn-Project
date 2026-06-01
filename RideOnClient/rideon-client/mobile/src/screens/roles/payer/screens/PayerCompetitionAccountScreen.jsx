@@ -3,10 +3,12 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
@@ -28,9 +30,15 @@ import styles from "../../../../styles/adminCompetitionPayerAccountStyles";
 
 import { cancelEntryByPayer } from "../../../../services/entriesService";
 
-import { cancelPaidTimeRequestByPayer } from "../../../../services/paidTimeRequestsService";
+import {
+  cancelPaidTimeRequestByPayer,
+  updatePaidTimeNotesByPayer,
+} from "../../../../services/paidTimeRequestsService";
 
-import { cancelStallBookingByPayer } from "../../../../services/stallBookingsService";
+import {
+  cancelStallBookingByPayer,
+  createStallChangeRequestByPayer,
+} from "../../../../services/stallBookingsService";
 
 function extractErrorMessage(err) {
   if (!err) return "אירעה שגיאה";
@@ -184,6 +192,78 @@ export default function PayerCompetitionAccountScreen(props) {
   var summary = account.summary || {};
 
   var [cancellingId, setCancellingId] = useState(null);
+
+  var [editingPaidTime, setEditingPaidTime] = useState(null);
+
+  var [editPaidTimeNotes, setEditPaidTimeNotes] = useState("");
+
+  var [savingEdit, setSavingEdit] = useState(false);
+
+  function openEditPaidTime(item) {
+    setEditingPaidTime(item);
+    setEditPaidTimeNotes(item.notes || "");
+  }
+
+  function closeEditPaidTime() {
+    setEditingPaidTime(null);
+    setEditPaidTimeNotes("");
+  }
+
+  async function savePaidTimeEdit() {
+    if (!editingPaidTime) return;
+
+    try {
+      setSavingEdit(true);
+
+      await updatePaidTimeNotesByPayer({
+        paidTimeRequestId: editingPaidTime.paidTimeRequestId,
+        ranchId: activeRole?.ranchId,
+        notes: editPaidTimeNotes,
+      });
+
+      Alert.alert("נשמר", "ההערות עודכנו");
+      closeEditPaidTime();
+      await account.reload();
+    } catch (err) {
+      Alert.alert("שגיאה", extractErrorMessage(err));
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  function confirmStallChangeRequest(item) {
+    Alert.alert(
+      "בקשת שינוי תא",
+      "האם לשלוח בקשת שינוי תא למזכירה? המזכירה תיצור איתך קשר לפרטים.",
+      [
+        { text: "לא", style: "cancel" },
+        {
+          text: "כן",
+          onPress: function () {
+            doStallChangeRequest(item);
+          },
+        },
+      ],
+    );
+  }
+
+  async function doStallChangeRequest(item) {
+    try {
+      setCancellingId("stall-change:" + item.stallBookingId);
+
+      await createStallChangeRequestByPayer({
+        stallBookingId: item.stallBookingId,
+        ranchId: activeRole?.ranchId,
+      });
+
+      Alert.alert("נשלח", "בקשת שינוי התא נשלחה למזכירה");
+      await account.reload();
+    } catch (err) {
+      Alert.alert("שגיאה", extractErrorMessage(err));
+    } finally {
+      setCancellingId(null);
+    }
+  }
 
   function confirmCancelEntry(item) {
     Alert.alert(
@@ -627,13 +707,65 @@ export default function PayerCompetitionAccountScreen(props) {
 
           <Text style={styles.itemMutedText}>סטטוס: {item.status || "-"}</Text>
 
-          {renderCancelButton(
-            "paidTime:" + item.paidTimeRequestId,
-            isLocked,
-            function () {
-              confirmCancelPaidTime(item);
-            },
-            lockedLabel,
+          {!isLocked ? (
+            <View
+              style={{
+                flexDirection: "row-reverse",
+                marginTop: 10,
+                gap: 8,
+              }}
+            >
+              <Pressable
+                onPress={function () {
+                  openEditPaidTime(item);
+                }}
+                style={{
+                  flex: 1,
+                  backgroundColor: "#F0E5DC",
+                  borderWidth: 1,
+                  borderColor: "#7B5A4D",
+                  borderRadius: 10,
+                  paddingVertical: 9,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#7B5A4D", fontWeight: "800" }}>
+                  ערוך הערות
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={function () {
+                  confirmCancelPaidTime(item);
+                }}
+                disabled={cancellingId === "paidTime:" + item.paidTimeRequestId}
+                style={{
+                  flex: 1,
+                  backgroundColor:
+                    cancellingId === "paidTime:" + item.paidTimeRequestId
+                      ? "#C9B7AC"
+                      : "#A0522D",
+                  borderRadius: 10,
+                  paddingVertical: 9,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#FFFFFF", fontWeight: "800" }}>
+                  {cancellingId === "paidTime:" + item.paidTimeRequestId
+                    ? "שולח..."
+                    : "בטל"}
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            renderCancelButton(
+              "paidTime:" + item.paidTimeRequestId,
+              isLocked,
+              function () {
+                confirmCancelPaidTime(item);
+              },
+              lockedLabel,
+            )
           )}
         </View>
       );
@@ -708,13 +840,70 @@ export default function PayerCompetitionAccountScreen(props) {
             </View>
           ) : null}
 
-          {renderCancelButton(
-            "stall:" + item.stallBookingId,
-            isLocked,
-            function () {
-              confirmCancelStall(item);
-            },
-            lockedLabel,
+          {!isLocked ? (
+            <View
+              style={{
+                flexDirection: "row-reverse",
+                marginTop: 10,
+                gap: 8,
+              }}
+            >
+              <Pressable
+                onPress={function () {
+                  confirmStallChangeRequest(item);
+                }}
+                disabled={
+                  cancellingId === "stall-change:" + item.stallBookingId
+                }
+                style={{
+                  flex: 1,
+                  backgroundColor: "#F0E5DC",
+                  borderWidth: 1,
+                  borderColor: "#7B5A4D",
+                  borderRadius: 10,
+                  paddingVertical: 9,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#7B5A4D", fontWeight: "800" }}>
+                  {cancellingId === "stall-change:" + item.stallBookingId
+                    ? "שולח..."
+                    : "בקשת שינוי"}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={function () {
+                  confirmCancelStall(item);
+                }}
+                disabled={cancellingId === "stall:" + item.stallBookingId}
+                style={{
+                  flex: 1,
+                  backgroundColor:
+                    cancellingId === "stall:" + item.stallBookingId
+                      ? "#C9B7AC"
+                      : "#A0522D",
+                  borderRadius: 10,
+                  paddingVertical: 9,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#FFFFFF", fontWeight: "800" }}>
+                  {cancellingId === "stall:" + item.stallBookingId
+                    ? "שולח..."
+                    : "בטל"}
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            renderCancelButton(
+              "stall:" + item.stallBookingId,
+              isLocked,
+              function () {
+                confirmCancelStall(item);
+              },
+              lockedLabel,
+            )
           )}
         </View>
       );
@@ -803,6 +992,99 @@ export default function PayerCompetitionAccountScreen(props) {
       >
         {renderContent()}
       </ScrollView>
+
+      <Modal
+        visible={!!editingPaidTime}
+        transparent
+        animationType="fade"
+        onRequestClose={closeEditPaidTime}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: 16,
+              padding: 18,
+              gap: 12,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 17,
+                fontWeight: "800",
+                color: "#4F3B31",
+                textAlign: "right",
+              }}
+            >
+              עריכת הערות פייד טיים
+            </Text>
+
+            <TextInput
+              value={editPaidTimeNotes}
+              onChangeText={setEditPaidTimeNotes}
+              placeholder="הערות..."
+              placeholderTextColor="#9E8A7F"
+              multiline
+              style={{
+                borderWidth: 1,
+                borderColor: "#D6C5B8",
+                borderRadius: 10,
+                padding: 12,
+                minHeight: 100,
+                textAlign: "right",
+                textAlignVertical: "top",
+                color: "#4F3B31",
+              }}
+            />
+
+            <View
+              style={{
+                flexDirection: "row-reverse",
+                gap: 10,
+              }}
+            >
+              <Pressable
+                onPress={savePaidTimeEdit}
+                disabled={savingEdit}
+                style={{
+                  flex: 2,
+                  backgroundColor: savingEdit ? "#B8A496" : "#7B5A4D",
+                  borderRadius: 10,
+                  paddingVertical: 11,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#FFFFFF", fontWeight: "800" }}>
+                  {savingEdit ? "שומר..." : "שמור"}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={closeEditPaidTime}
+                disabled={savingEdit}
+                style={{
+                  flex: 1,
+                  backgroundColor: "#F0E5DC",
+                  borderRadius: 10,
+                  paddingVertical: 11,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#5A4036", fontWeight: "800" }}>
+                  ביטול
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </MobileScreenLayout>
   );
 }

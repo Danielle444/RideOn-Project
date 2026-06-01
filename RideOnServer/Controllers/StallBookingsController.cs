@@ -383,5 +383,42 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("change-request-by-payer")]
+        public IActionResult CreateStallChangeRequestByPayer(
+            [FromBody] CreateStallBookingCancelRequest request)
+        {
+            try
+            {
+                if (request == null || request.StallBookingId <= 0 || request.RanchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.Payer
+                );
+
+                int requestId = StallBooking.CreateChangeRequestByPayer(
+                    request.StallBookingId,
+                    personId
+                );
+
+                return Ok(requestId);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in CreateStallChangeRequestByPayer: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
     }
 }

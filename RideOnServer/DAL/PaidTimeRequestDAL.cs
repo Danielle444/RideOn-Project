@@ -579,6 +579,33 @@ namespace RideOnServer.DAL
             }
         }
 
+        public void UpdatePaidTimeNotesByPayer(int paidTimeRequestId, int payerPersonId, string? notes)
+        {
+            try
+            {
+                using NpgsqlConnection connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using NpgsqlCommand command = new NpgsqlCommand(@"
+                    SELECT public.usp_updatepaidtimenotesbypayer(
+                        p_paidtimerequestid := @id,
+                        p_payerpersonid     := @payerPersonId,
+                        p_notes             := @notes
+                    );", connection);
+
+                command.Parameters.Add("@id", NpgsqlDbType.Integer).Value = paidTimeRequestId;
+                command.Parameters.Add("@payerPersonId", NpgsqlDbType.Integer).Value = payerPersonId;
+                command.Parameters.Add("@notes", NpgsqlDbType.Text).Value =
+                    (object?)notes ?? DBNull.Value;
+
+                command.ExecuteNonQuery();
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
         public void UpdatePaidTimeRequest(
             int paidTimeRequestId,
             int orderedBySystemUserId,

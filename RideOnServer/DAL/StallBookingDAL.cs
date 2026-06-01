@@ -384,5 +384,31 @@ namespace RideOnServer.DAL
             return Convert.ToInt32(result);
         }
 
+        public static int CreateStallChangeRequestByPayer(int stallBookingId, int payerPersonId)
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                @"SELECT public.usp_createstallchangerequestbypayer(
+                    p_stallbookingid := @stallBookingId,
+                    p_payerpersonid  := @payerPersonId
+                );",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
+            cmd.Parameters.AddWithValue("@payerPersonId", payerPersonId);
+
+            object? result = cmd.ExecuteScalar();
+
+            if (result == null || result == DBNull.Value)
+            {
+                throw new Exception("Failed to create payer stall change request");
+            }
+
+            return Convert.ToInt32(result);
+        }
+
     }
 }
