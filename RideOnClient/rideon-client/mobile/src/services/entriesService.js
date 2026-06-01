@@ -28,6 +28,18 @@ function getMyCompetitionEntries(
   });
 }
 
+function getCompetitionEntriesView(
+  competitionId,
+  ranchId
+) {
+  return axios.get("/Entries/competition-view", {
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
+  });
+}
+
 function createChangeEntryRequest(payload) {
   return axios.post(
     "/ChangeEntryRequests",
@@ -35,9 +47,45 @@ function createChangeEntryRequest(payload) {
   );
 }
 
+function getMyPastCompetitionsWithEntries(excludeCompetitionId, ranchId) {
+  return axios.get("/Entries/my-past-competitions", {
+    params: {
+      excludeCompetitionId: excludeCompetitionId,
+      ranchId: ranchId,
+    },
+  });
+}
+
+function getDuplicatableEntriesFromCompetition(
+  sourceCompetitionId,
+  targetCompetitionId,
+  ranchId,
+) {
+  return axios.get("/Entries/duplicatable-from-competition", {
+    params: {
+      sourceCompetitionId: sourceCompetitionId,
+      targetCompetitionId: targetCompetitionId,
+      ranchId: ranchId,
+    },
+  });
+}
+
+function bulkDuplicateEntries(payload) {
+  return axios.post("/Entries/bulk-duplicate", payload);
+}
+
+function cancelEntryByPayer(payload) {
+  return axios.post("/ChangeEntryRequests/cancel-by-payer", payload);
+}
+
 export {
   createEntry,
   getPaidTimeCandidatesByRanch,
   getMyCompetitionEntries,
+  getCompetitionEntriesView,
   createChangeEntryRequest,
+  getMyPastCompetitionsWithEntries,
+  getDuplicatableEntriesFromCompetition,
+  bulkDuplicateEntries,
+  cancelEntryByPayer,
 };

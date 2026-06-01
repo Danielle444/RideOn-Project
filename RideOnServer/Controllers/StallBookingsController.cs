@@ -349,6 +349,39 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("cancel-by-payer")]
+        public IActionResult CancelStallBookingByPayer(
+            [FromBody] CreateStallBookingCancelRequest request)
+        {
+            try
+            {
+                if (request == null || request.StallBookingId <= 0 || request.RanchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.Payer
+                );
+
+                int requestId = StallBooking.CancelByPayer(request.StallBookingId, personId);
+
+                return Ok(requestId);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in CancelStallBookingByPayer: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
 
     }
 }

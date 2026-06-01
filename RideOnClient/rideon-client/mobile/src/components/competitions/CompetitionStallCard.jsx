@@ -2,6 +2,8 @@ import React, { useMemo, useState } from "react";
 
 import { Pressable, Text, View } from "react-native";
 
+import { Ionicons } from "@expo/vector-icons";
+
 import ShavingsHistoryModal from "./ShavingsHistoryModal";
 
 import styles from "../../styles/adminCompetitionStallsStyles";
@@ -192,9 +194,25 @@ export default function CompetitionStallCard(props) {
 
           <View style={styles.stallDetails}>
             <View style={styles.stallTitleBlock}>
-              <Text style={styles.stallHorseName}>
-                {isTackBooking ? "תא ציוד" : item.horseName || "ללא סוס"}
-              </Text>
+              <View style={{ flexDirection: "row-reverse", alignItems: "center", gap: 6, flex: 1 }}>
+                <Text style={styles.stallHorseName}>
+                  {isTackBooking ? "תא ציוד" : item.horseName || "ללא סוס"}
+                </Text>
+
+                {item.isAssigned &&
+                item.stallMapIsPublished &&
+                typeof props.onViewCompound === "function" ? (
+                  <Pressable
+                    onPress={function () {
+                      props.onViewCompound(item);
+                    }}
+                    hitSlop={8}
+                    style={{ padding: 4 }}
+                  >
+                    <Ionicons name="eye-outline" size={20} color="#5A4036" />
+                  </Pressable>
+                ) : null}
+              </View>
 
               {bookingStatusText ? (
                 <View style={[styles.stallStatusBadge, bookingStatusStyle]}>
@@ -206,8 +224,20 @@ export default function CompetitionStallCard(props) {
             </View>
 
             <Text style={styles.stallMeta}>
-              סוג תא: {isTackBooking ? "תא ציוד" : "תא רגיל"}
+              סוג תא:{" "}
+              {item.isAssigned
+                ? item.assignedProductName ||
+                  (isTackBooking ? "תא ציוד" : "תא רגיל")
+                : isTackBooking
+                  ? "תא ציוד (מבוקש)"
+                  : "תא רגיל (מבוקש)"}
             </Text>
+
+            {item.isAssigned && item.assignedStallNumber ? (
+              <Text style={styles.stallMeta}>
+                שובץ לתא: {item.assignedStallNumber}
+              </Text>
+            ) : null}
 
             <Text style={styles.stallMeta}>
               {formatDate(item.startDate)} - {formatDate(item.endDate)} •{" "}
@@ -220,6 +250,7 @@ export default function CompetitionStallCard(props) {
 
             <Text style={styles.stallMeta}>
               עלות תא: {formatPrice(stallAmount)}
+              {!item.isAssigned ? " (משוער)" : ""}
             </Text>
           </View>
         </View>

@@ -41,5 +41,13 @@
         public int RiderFederationMemberId { get; set; }
 
         public int? CoachFederationMemberId { get; set; }
+
+        public string EntryStatus { get; set; } = "Active";
+
+        public bool IsCancelledAfterStart { get; set; }
+
+        public bool HasPendingCancellation { get; set; }
+
+        public bool HasPendingChange { get; set; }
     }
 }

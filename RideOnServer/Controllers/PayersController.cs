@@ -471,5 +471,44 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("my-competition-account")]
+        public IActionResult GetMyCompetitionAccount(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId
+        )
+        {
+            try
+            {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    ranchId,
+                    RoleNames.Payer
+                );
+
+                // Force payerPersonId = self. Payer can only ever see own account.
+                string accountJson = Payer.GetPayerCompetitionAccount(
+                    currentPersonId,
+                    competitionId,
+                    ranchId,
+                    currentPersonId
+                );
+
+                JsonElement account = JsonSerializer.Deserialize<JsonElement>(accountJson);
+
+                return Ok(account);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetMyCompetitionAccount: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת חשבון המשלם שלך");
+            }
+        }
+
     }
 }

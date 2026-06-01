@@ -52,6 +52,22 @@ namespace RideOnServer.BL
                 fine?.FineAmount
             );
         }
+
+        internal static int CancelByPayer(int entryId, int payerPersonId)
+        {
+            if (entryId <= 0)
+            {
+                throw new Exception("Invalid EntryId");
+            }
+
+            if (payerPersonId <= 0)
+            {
+                throw new Exception("Invalid PayerPersonId");
+            }
+
+            ChangeEntryRequestDAL dal = new ChangeEntryRequestDAL();
+            return dal.CancelEntryByPayer(entryId, payerPersonId);
+        }
     }
 
 }

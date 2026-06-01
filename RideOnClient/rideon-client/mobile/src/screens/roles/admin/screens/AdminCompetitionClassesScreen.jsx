@@ -28,6 +28,10 @@ import CompetitionEntryCreateModal from "../../../../components/competitions/Com
 
 import CompetitionEntryCard from "../../../../components/competitions/CompetitionEntryCard";
 
+import EntriesViewModal from "../../../../components/competitions/EntriesViewModal";
+
+import DuplicateEntriesModal from "../../../../components/competitions/DuplicateEntriesModal";
+
 import { createChangeEntryRequest } from "../../../../services/entriesService";
 
 export default function AdminCompetitionClassesScreen(props) {
@@ -49,6 +53,28 @@ export default function AdminCompetitionClassesScreen(props) {
   var [showCreateModal, setShowCreateModal] = useState(false);
 
   var [editingItem, setEditingItem] = useState(null);
+
+  var [entriesViewOpen, setEntriesViewOpen] = useState(false);
+
+  var [entriesViewFocusClass, setEntriesViewFocusClass] = useState(null);
+
+  var [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+
+  function handleViewAllEntries() {
+    setEntriesViewFocusClass(null);
+    setEntriesViewOpen(true);
+  }
+
+  function handleViewEntriesForClass(entryItem) {
+    if (!entryItem || !entryItem.classInCompId) return;
+    setEntriesViewFocusClass(entryItem.classInCompId);
+    setEntriesViewOpen(true);
+  }
+
+  function handleCloseEntriesView() {
+    setEntriesViewOpen(false);
+    setEntriesViewFocusClass(null);
+  }
 
   function handleCompetitionMenuPress(item) {
     props.navigation.navigate(item.screen);
@@ -255,6 +281,7 @@ export default function AdminCompetitionClassesScreen(props) {
           formatDate={entries.formatDate}
           onEdit={handleEditEntry}
           onCancel={handleCancelEntry}
+          onViewEntries={handleViewEntriesForClass}
         />
       );
     });
@@ -360,6 +387,51 @@ export default function AdminCompetitionClassesScreen(props) {
           <Text style={styles.addButtonText}>+ הוסף הרשמה למקצה</Text>
         </Pressable>
 
+        <Pressable
+          onPress={function () {
+            setDuplicateModalOpen(true);
+          }}
+          style={{
+            flexDirection: "row-reverse",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "#FFFFFF",
+            borderWidth: 1,
+            borderColor: "#7B5A4D",
+            paddingVertical: 10,
+            paddingHorizontal: 14,
+            borderRadius: 10,
+            gap: 8,
+            marginTop: 10,
+            marginBottom: 12,
+          }}
+        >
+          <Text style={{ color: "#7B5A4D", fontWeight: "700", fontSize: 14 }}>
+            שכפל הרשמות מתחרות קודמת
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={handleViewAllEntries}
+          style={{
+            flexDirection: "row-reverse",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "#FFFFFF",
+            borderWidth: 1,
+            borderColor: "#7B5A4D",
+            paddingVertical: 10,
+            paddingHorizontal: 14,
+            borderRadius: 10,
+            gap: 8,
+            marginBottom: 12,
+          }}
+        >
+          <Text style={{ color: "#7B5A4D", fontWeight: "700", fontSize: 14 }}>
+            צפה בסדר כניסות בכל התחרות
+          </Text>
+        </Pressable>
+
         <CompetitionEntryCreateModal
           visible={showCreateModal}
           editItem={editingItem}
@@ -369,6 +441,24 @@ export default function AdminCompetitionClassesScreen(props) {
             setEditingItem(null);
           }}
           onCreated={entries.handleRefresh}
+        />
+
+        <EntriesViewModal
+          isOpen={entriesViewOpen}
+          competitionId={activeCompetition?.competitionId}
+          ranchId={activeRole?.ranchId}
+          focusClassInCompId={entriesViewFocusClass}
+          onClose={handleCloseEntriesView}
+        />
+
+        <DuplicateEntriesModal
+          isOpen={duplicateModalOpen}
+          activeCompetitionId={activeCompetition?.competitionId}
+          ranchId={activeRole?.ranchId}
+          onClose={function () {
+            setDuplicateModalOpen(false);
+          }}
+          onDuplicated={entries.handleRefresh}
         />
 
         <Text style={styles.resultsText}>

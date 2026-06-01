@@ -10,6 +10,62 @@ import {
   getAllShavingsOrderDetailsForCompetitionAndRanch,
 } from "../services/shavingsOrderService";
 
+import {
+  getAssignments,
+  getAssignedStallPrices,
+  getStallMapPublishStatus,
+} from "../services/stallMapService";
+
+function normalizeAssignedPrice(item) {
+  if (!item) return null;
+  return {
+    assignmentId:
+      item.assignmentId || item.AssignmentId || item.assignmentid || null,
+    compoundId:
+      item.compoundId || item.CompoundId || item.compoundid || null,
+    stallId: item.stallId || item.StallId || item.stallid || null,
+    horseId: item.horseId || item.HorseId || item.horseid || null,
+    assignedPrice:
+      Number(
+        item.assignedPrice ||
+          item.AssignedPrice ||
+          item.assignedprice ||
+          0,
+      ) || 0,
+    productName:
+      item.productName || item.ProductName || item.productname || "",
+  };
+}
+
+function normalizeStallAssignment(item) {
+  if (!item) return null;
+
+  return {
+    assignmentId:
+      item.assignmentId || item.AssignmentId || item.assignmentid || null,
+    stallBookingId:
+      item.stallBookingId || item.StallBookingId || item.stallbookingid || null,
+    compoundId:
+      item.compoundId || item.CompoundId || item.compoundid || null,
+    stallId: item.stallId || item.StallId || item.stallid || null,
+    stallNumber:
+      item.stallNumber || item.StallNumber || item.stallnumber || "",
+    horseId: item.horseId || item.HorseId || item.horseid || null,
+    productName:
+      item.productName || item.ProductName || item.productname || "",
+    bookingRanchId:
+      item.bookingRanchId ||
+      item.BookingRanchId ||
+      item.bookingranchid ||
+      null,
+    bookingRanchName:
+      item.bookingRanchName ||
+      item.BookingRanchName ||
+      item.bookingranchname ||
+      "",
+  };
+}
+
 function normalizeBoolean(value) {
   if (typeof value === "boolean") {
     return value;
@@ -292,6 +348,12 @@ export default function useAdminCompetitionStallsOverview(params) {
 
   var [shavingsDetails, setShavingsDetails] = useState([]);
 
+  var [stallAssignments, setStallAssignments] = useState([]);
+
+  var [assignedStallPrices, setAssignedStallPrices] = useState([]);
+
+  var [stallMapPublished, setStallMapPublished] = useState(false);
+
   var loadData = useCallback(
     async function () {
       if (!competitionId || !activeRole || !activeRole.ranchId) {
@@ -323,6 +385,26 @@ export default function useAdminCompetitionStallsOverview(params) {
             competitionId,
             activeRole.ranchId,
           ),
+
+          // assignments may fail (older server / SP missing) - swallow gracefully.
+          getAssignments(competitionId, activeRole.ranchId).catch(function (err) {
+            console.log("STALL ASSIGNMENTS LOAD WARN", err);
+            return { data: [] };
+          }),
+
+          getAssignedStallPrices(competitionId, activeRole.ranchId).catch(
+            function (err) {
+              console.log("STALL ASSIGNED PRICES LOAD WARN", err);
+              return { data: [] };
+            },
+          ),
+
+          getStallMapPublishStatus(competitionId, activeRole.ranchId).catch(
+            function (err) {
+              console.log("STALL MAP PUBLISH STATUS WARN", err);
+              return { data: null };
+            },
+          ),
         ]);
 
         setStallBookings(
@@ -347,6 +429,24 @@ export default function useAdminCompetitionStallsOverview(params) {
           (Array.isArray(results[3]?.data) ? results[3].data : [])
             .map(normalizeShavingsDetail)
             .filter(Boolean),
+        );
+
+        setStallAssignments(
+          (Array.isArray(results[4]?.data) ? results[4].data : [])
+            .map(normalizeStallAssignment)
+            .filter(Boolean),
+        );
+
+        setAssignedStallPrices(
+          (Array.isArray(results[5]?.data) ? results[5].data : [])
+            .map(normalizeAssignedPrice)
+            .filter(Boolean),
+        );
+
+        var publishData = results[6]?.data;
+        setStallMapPublished(
+          !!(publishData &&
+            (publishData.isPublished || publishData.IsPublished)),
         );
       } catch (error) {
         console.log("STALLS OVERVIEW ERROR", error);
@@ -380,12 +480,36 @@ export default function useAdminCompetitionStallsOverview(params) {
 
       var safeDetails = Array.isArray(shavingsDetails) ? shavingsDetails : [];
 
+      var safeAssignments = Array.isArray(stallAssignments)
+        ? stallAssignments
+        : [];
+
+      var safePrices = Array.isArray(assignedStallPrices)
+        ? assignedStallPrices
+        : [];
+
       return safeBookings.map(function (booking) {
         var bookingPayers = safePayers.filter(function (payer) {
           return (
             Number(payer.stallBookingId) === Number(booking.stallBookingId)
           );
         });
+
+        var assignment = safeAssignments.find(function (a) {
+          return (
+            Number(a.stallBookingId) === Number(booking.stallBookingId)
+          );
+        });
+
+        var priceRow = assignment
+          ? safePrices.find(function (p) {
+              return (
+                Number(p.compoundId) === Number(assignment.compoundId) &&
+                Number(p.stallId) === Number(assignment.stallId) &&
+                Number(p.horseId) === Number(assignment.horseId)
+              );
+            })
+          : null;
 
         var relatedDetails = safeDetails.filter(function (detail) {
           return (
@@ -426,8 +550,14 @@ export default function useAdminCompetitionStallsOverview(params) {
           booking.endDate,
         );
 
+        // Prefer assigned-stall price (reflects actual stall type secretary assigned).
+        // Falls back to booking price if no assignment or price endpoint failed.
+        var effectivePerDayPrice = priceRow
+          ? Number(priceRow.assignedPrice || 0)
+          : Number(booking.itemPrice || 0);
+
         var stallAmount =
-          Number(numberOfDays || 1) * Number(booking.itemPrice || 0);
+          Number(numberOfDays || 1) * effectivePerDayPrice;
 
         var shavingsTotalAmount = relatedOrders.reduce(function (sum, order) {
           return sum + Number(order.amountForThisStall || 0);
@@ -451,10 +581,36 @@ export default function useAdminCompetitionStallsOverview(params) {
           shavingsTotalAmount: shavingsTotalAmount,
 
           totalAmount: totalCardAmount,
+
+          // Assignment data (from stallassignment) - if present, secretary already assigned a specific stall.
+          // Display layer should prefer these over the requested booking.compoundId/stallId.
+          isAssigned: !!assignment,
+          assignedCompoundId: assignment ? assignment.compoundId : null,
+          assignedStallId: assignment ? assignment.stallId : null,
+          assignedStallNumber: assignment ? assignment.stallNumber : null,
+          assignedProductName: assignment
+            ? assignment.productName ||
+              (priceRow ? priceRow.productName : null)
+            : null,
+          // Assigned per-day price from stall.stalltype's current pricecatalog.
+          assignedPricePerDay: priceRow
+            ? Number(priceRow.assignedPrice || 0)
+            : null,
+          // Stall map is published at competition+hostRanch level (per Danielle's design).
+          // Same flag for all cards in this competition.
+          stallMapIsPublished: stallMapPublished,
         };
       });
     },
-    [stallBookings, stallBookingPayers, shavingsOrders, shavingsDetails],
+    [
+      stallBookings,
+      stallBookingPayers,
+      shavingsOrders,
+      shavingsDetails,
+      stallAssignments,
+      assignedStallPrices,
+      stallMapPublished,
+    ],
   );
 
   return {

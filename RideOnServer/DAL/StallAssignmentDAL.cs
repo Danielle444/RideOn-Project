@@ -334,6 +334,50 @@ namespace RideOnServer.DAL
             }
         }
 
+        public List<AssignedStallPriceDto> GetAssignedStallPrices(int competitionId, int ranchId)
+        {
+            var paramDic = new Dictionary<string, object?>
+            {
+                { "@CompetitionId", competitionId },
+                { "@RanchId", ranchId },
+            };
+
+            try
+            {
+                using var connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using var command = CreateCommandWithStoredProcedure(
+                    "usp_GetAssignedStallPrices",
+                    connection,
+                    paramDic
+                );
+
+                using var reader = command.ExecuteReader();
+
+                var list = new List<AssignedStallPriceDto>();
+
+                while (reader.Read())
+                {
+                    list.Add(new AssignedStallPriceDto
+                    {
+                        AssignmentId = Convert.ToInt32(reader["AssignmentId"]),
+                        CompoundId = Convert.ToInt16(reader["CompoundId"]),
+                        StallId = Convert.ToInt16(reader["StallId"]),
+                        HorseId = Convert.ToInt32(reader["HorseId"]),
+                        AssignedPrice = Convert.ToDecimal(reader["AssignedPrice"]),
+                        ProductName = reader["ProductName"]?.ToString() ?? string.Empty,
+                    });
+                }
+
+                return list;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
         public void UnpublishStallMap(int competitionId, int hostRanchId)
         {
             var paramDic = new Dictionary<string, object?>
