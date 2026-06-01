@@ -23,7 +23,11 @@ function getCompetitionPaymentPayers(competitionId, ranchId) {
   });
 }
 
-function getCompetitionPayerAccountSummary(competitionId, ranchId, payerPersonId) {
+function getCompetitionPayerAccountSummary(
+  competitionId,
+  ranchId,
+  payerPersonId,
+) {
   return axios.get(
     `${API}/CompetitionPayments/payers/${payerPersonId}/account-summary`,
     {
@@ -36,7 +40,11 @@ function getCompetitionPayerAccountSummary(competitionId, ranchId, payerPersonId
   );
 }
 
-function getCompetitionPayerCategorySummary(competitionId, ranchId, payerPersonId) {
+function getCompetitionPayerCategorySummary(
+  competitionId,
+  ranchId,
+  payerPersonId,
+) {
   return axios.get(
     `${API}/CompetitionPayments/payers/${payerPersonId}/category-summary`,
     {
@@ -69,10 +77,13 @@ function getCompetitionPayerCharges(
     params.categoryKey = categoryKey;
   }
 
-  return axios.get(`${API}/CompetitionPayments/payers/${payerPersonId}/charges`, {
-    params: params,
-    ...getAuthHeaders(),
-  });
+  return axios.get(
+    `${API}/CompetitionPayments/payers/${payerPersonId}/charges`,
+    {
+      params: params,
+      ...getAuthHeaders(),
+    },
+  );
 }
 
 function getCompetitionPaymentMethods() {
@@ -82,7 +93,115 @@ function getCompetitionPaymentMethods() {
 }
 
 function createCompetitionPayment(data) {
-  return axios.post(`${API}/CompetitionPayments/payments`, data, getAuthHeaders());
+  return axios.post(
+    `${API}/CompetitionPayments/payments`,
+    data,
+    getAuthHeaders(),
+  );
+}
+
+/* Federation payment coverage */
+
+function getFederationCoverageStatusForPayer(
+  competitionId,
+  ranchId,
+  payerPersonId,
+) {
+  return axios.get(
+    `${API}/CompetitionPayments/federation/payers/${payerPersonId}/coverage-status`,
+    {
+      params: {
+        competitionId: competitionId,
+        ranchId: ranchId,
+      },
+      ...getAuthHeaders(),
+    },
+  );
+}
+
+function getFederationChargesForPayer(competitionId, ranchId, payerPersonId) {
+  return axios.get(
+    `${API}/CompetitionPayments/federation/payers/${payerPersonId}/charges`,
+    {
+      params: {
+        competitionId: competitionId,
+        ranchId: ranchId,
+      },
+      ...getAuthHeaders(),
+    },
+  );
+}
+
+function validateFederationCoverageBeforeOrganizerPayment(
+  competitionId,
+  ranchId,
+  payerPersonId,
+) {
+  return axios.get(
+    `${API}/CompetitionPayments/federation/payers/${payerPersonId}/validate-before-organizer-payment`,
+    {
+      params: {
+        competitionId: competitionId,
+        ranchId: ranchId,
+      },
+      ...getAuthHeaders(),
+    },
+  );
+}
+
+function searchFederationExternalCredits(
+  competitionId,
+  ranchId,
+  searchText,
+  onlyAvailable,
+) {
+  var params = {
+    competitionId: competitionId,
+    ranchId: ranchId,
+    onlyAvailable: onlyAvailable === true,
+  };
+
+  if (searchText) {
+    params.searchText = searchText;
+  }
+
+  return axios.get(`${API}/CompetitionPayments/federation/credits/search`, {
+    params: params,
+    ...getAuthHeaders(),
+  });
+}
+
+function createFederationExternalCredit(data) {
+  return axios.post(
+    `${API}/CompetitionPayments/federation/credits`,
+    data,
+    getAuthHeaders(),
+  );
+}
+
+function allocateFederationCreditToCharge(data) {
+  return axios.post(
+    `${API}/CompetitionPayments/federation/credits/allocate`,
+    data,
+    getAuthHeaders(),
+  );
+}
+
+function getFederationCreditAllocations(
+  competitionId,
+  ranchId,
+  federationExternalCreditId,
+) {
+  return axios.get(
+    `${API}/CompetitionPayments/federation/credits/${federationExternalCreditId}/allocations`,
+    {
+      params: {
+        competitionId: competitionId,
+        ranchId: ranchId,
+      },
+      ...getAuthHeaders(),
+    },
+  );
 }
 
 export {
@@ -92,4 +211,11 @@ export {
   getCompetitionPayerCharges,
   getCompetitionPaymentMethods,
   createCompetitionPayment,
+  getFederationCoverageStatusForPayer,
+  getFederationChargesForPayer,
+  validateFederationCoverageBeforeOrganizerPayment,
+  searchFederationExternalCredits,
+  createFederationExternalCredit,
+  allocateFederationCreditToCharge,
+  getFederationCreditAllocations,
 };

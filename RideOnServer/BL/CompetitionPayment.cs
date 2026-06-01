@@ -162,6 +162,204 @@ namespace RideOnServer.BL
             return dal.CreateCompetitionPayment(request);
         }
 
+        public static FederationExternalCreditItem CreateFederationExternalCredit(
+    CreateFederationExternalCreditRequest request)
+        {
+            if (request == null)
+            {
+                throw new Exception("Invalid federation external credit request");
+            }
+
+            ValidateCompetitionAndRanch(
+                request.CompetitionId,
+                request.RanchId
+            );
+
+            if (request.CreatedBySystemUserId <= 0)
+            {
+                throw new Exception("Invalid CreatedBySystemUserId");
+            }
+
+            request.SourceType = NormalizeRequiredFederationCreditSourceType(
+                request.SourceType
+            );
+
+            if (request.OriginalAmount <= 0)
+            {
+                throw new Exception("Original amount must be greater than zero");
+            }
+
+            request.ExternalReference = NormalizeOptionalText(
+                request.ExternalReference
+            );
+
+            request.ExternalName = NormalizeOptionalText(
+                request.ExternalName
+            );
+
+            request.ExternalClubName = NormalizeOptionalText(
+                request.ExternalClubName
+            );
+
+            request.ExternalIdNumber = NormalizeOptionalText(
+                request.ExternalIdNumber
+            );
+
+            request.Notes = NormalizeOptionalText(
+                request.Notes
+            );
+
+            CompetitionPaymentDAL dal = new CompetitionPaymentDAL();
+
+            return dal.CreateFederationExternalCredit(request);
+        }
+
+        public static List<FederationExternalCreditItem> SearchFederationExternalCredits(
+            int competitionId,
+            int ranchId,
+            string? searchText,
+            bool onlyAvailable)
+        {
+            ValidateCompetitionAndRanch(
+                competitionId,
+                ranchId
+            );
+
+            CompetitionPaymentDAL dal = new CompetitionPaymentDAL();
+
+            return dal.SearchFederationExternalCredits(
+                competitionId,
+                NormalizeOptionalText(searchText),
+                onlyAvailable
+            );
+        }
+
+        public static AllocateFederationCreditResponse AllocateFederationCreditToCharge(
+            AllocateFederationCreditRequest request)
+        {
+            if (request == null)
+            {
+                throw new Exception("Invalid federation credit allocation request");
+            }
+
+            ValidateCompetitionAndRanch(
+                request.CompetitionId,
+                request.RanchId
+            );
+
+            if (request.FederationExternalCreditId <= 0)
+            {
+                throw new Exception("Invalid FederationExternalCreditId");
+            }
+
+            if (request.BillChargeId <= 0)
+            {
+                throw new Exception("Invalid BillChargeId");
+            }
+
+            if (request.AllocatedAmount <= 0)
+            {
+                throw new Exception("Allocated amount must be greater than zero");
+            }
+
+            if (request.AllocatedBySystemUserId <= 0)
+            {
+                throw new Exception("Invalid AllocatedBySystemUserId");
+            }
+
+            request.Notes = NormalizeOptionalText(
+                request.Notes
+            );
+
+            CompetitionPaymentDAL dal = new CompetitionPaymentDAL();
+
+            return dal.AllocateFederationCreditToCharge(request);
+        }
+
+        public static List<FederationCreditAllocationItem> GetFederationCreditAllocations(
+            int competitionId,
+            int ranchId,
+            int federationExternalCreditId)
+        {
+            ValidateCompetitionAndRanch(
+                competitionId,
+                ranchId
+            );
+
+            if (federationExternalCreditId <= 0)
+            {
+                throw new Exception("Invalid FederationExternalCreditId");
+            }
+
+            CompetitionPaymentDAL dal = new CompetitionPaymentDAL();
+
+            return dal.GetFederationCreditAllocations(
+                federationExternalCreditId
+            );
+        }
+
+        public static FederationCoverageStatusItem GetFederationCoverageStatusForPayer(
+            int competitionId,
+            int ranchId,
+            int payerPersonId)
+        {
+            ValidateCompetitionAndRanch(
+                competitionId,
+                ranchId
+            );
+
+            ValidatePayer(payerPersonId);
+
+            CompetitionPaymentDAL dal = new CompetitionPaymentDAL();
+
+            return dal.GetFederationCoverageStatusForPayer(
+                competitionId,
+                payerPersonId
+            );
+        }
+
+        public static List<FederationChargeCoverageItem> GetFederationChargesForPayer(
+            int competitionId,
+            int ranchId,
+            int payerPersonId)
+        {
+            ValidateCompetitionAndRanch(
+                competitionId,
+                ranchId
+            );
+
+            ValidatePayer(payerPersonId);
+
+            CompetitionPaymentDAL dal = new CompetitionPaymentDAL();
+
+            return dal.GetFederationChargesForPayer(
+                competitionId,
+                payerPersonId
+            );
+        }
+
+        public static ValidateFederationCoverageResponse
+            ValidateFederationCoverageBeforeOrganizerPayment(
+                int competitionId,
+                int ranchId,
+                int payerPersonId)
+        {
+            ValidateCompetitionAndRanch(
+                competitionId,
+                ranchId
+            );
+
+            ValidatePayer(payerPersonId);
+
+            CompetitionPaymentDAL dal = new CompetitionPaymentDAL();
+
+            return dal.ValidateFederationCoverageBeforeOrganizerPayment(
+                competitionId,
+                payerPersonId
+            );
+        }
+
+
         private static void ValidateCompetitionAndRanch(
             int competitionId,
             int ranchId)
@@ -207,6 +405,32 @@ namespace RideOnServer.BL
             if (normalized != "Organizer" && normalized != "Federation")
             {
                 throw new Exception("ChargeOwner must be Organizer or Federation");
+            }
+
+            return normalized;
+        }
+
+        private static string NormalizeRequiredFederationCreditSourceType(
+    string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new Exception("SourceType is required");
+            }
+
+            string normalized = value.Trim();
+
+            if (
+                normalized != "ExcelReceipt" &&
+                normalized != "BankTransfer" &&
+                normalized != "PreviousCredit" &&
+                normalized != "Manual" &&
+                normalized != "Exception"
+            )
+            {
+                throw new Exception(
+                    "SourceType must be ExcelReceipt, BankTransfer, PreviousCredit, Manual or Exception"
+                );
             }
 
             return normalized;

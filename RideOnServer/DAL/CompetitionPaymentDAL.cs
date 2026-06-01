@@ -453,6 +453,569 @@ namespace RideOnServer.DAL
             }
         }
 
+        public FederationExternalCreditItem CreateFederationExternalCredit(
+    CreateFederationExternalCreditRequest request)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_createfederationexternalcredit(
+                        @competitionId,
+                        @sourceType,
+                        @externalReference,
+                        @externalName,
+                        @externalClubName,
+                        @externalIdNumber,
+                        @originalAmount,
+                        @createdBySystemUserId,
+                        @notes
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add(
+                            "@competitionId",
+                            NpgsqlDbType.Integer
+                        ).Value = request.CompetitionId;
+
+                        command.Parameters.Add(
+                            "@sourceType",
+                            NpgsqlDbType.Text
+                        ).Value = request.SourceType;
+
+                        command.Parameters.Add(
+                            "@externalReference",
+                            NpgsqlDbType.Text
+                        ).Value =
+                            request.ExternalReference == null
+                                ? DBNull.Value
+                                : request.ExternalReference;
+
+                        command.Parameters.Add(
+                            "@externalName",
+                            NpgsqlDbType.Text
+                        ).Value =
+                            request.ExternalName == null
+                                ? DBNull.Value
+                                : request.ExternalName;
+
+                        command.Parameters.Add(
+                            "@externalClubName",
+                            NpgsqlDbType.Text
+                        ).Value =
+                            request.ExternalClubName == null
+                                ? DBNull.Value
+                                : request.ExternalClubName;
+
+                        command.Parameters.Add(
+                            "@externalIdNumber",
+                            NpgsqlDbType.Text
+                        ).Value =
+                            request.ExternalIdNumber == null
+                                ? DBNull.Value
+                                : request.ExternalIdNumber;
+
+                        command.Parameters.Add(
+                            "@originalAmount",
+                            NpgsqlDbType.Numeric
+                        ).Value = request.OriginalAmount;
+
+                        command.Parameters.Add(
+                            "@createdBySystemUserId",
+                            NpgsqlDbType.Integer
+                        ).Value = request.CreatedBySystemUserId;
+
+                        command.Parameters.Add(
+                            "@notes",
+                            NpgsqlDbType.Text
+                        ).Value =
+                            request.Notes == null
+                                ? DBNull.Value
+                                : request.Notes;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                return new FederationExternalCreditItem
+                                {
+                                    FederationExternalCreditId = GetInt(reader, "FederationExternalCreditId"),
+                                    CompetitionId = GetInt(reader, "CompetitionId"),
+                                    SourceType = GetString(reader, "SourceType"),
+                                    ExternalReference = GetNullableString(reader, "ExternalReference"),
+                                    ExternalName = GetNullableString(reader, "ExternalName"),
+                                    ExternalClubName = GetNullableString(reader, "ExternalClubName"),
+                                    ExternalIdNumber = GetNullableString(reader, "ExternalIdNumber"),
+                                    OriginalAmount = GetDecimal(reader, "OriginalAmount"),
+                                    UsedAmount = GetDecimal(reader, "UsedAmount"),
+                                    AvailableAmount = GetDecimal(reader, "AvailableAmount"),
+                                    CreditStatus = GetString(reader, "CreditStatus"),
+                                    UsageStatusLabel = null,
+                                    CreatedAt = GetDateTime(reader, "CreatedAt"),
+                                    Notes = GetNullableString(reader, "Notes")
+                                };
+                            }
+                        }
+                    }
+                }
+
+                throw new Exception("Federation external credit was not created");
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public List<FederationExternalCreditItem> SearchFederationExternalCredits(
+            int competitionId,
+            string? searchText,
+            bool onlyAvailable)
+        {
+            List<FederationExternalCreditItem> items =
+                new List<FederationExternalCreditItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_searchfederationexternalcredits(
+                        @competitionId,
+                        @searchText,
+                        @onlyAvailable
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add(
+                            "@competitionId",
+                            NpgsqlDbType.Integer
+                        ).Value = competitionId;
+
+                        command.Parameters.Add(
+                            "@searchText",
+                            NpgsqlDbType.Text
+                        ).Value =
+                            searchText == null
+                                ? DBNull.Value
+                                : searchText;
+
+                        command.Parameters.Add(
+                            "@onlyAvailable",
+                            NpgsqlDbType.Boolean
+                        ).Value = onlyAvailable;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new FederationExternalCreditItem
+                                    {
+                                        FederationExternalCreditId = GetInt(reader, "FederationExternalCreditId"),
+                                        CompetitionId = GetInt(reader, "CompetitionId"),
+                                        SourceType = GetString(reader, "SourceType"),
+                                        ExternalReference = GetNullableString(reader, "ExternalReference"),
+                                        ExternalName = GetNullableString(reader, "ExternalName"),
+                                        ExternalClubName = GetNullableString(reader, "ExternalClubName"),
+                                        ExternalIdNumber = GetNullableString(reader, "ExternalIdNumber"),
+                                        OriginalAmount = GetDecimal(reader, "OriginalAmount"),
+                                        UsedAmount = GetDecimal(reader, "UsedAmount"),
+                                        AvailableAmount = GetDecimal(reader, "AvailableAmount"),
+                                        CreditStatus = GetString(reader, "CreditStatus"),
+                                        UsageStatusLabel = GetNullableString(reader, "UsageStatusLabel"),
+                                        CreatedAt = GetDateTime(reader, "CreatedAt"),
+                                        Notes = GetNullableString(reader, "Notes")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public AllocateFederationCreditResponse AllocateFederationCreditToCharge(
+            AllocateFederationCreditRequest request)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_allocatefederationcredittocharge(
+                        @federationExternalCreditId,
+                        @billChargeId,
+                        @allocatedAmount,
+                        @allocatedBySystemUserId,
+                        @notes
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add(
+                            "@federationExternalCreditId",
+                            NpgsqlDbType.Integer
+                        ).Value = request.FederationExternalCreditId;
+
+                        command.Parameters.Add(
+                            "@billChargeId",
+                            NpgsqlDbType.Integer
+                        ).Value = request.BillChargeId;
+
+                        command.Parameters.Add(
+                            "@allocatedAmount",
+                            NpgsqlDbType.Numeric
+                        ).Value = request.AllocatedAmount;
+
+                        command.Parameters.Add(
+                            "@allocatedBySystemUserId",
+                            NpgsqlDbType.Integer
+                        ).Value = request.AllocatedBySystemUserId;
+
+                        command.Parameters.Add(
+                            "@notes",
+                            NpgsqlDbType.Text
+                        ).Value =
+                            request.Notes == null
+                                ? DBNull.Value
+                                : request.Notes;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                return new AllocateFederationCreditResponse
+                                {
+                                    FederationCreditAllocationId = GetInt(reader, "FederationCreditAllocationId"),
+                                    FederationExternalCreditId = GetInt(reader, "FederationExternalCreditId"),
+                                    BillChargeId = GetInt(reader, "BillChargeId"),
+                                    EntryId = GetNullableInt(reader, "EntryId"),
+                                    AllocatedAmount = GetDecimal(reader, "AllocatedAmount"),
+                                    CreditUsedAmount = GetDecimal(reader, "CreditUsedAmount"),
+                                    CreditAvailableAmount = GetDecimal(reader, "CreditAvailableAmount"),
+                                    CreditStatus = GetString(reader, "CreditStatus"),
+                                    BillChargeAmount = GetDecimal(reader, "BillChargeAmount"),
+                                    BillChargeCoveredAmount = GetDecimal(reader, "BillChargeCoveredAmount"),
+                                    BillChargeStatus = GetString(reader, "BillChargeStatus")
+                                };
+                            }
+                        }
+                    }
+                }
+
+                throw new Exception("Federation credit allocation was not created");
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public List<FederationCreditAllocationItem> GetFederationCreditAllocations(
+            int federationExternalCreditId)
+        {
+            List<FederationCreditAllocationItem> items =
+                new List<FederationCreditAllocationItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getfederationcreditallocations(
+                        @federationExternalCreditId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add(
+                            "@federationExternalCreditId",
+                            NpgsqlDbType.Integer
+                        ).Value = federationExternalCreditId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new FederationCreditAllocationItem
+                                    {
+                                        FederationCreditAllocationId = GetInt(reader, "FederationCreditAllocationId"),
+                                        FederationExternalCreditId = GetInt(reader, "FederationExternalCreditId"),
+                                        BillChargeId = GetInt(reader, "BillChargeId"),
+                                        EntryId = GetNullableInt(reader, "EntryId"),
+                                        AllocatedAmount = GetDecimal(reader, "AllocatedAmount"),
+                                        AllocatedAt = GetDateTime(reader, "AllocatedAt"),
+                                        AllocationNotes = GetNullableString(reader, "AllocationNotes"),
+
+                                        BillId = GetInt(reader, "BillId"),
+                                        PayerPersonId = GetInt(reader, "PaidByPersonId"),
+                                        PayerFullName = GetString(reader, "PayerFullName"),
+
+                                        RiderFederationMemberId = GetNullableInt(reader, "RiderFederationMemberId"),
+                                        RiderFullName = GetNullableString(reader, "RiderFullName"),
+
+                                        HorseId = GetNullableInt(reader, "HorseId"),
+                                        HorseName = GetNullableString(reader, "HorseName"),
+
+                                        ClassInCompId = GetNullableInt(reader, "ClassInCompId"),
+                                        ClassName = GetNullableString(reader, "ClassName"),
+                                        ClassDateTime = GetNullableDateTime(reader, "ClassDateTime"),
+
+                                        BillChargeAmount = GetDecimal(reader, "BillChargeAmount"),
+                                        BillChargeStatus = GetString(reader, "BillChargeStatus")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public FederationCoverageStatusItem GetFederationCoverageStatusForPayer(
+            int competitionId,
+            int payerPersonId)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getfederationcoveragestatusforpayer(
+                        @competitionId,
+                        @payerPersonId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add(
+                            "@competitionId",
+                            NpgsqlDbType.Integer
+                        ).Value = competitionId;
+
+                        command.Parameters.Add(
+                            "@payerPersonId",
+                            NpgsqlDbType.Integer
+                        ).Value = payerPersonId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                return new FederationCoverageStatusItem
+                                {
+                                    CompetitionId = GetInt(reader, "CompetitionId"),
+                                    PayerPersonId = GetInt(reader, "PaidByPersonId"),
+                                    PayerFullName = GetString(reader, "PayerFullName"),
+                                    TotalFederationAmount = GetDecimal(reader, "TotalFederationAmount"),
+                                    CoveredFederationAmount = GetDecimal(reader, "CoveredFederationAmount"),
+                                    MissingFederationAmount = GetDecimal(reader, "MissingFederationAmount"),
+                                    TotalChargesCount = GetInt(reader, "TotalChargesCount"),
+                                    FullyCoveredChargesCount = GetInt(reader, "FullyCoveredChargesCount"),
+                                    PartiallyCoveredChargesCount = GetInt(reader, "PartiallyCoveredChargesCount"),
+                                    UncoveredChargesCount = GetInt(reader, "UncoveredChargesCount"),
+                                    CoverageStatus = GetString(reader, "CoverageStatus")
+                                };
+                            }
+                        }
+                    }
+                }
+
+                throw new Exception("Federation coverage status was not found");
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public List<FederationChargeCoverageItem> GetFederationChargesForPayer(
+            int competitionId,
+            int payerPersonId)
+        {
+            List<FederationChargeCoverageItem> items =
+                new List<FederationChargeCoverageItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getfederationchargesforpayer(
+                        @competitionId,
+                        @payerPersonId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add(
+                            "@competitionId",
+                            NpgsqlDbType.Integer
+                        ).Value = competitionId;
+
+                        command.Parameters.Add(
+                            "@payerPersonId",
+                            NpgsqlDbType.Integer
+                        ).Value = payerPersonId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new FederationChargeCoverageItem
+                                    {
+                                        BillChargeId = GetInt(reader, "BillChargeId"),
+                                        BillId = GetInt(reader, "BillId"),
+                                        CompetitionId = GetInt(reader, "CompetitionId"),
+                                        PayerPersonId = GetInt(reader, "PaidByPersonId"),
+                                        PayerFullName = GetString(reader, "PayerFullName"),
+
+                                        EntryId = GetInt(reader, "EntryId"),
+                                        ClassInCompId = GetInt(reader, "ClassInCompId"),
+                                        ClassName = GetString(reader, "ClassName"),
+                                        ClassDateTime = GetNullableDateTime(reader, "ClassDateTime"),
+
+                                        RiderFederationMemberId = GetNullableInt(reader, "RiderFederationMemberId"),
+                                        RiderFullName = GetNullableString(reader, "RiderFullName"),
+
+                                        HorseId = GetNullableInt(reader, "HorseId"),
+                                        HorseName = GetNullableString(reader, "HorseName"),
+
+                                        ChargeAmount = GetDecimal(reader, "ChargeAmount"),
+                                        CoveredAmount = GetDecimal(reader, "CoveredAmount"),
+                                        MissingAmount = GetDecimal(reader, "MissingAmount"),
+                                        ChargeStatus = GetString(reader, "ChargeStatus"),
+                                        CoverageStatus = GetString(reader, "CoverageStatus")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public ValidateFederationCoverageResponse ValidateFederationCoverageBeforeOrganizerPayment(
+            int competitionId,
+            int payerPersonId)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_validatefederationcoveragebeforeorganizerpayment(
+                        @competitionId,
+                        @payerPersonId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add(
+                            "@competitionId",
+                            NpgsqlDbType.Integer
+                        ).Value = competitionId;
+
+                        command.Parameters.Add(
+                            "@payerPersonId",
+                            NpgsqlDbType.Integer
+                        ).Value = payerPersonId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                return new ValidateFederationCoverageResponse
+                                {
+                                    CanProceed = GetBool(reader, "CanProceed"),
+                                    CompetitionId = GetInt(reader, "CompetitionId"),
+                                    PayerPersonId = GetInt(reader, "PaidByPersonId"),
+                                    PayerFullName = GetString(reader, "PayerFullName"),
+                                    TotalFederationAmount = GetDecimal(reader, "TotalFederationAmount"),
+                                    CoveredFederationAmount = GetDecimal(reader, "CoveredFederationAmount"),
+                                    MissingFederationAmount = GetDecimal(reader, "MissingFederationAmount"),
+                                    Message = GetString(reader, "Message")
+                                };
+                            }
+                        }
+                    }
+                }
+
+                throw new Exception("Federation validation response was not found");
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+
         private static int GetInt(
             NpgsqlDataReader reader,
             string columnName)
