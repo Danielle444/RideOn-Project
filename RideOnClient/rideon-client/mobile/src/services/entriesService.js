@@ -74,6 +74,10 @@ function bulkDuplicateEntries(payload) {
   return axios.post("/Entries/bulk-duplicate", payload);
 }
 
+function cancelEntryByPayer(payload) {
+  return axios.post("/ChangeEntryRequests/cancel-by-payer", payload);
+}
+
 export {
   createEntry,
   getPaidTimeCandidatesByRanch,
@@ -83,4 +87,5 @@ export {
   getMyPastCompetitionsWithEntries,
   getDuplicatableEntriesFromCompetition,
   bulkDuplicateEntries,
+  cancelEntryByPayer,
 };

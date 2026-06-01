@@ -361,6 +361,40 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("cancel-by-payer")]
+        public IActionResult CancelPaidTimeRequestByPayer(
+            [FromBody] CancelPaidTimeRequestRequest request)
+        {
+            try
+            {
+                if (request == null || request.PaidTimeRequestId <= 0 || request.RanchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.Payer
+                );
+
+                PaidTimeRequest.CancelByPayer(request.PaidTimeRequestId, personId);
+
+                return Ok("הבקשה בוטלה בהצלחה");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in CancelPaidTimeRequestByPayer: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpPost("update-notes")]
         public IActionResult UpdatePaidTimeRequestNotes([FromBody] UpdatePaidTimeRequestNotesRequest request)
         {
