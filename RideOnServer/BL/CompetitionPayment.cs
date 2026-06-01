@@ -107,6 +107,13 @@ namespace RideOnServer.BL
 
             request.ChargeOwner = NormalizeRequiredChargeOwner(request.ChargeOwner);
 
+            if (request.ChargeOwner == "Federation")
+            {
+                throw new Exception(
+                    "Federation charges must be closed through the federation coverage flow"
+                );
+            }
+
             if (string.IsNullOrWhiteSpace(request.InvoiceNumber))
             {
                 throw new Exception("Invoice number is required");
