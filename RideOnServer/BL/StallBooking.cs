@@ -32,5 +32,20 @@ namespace RideOnServer.BL
 
             return StallBookingDAL.CancelStallBookingByPayer(stallBookingId, payerPersonId);
         }
+
+        public static int CreateChangeRequestByPayer(int stallBookingId, int payerPersonId)
+        {
+            if (stallBookingId <= 0)
+            {
+                throw new Exception("Invalid StallBookingId");
+            }
+
+            if (payerPersonId <= 0)
+            {
+                throw new Exception("Invalid PayerPersonId");
+            }
+
+            return StallBookingDAL.CreateStallChangeRequestByPayer(stallBookingId, payerPersonId);
+        }
     }
 }

@@ -395,6 +395,44 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("update-notes-by-payer")]
+        public IActionResult UpdatePaidTimeNotesByPayer(
+            [FromBody] UpdatePaidTimeRequestNotesRequest request)
+        {
+            try
+            {
+                if (request == null || request.PaidTimeRequestId <= 0 || request.RanchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.Payer
+                );
+
+                PaidTimeRequest.UpdateNotesByPayer(
+                    request.PaidTimeRequestId,
+                    personId,
+                    request.Notes
+                );
+
+                return Ok("ההערות עודכנו בהצלחה");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in UpdatePaidTimeNotesByPayer: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpPost("update-notes")]
         public IActionResult UpdatePaidTimeRequestNotes([FromBody] UpdatePaidTimeRequestNotesRequest request)
         {

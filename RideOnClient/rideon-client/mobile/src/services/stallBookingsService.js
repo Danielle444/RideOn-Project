@@ -59,6 +59,10 @@ function cancelStallBookingByPayer(payload) {
   return axios.post("/StallBookings/cancel-by-payer", payload);
 }
 
+function createStallChangeRequestByPayer(payload) {
+  return axios.post("/StallBookings/change-request-by-payer", payload);
+}
+
 export {
   getHorsesForStallBooking,
   getHorsePayersForCompetition,
@@ -69,4 +73,5 @@ export {
   createStallBookingCancelRequest,
   createStallBookingChangeRequest,
   cancelStallBookingByPayer,
+  createStallChangeRequestByPayer,
 };
