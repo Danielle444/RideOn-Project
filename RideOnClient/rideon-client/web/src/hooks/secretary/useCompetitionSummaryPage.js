@@ -17,6 +17,7 @@ import {
   getCompetitionCashDeskOverview,
   saveCompetitionCashCount,
   saveCompetitionCashSafeTransfer,
+  importFederationCreditsFromExcel,
 } from "../../services/competitionSummaryService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
 
@@ -89,6 +90,15 @@ export default function useCompetitionSummaryPage(options) {
   var [loading, setLoading] = useState(false);
   var [error, setError] = useState("");
 
+  var [federationInvoiceImporting, setFederationInvoiceImporting] =
+    useState(false);
+  var [federationInvoiceImportError, setFederationInvoiceImportError] =
+    useState("");
+  var [federationInvoiceImportSuccess, setFederationInvoiceImportSuccess] =
+    useState("");
+  var [federationInvoiceImportResult, setFederationInvoiceImportResult] =
+    useState(null);
+
   var [detailsModal, setDetailsModal] = useState(null);
   var [detailsItems, setDetailsItems] = useState([]);
   var [detailsLoading, setDetailsLoading] = useState(false);
@@ -149,6 +159,49 @@ export default function useCompetitionSummaryPage(options) {
       setSummary(getEmptySummary());
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function importFederationInvoices(file) {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    if (!file) {
+      setFederationInvoiceImportError("יש לבחור קובץ אקסל לייבוא");
+      return;
+    }
+
+    try {
+      setFederationInvoiceImporting(true);
+      setFederationInvoiceImportError("");
+      setFederationInvoiceImportSuccess("");
+      setFederationInvoiceImportResult(null);
+
+      var response = await importFederationCreditsFromExcel(
+        competitionId,
+        ranchId,
+        file,
+      );
+
+      var result = response.data || null;
+
+      setFederationInvoiceImportResult(result);
+      setFederationInvoiceImportSuccess(
+        "ייבוא חשבוניות ההתאחדות הסתיים בהצלחה",
+      );
+
+      await loadSummary();
+    } catch (error) {
+      console.error(error);
+
+      setFederationInvoiceImportError(
+        getErrorMessage(error, "שגיאה בייבוא חשבוניות התאחדות"),
+      );
+
+      setFederationInvoiceImportResult(null);
+    } finally {
+      setFederationInvoiceImporting(false);
     }
   }
 
@@ -685,5 +738,11 @@ export default function useCompetitionSummaryPage(options) {
     openPaymentBatchDetails: openPaymentBatchDetails,
     backInPaymentsModal: backInPaymentsModal,
     closePaymentsModal: closePaymentsModal,
+
+    federationInvoiceImporting: federationInvoiceImporting,
+    federationInvoiceImportError: federationInvoiceImportError,
+    federationInvoiceImportSuccess: federationInvoiceImportSuccess,
+    federationInvoiceImportResult: federationInvoiceImportResult,
+    importFederationInvoices: importFederationInvoices,
   };
 }

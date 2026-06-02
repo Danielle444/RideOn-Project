@@ -1015,6 +1015,251 @@ namespace RideOnServer.DAL
             }
         }
 
+        public FederationExcelImportResult ImportFederationExcelCredits(
+    List<FederationExcelCreditImportRow> rows)
+        {
+            FederationExcelImportResult result = new FederationExcelImportResult();
+
+            if (rows == null || rows.Count == 0)
+            {
+                result.Message = "לא נמצאו שורות לייבוא";
+                return result;
+            }
+
+            result.TotalRows = rows.Count;
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    foreach (FederationExcelCreditImportRow row in rows)
+                    {
+                        try
+                        {
+                            if (row.OriginalAmount <= 0)
+                            {
+                                result.SkippedZeroAmountCount++;
+                                continue;
+                            }
+
+                            bool exists = FederationExcelCreditExists(
+                                connection,
+                                row
+                            );
+
+                            if (exists)
+                            {
+                                result.SkippedDuplicatesCount++;
+                                continue;
+                            }
+
+                            using (
+                                NpgsqlCommand command = new NpgsqlCommand(
+                                    @"
+                            insert into public.federationexternalcredit
+                            (
+                                competitionid,
+                                sourcetype,
+                                externalreference,
+                                externalname,
+                                externalclubname,
+                                externalidnumber,
+                                originalamount,
+                                usedamount,
+                                availableamount,
+                                creditstatus,
+                                importfingerprint,
+                                rawdatajson,
+                                createdbysystemuserid,
+                                notes
+                            )
+                            values
+                            (
+                                @competitionId,
+                                @sourceType,
+                                @externalReference,
+                                @externalName,
+                                @externalClubName,
+                                @externalIdNumber,
+                                @originalAmount,
+                                0,
+                                @originalAmount,
+                                'Available',
+                                @importFingerprint,
+                                @rawDataJson::jsonb,
+                                @createdBySystemUserId,
+                                @notes
+                            );",
+                                    connection
+                                )
+                            )
+                            {
+                                command.Parameters.Add(
+                                    "@competitionId",
+                                    NpgsqlDbType.Integer
+                                ).Value = row.CompetitionId;
+
+                                command.Parameters.Add(
+                                    "@sourceType",
+                                    NpgsqlDbType.Text
+                                ).Value = row.SourceType;
+
+                                command.Parameters.Add(
+                                    "@externalReference",
+                                    NpgsqlDbType.Text
+                                ).Value =
+                                    row.ExternalReference == null
+                                        ? DBNull.Value
+                                        : row.ExternalReference;
+
+                                command.Parameters.Add(
+                                    "@externalName",
+                                    NpgsqlDbType.Text
+                                ).Value =
+                                    row.ExternalName == null
+                                        ? DBNull.Value
+                                        : row.ExternalName;
+
+                                command.Parameters.Add(
+                                    "@externalClubName",
+                                    NpgsqlDbType.Text
+                                ).Value =
+                                    row.ExternalClubName == null
+                                        ? DBNull.Value
+                                        : row.ExternalClubName;
+
+                                command.Parameters.Add(
+                                    "@externalIdNumber",
+                                    NpgsqlDbType.Text
+                                ).Value =
+                                    row.ExternalIdNumber == null
+                                        ? DBNull.Value
+                                        : row.ExternalIdNumber;
+
+                                command.Parameters.Add(
+                                    "@originalAmount",
+                                    NpgsqlDbType.Numeric
+                                ).Value = row.OriginalAmount;
+
+                                command.Parameters.Add(
+                                    "@importFingerprint",
+                                    NpgsqlDbType.Text
+                                ).Value = row.ImportFingerprint;
+
+                                command.Parameters.Add(
+                                    "@rawDataJson",
+                                    NpgsqlDbType.Jsonb
+                                ).Value = string.IsNullOrWhiteSpace(row.RawDataJson)
+                                    ? "{}"
+                                    : row.RawDataJson;
+
+                                command.Parameters.Add(
+                                    "@createdBySystemUserId",
+                                    NpgsqlDbType.Integer
+                                ).Value = row.CreatedBySystemUserId;
+
+                                command.Parameters.Add(
+                                    "@notes",
+                                    NpgsqlDbType.Text
+                                ).Value =
+                                    row.Notes == null
+                                        ? DBNull.Value
+                                        : row.Notes;
+
+                                command.ExecuteNonQuery();
+
+                                result.ImportedCreditsCount++;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            result.FailedRowsCount++;
+
+                            result.Errors.Add(
+                                "שורה " + row.RowNumber + ": " + ex.Message
+                            );
+                        }
+                    }
+                }
+
+                result.Message = "ייבוא אקסל התאחדות הסתיים בהצלחה";
+
+                return result;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        private static bool FederationExcelCreditExists(
+    NpgsqlConnection connection,
+    FederationExcelCreditImportRow row)
+        {
+            using (
+                NpgsqlCommand command = new NpgsqlCommand(
+                    @"
+            select exists
+            (
+                select 1
+                from public.federationexternalcredit fec
+                where fec.competitionid = @competitionId
+                  and fec.sourcetype = 'ExcelReceipt'
+                  and
+                  (
+                      fec.importfingerprint = @importFingerprint
+                      or
+                      (
+                          coalesce(fec.externalreference, '') =
+                              coalesce(@externalReference, '')
+                          and coalesce(fec.externalidnumber, '') =
+                              coalesce(@externalIdNumber, '')
+                          and fec.originalamount = @originalAmount
+                      )
+                  )
+            );",
+                    connection
+                )
+            )
+            {
+                command.Parameters.Add(
+                    "@competitionId",
+                    NpgsqlDbType.Integer
+                ).Value = row.CompetitionId;
+
+                command.Parameters.Add(
+                    "@importFingerprint",
+                    NpgsqlDbType.Text
+                ).Value = row.ImportFingerprint;
+
+                command.Parameters.Add(
+                    "@externalReference",
+                    NpgsqlDbType.Text
+                ).Value =
+                    row.ExternalReference == null
+                        ? DBNull.Value
+                        : row.ExternalReference;
+
+                command.Parameters.Add(
+                    "@externalIdNumber",
+                    NpgsqlDbType.Text
+                ).Value =
+                    row.ExternalIdNumber == null
+                        ? DBNull.Value
+                        : row.ExternalIdNumber;
+
+                command.Parameters.Add(
+                    "@originalAmount",
+                    NpgsqlDbType.Numeric
+                ).Value = row.OriginalAmount;
+
+                object result = command.ExecuteScalar()!;
+
+                return Convert.ToBoolean(result);
+            }
+        }
 
         private static int GetInt(
             NpgsqlDataReader reader,

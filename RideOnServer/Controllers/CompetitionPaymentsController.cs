@@ -553,6 +553,52 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("federation/credits/import-excel")]
+        [Consumes("multipart/form-data")]
+        public IActionResult ImportFederationCreditsFromExcel(
+     [FromForm] int competitionId,
+     [FromForm] int ranchId,
+     IFormFile file)
+        {
+            try
+            {
+                ValidateHostSecretaryCompetitionAccess(
+                    competitionId,
+                    ranchId
+                );
+
+                int personId =
+                    UserAccessValidator.GetPersonIdFromClaims(User);
+
+                FederationExcelImportResult result =
+                    CompetitionPayment.ImportFederationExcelCreditsFromExcel(
+                        competitionId,
+                        ranchId,
+                        personId,
+                        file
+                    );
+
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ex.Message
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in ImportFederationCreditsFromExcel: {ex.Message}"
+                );
+
+                return BadRequest(
+                    ex.Message
+                );
+            }
+        }
+
         private void ValidateHostSecretaryCompetitionAccess(
             int competitionId,
             int ranchId)

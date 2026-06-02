@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { ArrowRight, RefreshCw } from "lucide-react";
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import CreatePaymentModal from "../../components/secretary/competition-payments/CreatePaymentModal";
+import FederationCoverageApplyModal from "../../components/secretary/competition-payments/FederationCoverageApplyModal";
 import PayerAccountCards from "../../components/secretary/competition-payments/PayerAccountCards";
 import PayersList from "../../components/secretary/competition-payments/PayersList";
 import PaymentCategoriesSidebar from "../../components/secretary/competition-payments/PaymentCategoriesSidebar";
@@ -30,229 +31,6 @@ function formatMoney(value) {
   return "₪" + Number(value || 0).toLocaleString("he-IL");
 }
 
-function getStatusCardClasses(status) {
-  if (status === "מכוסה במלואו") {
-    return "border-green-200 bg-green-50 text-green-800";
-  }
-
-  if (status === "כיסוי חלקי") {
-    return "border-amber-200 bg-amber-50 text-amber-800";
-  }
-
-  if (status === "חסר כיסוי") {
-    return "border-red-200 bg-red-50 text-red-800";
-  }
-
-  return "border-[#E6DCD5] bg-white text-[#3F312B]";
-}
-
-function FederationCoverageCard(props) {
-  var status = props.status;
-  var charges = props.charges || [];
-  var validation = props.validation;
-  var loading = props.loading;
-  var error = props.error;
-
-  if (loading) {
-    return (
-      <div className="rounded-[24px] border border-[#E6DCD5] bg-white p-5 text-sm font-bold text-[#7B5A4D] shadow-sm">
-        טוען נתוני התאחדות...
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-[24px] border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700 shadow-sm">
-        {error}
-      </div>
-    );
-  }
-
-  if (!status) {
-    return null;
-  }
-
-  var coverageStatus = getValue(status, "coverageStatus", "CoverageStatus", "");
-
-  var totalFederationAmount = getValue(
-    status,
-    "totalFederationAmount",
-    "TotalFederationAmount",
-    0,
-  );
-
-  var coveredFederationAmount = getValue(
-    status,
-    "coveredFederationAmount",
-    "CoveredFederationAmount",
-    0,
-  );
-
-  var missingFederationAmount = getValue(
-    status,
-    "missingFederationAmount",
-    "MissingFederationAmount",
-    0,
-  );
-
-  var message = getValue(validation, "message", "Message", "");
-
-  return (
-    <div
-      className={
-        "rounded-[24px] border p-5 shadow-sm " +
-        getStatusCardClasses(coverageStatus)
-      }
-    >
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div>
-          <h2 className="text-xl font-black">כיסוי התאחדות</h2>
-
-          <p className="mt-1 text-sm font-bold opacity-80">
-            בדיקה האם חיובי ההתאחדות של המשלם מכוסים לפני סגירת תשלום מארגן
-          </p>
-
-          {message ? (
-            <p className="mt-3 rounded-2xl bg-white/60 px-4 py-2 text-sm font-bold">
-              {message}
-            </p>
-          ) : null}
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 text-sm xl:grid-cols-4">
-          <div className="rounded-2xl bg-white/70 px-4 py-3">
-            <p className="text-xs font-bold opacity-70">סטטוס</p>
-            <p className="mt-1 font-black">{coverageStatus}</p>
-          </div>
-
-          <div className="rounded-2xl bg-white/70 px-4 py-3">
-            <p className="text-xs font-bold opacity-70">סה״כ התאחדות</p>
-            <p className="mt-1 font-black">
-              {formatMoney(totalFederationAmount)}
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-white/70 px-4 py-3">
-            <p className="text-xs font-bold opacity-70">כוסה</p>
-            <p className="mt-1 font-black">
-              {formatMoney(coveredFederationAmount)}
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-white/70 px-4 py-3">
-            <p className="text-xs font-bold opacity-70">חסר</p>
-            <p className="mt-1 font-black">
-              {formatMoney(missingFederationAmount)}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {charges.length > 0 ? (
-        <div className="mt-5 overflow-hidden rounded-2xl border border-white/70 bg-white/70">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-right text-sm">
-              <thead>
-                <tr className="border-b border-[#E6DCD5] text-xs font-black">
-                  <th className="px-4 py-3">מקצה</th>
-                  <th className="px-4 py-3">רוכב</th>
-                  <th className="px-4 py-3">סוס</th>
-                  <th className="px-4 py-3">חיוב</th>
-                  <th className="px-4 py-3">כוסה</th>
-                  <th className="px-4 py-3">חסר</th>
-                  <th className="px-4 py-3">סטטוס</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {charges.map(function (charge) {
-                  var billChargeId = getValue(
-                    charge,
-                    "billChargeId",
-                    "BillChargeId",
-                    0,
-                  );
-
-                  var className = getValue(
-                    charge,
-                    "className",
-                    "ClassName",
-                    "-",
-                  );
-
-                  var riderFullName = getValue(
-                    charge,
-                    "riderFullName",
-                    "RiderFullName",
-                    "-",
-                  );
-
-                  var horseName = getValue(
-                    charge,
-                    "horseName",
-                    "HorseName",
-                    "-",
-                  );
-
-                  var chargeAmount = getValue(
-                    charge,
-                    "chargeAmount",
-                    "ChargeAmount",
-                    0,
-                  );
-
-                  var coveredAmount = getValue(
-                    charge,
-                    "coveredAmount",
-                    "CoveredAmount",
-                    0,
-                  );
-
-                  var missingAmount = getValue(
-                    charge,
-                    "missingAmount",
-                    "MissingAmount",
-                    0,
-                  );
-
-                  var rowStatus = getValue(
-                    charge,
-                    "coverageStatus",
-                    "CoverageStatus",
-                    "",
-                  );
-
-                  return (
-                    <tr
-                      key={billChargeId}
-                      className="border-b border-[#EFE7E1] last:border-b-0"
-                    >
-                      <td className="px-4 py-3 font-bold">{className}</td>
-                      <td className="px-4 py-3">{riderFullName}</td>
-                      <td className="px-4 py-3">{horseName}</td>
-                      <td className="px-4 py-3 font-bold">
-                        {formatMoney(chargeAmount)}
-                      </td>
-                      <td className="px-4 py-3 font-bold">
-                        {formatMoney(coveredAmount)}
-                      </td>
-                      <td className="px-4 py-3 font-bold">
-                        {formatMoney(missingAmount)}
-                      </td>
-                      <td className="px-4 py-3 font-black">{rowStatus}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function PaymentsPageContent(props) {
   var layout = props.layout;
   var activeRole = props.activeRole;
@@ -261,6 +39,9 @@ function PaymentsPageContent(props) {
     competitionId: Number(layout.competitionId),
     ranchId: activeRole?.ranchId || null,
   });
+
+  var paymentActionText =
+    page.selectedOwner === "Federation" ? "שייך כיסוי התאחדות" : "הוספת תשלום";
 
   useEffect(
     function () {
@@ -371,9 +152,21 @@ function PaymentsPageContent(props) {
         </div>
       ) : null}
 
+      {page.paymentError ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {page.paymentError}
+        </div>
+      ) : null}
+
       {page.paymentSuccess ? (
         <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
           {page.paymentSuccess}
+        </div>
+      ) : null}
+
+      {page.federationCoverageError ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {page.federationCoverageError}
         </div>
       ) : null}
 
@@ -383,18 +176,13 @@ function PaymentsPageContent(props) {
         </div>
       ) : (
         <>
-          <FederationCoverageCard
-            status={page.federationCoverageStatus}
-            charges={page.federationCharges}
-            validation={page.federationValidation}
-            loading={page.federationCoverageLoading}
-            error={page.federationCoverageError}
-          />
-
           <PayerAccountCards
             items={page.accountSummary}
             activeOwner={page.selectedOwner}
             onSelectOwner={page.selectOwner}
+            federationCoverageStatus={page.federationCoverageStatus}
+            federationValidation={page.federationValidation}
+            federationCoverageLoading={page.federationCoverageLoading}
           />
 
           <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
@@ -437,7 +225,7 @@ function PaymentsPageContent(props) {
                     disabled={page.selectedChargeIds.length === 0}
                     className="rounded-2xl bg-[#8B5E4C] px-6 py-3 font-bold text-white transition-colors hover:bg-[#765041] disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    הוספת תשלום
+                    {paymentActionText}
                   </button>
                 </div>
               </div>
@@ -467,6 +255,38 @@ function PaymentsPageContent(props) {
         error={page.paymentError}
         onClose={page.closePaymentModal}
         onSubmit={page.submitPayment}
+      />
+
+      <FederationCoverageApplyModal
+        open={page.federationApplyModalOpen}
+        selectedChargesCount={page.selectedFederationCharges.length}
+        selectedMissingAmount={page.selectedFederationMissingAmount}
+        credits={page.federationCredits}
+        selectedCredit={page.selectedFederationCredit}
+        searchText={page.federationCreditSearchText}
+        onlyAvailable={page.federationOnlyAvailable}
+        searching={page.federationCreditsSearching}
+        loading={page.federationApplyLoading}
+        error={page.federationApplyError}
+        success={page.federationApplySuccess}
+        manualCreditOpen={page.manualCreditOpen}
+        creatingManualCredit={page.creatingManualCredit}
+        manualCreditForm={page.manualCreditForm}
+        selectedCreditAllocations={page.selectedCreditAllocations}
+        creditAllocationsLoading={page.creditAllocationsLoading}
+        creditAllocationsError={page.creditAllocationsError}
+        allocationsCreditId={page.allocationsCreditId}
+        onClose={page.closeFederationCoverageModal}
+        onSearchTextChange={page.changeFederationCreditSearchText}
+        onOnlyAvailableChange={page.changeFederationOnlyAvailable}
+        onSearch={page.searchFederationCredits}
+        onSelectCredit={page.selectFederationCredit}
+        onSubmit={page.submitFederationCoverageAllocation}
+        onToggleManualCreditForm={page.toggleManualCreditForm}
+        onManualCreditFieldChange={page.updateManualCreditField}
+        onSubmitManualCredit={page.submitManualFederationCredit}
+        onViewAllocations={page.loadFederationCreditAllocations}
+        onClearAllocations={page.clearFederationCreditAllocations}
       />
     </div>
   );

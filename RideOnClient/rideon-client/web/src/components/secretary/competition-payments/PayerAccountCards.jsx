@@ -38,6 +38,114 @@ function findSummary(items, owner) {
   });
 }
 
+function getFederationCoverageInfo(status, validation, loading) {
+  if (loading) {
+    return {
+      label: "בודק כיסוי התאחדות...",
+      description: "מתבצעת בדיקה מול חיובי ההתאחדות של המשלם",
+      className: "border-[#E6DCD5] bg-[#FCFAF8] text-[#7B5A4D]",
+    };
+  }
+
+  if (!status) {
+    return null;
+  }
+
+  var coverageStatus = getValue(status, "coverageStatus", "CoverageStatus", "");
+
+  var missingAmount = getValue(
+    status,
+    "missingFederationAmount",
+    "MissingFederationAmount",
+    0,
+  );
+
+  var coveredAmount = getValue(
+    status,
+    "coveredFederationAmount",
+    "CoveredFederationAmount",
+    0,
+  );
+
+  var totalAmount = getValue(
+    status,
+    "totalFederationAmount",
+    "TotalFederationAmount",
+    0,
+  );
+
+  var message = getValue(validation, "message", "Message", "");
+
+  if (coverageStatus === "מכוסה במלואו") {
+    return {
+      label: "כיסוי התאחדות תקין",
+      description:
+        message || "כל חיובי ההתאחדות מכוסים, ניתן להמשיך לסגירת תשלום מארגן.",
+      className: "border-green-200 bg-green-50 text-green-800",
+    };
+  }
+
+  if (coverageStatus === "כיסוי חלקי") {
+    return {
+      label: "כיסוי התאחדות חלקי",
+      description:
+        "כוסה " +
+        formatMoney(coveredAmount) +
+        " מתוך " +
+        formatMoney(totalAmount) +
+        ". חסר " +
+        formatMoney(missingAmount) +
+        ".",
+      className: "border-amber-200 bg-amber-50 text-amber-800",
+    };
+  }
+
+  if (coverageStatus === "חסר כיסוי") {
+    return {
+      label: "חסר כיסוי התאחדות",
+      description:
+        message ||
+        "חסר " +
+          formatMoney(missingAmount) +
+          ". יש להשלים או לשייך קבלה לפני סגירת תשלום מארגן.",
+      className: "border-red-200 bg-red-50 text-red-800",
+    };
+  }
+
+  if (coverageStatus === "אין חיובי התאחדות") {
+    return {
+      label: "אין חיובי התאחדות",
+      description: "למשלם זה אין חיובי התאחדות פתוחים בתחרות.",
+      className: "border-[#E6DCD5] bg-[#FCFAF8] text-[#7B5A4D]",
+    };
+  }
+
+  return {
+    label: coverageStatus || "סטטוס התאחדות",
+    description: message || "סטטוס כיסוי ההתאחדות של המשלם.",
+    className: "border-[#E6DCD5] bg-[#FCFAF8] text-[#7B5A4D]",
+  };
+}
+
+function FederationCoverageMiniStatus(props) {
+  var info = getFederationCoverageInfo(
+    props.status,
+    props.validation,
+    props.loading,
+  );
+
+  if (!info) {
+    return null;
+  }
+
+  return (
+    <div className={"mt-5 rounded-2xl border px-4 py-3 " + info.className}>
+      <p className="text-sm font-black">{info.label}</p>
+      <p className="mt-1 text-xs font-bold opacity-80">{info.description}</p>
+    </div>
+  );
+}
+
 function AccountCard(props) {
   var item = props.item || {};
   var owner = props.owner;
@@ -98,6 +206,14 @@ function AccountCard(props) {
           </p>
         </div>
       </div>
+
+      {owner === "Federation" ? (
+        <FederationCoverageMiniStatus
+          status={props.federationCoverageStatus}
+          validation={props.federationValidation}
+          loading={props.federationCoverageLoading}
+        />
+      ) : null}
     </button>
   );
 }
@@ -120,6 +236,9 @@ export default function PayerAccountCards(props) {
         item={federation}
         activeOwner={props.activeOwner}
         onSelectOwner={props.onSelectOwner}
+        federationCoverageStatus={props.federationCoverageStatus}
+        federationValidation={props.federationValidation}
+        federationCoverageLoading={props.federationCoverageLoading}
       />
     </div>
   );
