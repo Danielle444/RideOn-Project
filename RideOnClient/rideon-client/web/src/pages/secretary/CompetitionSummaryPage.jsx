@@ -167,9 +167,30 @@ function SummaryPageContent(props) {
         approving={page.federationMatchingApproving}
         error={page.federationMatchingError}
         success={page.federationMatchingSuccess}
+        activeTab={page.federationMatchingActiveTab}
+        manualCreditSearchText={page.manualCreditSearchText}
+        manualCredits={page.manualCredits}
+        manualCreditsLoading={page.manualCreditsLoading}
+        selectedManualCredit={page.selectedManualCredit}
+        manualPayerSearchText={page.manualPayerSearchText}
+        manualPayers={page.manualPayers}
+        manualPayersLoading={page.manualPayersLoading}
+        selectedManualPayer={page.selectedManualPayer}
+        manualFederationCharges={page.manualFederationCharges}
+        manualChargesLoading={page.manualChargesLoading}
+        manualAllocationAmount={page.manualAllocationAmount}
         onClose={page.closeFederationMatchingModal}
         onReload={page.loadFederationMatchingSuggestions}
         onApprove={page.approveFederationMatchingSuggestion}
+        onChangeTab={page.changeFederationMatchingTab}
+        onManualCreditSearchTextChange={page.changeManualCreditSearchText}
+        onSearchManualCredits={page.searchManualFederationCredits}
+        onSelectManualCredit={page.selectManualCredit}
+        onManualPayerSearchTextChange={page.changeManualPayerSearchText}
+        onSearchManualPayers={page.searchManualPayers}
+        onSelectManualPayer={page.selectManualPayer}
+        onManualAllocationAmountChange={page.changeManualAllocationAmount}
+        onApproveManualAllocation={page.approveManualFederationAllocation}
       />
     </div>
   );

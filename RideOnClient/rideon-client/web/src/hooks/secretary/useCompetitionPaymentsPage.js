@@ -162,6 +162,9 @@ export default function useCompetitionPaymentsPage(options) {
     notes: "",
   });
 
+  var [federationCreditStatusFilter, setFederationCreditStatusFilter] =
+    useState("all");
+
   useEffect(
     function () {
       loadPayers();
@@ -253,6 +256,33 @@ export default function useCompetitionPaymentsPage(options) {
       }, 0);
     },
     [selectedFederationCharges],
+  );
+
+  var filteredFederationCredits = useMemo(
+    function () {
+      if (federationCreditStatusFilter === "all") {
+        return federationCredits;
+      }
+
+      return federationCredits.filter(function (credit) {
+        var status = getValue(credit, "creditStatus", "CreditStatus", "");
+
+        if (federationCreditStatusFilter === "available") {
+          return status === "Available";
+        }
+
+        if (federationCreditStatusFilter === "partiallyUsed") {
+          return status === "PartiallyUsed";
+        }
+
+        if (federationCreditStatusFilter === "fullyUsed") {
+          return status === "FullyUsed" || status === "Used";
+        }
+
+        return true;
+      });
+    },
+    [federationCredits, federationCreditStatusFilter],
   );
 
   var visibleSelectableChargeIds = useMemo(
@@ -759,6 +789,10 @@ export default function useCompetitionPaymentsPage(options) {
     });
   }
 
+  function changeFederationCreditStatusFilter(value) {
+    setFederationCreditStatusFilter(value || "all");
+  }
+
   async function submitManualFederationCredit() {
     if (!competitionId || !ranchId) {
       return;
@@ -1036,5 +1070,9 @@ export default function useCompetitionPaymentsPage(options) {
     allocationsCreditId: allocationsCreditId,
     loadFederationCreditAllocations: loadFederationCreditAllocations,
     clearFederationCreditAllocations: clearFederationCreditAllocations,
+
+    filteredFederationCredits: filteredFederationCredits,
+    federationCreditStatusFilter: federationCreditStatusFilter,
+    changeFederationCreditStatusFilter: changeFederationCreditStatusFilter,
   };
 }

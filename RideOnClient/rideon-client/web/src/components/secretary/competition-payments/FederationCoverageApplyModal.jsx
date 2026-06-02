@@ -152,6 +152,35 @@ export default function FederationCoverageApplyModal(props) {
             </div>
           </div>
 
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[
+              { key: "all", label: "הכול" },
+              { key: "available", label: "יתרות זמינות" },
+              { key: "partiallyUsed", label: "נוצל חלקית" },
+              { key: "fullyUsed", label: "נוצל במלואו" },
+            ].map(function (option) {
+              var active = props.creditStatusFilter === option.key;
+
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={function () {
+                    props.onCreditStatusFilterChange(option.key);
+                  }}
+                  className={
+                    "rounded-full border px-4 py-2 text-xs font-black transition-colors " +
+                    (active
+                      ? "border-[#8B5E4C] bg-[#FCF8F5] text-[#3F312B]"
+                      : "border-[#D8CBC3] bg-white text-[#7B5A4D] hover:bg-[#FCFAF8]")
+                  }
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="mt-5 rounded-2xl border border-[#E6DCD5] bg-[#FCFAF8] p-4">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div>

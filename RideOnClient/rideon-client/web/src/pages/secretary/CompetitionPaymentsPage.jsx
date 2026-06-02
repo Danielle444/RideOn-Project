@@ -261,7 +261,7 @@ function PaymentsPageContent(props) {
         open={page.federationApplyModalOpen}
         selectedChargesCount={page.selectedFederationCharges.length}
         selectedMissingAmount={page.selectedFederationMissingAmount}
-        credits={page.federationCredits}
+        credits={page.filteredFederationCredits}
         selectedCredit={page.selectedFederationCredit}
         searchText={page.federationCreditSearchText}
         onlyAvailable={page.federationOnlyAvailable}
@@ -287,6 +287,8 @@ function PaymentsPageContent(props) {
         onSubmitManualCredit={page.submitManualFederationCredit}
         onViewAllocations={page.loadFederationCreditAllocations}
         onClearAllocations={page.clearFederationCreditAllocations}
+        creditStatusFilter={page.federationCreditStatusFilter}
+        onCreditStatusFilterChange={page.changeFederationCreditStatusFilter}
       />
     </div>
   );
