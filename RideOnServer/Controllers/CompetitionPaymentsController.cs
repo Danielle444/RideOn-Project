@@ -599,6 +599,86 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("federation/matching-suggestions")]
+        public IActionResult GetFederationMatchingSuggestions(
+    [FromQuery] int competitionId,
+    [FromQuery] int ranchId)
+        {
+            try
+            {
+                ValidateHostSecretaryCompetitionAccess(
+                    competitionId,
+                    ranchId
+                );
+
+                List<FederationMatchingSuggestionItem> items =
+                    CompetitionPayment.GetFederationMatchingSuggestions(
+                        competitionId,
+                        ranchId
+                    );
+
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ex.Message
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in GetFederationMatchingSuggestions: {ex.Message}"
+                );
+
+                return BadRequest(
+                    "אירעה שגיאה בשליפת הצעות התאמת קבלות התאחדות"
+                );
+            }
+        }
+
+        [HttpPost("federation/matching-suggestions/approve")]
+        public IActionResult ApproveFederationMatchingSuggestion(
+    [FromBody] ApproveFederationMatchingSuggestionRequest request)
+        {
+            try
+            {
+                ValidateHostSecretaryCompetitionAccess(
+                    request.CompetitionId,
+                    request.RanchId
+                );
+
+                int personId =
+                    UserAccessValidator.GetPersonIdFromClaims(User);
+
+                ApproveFederationMatchingSuggestionResponse response =
+                    CompetitionPayment.ApproveFederationMatchingSuggestion(
+                        request,
+                        personId
+                    );
+
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ex.Message
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in ApproveFederationMatchingSuggestion: {ex.Message}"
+                );
+
+                return BadRequest(
+                    ex.Message
+                );
+            }
+        }
+
         private void ValidateHostSecretaryCompetitionAccess(
             int competitionId,
             int ranchId)

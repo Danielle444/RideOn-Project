@@ -224,6 +224,27 @@ function importFederationCreditsFromExcel(competitionId, ranchId, file) {
   );
 }
 
+function getFederationMatchingSuggestions(competitionId, ranchId) {
+  return axios.get(
+    `${API}/CompetitionPayments/federation/matching-suggestions`,
+    {
+      params: {
+        competitionId: competitionId,
+        ranchId: ranchId,
+      },
+      ...getAuthHeaders(),
+    },
+  );
+}
+
+function approveFederationMatchingSuggestion(data) {
+  return axios.post(
+    `${API}/CompetitionPayments/federation/matching-suggestions/approve`,
+    data,
+    getAuthHeaders(),
+  );
+}
+
 export {
   getCompetitionPaymentPayers,
   getCompetitionPayerAccountSummary,
@@ -239,4 +260,6 @@ export {
   allocateFederationCreditToCharge,
   getFederationCreditAllocations,
   importFederationCreditsFromExcel,
+  getFederationMatchingSuggestions,
+  approveFederationMatchingSuggestion,
 };

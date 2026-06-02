@@ -136,7 +136,7 @@ export default function CompetitionSummarySection(props) {
 
   return (
     <section className="rounded-[28px] border border-[#E6DCD5] bg-white p-8 shadow-sm">
-      <div className="mb-7 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_260px]">
+      <div className="mb-7 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_260px_220px]">
         <div>
           <h2 className="text-3xl font-black text-[#3F312B]">{props.title}</h2>
 
@@ -177,6 +177,17 @@ export default function CompetitionSummarySection(props) {
               {props.actionLoading ? "מעלה..." : "העלאת חשבוניות"}
             </button>
           </div>
+        ) : null}
+
+        {props.secondaryActionLabel ? (
+          <button
+            type="button"
+            onClick={props.onSecondaryActionClick}
+            disabled={props.actionLoading}
+            className="flex h-16 items-center justify-center gap-3 rounded-2xl border border-[#8B5E4C] bg-white px-6 text-lg font-bold text-[#6D4C41] transition-colors hover:bg-[#FCF8F5] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {props.secondaryActionLabel}
+          </button>
         ) : null}
       </div>
 
