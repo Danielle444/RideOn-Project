@@ -101,9 +101,14 @@ function SummaryPageContent(props) {
             totals={page.summary.federation}
             categories={page.summary.federationCategories}
             actionType="invoice"
+            actionLoading={page.federationInvoiceImporting}
+            actionError={page.federationInvoiceImportError}
+            actionSuccess={page.federationInvoiceImportSuccess}
+            invoiceImportResult={page.federationInvoiceImportResult}
             showQuantity={true}
             quantity={federationQuantity}
             showCategoriesTable={false}
+            onInvoiceFileSelected={page.importFederationInvoices}
             onExpectedAmountClick={page.openFederationClassesDetails}
           />
         </>

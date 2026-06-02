@@ -11,7 +11,6 @@ import {
   getFederationCoverageStatusForPayer,
   getFederationChargesForPayer,
   getFederationCreditAllocations,
-  importFederationCreditsFromExcel,
   searchFederationExternalCredits,
   validateFederationCoverageBeforeOrganizerPayment,
 } from "../../services/competitionPaymentsService";
@@ -144,12 +143,6 @@ export default function useCompetitionPaymentsPage(options) {
   var [federationApplyLoading, setFederationApplyLoading] = useState(false);
   var [federationApplyError, setFederationApplyError] = useState("");
   var [federationApplySuccess, setFederationApplySuccess] = useState("");
-
-  var [selectedFederationExcelFile, setSelectedFederationExcelFile] =
-    useState(null);
-  var [importingFederationExcel, setImportingFederationExcel] = useState(false);
-  var [federationExcelImportResult, setFederationExcelImportResult] =
-    useState(null);
 
   var [selectedCreditAllocations, setSelectedCreditAllocations] = useState([]);
   var [creditAllocationsLoading, setCreditAllocationsLoading] = useState(false);
@@ -364,52 +357,6 @@ export default function useCompetitionPaymentsPage(options) {
       setFederationValidation(null);
     } finally {
       setFederationCoverageLoading(false);
-    }
-  }
-
-  function changeFederationExcelFile(file) {
-    setSelectedFederationExcelFile(file || null);
-    setFederationExcelImportResult(null);
-    setFederationApplyError("");
-    setFederationApplySuccess("");
-  }
-
-  async function submitFederationExcelImport() {
-    if (!competitionId || !ranchId) {
-      return;
-    }
-
-    if (!selectedFederationExcelFile) {
-      setFederationApplyError("יש לבחור קובץ אקסל לייבוא");
-      return;
-    }
-
-    try {
-      setImportingFederationExcel(true);
-      setFederationApplyError("");
-      setFederationApplySuccess("");
-      setFederationExcelImportResult(null);
-
-      var response = await importFederationCreditsFromExcel(
-        competitionId,
-        ranchId,
-        selectedFederationExcelFile,
-      );
-
-      var result = response.data || null;
-
-      setFederationExcelImportResult(result);
-      setFederationApplySuccess("ייבוא אקסל התאחדות הסתיים בהצלחה");
-
-      await searchFederationCredits();
-    } catch (error) {
-      console.error(error);
-      setFederationApplyError(
-        getErrorMessage(error, "שגיאה בייבוא אקסל התאחדות"),
-      );
-      setFederationExcelImportResult(null);
-    } finally {
-      setImportingFederationExcel(false);
     }
   }
 
@@ -709,11 +656,7 @@ export default function useCompetitionPaymentsPage(options) {
   }
 
   function closeFederationCoverageModal() {
-    if (
-      federationApplyLoading ||
-      creatingManualCredit ||
-      importingFederationExcel
-    ) {
+    if (federationApplyLoading || creatingManualCredit) {
       return;
     }
 
@@ -724,8 +667,6 @@ export default function useCompetitionPaymentsPage(options) {
     setManualCreditOpen(false);
     resetManualCreditForm();
     clearFederationCreditAllocations();
-    setSelectedFederationExcelFile(null);
-    setFederationExcelImportResult(null);
   }
 
   function changeFederationCreditSearchText(value) {
@@ -1095,11 +1036,5 @@ export default function useCompetitionPaymentsPage(options) {
     allocationsCreditId: allocationsCreditId,
     loadFederationCreditAllocations: loadFederationCreditAllocations,
     clearFederationCreditAllocations: clearFederationCreditAllocations,
-
-    selectedFederationExcelFile: selectedFederationExcelFile,
-    importingFederationExcel: importingFederationExcel,
-    federationExcelImportResult: federationExcelImportResult,
-    changeFederationExcelFile: changeFederationExcelFile,
-    submitFederationExcelImport: submitFederationExcelImport,
   };
 }

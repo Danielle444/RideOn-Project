@@ -276,9 +276,6 @@ function PaymentsPageContent(props) {
         creditAllocationsLoading={page.creditAllocationsLoading}
         creditAllocationsError={page.creditAllocationsError}
         allocationsCreditId={page.allocationsCreditId}
-        selectedExcelFile={page.selectedFederationExcelFile}
-        importingExcel={page.importingFederationExcel}
-        excelImportResult={page.federationExcelImportResult}
         onClose={page.closeFederationCoverageModal}
         onSearchTextChange={page.changeFederationCreditSearchText}
         onOnlyAvailableChange={page.changeFederationOnlyAvailable}
@@ -290,8 +287,6 @@ function PaymentsPageContent(props) {
         onSubmitManualCredit={page.submitManualFederationCredit}
         onViewAllocations={page.loadFederationCreditAllocations}
         onClearAllocations={page.clearFederationCreditAllocations}
-        onExcelFileChange={page.changeFederationExcelFile}
-        onSubmitExcelImport={page.submitFederationExcelImport}
       />
     </div>
   );
