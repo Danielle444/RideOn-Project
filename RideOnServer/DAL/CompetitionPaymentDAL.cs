@@ -1261,6 +1261,223 @@ namespace RideOnServer.DAL
             }
         }
 
+        public List<FederationMatchingSuggestionItem> GetFederationMatchingSuggestions(
+    int competitionId)
+        {
+            List<FederationMatchingSuggestionItem> items =
+                new List<FederationMatchingSuggestionItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getfederationmatchingsuggestions(
+                        @competitionId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add(
+                            "@competitionId",
+                            NpgsqlDbType.Integer
+                        ).Value = competitionId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new FederationMatchingSuggestionItem
+                                    {
+                                        FederationExternalCreditId = GetInt(
+                                            reader,
+                                            "FederationExternalCreditId"
+                                        ),
+
+                                        CompetitionId = GetInt(
+                                            reader,
+                                            "CompetitionId"
+                                        ),
+
+                                        SourceType = GetString(
+                                            reader,
+                                            "SourceType"
+                                        ),
+
+                                        ExternalReference = GetNullableString(
+                                            reader,
+                                            "ExternalReference"
+                                        ),
+
+                                        ExternalName = GetNullableString(
+                                            reader,
+                                            "ExternalName"
+                                        ),
+
+                                        ExternalClubName = GetNullableString(
+                                            reader,
+                                            "ExternalClubName"
+                                        ),
+
+                                        ExternalIdNumber = GetNullableString(
+                                            reader,
+                                            "ExternalIdNumber"
+                                        ),
+
+                                        OriginalAmount = GetDecimal(
+                                            reader,
+                                            "OriginalAmount"
+                                        ),
+
+                                        UsedAmount = GetDecimal(
+                                            reader,
+                                            "UsedAmount"
+                                        ),
+
+                                        AvailableAmount = GetDecimal(
+                                            reader,
+                                            "AvailableAmount"
+                                        ),
+
+                                        CreditStatus = GetString(
+                                            reader,
+                                            "CreditStatus"
+                                        ),
+
+                                        PaidByPersonId = GetInt(
+                                            reader,
+                                            "PaidByPersonId"
+                                        ),
+
+                                        PayerFullName = GetString(
+                                            reader,
+                                            "PayerFullName"
+                                        ),
+
+                                        TotalFederationAmount = GetDecimal(
+                                            reader,
+                                            "TotalFederationAmount"
+                                        ),
+
+                                        CoveredFederationAmount = GetDecimal(
+                                            reader,
+                                            "CoveredFederationAmount"
+                                        ),
+
+                                        MissingFederationAmount = GetDecimal(
+                                            reader,
+                                            "MissingFederationAmount"
+                                        ),
+
+                                        SuggestedAllocatedAmount = GetDecimal(
+                                            reader,
+                                            "SuggestedAllocatedAmount"
+                                        ),
+
+                                        MatchScore = GetInt(
+                                            reader,
+                                            "MatchScore"
+                                        ),
+
+                                        ConfidenceLevel = GetString(
+                                            reader,
+                                            "ConfidenceLevel"
+                                        ),
+
+                                        MatchReason = GetString(
+                                            reader,
+                                            "MatchReason"
+                                        )
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public ApproveFederationMatchingSuggestionResponse ApproveFederationMatchingSuggestion(
+    ApproveFederationMatchingSuggestionRequest request,
+    int approvedBySystemUserId)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_approvefederationmatchingsuggestion(
+                        @competitionId,
+                        @federationExternalCreditId,
+                        @paidByPersonId,
+                        @amount,
+                        @approvedBySystemUserId,
+                        @notes
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = request.CompetitionId;
+
+                        command.Parameters.Add("@federationExternalCreditId", NpgsqlDbType.Integer)
+                            .Value = request.FederationExternalCreditId;
+
+                        command.Parameters.Add("@paidByPersonId", NpgsqlDbType.Integer)
+                            .Value = request.PaidByPersonId;
+
+                        command.Parameters.Add("@amount", NpgsqlDbType.Numeric)
+                            .Value = request.Amount;
+
+                        command.Parameters.Add("@approvedBySystemUserId", NpgsqlDbType.Integer)
+                            .Value = approvedBySystemUserId;
+
+                        command.Parameters.Add("@notes", NpgsqlDbType.Text)
+                            .Value = request.Notes == null ? DBNull.Value : request.Notes;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                return new ApproveFederationMatchingSuggestionResponse
+                                {
+                                    ApprovedAmount = GetDecimal(reader, "approvedamount"),
+                                    AllocationsCount = GetInt(reader, "allocationscount"),
+                                    RemainingCreditAmount = GetDecimal(reader, "remainingcreditamount"),
+                                    Message = GetString(reader, "message")
+                                };
+                            }
+                        }
+                    }
+                }
+
+                throw new Exception("No response returned from approval function");
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
         private static int GetInt(
             NpgsqlDataReader reader,
             string columnName)

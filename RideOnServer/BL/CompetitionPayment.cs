@@ -818,6 +818,60 @@ namespace RideOnServer.BL
             }
         }
 
+        public static List<FederationMatchingSuggestionItem>
+    GetFederationMatchingSuggestions(
+        int competitionId,
+        int ranchId)
+        {
+            ValidateCompetitionAndRanch(
+                competitionId,
+                ranchId
+            );
+
+            CompetitionPaymentDAL dal = new CompetitionPaymentDAL();
+
+            return dal.GetFederationMatchingSuggestions(
+                competitionId
+            );
+        }
+
+        public static ApproveFederationMatchingSuggestionResponse ApproveFederationMatchingSuggestion(
+    ApproveFederationMatchingSuggestionRequest request,
+    int approvedBySystemUserId)
+        {
+            ValidateCompetitionAndRanch(
+                request.CompetitionId,
+                request.RanchId
+            );
+
+            if (request.FederationExternalCreditId <= 0)
+            {
+                throw new Exception("Invalid FederationExternalCreditId");
+            }
+
+            if (request.PaidByPersonId <= 0)
+            {
+                throw new Exception("Invalid PaidByPersonId");
+            }
+
+            if (request.Amount <= 0)
+            {
+                throw new Exception("Amount must be greater than zero");
+            }
+
+            if (approvedBySystemUserId <= 0)
+            {
+                throw new Exception("Invalid approved user");
+            }
+
+            CompetitionPaymentDAL dal = new CompetitionPaymentDAL();
+
+            return dal.ApproveFederationMatchingSuggestion(
+                request,
+                approvedBySystemUserId
+            );
+        }
+
         private static string NormalizeForFingerprint(
             string? value)
         {

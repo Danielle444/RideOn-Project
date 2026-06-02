@@ -7,6 +7,7 @@ import CashDeskModal from "../../components/secretary/competition-summary/CashDe
 import { getCompetitionById } from "../../services/competitionService";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import useCompetitionSummaryPage from "../../hooks/secretary/useCompetitionSummaryPage";
+import FederationMatchingSuggestionsModal from "../../components/secretary/competition-summary/FederationMatchingSuggestionsModal";
 
 function SummaryPageContent(props) {
   var layout = props.layout;
@@ -109,6 +110,8 @@ function SummaryPageContent(props) {
             quantity={federationQuantity}
             showCategoriesTable={false}
             onInvoiceFileSelected={page.importFederationInvoices}
+            onSecondaryActionClick={page.openFederationMatchingModal}
+            secondaryActionLabel="התאמת קבלות"
             onExpectedAmountClick={page.openFederationClassesDetails}
           />
         </>
@@ -155,6 +158,18 @@ function SummaryPageContent(props) {
         onClose={page.closeCashDesk}
         onSaveCount={page.saveCashCount}
         onSaveSafeTransfer={page.saveCashSafeTransfer}
+      />
+
+      <FederationMatchingSuggestionsModal
+        open={page.federationMatchingOpen}
+        items={page.federationMatchingItems}
+        loading={page.federationMatchingLoading}
+        approving={page.federationMatchingApproving}
+        error={page.federationMatchingError}
+        success={page.federationMatchingSuccess}
+        onClose={page.closeFederationMatchingModal}
+        onReload={page.loadFederationMatchingSuggestions}
+        onApprove={page.approveFederationMatchingSuggestion}
       />
     </div>
   );
