@@ -8,7 +8,7 @@ namespace RideOnServer.DAL
     {
         public List<Competition> GetCompetitionsByHostRanch(CompetitionFiltersRequest filters)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
                 { "@RanchId", filters.RanchId },
                 { "@SearchText", filters.SearchText },
@@ -46,7 +46,7 @@ namespace RideOnServer.DAL
 
         public Competition? GetCompetitionById(int competitionId)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
                 { "@CompetitionId", competitionId }
             };
@@ -77,7 +77,7 @@ namespace RideOnServer.DAL
 
         public int InsertCompetition(Competition competition)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
                 { "@HostRanchId", competition.HostRanchId },
                 { "@FieldId", competition.FieldId },
@@ -85,12 +85,12 @@ namespace RideOnServer.DAL
                 { "@CompetitionName", competition.CompetitionName },
                 { "@CompetitionStartDate", competition.CompetitionStartDate.Date },
                 { "@CompetitionEndDate", competition.CompetitionEndDate.Date },
-                { "@RegistrationOpenDate", competition.RegistrationOpenDate?.Date ?? (object)DBNull.Value },
-                { "@RegistrationEndDate", competition.RegistrationEndDate?.Date ?? (object)DBNull.Value },
-                { "@PaidTimeRegistrationDate", competition.PaidTimeRegistrationDate?.Date ?? (object)DBNull.Value },
-                { "@PaidTimePublicationDate", competition.PaidTimePublicationDate?.Date ?? (object)DBNull.Value },
-                { "@CompetitionStatus", competition.CompetitionStatus ?? (object)DBNull.Value },
-                { "@Notes", competition.Notes ?? (object)DBNull.Value }
+                { "@RegistrationOpenDate", competition.RegistrationOpenDate?.Date },
+                { "@RegistrationEndDate", competition.RegistrationEndDate?.Date },
+                { "@PaidTimeRegistrationDate", competition.PaidTimeRegistrationDate?.Date },
+                { "@PaidTimePublicationDate", competition.PaidTimePublicationDate?.Date },
+                { "@CompetitionStatus", competition.CompetitionStatus },
+                { "@Notes", competition.Notes }
             };
 
             try
@@ -114,19 +114,19 @@ namespace RideOnServer.DAL
 
         public void UpdateCompetition(Competition competition)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
                 { "@CompetitionId", competition.CompetitionId },
                 { "@FieldId", competition.FieldId },
                 { "@CompetitionName", competition.CompetitionName },
                 { "@CompetitionStartDate", competition.CompetitionStartDate.Date },
                 { "@CompetitionEndDate", competition.CompetitionEndDate.Date },
-                { "@RegistrationOpenDate", competition.RegistrationOpenDate?.Date ?? (object)DBNull.Value },
-                { "@RegistrationEndDate", competition.RegistrationEndDate?.Date ?? (object)DBNull.Value },
-                { "@PaidTimeRegistrationDate", competition.PaidTimeRegistrationDate?.Date ?? (object)DBNull.Value },
-                { "@PaidTimePublicationDate", competition.PaidTimePublicationDate?.Date ?? (object)DBNull.Value },
-                { "@CompetitionStatus", competition.CompetitionStatus ?? (object)DBNull.Value },
-                { "@Notes", competition.Notes ?? (object)DBNull.Value }
+                { "@RegistrationOpenDate", competition.RegistrationOpenDate?.Date },
+                { "@RegistrationEndDate", competition.RegistrationEndDate?.Date },
+                { "@PaidTimeRegistrationDate", competition.PaidTimeRegistrationDate?.Date },
+                { "@PaidTimePublicationDate", competition.PaidTimePublicationDate?.Date },
+                { "@CompetitionStatus", competition.CompetitionStatus },
+                { "@Notes", competition.Notes }
             };
 
             try
@@ -177,7 +177,7 @@ namespace RideOnServer.DAL
 
         public List<Competition> GetCompetitionsForMobileWorker(int ranchId)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
                 { "@RanchId", ranchId }
             };
@@ -210,7 +210,7 @@ namespace RideOnServer.DAL
 
         public List<Competition> GetCompetitionsForMobilePayer(int personId)
         {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
                 { "@PersonId", personId }
             };
@@ -232,6 +232,136 @@ namespace RideOnServer.DAL
                         }
 
                         return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public List<Competition> GetCompetitionsForMobileAdminHome(int systemUserId)
+        {
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@SystemUserId", systemUserId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetMobileAdminHomeCompetitions", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<Competition> list = new List<Competition>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(MapCompetition(reader));
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public List<string> GetJudgeNamesByCompetitionId(int competitionId)
+        {
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@CompetitionId", competitionId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetJudgesByCompetitionId", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<string> list = new List<string>();
+
+                        while (reader.Read())
+                        {
+                            string fullName =
+                                ((reader["FirstNameHebrew"] == DBNull.Value ? "" : reader["FirstNameHebrew"].ToString()) + " " +
+                                 (reader["LastNameHebrew"] == DBNull.Value ? "" : reader["LastNameHebrew"].ToString())).Trim();
+
+                            if (!string.IsNullOrWhiteSpace(fullName))
+                            {
+                                list.Add(fullName);
+                            }
+                        }
+
+                        return list.Distinct().ToList();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public DuplicateCompetitionResponse DuplicateCompetition(
+            DuplicateCompetitionRequest request,
+            int createdBySystemUserId)
+        {
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@SourceCompetitionId", request.SourceCompetitionId },
+                { "@CreatedBySystemUserId", createdBySystemUserId },
+                { "@NewCompetitionName", request.NewCompetitionName },
+                { "@NewCompetitionStartDate", request.NewCompetitionStartDate.Date },
+                { "@NewCompetitionEndDate", request.NewCompetitionEndDate.Date },
+                { "@RegistrationOpenDate", request.RegistrationOpenDate?.Date },
+                { "@RegistrationEndDate", request.RegistrationEndDate?.Date },
+                { "@PaidTimeRegistrationDate", request.PaidTimeRegistrationDate?.Date },
+                { "@PaidTimePublicationDate", request.PaidTimePublicationDate?.Date },
+                { "@Notes", string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim() },
+                { "@CopyClasses", request.CopyClasses },
+                { "@CopyClassPrices", request.CopyClassPrices },
+                { "@CopyClassPrizes", request.CopyClassPrizes },
+                { "@CopyReiningPatterns", request.CopyReiningPatterns },
+                { "@ClassJudgeIds", request.ClassJudgeIds == null ? Array.Empty<int>() : request.ClassJudgeIds.ToArray() },
+                { "@CopyPaidTimeSlots", request.CopyPaidTimeSlots }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_DuplicateCompetition", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return new DuplicateCompetitionResponse
+                            {
+                                NewCompetitionId = Convert.ToInt32(reader["NewCompetitionId"]),
+                                CopiedClassesCount = Convert.ToInt32(reader["CopiedClassesCount"]),
+                                CopiedClassPrizesCount = Convert.ToInt32(reader["CopiedClassPrizesCount"]),
+                                CopiedReiningPatternsCount = Convert.ToInt32(reader["CopiedReiningPatternsCount"]),
+                                CopiedClassJudgesCount = Convert.ToInt32(reader["CopiedClassJudgesCount"]),
+                                CopiedPaidTimeSlotsCount = Convert.ToInt32(reader["CopiedPaidTimeSlotsCount"]),
+                                Message = reader["Message"].ToString() ?? string.Empty
+                            };
+                        }
+
+                        throw new Exception("Duplicate competition did not return a result");
                     }
                 }
             }
@@ -294,81 +424,5 @@ namespace RideOnServer.DAL
 
             return false;
         }
-
-
-        public List<Competition> GetCompetitionsForMobileAdminHome(int systemUserId)
-        {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
-            {
-                { "@SystemUserId", systemUserId }
-            };
-
-            try
-            {
-                using (NpgsqlConnection connection = Connect("DefaultConnection"))
-                {
-                    connection.Open();
-
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetMobileAdminHomeCompetitions", connection, paramDic))
-                    using (NpgsqlDataReader reader = command.ExecuteReader())
-                    {
-                        List<Competition> list = new List<Competition>();
-
-                        while (reader.Read())
-                        {
-                            list.Add(MapCompetition(reader));
-                        }
-
-                        return list;
-                    }
-                }
-            }
-            catch (NpgsqlException ex)
-            {
-                throw new Exception($"Database error: {ex.Message}");
-            }
-        }
-
-        public List<string> GetJudgeNamesByCompetitionId(int competitionId)
-        {
-            Dictionary<string, object> paramDic = new Dictionary<string, object>
-            {
-                { "@CompetitionId", competitionId }
-            };
-
-            try
-            {
-                using (NpgsqlConnection connection = Connect("DefaultConnection"))
-                {
-                    connection.Open();
-
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetJudgesByCompetitionId", connection, paramDic))
-                    using (NpgsqlDataReader reader = command.ExecuteReader())
-                    {
-                        List<string> list = new List<string>();
-
-                        while (reader.Read())
-                        {
-                            string fullName =
-                                ((reader["FirstNameHebrew"] == DBNull.Value ? "" : reader["FirstNameHebrew"].ToString()) + " " +
-                                 (reader["LastNameHebrew"] == DBNull.Value ? "" : reader["LastNameHebrew"].ToString())).Trim();
-
-                            if (!string.IsNullOrWhiteSpace(fullName))
-                            {
-                                list.Add(fullName);
-                            }
-                        }
-
-                        return list.Distinct().ToList();
-                    }
-                }
-            }
-            catch (NpgsqlException ex)
-            {
-                throw new Exception($"Database error: {ex.Message}");
-            }
-        }
-
-
     }
 }

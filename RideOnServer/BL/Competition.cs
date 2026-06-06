@@ -194,6 +194,81 @@ namespace RideOnServer.BL
                 .ToList();
         }
 
+        internal static List<Competition> GetCompetitionsForMobileAdminHome(int systemUserId)
+        {
+            if (systemUserId <= 0)
+            {
+                throw new Exception("SystemUserId is invalid");
+            }
+
+            CompetitionDAL dal = new CompetitionDAL();
+            List<Competition> list = dal.GetCompetitionsForMobileAdminHome(systemUserId);
+
+            foreach (Competition item in list)
+            {
+                item.CompetitionStatus = CalculateEffectiveStatus(item);
+            }
+
+            return list
+                .Where(item => item.CompetitionStatus != CompetitionStatuses.Draft)
+                .OrderBy(item => item.CompetitionStartDate)
+                .Take(2)
+                .ToList();
+        }
+
+        internal static DuplicateCompetitionResponse DuplicateCompetition(
+            DuplicateCompetitionRequest request,
+            int createdBySystemUserId)
+        {
+            if (request == null)
+            {
+                throw new Exception("Invalid request");
+            }
+
+            if (request.SourceCompetitionId <= 0)
+            {
+                throw new Exception("SourceCompetitionId is invalid");
+            }
+
+            if (request.HostRanchId <= 0)
+            {
+                throw new Exception("HostRanchId is invalid");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.NewCompetitionName))
+            {
+                throw new Exception("Competition name is required");
+            }
+
+            if (request.NewCompetitionEndDate < request.NewCompetitionStartDate)
+            {
+                throw new Exception("Competition end date cannot be earlier than start date");
+            }
+
+            if (request.RegistrationOpenDate.HasValue &&
+                request.RegistrationEndDate.HasValue &&
+                request.RegistrationEndDate.Value < request.RegistrationOpenDate.Value)
+            {
+                throw new Exception("Registration end date cannot be earlier than registration open date");
+            }
+
+            if (request.CopyClasses)
+            {
+                if (request.ClassJudgeIds == null || request.ClassJudgeIds.Count == 0)
+                {
+                    throw new Exception("יש לבחור לפחות שופט אחד לשכפול מקצים");
+                }
+
+                if (request.ClassJudgeIds.Any(judgeId => judgeId <= 0))
+                {
+                    throw new Exception("רשימת השופטים אינה תקינה");
+                }
+            }
+
+            CompetitionDAL dal = new CompetitionDAL();
+            return dal.DuplicateCompetition(request, createdBySystemUserId);
+        }
+
         private static void ValidateCompetitionRequest(
             string competitionName,
             byte fieldId,
@@ -293,29 +368,5 @@ namespace RideOnServer.BL
 
             return CompetitionStatuses.Future;
         }
-
-        internal static List<Competition> GetCompetitionsForMobileAdminHome(int systemUserId)
-        {
-            if (systemUserId <= 0)
-            {
-                throw new Exception("SystemUserId is invalid");
-            }
-
-            CompetitionDAL dal = new CompetitionDAL();
-            List<Competition> list = dal.GetCompetitionsForMobileAdminHome(systemUserId);
-
-            foreach (Competition item in list)
-            {
-                item.CompetitionStatus = CalculateEffectiveStatus(item);
-            }
-
-            return list
-                .Where(item => item.CompetitionStatus != CompetitionStatuses.Draft)
-                .OrderBy(item => item.CompetitionStartDate)
-                .Take(2)
-                .ToList();
-        }
-
-
     }
 }

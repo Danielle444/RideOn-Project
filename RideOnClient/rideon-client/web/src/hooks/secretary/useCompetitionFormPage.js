@@ -3,6 +3,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import useCompetitionDetailsStep from "./useCompetitionDetailsStep";
 import useCompetitionClassesStep from "./useCompetitionClassesStep";
 import useCompetitionPaidTimeStep from "./useCompetitionPaidTimeStep";
+import {
+  getCompetitionsByHostRanch,
+  duplicateCompetition,
+} from "../../services/competitionService";
+import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function useCompetitionFormPage(options) {
   var navigate = useNavigate();
@@ -20,6 +25,14 @@ export default function useCompetitionFormPage(options) {
     type: "success",
     message: "",
   });
+
+  var [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+  var [duplicateSourceCompetitions, setDuplicateSourceCompetitions] = useState(
+    [],
+  );
+  var [loadingDuplicateSources, setLoadingDuplicateSources] = useState(false);
+  var [savingDuplicate, setSavingDuplicate] = useState(false);
+  var [duplicateError, setDuplicateError] = useState("");
 
   function showToast(type, message) {
     setToast({
@@ -167,6 +180,88 @@ export default function useCompetitionFormPage(options) {
     showToast("info", "ניתן לחזור ולהגדיר פייד־טיים בהמשך");
   }
 
+  async function openDuplicateModal() {
+    if (isEdit || details.competitionId) {
+      return;
+    }
+
+    if (!currentRanchId) {
+      showToast("error", "לא נבחרה חווה פעילה");
+      return;
+    }
+
+    if (!details.detailsForm.fieldId) {
+      showToast("error", "יש לבחור ענף לפני שכפול תחרות");
+      setActiveStep("details");
+      return;
+    }
+
+    try {
+      setDuplicateError("");
+      setLoadingDuplicateSources(true);
+      setDuplicateModalOpen(true);
+
+      var response = await getCompetitionsByHostRanch({
+        ranchId: currentRanchId,
+        searchText: null,
+        status: null,
+        fieldId: details.detailsForm.fieldId,
+        dateFrom: null,
+        dateTo: null,
+      });
+
+      var items = Array.isArray(response.data) ? response.data : [];
+      var filteredItems = items.filter(function (item) {
+        return String(item.fieldId) === String(details.detailsForm.fieldId);
+      });
+
+      setDuplicateSourceCompetitions(filteredItems);
+    } catch (error) {
+      console.error(error);
+      setDuplicateSourceCompetitions([]);
+      setDuplicateError(
+        getErrorMessage(error, "שגיאה בטעינת תחרויות מקור לשכפול"),
+      );
+    } finally {
+      setLoadingDuplicateSources(false);
+    }
+  }
+
+  function closeDuplicateModal() {
+    if (savingDuplicate) {
+      return;
+    }
+
+    setDuplicateModalOpen(false);
+    setDuplicateError("");
+  }
+
+  async function handleDuplicateCompetition(payload) {
+    try {
+      setSavingDuplicate(true);
+      setDuplicateError("");
+
+      var response = await duplicateCompetition(payload);
+      var newCompetitionId = response.data?.newCompetitionId;
+
+      if (!newCompetitionId) {
+        throw new Error("לא התקבל מזהה לתחרות החדשה");
+      }
+
+      showToast("success", "התחרות שוכפלה בהצלחה");
+      setDuplicateModalOpen(false);
+
+      navigate("/competitions/" + newCompetitionId + "/edit", {
+        replace: true,
+      });
+    } catch (error) {
+      console.error(error);
+      setDuplicateError(getErrorMessage(error, "שגיאה בשכפול התחרות"));
+    } finally {
+      setSavingDuplicate(false);
+    }
+  }
+
   return {
     navigate,
     toast,
@@ -221,5 +316,13 @@ export default function useCompetitionFormPage(options) {
     handleDeletePaidTime: paidTime.handleDeletePaidTime,
     shouldShowPaidTimeStep: shouldShowPaidTimeStep,
     handleSkipPaidTimeStep: handleSkipPaidTimeStep,
+    duplicateModalOpen: duplicateModalOpen,
+    duplicateSourceCompetitions: duplicateSourceCompetitions,
+    loadingDuplicateSources: loadingDuplicateSources,
+    savingDuplicate: savingDuplicate,
+    duplicateError: duplicateError,
+    openDuplicateModal: openDuplicateModal,
+    closeDuplicateModal: closeDuplicateModal,
+    handleDuplicateCompetition: handleDuplicateCompetition,
   };
 }
