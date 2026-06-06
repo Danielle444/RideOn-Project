@@ -20,13 +20,14 @@ export default function useCompetitionFormPage(options) {
     : null;
 
   var [activeStep, setActiveStep] = useState("details");
+  var [creationMode, setCreationMode] = useState("manual");
+
   var [toast, setToast] = useState({
     isOpen: false,
     type: "success",
     message: "",
   });
 
-  var [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   var [duplicateSourceCompetitions, setDuplicateSourceCompetitions] = useState(
     [],
   );
@@ -141,6 +142,67 @@ export default function useCompetitionFormPage(options) {
     ],
   );
 
+  useEffect(
+    function () {
+      if (isEdit) {
+        return;
+      }
+
+      if (creationMode !== "duplicate") {
+        return;
+      }
+
+      loadDuplicateSourceCompetitions();
+    },
+    [creationMode, currentRanchId],
+  );
+
+  async function loadDuplicateSourceCompetitions() {
+    if (!currentRanchId) {
+      showToast("error", "לא נבחרה חווה פעילה");
+      return;
+    }
+
+    try {
+      setDuplicateError("");
+      setLoadingDuplicateSources(true);
+
+      var response = await getCompetitionsByHostRanch({
+        ranchId: currentRanchId,
+        searchText: null,
+        status: null,
+        fieldId: null,
+        dateFrom: null,
+        dateTo: null,
+      });
+
+      setDuplicateSourceCompetitions(
+        Array.isArray(response.data) ? response.data : [],
+      );
+    } catch (error) {
+      console.error(error);
+      setDuplicateSourceCompetitions([]);
+      setDuplicateError(
+        getErrorMessage(error, "שגיאה בטעינת תחרויות מקור לשכפול"),
+      );
+    } finally {
+      setLoadingDuplicateSources(false);
+    }
+  }
+
+  function handleCreationModeChange(nextMode) {
+    if (details.competitionId) {
+      return;
+    }
+
+    setCreationMode(nextMode);
+    setDuplicateError("");
+
+    if (nextMode === "manual") {
+      setActiveStep("details");
+    }
+  }
+
   async function handleSaveDetails(intent) {
     var result = await details.saveDetails(
       intent,
@@ -180,62 +242,6 @@ export default function useCompetitionFormPage(options) {
     showToast("info", "ניתן לחזור ולהגדיר פייד־טיים בהמשך");
   }
 
-  async function openDuplicateModal() {
-    if (isEdit || details.competitionId) {
-      return;
-    }
-
-    if (!currentRanchId) {
-      showToast("error", "לא נבחרה חווה פעילה");
-      return;
-    }
-
-    if (!details.detailsForm.fieldId) {
-      showToast("error", "יש לבחור ענף לפני שכפול תחרות");
-      setActiveStep("details");
-      return;
-    }
-
-    try {
-      setDuplicateError("");
-      setLoadingDuplicateSources(true);
-      setDuplicateModalOpen(true);
-
-      var response = await getCompetitionsByHostRanch({
-        ranchId: currentRanchId,
-        searchText: null,
-        status: null,
-        fieldId: details.detailsForm.fieldId,
-        dateFrom: null,
-        dateTo: null,
-      });
-
-      var items = Array.isArray(response.data) ? response.data : [];
-      var filteredItems = items.filter(function (item) {
-        return String(item.fieldId) === String(details.detailsForm.fieldId);
-      });
-
-      setDuplicateSourceCompetitions(filteredItems);
-    } catch (error) {
-      console.error(error);
-      setDuplicateSourceCompetitions([]);
-      setDuplicateError(
-        getErrorMessage(error, "שגיאה בטעינת תחרויות מקור לשכפול"),
-      );
-    } finally {
-      setLoadingDuplicateSources(false);
-    }
-  }
-
-  function closeDuplicateModal() {
-    if (savingDuplicate) {
-      return;
-    }
-
-    setDuplicateModalOpen(false);
-    setDuplicateError("");
-  }
-
   async function handleDuplicateCompetition(payload) {
     try {
       setSavingDuplicate(true);
@@ -249,9 +255,8 @@ export default function useCompetitionFormPage(options) {
       }
 
       showToast("success", "התחרות שוכפלה בהצלחה");
-      setDuplicateModalOpen(false);
 
-      navigate("/competitions/" + newCompetitionId + "/edit", {
+      navigate("/competitions", {
         replace: true,
       });
     } catch (error) {
@@ -268,6 +273,8 @@ export default function useCompetitionFormPage(options) {
     closeToast,
     activeStep,
     setActiveStep,
+    creationMode,
+    setCreationMode: handleCreationModeChange,
     loadingPage: details.loadingPage,
     savingDetails: details.savingDetails,
     fields: details.fields,
@@ -316,13 +323,11 @@ export default function useCompetitionFormPage(options) {
     handleDeletePaidTime: paidTime.handleDeletePaidTime,
     shouldShowPaidTimeStep: shouldShowPaidTimeStep,
     handleSkipPaidTimeStep: handleSkipPaidTimeStep,
-    duplicateModalOpen: duplicateModalOpen,
     duplicateSourceCompetitions: duplicateSourceCompetitions,
     loadingDuplicateSources: loadingDuplicateSources,
     savingDuplicate: savingDuplicate,
     duplicateError: duplicateError,
-    openDuplicateModal: openDuplicateModal,
-    closeDuplicateModal: closeDuplicateModal,
     handleDuplicateCompetition: handleDuplicateCompetition,
+    reloadDuplicateSourceCompetitions: loadDuplicateSourceCompetitions,
   };
 }
