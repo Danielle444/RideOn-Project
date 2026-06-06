@@ -5,7 +5,7 @@ import useCompetitionClassesStep from "./useCompetitionClassesStep";
 import useCompetitionPaidTimeStep from "./useCompetitionPaidTimeStep";
 import {
   getCompetitionsByHostRanch,
-  duplicateCompetition,
+  duplicateCompetitionFromSelection,
 } from "../../services/competitionService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
 
@@ -247,7 +247,7 @@ export default function useCompetitionFormPage(options) {
       setSavingDuplicate(true);
       setDuplicateError("");
 
-      var response = await duplicateCompetition(payload);
+      var response = await duplicateCompetitionFromSelection(payload);
       var newCompetitionId = response.data?.newCompetitionId;
 
       if (!newCompetitionId) {

@@ -200,6 +200,16 @@ function getClassSourceDate(item) {
   return item.classDateTime || item.classdatetime || item.classDate || null;
 }
 
+function getPaidTimeSlotInCompId(item) {
+  return (
+    item.paidTimeSlotInCompId ||
+    item.PaidTimeSlotInCompId ||
+    item.paidtimeslotincompid ||
+    item.paidTimeSlotInCompetitionId ||
+    null
+  );
+}
+
 function buildClassesPreview(classes, sourceCompetition, newStartDate) {
   if (!Array.isArray(classes) || !sourceCompetition || !newStartDate) {
     return [];
@@ -243,14 +253,46 @@ function buildPaidTimePreview(slots, sourceCompetition, newStartDate) {
     );
 
     return {
-      paidTimeSlotInCompId:
-        item.PaidTimeSlotInCompId || item.paidTimeSlotInCompId,
+      paidTimeSlotInCompId: getPaidTimeSlotInCompId(item),
       sourceDate: sourceDate,
       newDate: newDate,
       startTime: item.startTime,
       endTime: item.endTime,
       arenaName: item.arenaName || "-",
       paidTimeSlotName: item.paidTimeSlotName || item.productName || "-",
+    };
+  });
+}
+
+function buildClassSelectionRows(classes, defaultValues) {
+  if (!Array.isArray(classes)) {
+    return [];
+  }
+
+  return classes.map(function (item) {
+    return {
+      sourceClassInCompId: item.classInCompId,
+      copyClass: !!defaultValues.copyClasses,
+      copyClassPrices: !!defaultValues.copyClassPrices,
+      copyClassPrizes: !!defaultValues.copyClassPrizes,
+      copyReiningPattern:
+        !!defaultValues.copyReiningPatterns &&
+        item.patternNumber !== null &&
+        item.patternNumber !== undefined &&
+        item.patternNumber !== "",
+    };
+  });
+}
+
+function buildPaidTimeSelectionRows(slots, shouldCopy) {
+  if (!Array.isArray(slots)) {
+    return [];
+  }
+
+  return slots.map(function (item) {
+    return {
+      sourcePaidTimeSlotInCompId: getPaidTimeSlotInCompId(item),
+      copyPaidTimeSlot: !!shouldCopy,
     };
   });
 }
@@ -275,6 +317,9 @@ export default function DuplicateCompetitionSetupSection(props) {
   var [sourceDetailsError, setSourceDetailsError] = useState("");
   var [sourceClasses, setSourceClasses] = useState([]);
   var [sourcePaidTimeSlots, setSourcePaidTimeSlots] = useState([]);
+
+  var [classSelectionRows, setClassSelectionRows] = useState([]);
+  var [paidTimeSelectionRows, setPaidTimeSelectionRows] = useState([]);
 
   var selectedField = useMemo(
     function () {
@@ -354,16 +399,20 @@ export default function DuplicateCompetitionSetupSection(props) {
     ],
   );
 
-  var copiedPrizesCount = classesPreview.filter(function (item) {
-    return item.prizeTypeName || item.prizeAmount;
+  var selectedClassesCount = classSelectionRows.filter(function (item) {
+    return item.copyClass;
   }).length;
 
-  var copiedPatternsCount = classesPreview.filter(function (item) {
-    return (
-      item.patternNumber !== null &&
-      item.patternNumber !== undefined &&
-      item.patternNumber !== ""
-    );
+  var selectedPrizesCount = classSelectionRows.filter(function (item) {
+    return item.copyClass && item.copyClassPrizes;
+  }).length;
+
+  var selectedPatternsCount = classSelectionRows.filter(function (item) {
+    return item.copyClass && item.copyReiningPattern;
+  }).length;
+
+  var selectedPaidTimeCount = paidTimeSelectionRows.filter(function (item) {
+    return item.copyPaidTimeSlot;
   }).length;
 
   var judgeCreation = useJudgeCreation({
@@ -418,6 +467,8 @@ export default function DuplicateCompetitionSetupSection(props) {
         setSourceHasPaidTimeSlots(false);
         setSourceClasses([]);
         setSourcePaidTimeSlots([]);
+        setClassSelectionRows([]);
+        setPaidTimeSelectionRows([]);
 
         setFormData(function (prev) {
           return {
@@ -492,12 +543,27 @@ export default function DuplicateCompetitionSetupSection(props) {
       setSourceHasReiningPatterns(hasPatterns);
       setSourceHasPaidTimeSlots(paidTimeSlots.length > 0);
 
+      setClassSelectionRows(
+        buildClassSelectionRows(classes, {
+          copyClasses: true,
+          copyClassPrices: true,
+          copyClassPrizes: true,
+          copyReiningPatterns: false,
+        }),
+      );
+
+      setPaidTimeSelectionRows(
+        buildPaidTimeSelectionRows(paidTimeSlots, paidTimeSlots.length > 0),
+      );
+
       setFormData(function (prev) {
         return {
           ...prev,
-          copyReiningPatterns: hasPatterns ? prev.copyReiningPatterns : false,
-          copyPaidTimeSlots:
-            paidTimeSlots.length > 0 ? prev.copyPaidTimeSlots || true : false,
+          copyClasses: true,
+          copyClassPrices: true,
+          copyClassPrizes: true,
+          copyReiningPatterns: false,
+          copyPaidTimeSlots: paidTimeSlots.length > 0,
         };
       });
     } catch (error) {
@@ -505,6 +571,8 @@ export default function DuplicateCompetitionSetupSection(props) {
 
       setSourceClasses([]);
       setSourcePaidTimeSlots([]);
+      setClassSelectionRows([]);
+      setPaidTimeSelectionRows([]);
       setSourceHasReiningPatterns(false);
       setSourceHasPaidTimeSlots(false);
       setSourceDetailsError(
@@ -544,6 +612,8 @@ export default function DuplicateCompetitionSetupSection(props) {
     setSourceHasPaidTimeSlots(false);
     setSourceClasses([]);
     setSourcePaidTimeSlots([]);
+    setClassSelectionRows([]);
+    setPaidTimeSelectionRows([]);
     setFieldJudges([]);
 
     setFormData(function (prev) {
@@ -568,6 +638,8 @@ export default function DuplicateCompetitionSetupSection(props) {
     setSourceHasPaidTimeSlots(false);
     setSourceClasses([]);
     setSourcePaidTimeSlots([]);
+    setClassSelectionRows([]);
+    setPaidTimeSelectionRows([]);
 
     if (!sourceCompetition) {
       setFormData(function (prev) {
@@ -634,14 +706,173 @@ export default function DuplicateCompetitionSetupSection(props) {
     });
   }
 
+  function setAllClassesFlag(fieldName, value) {
+    setClassSelectionRows(function (prev) {
+      return prev.map(function (item) {
+        var nextItem = {
+          ...item,
+          [fieldName]: value,
+        };
+
+        if (fieldName === "copyClass" && value === false) {
+          nextItem.copyClassPrices = false;
+          nextItem.copyClassPrizes = false;
+          nextItem.copyReiningPattern = false;
+        }
+
+        return nextItem;
+      });
+    });
+  }
+
   function toggleBoolean(fieldName) {
     setLocalError("");
 
     setFormData(function (prev) {
+      var nextValue = !prev[fieldName];
+
+      if (fieldName === "copyClasses") {
+        setAllClassesFlag("copyClass", nextValue);
+
+        return {
+          ...prev,
+          copyClasses: nextValue,
+          copyClassPrices: nextValue ? prev.copyClassPrices : false,
+          copyClassPrizes: nextValue ? prev.copyClassPrizes : false,
+          copyReiningPatterns: nextValue ? prev.copyReiningPatterns : false,
+        };
+      }
+
+      if (fieldName === "copyClassPrices") {
+        setAllClassesFlag("copyClassPrices", nextValue);
+
+        return {
+          ...prev,
+          copyClassPrices: nextValue,
+        };
+      }
+
+      if (fieldName === "copyClassPrizes") {
+        setAllClassesFlag("copyClassPrizes", nextValue);
+
+        return {
+          ...prev,
+          copyClassPrizes: nextValue,
+        };
+      }
+
+      if (fieldName === "copyReiningPatterns") {
+        setClassSelectionRows(function (rows) {
+          return rows.map(function (item) {
+            var classPreviewItem = classesPreview.find(function (previewItem) {
+              return (
+                String(previewItem.classInCompId) ===
+                String(item.sourceClassInCompId)
+              );
+            });
+
+            var hasPattern =
+              classPreviewItem &&
+              classPreviewItem.patternNumber !== null &&
+              classPreviewItem.patternNumber !== undefined &&
+              classPreviewItem.patternNumber !== "";
+
+            return {
+              ...item,
+              copyReiningPattern: nextValue && hasPattern,
+            };
+          });
+        });
+
+        return {
+          ...prev,
+          copyReiningPatterns: nextValue,
+        };
+      }
+
+      if (fieldName === "copyPaidTimeSlots") {
+        setPaidTimeSelectionRows(function (rows) {
+          return rows.map(function (item) {
+            return {
+              ...item,
+              copyPaidTimeSlot: nextValue,
+            };
+          });
+        });
+
+        return {
+          ...prev,
+          copyPaidTimeSlots: nextValue,
+        };
+      }
+
       return {
         ...prev,
-        [fieldName]: !prev[fieldName],
+        [fieldName]: nextValue,
       };
+    });
+  }
+
+  function toggleClassRow(classInCompId) {
+    setLocalError("");
+
+    setClassSelectionRows(function (prev) {
+      return prev.map(function (item) {
+        if (String(item.sourceClassInCompId) !== String(classInCompId)) {
+          return item;
+        }
+
+        var nextCopyClass = !item.copyClass;
+
+        return {
+          ...item,
+          copyClass: nextCopyClass,
+          copyClassPrices: nextCopyClass ? item.copyClassPrices : false,
+          copyClassPrizes: nextCopyClass ? item.copyClassPrizes : false,
+          copyReiningPattern: nextCopyClass ? item.copyReiningPattern : false,
+        };
+      });
+    });
+  }
+
+  function toggleClassRowFlag(classInCompId, fieldName) {
+    setLocalError("");
+
+    setClassSelectionRows(function (prev) {
+      return prev.map(function (item) {
+        if (String(item.sourceClassInCompId) !== String(classInCompId)) {
+          return item;
+        }
+
+        if (!item.copyClass) {
+          return item;
+        }
+
+        return {
+          ...item,
+          [fieldName]: !item[fieldName],
+        };
+      });
+    });
+  }
+
+  function togglePaidTimeRow(paidTimeSlotInCompId) {
+    setLocalError("");
+
+    setPaidTimeSelectionRows(function (prev) {
+      return prev.map(function (item) {
+        if (
+          String(item.sourcePaidTimeSlotInCompId) !==
+          String(paidTimeSlotInCompId)
+        ) {
+          return item;
+        }
+
+        return {
+          ...item,
+          copyPaidTimeSlot: !item.copyPaidTimeSlot,
+        };
+      });
     });
   }
 
@@ -662,6 +893,20 @@ export default function DuplicateCompetitionSetupSection(props) {
             })
           : [...current, judgeId],
       };
+    });
+  }
+
+  function getClassSelection(classInCompId) {
+    return classSelectionRows.find(function (item) {
+      return String(item.sourceClassInCompId) === String(classInCompId);
+    });
+  }
+
+  function getPaidTimeSelection(paidTimeSlotInCompId) {
+    return paidTimeSelectionRows.find(function (item) {
+      return (
+        String(item.sourcePaidTimeSlotInCompId) === String(paidTimeSlotInCompId)
+      );
     });
   }
 
@@ -710,8 +955,12 @@ export default function DuplicateCompetitionSetupSection(props) {
       return "תאריך סגירת ההרשמה לא יכול להיות לפני פתיחת ההרשמה";
     }
 
-    if (formData.copyClasses && formData.classJudgeIds.length === 0) {
+    if (selectedClassesCount > 0 && formData.classJudgeIds.length === 0) {
       return "אם משכפלים מקצים, חובה לבחור לפחות שופט אחד לתחרות החדשה";
+    }
+
+    if (selectedClassesCount === 0 && selectedPaidTimeCount === 0) {
+      return "יש לבחור לפחות מקצה אחד או פייד־טיים אחד לשכפול";
     }
 
     return "";
@@ -738,17 +987,9 @@ export default function DuplicateCompetitionSetupSection(props) {
       paidTimeRegistrationDate: formData.paidTimeRegistrationDate || null,
       paidTimePublicationDate: formData.paidTimePublicationDate || null,
       notes: formData.notes.trim() || null,
-      copyClasses: formData.copyClasses,
-      copyClassPrices: formData.copyClasses ? formData.copyClassPrices : false,
-      copyClassPrizes: formData.copyClasses ? formData.copyClassPrizes : false,
-      copyReiningPatterns:
-        formData.copyClasses && sourceHasReiningPatterns
-          ? formData.copyReiningPatterns
-          : false,
-      classJudgeIds: formData.copyClasses ? formData.classJudgeIds : [],
-      copyPaidTimeSlots: sourceHasPaidTimeSlots
-        ? formData.copyPaidTimeSlots
-        : false,
+      classJudgeIds: selectedClassesCount > 0 ? formData.classJudgeIds : [],
+      classes: classSelectionRows,
+      paidTimeSlots: paidTimeSelectionRows,
     });
   }
 
@@ -963,7 +1204,7 @@ export default function DuplicateCompetitionSetupSection(props) {
 
         <div className="rounded-3xl border border-[#E8DDD7] bg-[#FFFCFA] p-5">
           <h3 className="mb-4 text-lg font-bold text-[#3F312B]">
-            3. החלטות שכפול
+            3. החלטות שכפול כלליות
           </h3>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -975,7 +1216,7 @@ export default function DuplicateCompetitionSetupSection(props) {
                   toggleBoolean("copyClasses");
                 }}
               />
-              שכפל מקצים
+              סמן את כל המקצים לשכפול
             </label>
 
             <label className="flex items-center gap-3 rounded-2xl border border-[#E8DDD7] bg-white px-4 py-3 text-right text-sm font-semibold text-[#5D4037]">
@@ -987,7 +1228,7 @@ export default function DuplicateCompetitionSetupSection(props) {
                 }}
                 disabled={!formData.copyClasses}
               />
-              שכפל מחירי מקצים
+              סמן מחירים לכל המקצים
             </label>
 
             <label className="flex items-center gap-3 rounded-2xl border border-[#E8DDD7] bg-white px-4 py-3 text-right text-sm font-semibold text-[#5D4037]">
@@ -999,7 +1240,7 @@ export default function DuplicateCompetitionSetupSection(props) {
                 }}
                 disabled={!formData.copyClasses}
               />
-              שכפל פרסים
+              סמן פרסים לכל המקצים
             </label>
 
             {sourceHasReiningPatterns ? (
@@ -1012,7 +1253,7 @@ export default function DuplicateCompetitionSetupSection(props) {
                   }}
                   disabled={!formData.copyClasses}
                 />
-                שכפל מסלולי ריינינג
+                סמן מסלולי ריינינג קיימים
               </label>
             ) : null}
 
@@ -1025,7 +1266,7 @@ export default function DuplicateCompetitionSetupSection(props) {
                     toggleBoolean("copyPaidTimeSlots");
                   }}
                 />
-                שכפל לו״ז פייד־טיים
+                סמן את כל לו״ז הפייד־טיים לשכפול
               </label>
             ) : null}
           </div>
@@ -1034,41 +1275,35 @@ export default function DuplicateCompetitionSetupSection(props) {
         {selectedSourceCompetition && !sourceDetailsLoading ? (
           <div className="rounded-3xl border border-[#E8DDD7] bg-white p-5">
             <h3 className="mb-4 text-lg font-bold text-[#3F312B]">
-              4. תצוגה מקדימה לשכפול
+              4. בחירת נתונים לשכפול
             </h3>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
               <div className="rounded-2xl bg-[#F8F5F2] px-4 py-3 text-center">
                 <div className="text-xs text-[#8A7268]">מקצים</div>
                 <div className="text-xl font-bold text-[#3F312B]">
-                  {formData.copyClasses ? classesPreview.length : 0}
+                  {selectedClassesCount}
                 </div>
               </div>
 
               <div className="rounded-2xl bg-[#F8F5F2] px-4 py-3 text-center">
                 <div className="text-xs text-[#8A7268]">פרסים</div>
                 <div className="text-xl font-bold text-[#3F312B]">
-                  {formData.copyClasses && formData.copyClassPrizes
-                    ? copiedPrizesCount
-                    : 0}
+                  {selectedPrizesCount}
                 </div>
               </div>
 
               <div className="rounded-2xl bg-[#F8F5F2] px-4 py-3 text-center">
                 <div className="text-xs text-[#8A7268]">מסלולים</div>
                 <div className="text-xl font-bold text-[#3F312B]">
-                  {formData.copyClasses &&
-                  formData.copyReiningPatterns &&
-                  sourceHasReiningPatterns
-                    ? copiedPatternsCount
-                    : 0}
+                  {selectedPatternsCount}
                 </div>
               </div>
 
               <div className="rounded-2xl bg-[#F8F5F2] px-4 py-3 text-center">
                 <div className="text-xs text-[#8A7268]">פייד־טיים</div>
                 <div className="text-xl font-bold text-[#3F312B]">
-                  {formData.copyPaidTimeSlots ? paidTimePreview.length : 0}
+                  {selectedPaidTimeCount}
                 </div>
               </div>
 
@@ -1080,23 +1315,21 @@ export default function DuplicateCompetitionSetupSection(props) {
               </div>
             </div>
 
-            {formData.copyClasses ? (
+            {classesPreview.length > 0 ? (
               <div className="mt-6">
-                <h4 className="mb-3 font-bold text-[#3F312B]">
-                  מקצים שישוכפלו
-                </h4>
+                <h4 className="mb-3 font-bold text-[#3F312B]">מקצים לבחירה</h4>
 
-                <div className="max-h-[280px] overflow-auto rounded-2xl border border-[#E8DDD7]">
-                  <table className="w-full min-w-[1000px] text-right text-sm">
+                <div className="max-h-[360px] overflow-auto rounded-2xl border border-[#E8DDD7]">
+                  <table className="w-full min-w-[1180px] text-right text-sm">
                     <thead className="sticky top-0 bg-[#FAF7F5] text-[#4E342E]">
                       <tr>
+                        <th className="px-4 py-3">שכפל</th>
                         <th className="px-4 py-3">מקצה</th>
                         <th className="px-4 py-3">תאריך מקור</th>
                         <th className="px-4 py-3">תאריך חדש</th>
                         <th className="px-4 py-3">שעה</th>
                         <th className="px-4 py-3">מגרש</th>
-                        <th className="px-4 py-3">מארגן</th>
-                        <th className="px-4 py-3">התאחדות</th>
+                        <th className="px-4 py-3">מחירים</th>
                         <th className="px-4 py-3">פרס</th>
                         <th className="px-4 py-3">מסלול</th>
                       </tr>
@@ -1104,52 +1337,116 @@ export default function DuplicateCompetitionSetupSection(props) {
 
                     <tbody>
                       {classesPreview.map(function (item, index) {
+                        var selection = getClassSelection(item.classInCompId);
+                        var isClassSelected = !!selection?.copyClass;
+                        var hasPattern =
+                          item.patternNumber !== null &&
+                          item.patternNumber !== undefined &&
+                          item.patternNumber !== "";
+
                         return (
                           <tr
                             key={item.classInCompId || index}
-                            className="border-t border-[#F1E8E3]"
+                            className={
+                              "border-t border-[#F1E8E3] " +
+                              (isClassSelected
+                                ? "bg-white"
+                                : "bg-[#FAFAFA] opacity-70")
+                            }
                           >
+                            <td className="px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={isClassSelected}
+                                onChange={function () {
+                                  toggleClassRow(item.classInCompId);
+                                }}
+                              />
+                            </td>
+
                             <td className="px-4 py-3 font-semibold">
                               {item.className}
                             </td>
+
                             <td className="px-4 py-3">
                               {formatDate(item.sourceDate)}
                             </td>
+
                             <td className="px-4 py-3">
                               {formatDate(item.newDate)}
                             </td>
+
                             <td className="px-4 py-3">
                               {formatTime(item.startTime)}
                             </td>
+
                             <td className="px-4 py-3">{item.arenaName}</td>
+
                             <td className="px-4 py-3">
-                              {formData.copyClassPrices
-                                ? formatMoney(item.organizerCost)
-                                : "לא ישוכפל"}
+                              <label className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={!!selection?.copyClassPrices}
+                                  disabled={!isClassSelected}
+                                  onChange={function () {
+                                    toggleClassRowFlag(
+                                      item.classInCompId,
+                                      "copyClassPrices",
+                                    );
+                                  }}
+                                />
+                                <span>
+                                  {formatMoney(item.organizerCost)} /{" "}
+                                  {formatMoney(item.federationCost)}
+                                </span>
+                              </label>
                             </td>
+
                             <td className="px-4 py-3">
-                              {formData.copyClassPrices
-                                ? formatMoney(item.federationCost)
-                                : "לא ישוכפל"}
-                            </td>
-                            <td className="px-4 py-3">
-                              {formData.copyClassPrizes
-                                ? [
+                              <label className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={!!selection?.copyClassPrizes}
+                                  disabled={!isClassSelected}
+                                  onChange={function () {
+                                    toggleClassRowFlag(
+                                      item.classInCompId,
+                                      "copyClassPrizes",
+                                    );
+                                  }}
+                                />
+                                <span>
+                                  {[
                                     item.prizeTypeName,
                                     formatMoney(item.prizeAmount),
                                   ]
                                     .filter(function (value) {
                                       return value && value !== "-";
                                     })
-                                    .join(" · ") || "-"
-                                : "לא ישוכפל"}
+                                    .join(" · ") || "-"}
+                                </span>
+                              </label>
                             </td>
+
                             <td className="px-4 py-3">
-                              {formData.copyReiningPatterns &&
-                              sourceHasReiningPatterns &&
-                              item.patternNumber
-                                ? "מסלול " + item.patternNumber
-                                : "לא ישוכפל"}
+                              {hasPattern ? (
+                                <label className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!selection?.copyReiningPattern}
+                                    disabled={!isClassSelected}
+                                    onChange={function () {
+                                      toggleClassRowFlag(
+                                        item.classInCompId,
+                                        "copyReiningPattern",
+                                      );
+                                    }}
+                                  />
+                                  <span>מסלול {item.patternNumber}</span>
+                                </label>
+                              ) : (
+                                "-"
+                              )}
                             </td>
                           </tr>
                         );
@@ -1160,16 +1457,17 @@ export default function DuplicateCompetitionSetupSection(props) {
               </div>
             ) : null}
 
-            {formData.copyPaidTimeSlots && sourceHasPaidTimeSlots ? (
+            {paidTimePreview.length > 0 ? (
               <div className="mt-6">
                 <h4 className="mb-3 font-bold text-[#3F312B]">
-                  פייד־טיים שישוכפל
+                  פייד־טיים לבחירה
                 </h4>
 
-                <div className="max-h-[230px] overflow-auto rounded-2xl border border-[#E8DDD7]">
-                  <table className="w-full min-w-[850px] text-right text-sm">
+                <div className="max-h-[280px] overflow-auto rounded-2xl border border-[#E8DDD7]">
+                  <table className="w-full min-w-[920px] text-right text-sm">
                     <thead className="sticky top-0 bg-[#FAF7F5] text-[#4E342E]">
                       <tr>
+                        <th className="px-4 py-3">שכפל</th>
                         <th className="px-4 py-3">תאריך מקור</th>
                         <th className="px-4 py-3">תאריך חדש</th>
                         <th className="px-4 py-3">שעה</th>
@@ -1181,24 +1479,50 @@ export default function DuplicateCompetitionSetupSection(props) {
 
                     <tbody>
                       {paidTimePreview.map(function (item, index) {
+                        var selection = getPaidTimeSelection(
+                          item.paidTimeSlotInCompId,
+                        );
+
+                        var isPaidTimeSelected = !!selection?.copyPaidTimeSlot;
+
                         return (
                           <tr
                             key={item.paidTimeSlotInCompId || index}
-                            className="border-t border-[#F1E8E3]"
+                            className={
+                              "border-t border-[#F1E8E3] " +
+                              (isPaidTimeSelected
+                                ? "bg-white"
+                                : "bg-[#FAFAFA] opacity-70")
+                            }
                           >
+                            <td className="px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={isPaidTimeSelected}
+                                onChange={function () {
+                                  togglePaidTimeRow(item.paidTimeSlotInCompId);
+                                }}
+                              />
+                            </td>
+
                             <td className="px-4 py-3">
                               {formatDate(item.sourceDate)}
                             </td>
+
                             <td className="px-4 py-3">
                               {formatDate(item.newDate)}
                             </td>
+
                             <td className="px-4 py-3">
                               {formatTime(item.startTime)}
                             </td>
+
                             <td className="px-4 py-3">
                               {formatTime(item.endTime)}
                             </td>
+
                             <td className="px-4 py-3">{item.arenaName}</td>
+
                             <td className="px-4 py-3">
                               {item.paidTimeSlotName}
                             </td>
@@ -1213,7 +1537,7 @@ export default function DuplicateCompetitionSetupSection(props) {
           </div>
         ) : null}
 
-        {formData.copyClasses ? (
+        {selectedClassesCount > 0 ? (
           <div className="rounded-3xl border border-[#E8DDD7] bg-white p-5">
             <h3 className="mb-2 text-lg font-bold text-[#3F312B]">
               5. שופטים לתחרות החדשה
@@ -1293,6 +1617,12 @@ export default function DuplicateCompetitionSetupSection(props) {
         {localError ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
             {localError}
+          </div>
+        ) : null}
+
+        {sourceDetailsError ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-right text-sm text-amber-800">
+            {sourceDetailsError}
           </div>
         ) : null}
 

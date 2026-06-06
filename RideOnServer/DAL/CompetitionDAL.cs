@@ -1,6 +1,9 @@
 using Npgsql;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.Competition;
+using System.Data;
+using System.Text.Json;
+using NpgsqlTypes;
 
 namespace RideOnServer.DAL
 {
@@ -362,6 +365,141 @@ namespace RideOnServer.DAL
                         }
 
                         throw new Exception("Duplicate competition did not return a result");
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public DuplicateCompetitionResponse DuplicateCompetitionFromSelection(
+    DuplicateCompetitionFromSelectionRequest request,
+    int createdBySystemUserId)
+        {
+            JsonSerializerOptions jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+
+            string classesJson = JsonSerializer.Serialize(
+                request.Classes ?? new List<DuplicateCompetitionSelectionClassItem>(),
+                jsonOptions
+            );
+
+            string paidTimeSlotsJson = JsonSerializer.Serialize(
+                request.PaidTimeSlots ?? new List<DuplicateCompetitionSelectionPaidTimeSlotItem>(),
+                jsonOptions
+            );
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = new NpgsqlCommand("usp_DuplicateCompetitionFromSelection", connection))
+                    {
+                        command.CommandType = CommandType.StoredProcedure;
+
+                        command.Parameters.AddWithValue(
+                            "p_sourcecompetitionid",
+                            request.SourceCompetitionId
+                        );
+
+                        command.Parameters.AddWithValue(
+                            "p_createdbysystemuserid",
+                            createdBySystemUserId
+                        );
+
+                        command.Parameters.AddWithValue(
+                            "p_newcompetitionname",
+                            request.NewCompetitionName
+                        );
+
+                        command.Parameters.AddWithValue(
+                            "p_newcompetitionstartdate",
+                            request.NewCompetitionStartDate.Date
+                        );
+
+                        command.Parameters.AddWithValue(
+                            "p_newcompetitionenddate",
+                            request.NewCompetitionEndDate.Date
+                        );
+
+                        command.Parameters.AddWithValue(
+                            "p_registrationopendate",
+                            request.RegistrationOpenDate.HasValue
+                                ? request.RegistrationOpenDate.Value.Date
+                                : DBNull.Value
+                        );
+
+                        command.Parameters.AddWithValue(
+                            "p_registrationenddate",
+                            request.RegistrationEndDate.HasValue
+                                ? request.RegistrationEndDate.Value.Date
+                                : DBNull.Value
+                        );
+
+                        command.Parameters.AddWithValue(
+                            "p_paidtimeregistrationdate",
+                            request.PaidTimeRegistrationDate.HasValue
+                                ? request.PaidTimeRegistrationDate.Value.Date
+                                : DBNull.Value
+                        );
+
+                        command.Parameters.AddWithValue(
+                            "p_paidtimepublicationdate",
+                            request.PaidTimePublicationDate.HasValue
+                                ? request.PaidTimePublicationDate.Value.Date
+                                : DBNull.Value
+                        );
+
+                        command.Parameters.AddWithValue(
+                            "p_notes",
+                            string.IsNullOrWhiteSpace(request.Notes)
+                                ? DBNull.Value
+                                : request.Notes.Trim()
+                        );
+
+                        command.Parameters.AddWithValue(
+                            "p_classjudgeids",
+                            request.ClassJudgeIds == null
+                                ? Array.Empty<int>()
+                                : request.ClassJudgeIds.ToArray()
+                        );
+
+                        NpgsqlParameter classesJsonParameter = command.Parameters.Add(
+                            "p_classesjson",
+                            NpgsqlDbType.Jsonb
+                        );
+                        classesJsonParameter.Value = classesJson;
+
+                        NpgsqlParameter paidTimeSlotsJsonParameter = command.Parameters.Add(
+                            "p_paidtimeslotsjson",
+                            NpgsqlDbType.Jsonb
+                        );
+                        paidTimeSlotsJsonParameter.Value = paidTimeSlotsJson;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                return new DuplicateCompetitionResponse
+                                {
+                                    NewCompetitionId = Convert.ToInt32(reader["NewCompetitionId"]),
+                                    CopiedClassesCount = Convert.ToInt32(reader["CopiedClassesCount"]),
+                                    CopiedClassPrizesCount = Convert.ToInt32(reader["CopiedClassPrizesCount"]),
+                                    CopiedReiningPatternsCount = Convert.ToInt32(reader["CopiedReiningPatternsCount"]),
+                                    CopiedClassJudgesCount = Convert.ToInt32(reader["CopiedClassJudgesCount"]),
+                                    CopiedPaidTimeSlotsCount = Convert.ToInt32(reader["CopiedPaidTimeSlotsCount"]),
+                                    Message = reader["Message"].ToString() ?? string.Empty
+                                };
+                            }
+
+                            throw new Exception("Duplicate competition from selection did not return a result");
+                        }
                     }
                 }
             }

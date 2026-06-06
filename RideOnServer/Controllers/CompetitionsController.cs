@@ -172,6 +172,51 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("duplicate-from-selection")]
+        public IActionResult DuplicateCompetitionFromSelection(
+    [FromBody] DuplicateCompetitionFromSelectionRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.HostRanchId,
+                    RoleNames.HostSecretary
+                );
+
+                Competition sourceCompetition = Competition.GetCompetitionById(request.SourceCompetitionId)
+                    ?? throw new Exception("Source competition not found");
+
+                if (sourceCompetition.HostRanchId != request.HostRanchId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לשכפל תחרות זו");
+                }
+
+                DuplicateCompetitionResponse response = Competition.DuplicateCompetitionFromSelection(
+                    request,
+                    personId
+                );
+
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in DuplicateCompetitionFromSelection: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpPut("{competitionId}")]
         public IActionResult UpdateCompetition(int competitionId, [FromBody] UpdateCompetitionRequest request)
         {

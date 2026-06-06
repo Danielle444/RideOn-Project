@@ -52,10 +52,19 @@ function duplicateCompetition(data) {
   return axios.post(`${API}/Competitions/duplicate`, data, getAuthHeaders());
 }
 
+function duplicateCompetitionFromSelection(data) {
+  return axios.post(
+    `${API}/Competitions/duplicate-from-selection`,
+    data,
+    getAuthHeaders(),
+  );
+}
+
 export {
   getCompetitionsByHostRanch,
   getCompetitionById,
   createCompetition,
   updateCompetition,
   duplicateCompetition,
+  duplicateCompetitionFromSelection,
 };
