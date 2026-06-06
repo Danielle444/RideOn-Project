@@ -5,6 +5,7 @@ import CompetitionDetailsSection from "../../components/secretary/competition-fo
 import CompetitionClassesStep from "../../components/secretary/competition-form/CompetitionClassesStep";
 import CompetitionPaidTimeStep from "../../components/secretary/competition-form/CompetitionPaidTimeStep";
 import CompetitionFormHeader from "../../components/secretary/competition-form/CompetitionFormHeader";
+import DuplicateCompetitionModal from "../../components/secretary/competition-form/DuplicateCompetitionModal";
 import ClassInCompetitionModal from "../../components/secretary/ClassInCompetitionModal";
 import PaidTimeSlotInCompetitionModal from "../../components/secretary/PaidTimeSlotInCompetitionModal";
 import { useUser } from "../../context/UserContext";
@@ -23,7 +24,11 @@ export default function CompetitionFormPage(props) {
     currentRanchId: activeRole?.ranchId || null,
   });
 
-  var userName = ((user?.firstName || "") + " " + (user?.lastName || "")).trim();
+  var userName = (
+    (user?.firstName || "") +
+    " " +
+    (user?.lastName || "")
+  ).trim();
   var subtitle =
     [activeRole?.roleName, activeRole?.ranchName].filter(Boolean).join(" · ") ||
     "לא נבחר תפקיד וחווה";
@@ -57,6 +62,7 @@ export default function CompetitionFormPage(props) {
       <div className="mx-auto max-w-[1500px] space-y-8">
         <CompetitionFormHeader
           competitionId={page.competitionId}
+          onDuplicate={page.openDuplicateModal}
           onBack={function () {
             page.navigate("/competitions");
           }}
@@ -148,6 +154,19 @@ export default function CompetitionFormPage(props) {
           />
         ) : null}
       </div>
+
+      <DuplicateCompetitionModal
+        isOpen={page.duplicateModalOpen}
+        onClose={page.closeDuplicateModal}
+        onSubmit={page.handleDuplicateCompetition}
+        currentRanchId={activeRole?.ranchId || null}
+        fieldName={selectedFieldName}
+        sourceCompetitions={page.duplicateSourceCompetitions}
+        judges={page.judges || []}
+        loading={page.loadingDuplicateSources}
+        saving={page.savingDuplicate}
+        error={page.duplicateError}
+      />
 
       <ClassInCompetitionModal
         isOpen={page.classModalOpen}
