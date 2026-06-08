@@ -25,6 +25,28 @@ function safeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+// SPs that JOIN through 1-to-many tables (e.g. billproductrequest, shavings)
+// can return the same logical row multiple times. Dedup on the natural key
+// of each list before render so React keys stay unique.
+function dedupBy(list, getKey) {
+  var seen = new Set();
+  var out = [];
+
+  list.forEach(function (item) {
+    var k = getKey(item);
+    if (k === null || k === undefined) {
+      out.push(item);
+      return;
+    }
+    var keyStr = String(k);
+    if (seen.has(keyStr)) return;
+    seen.add(keyStr);
+    out.push(item);
+  });
+
+  return out;
+}
+
 export default function useAdminCompetitionPayerAccount(params) {
   var activeRole = params.activeRole;
   var activeCompetition = params.activeCompetition;
@@ -106,10 +128,18 @@ export default function useAdminCompetitionPayerAccount(params) {
       return {
         payer: safeAccount.payer || routePayer || null,
         summary: safeAccount.summary || {},
-        classes: safeArray(safeAccount.classes),
-        paidTimes: safeArray(safeAccount.paidTimes),
-        stalls: safeArray(safeAccount.stalls),
-        shavings: safeArray(safeAccount.shavings),
+        classes: dedupBy(safeArray(safeAccount.classes), function (it) {
+          return it.entryId;
+        }),
+        paidTimes: dedupBy(safeArray(safeAccount.paidTimes), function (it) {
+          return it.paidTimeRequestId;
+        }),
+        stalls: dedupBy(safeArray(safeAccount.stalls), function (it) {
+          return it.stallBookingId;
+        }),
+        shavings: dedupBy(safeArray(safeAccount.shavings), function (it) {
+          return it.shavingsOrderId;
+        }),
       };
     },
     [account, routePayer],
