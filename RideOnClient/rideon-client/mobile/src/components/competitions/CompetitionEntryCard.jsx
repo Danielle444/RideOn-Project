@@ -69,6 +69,11 @@ export default function CompetitionEntryCard(props) {
   var statusStyle = getStatusBadgeStyle(item);
 
   function renderPaymentBadge() {
+    // Skip payment badge entirely when there's nothing to pay
+    if (Number(item.amountToPay || 0) <= 0) {
+      return null;
+    }
+
     return (
       <View
         style={[

@@ -123,7 +123,11 @@ function getDisplayName(payer) {
   return ((payer.firstName || "") + " " + (payer.lastName || "")).trim();
 }
 
-function renderPaymentBadge(isPaid) {
+function renderPaymentBadge(isPaid, amount) {
+  if (amount !== undefined && Number(amount || 0) <= 0) {
+    return null;
+  }
+
   var status = isPaid ? getStatusInfo("Paid") : getStatusInfo("Unpaid");
 
   return (
@@ -819,7 +823,7 @@ export default function PayerCompetitionAccountScreen(props) {
             תא: {item.stallId ? "#" + item.stallId : "טרם שובץ"}
           </Text>
 
-          {renderPaymentBadge(item.isPaid)}
+          {renderPaymentBadge(item.isPaid, item.stallAmountToPay)}
 
           {shavingsOrders.length > 0 ? (
             <View style={{ marginTop: 12 }}>

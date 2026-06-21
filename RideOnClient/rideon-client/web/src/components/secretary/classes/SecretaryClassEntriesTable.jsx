@@ -389,7 +389,37 @@ export default function SecretaryClassEntriesTable(props) {
       <section className="rounded-3xl border border-[#EFE5DF] bg-[#FFFDFB] p-4 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-bold text-[#3F312B]">כניסות למקצה</h2>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="text-lg font-bold text-[#3F312B]">כניסות למקצה</h2>
+              {(function () {
+                var s = props.summary || {};
+                var total = Number(s.totalCount || 0);
+                var paid = Number(s.paidCount || 0);
+                var totalAmt = Number(s.totalAmount || 0);
+                if (total === 0 || totalAmt === 0) {
+                  return null;
+                }
+                if (paid >= total) {
+                  return (
+                    <span className="inline-flex items-center rounded-full border border-[#B9D9C0] bg-[#E7F4EA] px-3 py-1 text-xs font-bold text-[#2F6B3B]">
+                      המקצה שולם במלואו
+                    </span>
+                  );
+                }
+                if (paid === 0) {
+                  return (
+                    <span className="inline-flex items-center rounded-full border border-[#E7BABA] bg-[#F9E5E5] px-3 py-1 text-xs font-bold text-[#A54848]">
+                      המקצה לא שולם
+                    </span>
+                  );
+                }
+                return (
+                  <span className="inline-flex items-center rounded-full border border-[#E8C99A] bg-[#F7E7CF] px-3 py-1 text-xs font-bold text-[#9A6700]">
+                    שולם חלקית ({paid}/{total})
+                  </span>
+                );
+              })()}
+            </div>
             <p className="text-xs text-[#8D6E63]">
               {props.drawOrderEditMode
                 ? "מצב עריכת סדר פעיל - אפשר לגרור כניסות פעילות או להזין מספר הגרלה ידנית"

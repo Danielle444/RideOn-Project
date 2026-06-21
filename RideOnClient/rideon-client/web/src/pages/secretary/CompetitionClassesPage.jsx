@@ -6,6 +6,7 @@ import TableActionButton from "../../components/common/table/TableActionButton";
 import SecretaryClassesOverviewTable from "../../components/secretary/classes/SecretaryClassesOverviewTable";
 import SecretaryClassEntriesTable from "../../components/secretary/classes/SecretaryClassEntriesTable";
 import SecretaryClassEntriesSummaryCards from "../../components/secretary/classes/SecretaryClassEntriesSummaryCards";
+import ClassInCompetitionModal from "../../components/secretary/ClassInCompetitionModal";
 import useSecretaryCompetitionClassesPage from "../../hooks/secretary/useSecretaryCompetitionClassesPage";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 
@@ -123,12 +124,36 @@ export default function CompetitionClassesPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             {page.viewMode !== "classes" ? (
-              <TableActionButton
-                label="חזרה למקצים"
-                icon={<ArrowRight size={15} />}
-                onClick={page.backToClasses}
-                disabled={page.savingDrawOrder || page.generatingDrawPreview}
-              />
+              <>
+                <TableActionButton
+                  label="חזרה למקצים"
+                  icon={<ArrowRight size={15} />}
+                  onClick={page.backToClasses}
+                  disabled={page.savingDrawOrder || page.generatingDrawPreview}
+                />
+
+                <button
+                  type="button"
+                  onClick={function () {
+                    if (page.cancelledFilter === "only") {
+                      page.setCancelledFilter("hide");
+                    } else {
+                      page.setCancelledFilter("only");
+                    }
+                  }}
+                  className={
+                    "rounded-2xl border px-4 py-2 text-sm font-bold transition-colors " +
+                    (page.cancelledFilter === "only"
+                      ? "border-[#A54848] bg-[#F9E5E5] text-[#A54848]"
+                      : "border-[#E2D5CE] bg-white text-[#6B574F] hover:bg-[#FAF5F1]")
+                  }
+                  title="הצג רק הרשמות שבוטלו"
+                >
+                  {page.cancelledFilter === "only"
+                    ? "הצג רק פעילות"
+                    : "הצג הרשמות מבוטלות"}
+                </button>
+              </>
             ) : null}
 
             <TableActionButton
@@ -362,6 +387,8 @@ export default function CompetitionClassesPage() {
               getEntriesCountForClass={page.getEntriesCountForClass}
               getEntriesCountForGroup={page.getEntriesCountForGroup}
               getClassStatus={page.getClassStatus}
+              onEditClass={page.openEditClassModal}
+              onDeleteClass={page.handleDeleteClass}
             />
           </>
         ) : (
@@ -395,6 +422,23 @@ export default function CompetitionClassesPage() {
           />
         )}
       </div>
+
+      <ClassInCompetitionModal
+        isOpen={page.classModalOpen}
+        onClose={page.closeClassModal}
+        onSubmit={page.handleSubmitClass}
+        initialValue={page.editClassItem}
+        defaultJudgeIds={page.selectedCompetitionJudgeIds}
+        classTypes={page.classTypes}
+        judges={page.judges}
+        prizeTypes={page.prizeTypes}
+        patterns={page.patterns}
+        arenas={page.arenas}
+        fieldName={page.selectedFieldName}
+        isReiningField={page.isReiningField}
+        error={page.classModalError}
+        saving={page.savingClass}
+      />
     </CompetitionWorkspaceLayout>
   );
 }
