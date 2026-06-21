@@ -263,23 +263,27 @@ export default function CompetitionStallCard(props) {
           </Text>
 
           <View style={styles.stallFooterActionsLine}>
-            <View
-              style={[
-                styles.paymentBadge,
-                item.isPaid ? styles.paymentPaid : styles.paymentUnpaid,
-              ]}
-            >
-              <Text
+            {Number(totalAmount || 0) > 0 ? (
+              <View
                 style={[
-                  styles.paymentBadgeText,
-                  item.isPaid
-                    ? styles.paymentBadgeTextPaid
-                    : styles.paymentBadgeTextUnpaid,
+                  styles.paymentBadge,
+                  item.isPaid ? styles.paymentPaid : styles.paymentUnpaid,
                 ]}
               >
-                {item.isPaid ? "שולם" : "לא שולם"}
-              </Text>
-            </View>
+                <Text
+                  style={[
+                    styles.paymentBadgeText,
+                    item.isPaid
+                      ? styles.paymentBadgeTextPaid
+                      : styles.paymentBadgeTextUnpaid,
+                  ]}
+                >
+                  {item.isPaid ? "שולם" : "לא שולם"}
+                </Text>
+              </View>
+            ) : (
+              <View />
+            )}
 
             <View style={styles.footerActionsRow}>
               {props.onDelete && !isLocked ? (

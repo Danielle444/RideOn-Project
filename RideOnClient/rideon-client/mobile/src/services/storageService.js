@@ -2,6 +2,27 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Buffer } from "buffer";
 import { STORAGE_KEYS } from "../../../shared/auth/constants/storageKeys";
 
+const REMEMBER_ME_KEY = "rideon_remember_me";
+
+// ---------- REMEMBER ME ----------
+export async function saveRememberMe(rememberMe) {
+  await AsyncStorage.setItem(REMEMBER_ME_KEY, JSON.stringify(!!rememberMe));
+}
+
+export async function getRememberMe() {
+  const value = await AsyncStorage.getItem(REMEMBER_ME_KEY);
+  if (!value) return false;
+  try {
+    return JSON.parse(value) === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function removeRememberMe() {
+  await AsyncStorage.removeItem(REMEMBER_ME_KEY);
+}
+
 // ---------- TOKEN ----------
 export async function saveToken(token) {
   if (!token) return;
@@ -120,5 +141,6 @@ export async function clearAuthStorage() {
     STORAGE_KEYS.USER,
     STORAGE_KEYS.ACTIVE_ROLE,
     ACTIVE_COMPETITION_KEY,
+    REMEMBER_ME_KEY,
   ]);
 }

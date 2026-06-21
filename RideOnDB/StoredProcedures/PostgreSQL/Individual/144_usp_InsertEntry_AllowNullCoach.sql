@@ -1,0 +1,34 @@
+-- ============================================================================
+-- usp_insertentry — allow NULL coach
+-- ============================================================================
+-- BUG: existing SP raises 'Coach not found' even when p_coachfederationmemberid
+-- IS NULL, because `WHERE federationmemberid = NULL` always returns no rows,
+-- so IF NOT EXISTS always evaluates true.
+--
+-- FIX: skip the coach existence check when p_coachfederationmemberid IS NULL.
+--
+-- HOW TO APPLY:
+--   1. In Supabase SQL editor, open the current definition of usp_insertentry
+--      (run: SELECT pg_get_functiondef('public.usp_insertentry'::regproc::oid);)
+--   2. Locate the existing block:
+--        IF NOT EXISTS (
+--            SELECT 1 FROM federationmember
+--            WHERE federationmemberid = p_coachfederationmemberid
+--        ) THEN
+--            RAISE EXCEPTION 'Coach not found';
+--        END IF;
+--   3. Replace it with:
+--        IF p_coachfederationmemberid IS NOT NULL
+--           AND NOT EXISTS (
+--               SELECT 1 FROM federationmember
+--               WHERE federationmemberid = p_coachfederationmemberid
+--           )
+--        THEN
+--            RAISE EXCEPTION 'Coach not found';
+--        END IF;
+--   4. CREATE OR REPLACE the function with the fixed body.
+--
+-- Same fix should also apply to usp_InsertPaidTimeRequest (120_*.sql line 80-86)
+-- if Daniel wants the chatbot to allow horses without a coach. For now leave
+-- paid-time as-is (chatbot always supplies a coach via the flow).
+-- ============================================================================

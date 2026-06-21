@@ -11,6 +11,8 @@ import {
   saveUser,
   clearAuthStorage,
   isTokenValid,
+  saveRememberMe,
+  getRememberMe,
 } from "../services/storageService";
 import { registerUnauthorizedHandler } from "../services/axiosInstance";
 import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
@@ -53,6 +55,19 @@ export function AuthProvider(props) {
 
   async function loadAuthState() {
     try {
+      // Respect the "remember me" preference from the previous session.
+      // If the user did NOT check "remember me" last login, force a fresh
+      // login on app open by clearing any persisted token.
+      const rememberMe = await getRememberMe();
+
+      if (!rememberMe) {
+        await clearAuthStorage();
+        setUser(null);
+        setActiveRole(null);
+        setIsAuthenticated(false);
+        return;
+      }
+
       const token = await getToken();
       const storedUser = await getUser();
       const storedActiveRole = await getActiveRole();
@@ -92,7 +107,7 @@ export function AuthProvider(props) {
     setIsAuthenticated(true);
   }
 
-  async function loginAndInitialize(username, password) {
+  async function loginAndInitialize(username, password, rememberMe) {
     try {
       await clearAuthStorage();
       setActiveRole(null);
@@ -139,6 +154,7 @@ export function AuthProvider(props) {
         approvedRolesAndRanches: data.approvedRolesAndRanches,
       };
 
+      await saveRememberMe(!!rememberMe);
       await saveToken(data.token);
       await saveUser(userData);
 
