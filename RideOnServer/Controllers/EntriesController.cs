@@ -616,5 +616,40 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpDelete("secretary/{entryId}")]
+        public IActionResult SecretaryDeleteEntry(
+            int entryId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (entryId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                int changeRequestId = Entry.SecretaryDeleteEntry(entryId, personId);
+
+                return Ok(new { ChangeRequestId = changeRequestId, Message = "Entry cancelled" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in SecretaryDeleteEntry: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
     }
 }

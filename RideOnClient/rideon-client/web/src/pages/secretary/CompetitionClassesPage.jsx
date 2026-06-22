@@ -419,6 +419,7 @@ export default function CompetitionClassesPage() {
             onGenerateSmartDrawOrderPreview={page.generateSmartDrawOrderPreview}
             onSaveDrawOrder={page.saveDrawOrder}
             onClearDrawOrder={page.clearDrawOrder}
+            onDeleteEntry={page.handleDeleteEntry}
           />
         )}
       </div>

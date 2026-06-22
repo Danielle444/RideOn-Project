@@ -619,7 +619,52 @@ namespace RideOnServer.DAL
             }
         }
 
+        public List<CompetitionPayerForSecretaryItem> GetCompetitionPayersForSecretary(
+            int competitionId,
+            int secretarySystemUserId)
+        {
+            List<CompetitionPayerForSecretaryItem> result =
+                new List<CompetitionPayerForSecretaryItem>();
 
+            try
+            {
+                using NpgsqlConnection connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using NpgsqlCommand command = new NpgsqlCommand(@"
+                    SELECT *
+                    FROM public.usp_getcompetitionpayersforsecretary(
+                        p_competitionid         := @competitionId,
+                        p_secretarysystemuserid := @secretaryId
+                    );", connection);
+
+                command.Parameters.Add("@competitionId", NpgsqlDbType.Integer).Value = competitionId;
+                command.Parameters.Add("@secretaryId", NpgsqlDbType.Integer).Value = secretarySystemUserId;
+
+                using NpgsqlDataReader reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    result.Add(new CompetitionPayerForSecretaryItem
+                    {
+                        PayerPersonId = Convert.ToInt32(reader["payerpersonid"]),
+                        FirstName = reader["firstname"]?.ToString() ?? string.Empty,
+                        LastName = reader["lastname"]?.ToString() ?? string.Empty,
+                        FullName = reader["fullname"]?.ToString() ?? string.Empty,
+                        Email = reader["email"] == DBNull.Value ? null : reader["email"].ToString(),
+                        CellPhone = reader["cellphone"] == DBNull.Value ? null : reader["cellphone"].ToString(),
+                        OpenBillId = reader["openbillid"] == DBNull.Value
+                            ? null
+                            : Convert.ToInt32(reader["openbillid"]),
+                    });
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+
+            return result;
+        }
 
     }
 }

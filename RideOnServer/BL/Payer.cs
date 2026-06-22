@@ -381,5 +381,23 @@ namespace RideOnServer.BL
             );
         }
 
+        internal static List<DTOs.Payers.CompetitionPayerForSecretaryItem> GetCompetitionPayersForSecretary(
+            int competitionId,
+            int secretarySystemUserId)
+        {
+            if (competitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            if (secretarySystemUserId <= 0)
+            {
+                throw new Exception("Invalid SecretarySystemUserId");
+            }
+
+            PayerDAL dal = new PayerDAL();
+            return dal.GetCompetitionPayersForSecretary(competitionId, secretarySystemUserId);
+        }
+
     }
 }

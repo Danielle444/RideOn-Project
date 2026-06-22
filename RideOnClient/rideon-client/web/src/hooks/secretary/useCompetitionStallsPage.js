@@ -10,6 +10,11 @@ import {
   publishStallMap,
   unpublishStallMap,
 } from "../../services/stallMapService";
+import {
+  secretaryDeleteStallBooking,
+  secretaryUpdateStallBooking,
+  secretaryCreateStallBookingForPayer,
+} from "../../services/stallBookingsService";
 
 function parseLayout(layoutJson) {
   if (!layoutJson) return null;
@@ -312,5 +317,48 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
     handleAssign,
     handleUnassign,
     load,
+
+    // Task 3: delete/update stall booking
+    handleDeleteStallBooking,
+    handleUpdateStallBooking,
+
+    // Task 4: add stall for payer
+    handleCreateStallBookingForPayer,
   };
+
+  async function handleDeleteStallBooking(stallBookingId) {
+    var ok = window.confirm("האם לבטל את התא? פעולה זו תעדכן גם את החיובים.");
+    if (!ok) return;
+    await secretaryDeleteStallBooking(stallBookingId, ranchId);
+    await refreshAssignmentsAndOverview();
+  }
+
+  async function handleUpdateStallBooking(stallBookingId, payload) {
+    await secretaryUpdateStallBooking(stallBookingId, {
+      stallBookingId: stallBookingId,
+      ranchId: ranchId,
+      newStartDate: payload.newStartDate,
+      newEndDate: payload.newEndDate,
+      notes: payload.notes,
+      isForTack: payload.isForTack,
+      horseId: payload.horseId,
+    });
+    await refreshAssignmentsAndOverview();
+  }
+
+  async function handleCreateStallBookingForPayer(payload) {
+    var res = await secretaryCreateStallBookingForPayer({
+      competitionId: competitionId,
+      ranchId: ranchId,
+      payerPersonId: payload.payerPersonId,
+      horseId: payload.horseId,
+      startDate: payload.startDate,
+      endDate: payload.endDate,
+      isForTack: payload.isForTack,
+      productId: payload.productId,
+      notes: payload.notes,
+    });
+    await refreshAssignmentsAndOverview();
+    return res.data;
+  }
 }

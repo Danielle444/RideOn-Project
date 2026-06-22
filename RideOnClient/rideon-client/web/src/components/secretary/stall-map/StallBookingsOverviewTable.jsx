@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { MoveRight, Package, Search } from "lucide-react";
+import { MoveRight, Package, Pencil, Search, Trash2 } from "lucide-react";
 import DataTableShell from "../../common/table/DataTableShell";
 
 function formatDate(value) {
@@ -196,6 +196,7 @@ export default function StallBookingsOverviewTable({ items, compounds }) {
             <th className="px-4 py-3 text-sm font-bold">תשלום</th>
             <th className="px-4 py-3 text-sm font-bold">משלמים</th>
             <th className="px-4 py-3 text-sm font-bold">הערות</th>
+            <th className="px-4 py-3 text-sm font-bold">פעולות</th>
             <th className="sticky left-0 z-20 bg-[#F3EEEA] px-4 py-3 text-sm font-bold shadow-[6px_0_10px_-10px_rgba(0,0,0,0.35)]">
               שיבוץ
             </th>
@@ -263,6 +264,36 @@ export default function StallBookingsOverviewTable({ items, compounds }) {
 
                 <td className="min-w-[160px] px-4 py-3 text-sm text-[#6B574F]">
                   {item.notes || "—"}
+                </td>
+
+                <td className="whitespace-nowrap px-2 py-3">
+                  <div className="flex items-center justify-end gap-1">
+                    {props.onEditBooking ? (
+                      <button
+                        type="button"
+                        onClick={function () {
+                          props.onEditBooking(item);
+                        }}
+                        title="עריכה"
+                        className="rounded-lg border border-[#E2D5CE] bg-white p-1.5 text-[#5D4037] hover:bg-[#F5EDE8]"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    ) : null}
+
+                    {props.onDeleteBooking ? (
+                      <button
+                        type="button"
+                        onClick={function () {
+                          props.onDeleteBooking(item);
+                        }}
+                        title="ביטול"
+                        className="rounded-lg border border-[#E7BABA] bg-white p-1.5 text-[#A54848] hover:bg-[#F9E5E5]"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    ) : null}
+                  </div>
                 </td>
 
                 <td className="sticky left-0 z-10 bg-inherit px-4 py-3 shadow-[6px_0_10px_-10px_rgba(0,0,0,0.35)]">

@@ -27,6 +27,7 @@ import ToastMessage from "../../components/common/ToastMessage";
 import PaidTimeRequestCard from "../../components/secretary/paid-time/PaidTimeRequestCard";
 import PaidTimeScheduleCell from "../../components/secretary/paid-time/PaidTimeScheduleCell";
 import PaidTimeSlotInCompetitionModal from "../../components/secretary/PaidTimeSlotInCompetitionModal";
+import PaidTimeSlotRegistrationsModal from "../../components/secretary/paid-time/PaidTimeSlotRegistrationsModal";
 import useCompetitionPaidTimePage from "../../hooks/secretary/useCompetitionPaidTimePage";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import CustomDropdown from "../../components/common/CustomDropdown";
@@ -116,6 +117,44 @@ export default function CompetitionPaidTimePage() {
   const [sortBy, setSortBy] = useState("date");
   const [selectedCoach, setSelectedCoach] = useState("");
   const [openDropdownKey, setOpenDropdownKey] = useState("");
+
+  // Task 2: slot registrations modal
+  const [slotDetailsOpen, setSlotDetailsOpen] = useState(false);
+  const [slotDetailsTarget, setSlotDetailsTarget] = useState(null);
+
+  function handleOpenSlotDetails(timeCell) {
+    var slotId = timeCell && timeCell.slotId;
+    if (!slotId) return;
+
+    var fullSlot = (page.slots || []).find(function (s) {
+      return getSlotId(s) === slotId;
+    });
+
+    setSlotDetailsTarget({
+      slotInCompId: slotId,
+      meta: {
+        slotDate: fullSlot ? getSlotDate(fullSlot) : null,
+        startTime: fullSlot ? fullSlot.startTime || fullSlot.StartTime : null,
+        endTime: fullSlot ? fullSlot.endTime || fullSlot.EndTime : null,
+        arenaName: fullSlot ? fullSlot.arenaName || fullSlot.ArenaName : null,
+      },
+    });
+    setSlotDetailsOpen(true);
+  }
+
+  const allSlotsForTransfer = useMemo(
+    function () {
+      return (page.slots || []).map(function (s) {
+        return {
+          paidTimeSlotInCompId: getSlotId(s),
+          slotDate: getSlotDate(s),
+          startTime: s.startTime || s.StartTime,
+          arenaName: s.arenaName || s.ArenaName,
+        };
+      });
+    },
+    [page.slots],
+  );
 
   const page = useCompetitionPaidTimePage({
     competitionId: Number(competitionId),
@@ -602,6 +641,7 @@ export default function CompetitionPaidTimePage() {
                             assignment={assignment}
                             onUnassign={page.handleUnassignRequest}
                             selectedCoach={selectedCoach}
+                            onOpenDetails={handleOpenSlotDetails}
                           />
                         </div>
                       );
@@ -697,6 +737,21 @@ export default function CompetitionPaidTimePage() {
         type={toast.type}
         message={toast.message}
         onClose={closeToast}
+      />
+
+      <PaidTimeSlotRegistrationsModal
+        isOpen={slotDetailsOpen}
+        slotInCompId={slotDetailsTarget ? slotDetailsTarget.slotInCompId : null}
+        ranchId={ranchId}
+        slotMeta={slotDetailsTarget ? slotDetailsTarget.meta : null}
+        allSlotsInComp={allSlotsForTransfer}
+        onClose={function () {
+          setSlotDetailsOpen(false);
+          setSlotDetailsTarget(null);
+        }}
+        onChanged={function () {
+          page.loadRequests();
+        }}
       />
     </CompetitionWorkspaceLayout>
   );

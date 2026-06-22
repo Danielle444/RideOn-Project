@@ -420,5 +420,134 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpDelete("secretary/{stallBookingId}")]
+        public IActionResult SecretaryDeleteStallBooking(
+            int stallBookingId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (stallBookingId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                int requestId = StallBooking.SecretaryDeleteStallBooking(stallBookingId, personId);
+
+                return Ok(new { ChangeRequestId = requestId, Message = "Stall booking cancelled" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in SecretaryDeleteStallBooking: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPut("secretary/{stallBookingId}")]
+        public IActionResult SecretaryUpdateStallBooking(
+            int stallBookingId,
+            [FromBody] SecretaryUpdateStallBookingRequest request)
+        {
+            try
+            {
+                if (request == null || stallBookingId <= 0 || request.RanchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                if (stallBookingId != request.StallBookingId)
+                {
+                    return BadRequest("StallBookingId mismatch");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
+                StallBooking.SecretaryUpdateStallBooking(
+                    stallBookingId,
+                    personId,
+                    request.NewStartDate,
+                    request.NewEndDate,
+                    request.Notes,
+                    request.IsForTack,
+                    request.HorseId);
+
+                return Ok(new { Message = "Stall booking updated" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in SecretaryUpdateStallBooking: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("secretary/create-for-payer")]
+        public IActionResult SecretaryCreateStallBookingForPayer(
+            [FromBody] SecretaryCreateStallBookingRequest request)
+        {
+            try
+            {
+                if (request == null ||
+                    request.CompetitionId <= 0 ||
+                    request.RanchId <= 0 ||
+                    request.PayerPersonId <= 0 ||
+                    request.ProductId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
+                int newId = StallBooking.SecretaryCreateStallBookingForPayer(
+                    request.CompetitionId,
+                    personId,
+                    request.PayerPersonId,
+                    request.HorseId,
+                    request.StartDate,
+                    request.EndDate,
+                    request.IsForTack,
+                    request.ProductId,
+                    request.Notes);
+
+                return Ok(new { StallBookingId = newId, Message = "Stall booking created" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in SecretaryCreateStallBookingForPayer: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
     }
 }
