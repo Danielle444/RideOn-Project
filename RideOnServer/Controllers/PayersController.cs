@@ -510,5 +510,39 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("secretary/competition-payers")]
+        public IActionResult GetCompetitionPayersForSecretary(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (competitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                var items = Payer.GetCompetitionPayersForSecretary(competitionId, personId);
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetCompetitionPayersForSecretary: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
     }
 }

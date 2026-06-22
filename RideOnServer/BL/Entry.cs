@@ -464,5 +464,21 @@ namespace RideOnServer.BL
 
             return response;
         }
+
+        public static int SecretaryDeleteEntry(int entryId, int secretarySystemUserId)
+        {
+            if (entryId <= 0)
+            {
+                throw new Exception("Invalid EntryId");
+            }
+
+            if (secretarySystemUserId <= 0)
+            {
+                throw new Exception("Invalid SecretarySystemUserId");
+            }
+
+            EntryDAL dal = new EntryDAL();
+            return dal.SecretaryDeleteEntry(entryId, secretarySystemUserId);
+        }
     }
 }

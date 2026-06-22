@@ -719,7 +719,34 @@ namespace RideOnServer.DAL
             }
         }
 
+        public int SecretaryDeleteEntry(int entryId, int secretarySystemUserId)
+        {
+            try
+            {
+                using NpgsqlConnection connection = Connect("DefaultConnection");
+                connection.Open();
 
+                using NpgsqlCommand command = new NpgsqlCommand(@"
+                    SELECT public.usp_secretarydeleteentry(
+                        p_entryid               := @entryId,
+                        p_secretarysystemuserid := @secretaryId
+                    );", connection);
+
+                command.Parameters.Add("@entryId", NpgsqlDbType.Integer).Value = entryId;
+                command.Parameters.Add("@secretaryId", NpgsqlDbType.Integer).Value = secretarySystemUserId;
+
+                object? result = command.ExecuteScalar();
+                if (result == null || result == DBNull.Value)
+                {
+                    throw new Exception("Failed to delete entry");
+                }
+                return Convert.ToInt32(result);
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
 
     }
 }

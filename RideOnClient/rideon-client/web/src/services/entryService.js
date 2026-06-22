@@ -43,9 +43,17 @@ function clearGroupEntriesDrawOrder(data) {
   );
 }
 
+function secretaryDeleteEntry(entryId, ranchId) {
+  return axios.delete(`${API}/Entries/secretary/${entryId}`, {
+    params: { ranchId: ranchId },
+    ...getAuthHeaders(),
+  });
+}
+
 export {
   getSecretaryCompetitionEntries,
   updateGroupEntriesDrawOrder,
   previewGroupEntriesDrawOrder,
   clearGroupEntriesDrawOrder,
+  secretaryDeleteEntry,
 };

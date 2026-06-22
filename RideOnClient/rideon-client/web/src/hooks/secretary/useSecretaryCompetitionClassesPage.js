@@ -9,6 +9,7 @@ import {
   updateGroupEntriesDrawOrder,
   previewGroupEntriesDrawOrder,
   clearGroupEntriesDrawOrder,
+  secretaryDeleteEntry,
 } from "../../services/entryService";
 import { getCompetitionById } from "../../services/competitionService";
 import {
@@ -373,6 +374,23 @@ export default function useSecretaryCompetitionClassesPage(options) {
       alert(getErrorMessage(err, "שגיאה במחיקת מקצה"));
     } finally {
       setDeletingClassId(null);
+    }
+  }
+
+  async function handleDeleteEntry(item) {
+    var entryId = item.entryId || item.EntryId;
+    if (!entryId) return;
+
+    var confirmed = window.confirm(
+      "האם לבטל את ההרשמה? הפעולה תסומן כביטול מאושר.",
+    );
+    if (!confirmed) return;
+
+    try {
+      await secretaryDeleteEntry(entryId, ranchId);
+      await loadEntries();
+    } catch (err) {
+      alert(getErrorMessage(err, "שגיאה בביטול הרשמה"));
     }
   }
 
@@ -1142,5 +1160,6 @@ export default function useSecretaryCompetitionClassesPage(options) {
     closeClassModal,
     handleSubmitClass,
     handleDeleteClass,
+    handleDeleteEntry,
   };
 }

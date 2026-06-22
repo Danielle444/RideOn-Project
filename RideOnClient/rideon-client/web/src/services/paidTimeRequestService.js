@@ -29,8 +29,20 @@ function unassignPaidTimeRequest(data) {
   return axios.post(`${API}/PaidTimeRequests/unassign`, data);
 }
 
+function getPaidTimeSlotRegistrations(slotInCompId, ranchId) {
+  return axios.get(`${API}/PaidTimeRequests/slot-registrations`, {
+    params: { slotInCompId: slotInCompId, ranchId: ranchId },
+  });
+}
+
+function transferPaidTimeRequestToSlot(payload) {
+  return axios.post(`${API}/PaidTimeRequests/transfer-to-slot`, payload);
+}
+
 export {
   getPaidTimeRequestsForAssignment,
   assignPaidTimeRequest,
   unassignPaidTimeRequest,
+  getPaidTimeSlotRegistrations,
+  transferPaidTimeRequestToSlot,
 };
