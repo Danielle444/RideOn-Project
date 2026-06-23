@@ -1,5 +1,6 @@
 ﻿using Npgsql;
 using NpgsqlTypes;
+using System.Text.Json;
 using RideOnServer.BL.DTOs.CompetitionSummary;
 
 namespace RideOnServer.DAL
@@ -909,6 +910,347 @@ namespace RideOnServer.DAL
             }
         }
 
+        public List<CompetitionSummaryPaymentMethodBreakdownItem>
+    GetPaymentMethodBreakdown(
+        int competitionId,
+        int ranchId,
+        string chargeOwner)
+        {
+            List<CompetitionSummaryPaymentMethodBreakdownItem> items =
+                new List<CompetitionSummaryPaymentMethodBreakdownItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getcompetitionsummarypaymentmethodbreakdown(
+                        @competitionId,
+                        @ranchId,
+                        @chargeOwner
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = competitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = ranchId;
+
+                        command.Parameters.Add("@chargeOwner", NpgsqlDbType.Text)
+                            .Value = chargeOwner;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new CompetitionSummaryPaymentMethodBreakdownItem
+                                    {
+                                        PaymentMethodId =
+                                            GetInt(reader, "PaymentMethodId"),
+
+                                        PaymentMethodType =
+                                            GetString(reader, "PaymentMethodType"),
+
+                                        PaymentBatchCount =
+                                            GetInt(reader, "PaymentBatchCount"),
+
+                                        AmountPaid =
+                                            GetDecimal(reader, "AmountPaid")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public List<CompetitionSummaryPaymentBatchItem>
+            GetPaymentBatches(
+                int competitionId,
+                int ranchId,
+                string chargeOwner,
+                int? paymentMethodId)
+        {
+            List<CompetitionSummaryPaymentBatchItem> items =
+                new List<CompetitionSummaryPaymentBatchItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getcompetitionsummarypaymentbatches(
+                        @competitionId,
+                        @ranchId,
+                        @chargeOwner,
+                        @paymentMethodId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = competitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = ranchId;
+
+                        command.Parameters.Add("@chargeOwner", NpgsqlDbType.Text)
+                            .Value = chargeOwner;
+
+                        command.Parameters.Add("@paymentMethodId", NpgsqlDbType.Integer)
+                            .Value = paymentMethodId == null
+                                ? DBNull.Value
+                                : paymentMethodId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new CompetitionSummaryPaymentBatchItem
+                                    {
+                                        PaymentBatchId =
+                                            GetInt(reader, "PaymentBatchId"),
+
+                                        BillId =
+                                            GetInt(reader, "BillId"),
+
+                                        PayerPersonId =
+                                            GetInt(reader, "PayerPersonId"),
+
+                                        PayerName =
+                                            GetString(reader, "PayerName"),
+
+                                        InvoiceNumber =
+                                            GetString(reader, "InvoiceNumber"),
+
+                                        CreatedAt =
+                                            GetDateTime(reader, "CreatedAt"),
+
+                                        EnteredByName =
+                                            GetNullableString(reader, "EnteredByName"),
+
+                                        BatchTotalAmount =
+                                            GetDecimal(reader, "BatchTotalAmount"),
+
+                                        SelectedMethodAmount =
+                                            GetDecimal(reader, "SelectedMethodAmount"),
+
+                                        PaymentMethodsText =
+                                            GetString(reader, "PaymentMethodsText")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public List<CompetitionSummaryPaymentBatchMethodItem>
+            GetPaymentBatchMethods(
+                int competitionId,
+                int ranchId,
+                int paymentBatchId)
+        {
+            List<CompetitionSummaryPaymentBatchMethodItem> items =
+                new List<CompetitionSummaryPaymentBatchMethodItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getcompetitionsummarypaymentbatchmethods(
+                        @competitionId,
+                        @ranchId,
+                        @paymentBatchId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = competitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = ranchId;
+
+                        command.Parameters.Add("@paymentBatchId", NpgsqlDbType.Integer)
+                            .Value = paymentBatchId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new CompetitionSummaryPaymentBatchMethodItem
+                                    {
+                                        PaymentId =
+                                            GetInt(reader, "PaymentId"),
+
+                                        PaymentBatchId =
+                                            GetInt(reader, "PaymentBatchId"),
+
+                                        PaymentMethodId =
+                                            GetInt(reader, "PaymentMethodId"),
+
+                                        PaymentMethodType =
+                                            GetString(reader, "PaymentMethodType"),
+
+                                        AmountPaid =
+                                            GetDecimal(reader, "AmountPaid"),
+
+                                        PaymentDate =
+                                            GetDateTime(reader, "PaymentDate"),
+
+                                        InvoiceNumber =
+                                            GetNullableString(reader, "InvoiceNumber"),
+
+                                        TransactionReference =
+                                            GetNullableString(reader, "TransactionReference")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public List<CompetitionSummaryPaymentBatchChargeItem>
+            GetPaymentBatchCharges(
+                int competitionId,
+                int ranchId,
+                int paymentBatchId)
+        {
+            List<CompetitionSummaryPaymentBatchChargeItem> items =
+                new List<CompetitionSummaryPaymentBatchChargeItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getcompetitionsummarypaymentbatchcharges(
+                        @competitionId,
+                        @ranchId,
+                        @paymentBatchId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = competitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = ranchId;
+
+                        command.Parameters.Add("@paymentBatchId", NpgsqlDbType.Integer)
+                            .Value = paymentBatchId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new CompetitionSummaryPaymentBatchChargeItem
+                                    {
+                                        BillChargeId =
+                                            GetInt(reader, "BillChargeId"),
+
+                                        ChargeOwner =
+                                            GetString(reader, "ChargeOwner"),
+
+                                        CategoryKey =
+                                            GetString(reader, "CategoryKey"),
+
+                                        SourceType =
+                                            GetString(reader, "SourceType"),
+
+                                        SourceId =
+                                            GetInt(reader, "SourceId"),
+
+                                        MainName =
+                                            GetString(reader, "MainName"),
+
+                                        ProductDetailsText =
+                                            GetNullableString(reader, "ProductDetailsText"),
+
+                                        RiderName =
+                                            GetNullableString(reader, "RiderName"),
+
+                                        HorseName =
+                                            GetNullableString(reader, "HorseName"),
+
+                                        BarnName =
+                                            GetNullableString(reader, "BarnName"),
+
+                                        AmountToPay =
+                                            GetDecimal(reader, "AmountToPay"),
+
+                                        Notes =
+                                            GetNullableString(reader, "Notes")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
         public List<CompetitionSummaryCashDetailItem> GetCompetitionSummaryCashDetails(
             int competitionId,
             int ranchId)
@@ -997,6 +1339,227 @@ namespace RideOnServer.DAL
             }
 
             return reader.GetInt16(ordinal);
+        }
+
+        public CompetitionCashDeskOverviewItem GetCashDeskOverview(
+    int competitionId,
+    int ranchId)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_getcompetitioncashdeskoverview(
+                        @competitionId,
+                        @ranchId
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = competitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = ranchId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                return new CompetitionCashDeskOverviewItem
+                                {
+                                    CompetitionId =
+                                        GetInt(reader, "CompetitionId"),
+
+                                    RanchId =
+                                        GetInt(reader, "RanchId"),
+
+                                    ExpectedCashAmount =
+                                        GetDecimal(reader, "ExpectedCashAmount"),
+
+                                    TransferredToSafeAmount =
+                                        GetDecimal(reader, "TransferredToSafeAmount"),
+
+                                    CurrentCashInDeskAmount =
+                                        GetDecimal(reader, "CurrentCashInDeskAmount"),
+
+                                    LastCountId =
+                                        GetNullableInt(reader, "LastCountId"),
+
+                                    LastCountedAt =
+                                        GetNullableDateTime(reader, "LastCountedAt"),
+
+                                    LastCountedByName =
+                                        GetNullableString(reader, "LastCountedByName"),
+
+                                    LastCountedAmount =
+                                        GetDecimal(reader, "LastCountedAmount"),
+
+                                    LastDifferenceAmount =
+                                        GetDecimal(reader, "LastDifferenceAmount"),
+
+                                    LastCountLinesJson =
+                                        GetString(reader, "LastCountLinesJson"),
+
+                                    LastSafeTransferAt =
+                                        GetNullableDateTime(reader, "LastSafeTransferAt"),
+
+                                    IsCountRequired =
+                                        GetBool(reader, "IsCountRequired")
+                                };
+                            }
+                        }
+                    }
+                }
+
+                return new CompetitionCashDeskOverviewItem
+                {
+                    CompetitionId = competitionId,
+                    RanchId = ranchId
+                };
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public int SaveCashCount(
+            SaveCompetitionCashCountRequest request)
+        {
+            try
+            {
+                string linesJson =
+                    JsonSerializer.Serialize(
+                        request.Lines.Select(
+                            line => new
+                            {
+                                denominationValue = line.DenominationValue,
+                                quantity = line.Quantity
+                            }
+                        )
+                    );
+
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select public.usp_savecompetitioncashcount(
+                        @competitionId,
+                        @ranchId,
+                        @countedBySystemUserId,
+                        @lines::jsonb,
+                        @notes
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = request.CompetitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = request.RanchId;
+
+                        command.Parameters.Add("@countedBySystemUserId", NpgsqlDbType.Integer)
+                            .Value = request.CountedBySystemUserId;
+
+                        command.Parameters.Add("@lines", NpgsqlDbType.Jsonb)
+                            .Value = linesJson;
+
+                        command.Parameters.Add("@notes", NpgsqlDbType.Text)
+                            .Value =
+                                request.Notes == null
+                                    ? DBNull.Value
+                                    : request.Notes;
+
+                        object result = command.ExecuteScalar()!;
+
+                        return Convert.ToInt32(result);
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public int SaveCashSafeTransfer(
+            SaveCompetitionCashSafeTransferRequest request)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select public.usp_savecompetitioncashsafetransfer(
+                        @competitionId,
+                        @ranchId,
+                        @transferredBySystemUserId,
+                        @amount,
+                        @notes
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
+                            .Value = request.CompetitionId;
+
+                        command.Parameters.Add("@ranchId", NpgsqlDbType.Integer)
+                            .Value = request.RanchId;
+
+                        command.Parameters.Add("@transferredBySystemUserId", NpgsqlDbType.Integer)
+                            .Value = request.TransferredBySystemUserId;
+
+                        command.Parameters.Add("@amount", NpgsqlDbType.Numeric)
+                            .Value = request.Amount;
+
+                        command.Parameters.Add("@notes", NpgsqlDbType.Text)
+                            .Value =
+                                request.Notes == null
+                                    ? DBNull.Value
+                                    : request.Notes;
+
+                        object result = command.ExecuteScalar()!;
+
+                        return Convert.ToInt32(result);
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        private static int? GetNullableInt(
+    NpgsqlDataReader reader,
+    string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+
+            if (reader.IsDBNull(ordinal))
+            {
+                return null;
+            }
+
+            return reader.GetInt32(ordinal);
         }
 
         private static TimeSpan GetTimeSpan(

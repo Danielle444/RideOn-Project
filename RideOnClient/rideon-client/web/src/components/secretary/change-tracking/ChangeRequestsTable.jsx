@@ -5,6 +5,10 @@ import DataTableLoadingState from "../../common/table/DataTableLoadingState";
 import TableActionButton from "../../common/table/TableActionButton";
 
 function getValue(item, camelKey, pascalKey, fallback) {
+  if (!item) {
+    return fallback;
+  }
+
   if (item[camelKey] !== null && item[camelKey] !== undefined) {
     return item[camelKey];
   }
@@ -72,6 +76,164 @@ function getStatusClass(status) {
   return "bg-[#FFF4E5] text-[#9A5B00]";
 }
 
+function getRequestKey(item) {
+  return (
+    getValue(item, "requestSource", "RequestSource", "") +
+    "-" +
+    getValue(item, "requestId", "RequestId", "")
+  );
+}
+
+function splitDetailsText(text) {
+  if (!text) {
+    return [];
+  }
+
+  return String(text)
+    .split("|")
+    .map(function (part) {
+      return part.trim();
+    })
+    .filter(function (part) {
+      return part.length > 0;
+    });
+}
+
+function getDetailLabel(part) {
+  var index = part.indexOf(":");
+
+  if (index === -1) {
+    return part.trim();
+  }
+
+  return part.substring(0, index).trim();
+}
+
+function getDetailValue(part) {
+  var index = part.indexOf(":");
+
+  if (index === -1) {
+    return "";
+  }
+
+  return part.substring(index + 1).trim();
+}
+
+function buildChangedFields(beforeText, afterText) {
+  var beforeParts = splitDetailsText(beforeText);
+  var afterParts = splitDetailsText(afterText);
+  var changes = [];
+
+  beforeParts.forEach(function (beforePart) {
+    var beforeLabel = getDetailLabel(beforePart);
+    var beforeValue = getDetailValue(beforePart);
+
+    var matchingAfterPart = afterParts.find(function (afterPart) {
+      return getDetailLabel(afterPart) === beforeLabel;
+    });
+
+    if (!matchingAfterPart) {
+      return;
+    }
+
+    var afterValue = getDetailValue(matchingAfterPart);
+
+    var isMissingAfterValue =
+      afterValue === "" ||
+      afterValue === "-" ||
+      afterValue === "₪" ||
+      afterValue === "₪0" ||
+      afterValue === "₪0.00";
+
+    var isPayerField = beforeLabel === "משלם" || beforeLabel === "משלמים";
+
+    if (isPayerField && isMissingAfterValue) {
+      return;
+    }
+
+    if (beforeValue !== afterValue) {
+      changes.push({
+        label: beforeLabel,
+        beforeValue: beforeValue || "-",
+        afterValue: afterValue || "-",
+      });
+    }
+  });
+
+  return changes;
+}
+
+function ChangeSummary(props) {
+  var item = props.item;
+
+  var requestType = getValue(item, "requestType", "RequestType", "");
+  var isCancelled = getValue(item, "isCancelled", "IsCancelled", false);
+  var beforeText = getValue(item, "beforeText", "BeforeText", "");
+  var afterText = getValue(item, "afterText", "AfterText", "");
+  var amountBefore = getValue(item, "amountBefore", "AmountBefore", null);
+  var amountAfter = getValue(item, "amountAfter", "AmountAfter", null);
+  var fineAmount = getValue(
+    item,
+    "fineAmountSnapshot",
+    "FineAmountSnapshot",
+    null,
+  );
+
+  var changes = buildChangedFields(beforeText, afterText);
+
+  if (isCancelled) {
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="font-bold text-[#3F312B]">{requestType}</span>
+
+        <span className="text-xs text-[#6D4C41]">
+          {beforeText || "ביטול הרשמה"}
+        </span>
+
+        <span className="text-xs font-bold text-[#9A5B00]">
+          לאחר אישור: {formatMoney(amountAfter)}
+        </span>
+
+        {fineAmount !== null && fineAmount !== undefined ? (
+          <span className="text-xs font-bold text-[#B26A00]">
+            כולל קנס: {formatMoney(fineAmount)}
+          </span>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="font-bold text-[#3F312B]">{requestType}</span>
+
+      {changes.length > 0 ? (
+        changes.slice(0, 3).map(function (change, index) {
+          return (
+            <span key={index} className="text-xs text-[#6D4C41]">
+              {change.label}: {change.beforeValue} ← {change.afterValue}
+            </span>
+          );
+        })
+      ) : (
+        <span className="text-xs text-[#6D4C41]">
+          {afterText || "שינוי בפרטי הבקשה"}
+        </span>
+      )}
+
+      <span className="text-xs font-bold text-[#7B5A4D]">
+        סכום: {formatMoney(amountBefore)} ← {formatMoney(amountAfter)}
+      </span>
+
+      {fineAmount !== null && fineAmount !== undefined ? (
+        <span className="text-xs font-bold text-[#B26A00]">
+          כולל קנס: {formatMoney(fineAmount)}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export default function ChangeRequestsTable(props) {
   var items = Array.isArray(props.items) ? props.items : [];
   var isPendingTab = props.activeStatus === "Pending";
@@ -81,6 +243,7 @@ export default function ChangeRequestsTable(props) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-[#3F312B]">בקשות שינוי</h2>
+
           <p className="text-xs text-[#8D6E63]">
             {items.length} בקשות מוצגות כרגע
           </p>
@@ -93,10 +256,8 @@ export default function ChangeRequestsTable(props) {
             <th className="px-4 py-3">תאריך בקשה</th>
             <th className="px-4 py-3">מבקש</th>
             <th className="px-4 py-3">מקור</th>
-            <th className="px-4 py-3">סוג שינוי</th>
             <th className="px-4 py-3">ישות</th>
-            <th className="px-4 py-3">לפני</th>
-            <th className="px-4 py-3">אחרי</th>
+            <th className="px-4 py-3">מה שונה</th>
             <th className="px-4 py-3">סטטוס</th>
             <th className="px-4 py-3">פעולות</th>
           </tr>
@@ -104,20 +265,16 @@ export default function ChangeRequestsTable(props) {
 
         <tbody>
           {props.loading ? (
-            <DataTableLoadingState colSpan={9} message="טוען בקשות שינוי..." />
+            <DataTableLoadingState colSpan={7} message="טוען בקשות שינוי..." />
           ) : null}
 
           {!props.loading && items.length === 0 ? (
-            <DataTableEmptyState colSpan={9} message="לא נמצאו בקשות שינוי" />
+            <DataTableEmptyState colSpan={7} message="לא נמצאו בקשות שינוי" />
           ) : null}
 
           {!props.loading
             ? items.map(function (item) {
-                var key =
-                  getValue(item, "requestSource", "RequestSource", "") +
-                  "-" +
-                  getValue(item, "requestId", "RequestId", "");
-
+                var requestKey = getRequestKey(item);
                 var status = getValue(item, "status", "Status", "");
                 var source = getValue(
                   item,
@@ -126,9 +283,11 @@ export default function ChangeRequestsTable(props) {
                   "",
                 );
 
+                var isAnswering = props.answeringRequestKey === requestKey;
+
                 return (
                   <tr
-                    key={key}
+                    key={requestKey}
                     className="border-t border-[#F1E7E1] text-sm text-[#4A3A34]"
                   >
                     <td className="px-4 py-3">
@@ -148,31 +307,20 @@ export default function ChangeRequestsTable(props) {
 
                     <td className="px-4 py-3">{getSourceLabel(source)}</td>
 
-                    <td className="px-4 py-3 font-semibold">
-                      {getValue(item, "requestType", "RequestType", "-")}
-                    </td>
-
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
                         <span className="font-bold">
                           {getValue(item, "entityName", "EntityName", "-")}
                         </span>
+
                         <span className="text-xs text-[#8D6E63]">
                           {getValue(item, "entityType", "EntityType", "-")}
                         </span>
                       </div>
                     </td>
 
-                    <td className="max-w-[260px] px-4 py-3">
-                      <span className="line-clamp-2">
-                        {getValue(item, "beforeText", "BeforeText", "-")}
-                      </span>
-                    </td>
-
-                    <td className="max-w-[260px] px-4 py-3">
-                      <span className="line-clamp-2">
-                        {getValue(item, "afterText", "AfterText", "-")}
-                      </span>
+                    <td className="max-w-[430px] px-4 py-3">
+                      <ChangeSummary item={item} />
                     </td>
 
                     <td className="px-4 py-3">
@@ -191,18 +339,22 @@ export default function ChangeRequestsTable(props) {
                         {isPendingTab ? (
                           <>
                             <TableActionButton
-                              label="אשר"
+                              label={isAnswering ? "מאשר..." : "אשר"}
                               icon={<Check size={15} />}
-                              disabled
-                              title="אישור יחובר אחרי בניית לוגיקת חיובים"
+                              disabled={isAnswering}
+                              onClick={function () {
+                                props.onApprove(item);
+                              }}
                             />
 
                             <TableActionButton
-                              label="דחה"
+                              label={isAnswering ? "דוחה..." : "דחה"}
                               icon={<X size={15} />}
                               variant="danger"
-                              disabled
-                              title="דחייה תחובר בשלב הבא"
+                              disabled={isAnswering}
+                              onClick={function () {
+                                props.onReject(item);
+                              }}
                             />
                           </>
                         ) : null}

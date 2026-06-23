@@ -56,8 +56,10 @@ namespace RideOnServer.DAL
                                 ? DBNull.Value
                                 : status;
 
-                        using (NpgsqlDataReader reader =
-                            command.ExecuteReader())
+                        using (
+                            NpgsqlDataReader reader =
+                                command.ExecuteReader()
+                        )
                         {
                             while (reader.Read())
                             {
@@ -196,6 +198,92 @@ namespace RideOnServer.DAL
             }
         }
 
+        public int AnswerSecretaryChangeRequest(
+            AnswerChangeRequestRequest request)
+        {
+            try
+            {
+                using (
+                    NpgsqlConnection connection =
+                        Connect("DefaultConnection")
+                )
+                {
+                    connection.Open();
+
+                    string sql = "";
+
+                    if (request.RequestSource == "Entry")
+                    {
+                        sql =
+                            @"
+                            select public.usp_answerchangeentryrequest(
+                                @requestId,
+                                @answerStatus,
+                                @answeredBySystemUserId,
+                                @notes
+                            );";
+                    }
+                    else if (request.RequestSource == "Product")
+                    {
+                        sql =
+                            @"
+                            select public.usp_answerproductchangerequest(
+                                @requestId,
+                                @answerStatus,
+                                @answeredBySystemUserId,
+                                @notes
+                            );";
+                    }
+                    else
+                    {
+                        throw new Exception("Invalid RequestSource");
+                    }
+
+                    using (
+                        NpgsqlCommand command =
+                            new NpgsqlCommand(sql, connection)
+                    )
+                    {
+                        command.Parameters.Add(
+                            "@requestId",
+                            NpgsqlDbType.Integer
+                        ).Value = request.RequestId;
+
+                        command.Parameters.Add(
+                            "@answerStatus",
+                            NpgsqlDbType.Text
+                        ).Value = request.AnswerStatus;
+
+                        command.Parameters.Add(
+                            "@answeredBySystemUserId",
+                            NpgsqlDbType.Integer
+                        ).Value = request.AnsweredBySystemUserId;
+
+                        command.Parameters.Add(
+                            "@notes",
+                            NpgsqlDbType.Text
+                        ).Value =
+                            string.IsNullOrWhiteSpace(request.Notes)
+                                ? DBNull.Value
+                                : request.Notes;
+
+                        object? result = command.ExecuteScalar();
+
+                        if (result == null || result == DBNull.Value)
+                        {
+                            return request.RequestId;
+                        }
+
+                        return Convert.ToInt32(result);
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
         public int GetHostSecretaryPendingChangeRequestsCount(
             int ranchId)
         {
@@ -235,6 +323,74 @@ namespace RideOnServer.DAL
                         return Convert.ToInt32(result);
                     }
                 }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public List<PendingChangeRequestsByCompetitionItem>
+            GetHostSecretaryPendingChangeRequestsByCompetition(int ranchId)
+        {
+            List<PendingChangeRequestsByCompetitionItem> items =
+                new List<PendingChangeRequestsByCompetitionItem>();
+
+            try
+            {
+                using (
+                    NpgsqlConnection connection =
+                        Connect("DefaultConnection")
+                )
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command =
+                            new NpgsqlCommand(
+                                @"
+                                select *
+                                from public.usp_gethostsecretarypendingchangerequestsbycompetition(
+                                    @ranchId
+                                );",
+                                connection
+                            )
+                    )
+                    {
+                        command.Parameters.Add(
+                            "@ranchId",
+                            NpgsqlDbType.Integer
+                        ).Value = ranchId;
+
+                        using (
+                            NpgsqlDataReader reader =
+                                command.ExecuteReader()
+                        )
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new PendingChangeRequestsByCompetitionItem
+                                    {
+                                        CompetitionId =
+                                            GetInt(reader, "CompetitionId"),
+
+                                        CompetitionName =
+                                            GetString(
+                                                reader,
+                                                "CompetitionName"
+                                            ),
+
+                                        PendingCount =
+                                            GetInt(reader, "PendingCount")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
             }
             catch (NpgsqlException ex)
             {
@@ -338,68 +494,6 @@ namespace RideOnServer.DAL
             }
 
             return reader.GetDecimal(ordinal);
-        }
-
-        public List<PendingChangeRequestsByCompetitionItem>
-            GetHostSecretaryPendingChangeRequestsByCompetition(int ranchId)
-        {
-            List<PendingChangeRequestsByCompetitionItem> items =
-                new List<PendingChangeRequestsByCompetitionItem>();
-
-            try
-            {
-                using (
-                    NpgsqlConnection connection =
-                        Connect("DefaultConnection")
-                )
-                {
-                    connection.Open();
-
-                    using (
-                        NpgsqlCommand command =
-                            new NpgsqlCommand(
-                                @"
-                        select *
-                        from public.usp_gethostsecretarypendingchangerequestsbycompetition(
-                            @ranchId
-                        );",
-                                connection
-                            )
-                    )
-                    {
-                        command.Parameters.Add(
-                            "@ranchId",
-                            NpgsqlDbType.Integer
-                        ).Value = ranchId;
-
-                        using (NpgsqlDataReader reader = command.ExecuteReader())
-                        {
-                            while (reader.Read())
-                            {
-                                items.Add(
-                                    new PendingChangeRequestsByCompetitionItem
-                                    {
-                                        CompetitionId =
-                                            GetInt(reader, "CompetitionId"),
-
-                                        CompetitionName =
-                                            GetString(reader, "CompetitionName"),
-
-                                        PendingCount =
-                                            GetInt(reader, "PendingCount")
-                                    }
-                                );
-                            }
-                        }
-                    }
-                }
-
-                return items;
-            }
-            catch (NpgsqlException ex)
-            {
-                throw new Exception(ex.Message);
-            }
         }
     }
 }

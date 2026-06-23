@@ -14,7 +14,17 @@
 
         public int SourceId { get; set; }
 
+        public string DisplayRowKey { get; set; } = string.Empty;
+
+        public int? StallBookingId { get; set; }
+
         public DateTime? DisplayDate { get; set; }
+
+        public DateTime? StartDate { get; set; }
+
+        public DateTime? EndDate { get; set; }
+
+        public DateTime? RequestedDeliveryTime { get; set; }
 
         public string MainName { get; set; } = string.Empty;
 
@@ -27,6 +37,24 @@
         public string? CoachName { get; set; }
 
         public string PayerName { get; set; } = string.Empty;
+
+        public string? OrderedByName { get; set; }
+
+        public string? StallTypeName { get; set; }
+
+        public string? StallNumber { get; set; }
+
+        public string? CompoundName { get; set; }
+
+        public int? BagQuantity { get; set; }
+
+        public int? SplitPayersCount { get; set; }
+
+        public string? SplitPaymentText { get; set; }
+
+        public string? SplitPayersJson { get; set; }
+
+        public string? StallAssignmentText { get; set; }
 
         public decimal AmountToPay { get; set; }
 

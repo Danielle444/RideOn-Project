@@ -42,8 +42,13 @@ function getPendingChangeRequestsByCompetition(ranchId) {
   });
 }
 
+function answerChangeRequest(data) {
+  return axios.post(`${API}/ChangeTracking/answer`, data, getAuthHeaders());
+}
+
 export {
   getCompetitionChangeRequests,
   getPendingChangeRequestsCount,
   getPendingChangeRequestsByCompetition,
+  answerChangeRequest,
 };

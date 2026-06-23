@@ -60,6 +60,7 @@ export default function SummaryAmountCards(props) {
         title="שולם בפועל"
         amount={totals.paidAmount || totals.PaidAmount}
         colorClass="text-[#2E7D32]"
+        onClick={props.onPaidAmountClick}
       />
 
       <AmountCard

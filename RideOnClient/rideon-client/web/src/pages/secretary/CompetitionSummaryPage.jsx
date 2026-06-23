@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import CompetitionSummarySection from "../../components/secretary/competition-summary/CompetitionSummarySection";
 import SummaryDetailsModal from "../../components/secretary/competition-summary/SummaryDetailsModal";
+import SummaryPaymentsBreakdownModal from "../../components/secretary/competition-summary/SummaryPaymentsBreakdownModal";
+import CashDeskModal from "../../components/secretary/competition-summary/CashDeskModal";
 import { getCompetitionById } from "../../services/competitionService";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import useCompetitionSummaryPage from "../../hooks/secretary/useCompetitionSummaryPage";
@@ -90,6 +92,7 @@ function SummaryPageContent(props) {
             actionType="cash"
             onActionClick={page.openCashDetails}
             onCategoryClick={page.openOrganizerCategoryDetails}
+            onPaidAmountClick={page.openOrganizerPaidBreakdown}
           />
 
           <CompetitionSummarySection
@@ -118,6 +121,35 @@ function SummaryPageContent(props) {
         onClose={page.closeDetailsModal}
         onDetailRowClick={page.openEntriesForDetail}
         onBackToDetails={page.backToDetailsList}
+      />
+
+      <SummaryPaymentsBreakdownModal
+        modal={page.paymentsModal}
+        breakdownItems={page.paymentBreakdownItems}
+        batchItems={page.paymentBatchItems}
+        batchMethods={page.paymentBatchMethods}
+        batchCharges={page.paymentBatchCharges}
+        loading={page.paymentsLoading}
+        error={page.paymentsError}
+        onClose={page.closePaymentsModal}
+        onBack={page.backInPaymentsModal}
+        onOpenAllBatches={function () {
+          page.openPaymentBatches(null);
+        }}
+        onOpenMethodBatches={page.openPaymentBatches}
+        onOpenBatchDetails={page.openPaymentBatchDetails}
+      />
+
+      <CashDeskModal
+        open={page.cashDeskOpen}
+        overview={page.cashDeskOverview}
+        loading={page.cashDeskLoading}
+        saving={page.cashDeskSaving}
+        error={page.cashDeskError}
+        success={page.cashDeskSuccess}
+        onClose={page.closeCashDesk}
+        onSaveCount={page.saveCashCount}
+        onSaveSafeTransfer={page.saveCashSafeTransfer}
       />
     </div>
   );
