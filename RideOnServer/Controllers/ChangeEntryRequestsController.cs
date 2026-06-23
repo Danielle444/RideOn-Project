@@ -58,5 +58,39 @@ namespace RideOnServer.Controllers
                 );
             }
         }
+
+        [HttpPost("cancel-by-payer")]
+        public IActionResult CancelByPayer(
+            [FromBody] CancelEntryByPayerRequest dto)
+        {
+            try
+            {
+                if (dto == null || dto.EntryId <= 0 || dto.RanchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    dto.RanchId,
+                    RoleNames.Payer
+                );
+
+                int requestId = ChangeEntryRequest.CancelByPayer(dto.EntryId, personId);
+
+                return Ok(requestId);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in CancelByPayer: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

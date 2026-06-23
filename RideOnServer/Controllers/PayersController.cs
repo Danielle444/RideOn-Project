@@ -471,5 +471,78 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("my-competition-account")]
+        public IActionResult GetMyCompetitionAccount(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId
+        )
+        {
+            try
+            {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    ranchId,
+                    RoleNames.Payer
+                );
+
+                // Force payerPersonId = self. Payer can only ever see own account.
+                string accountJson = Payer.GetPayerCompetitionAccount(
+                    currentPersonId,
+                    competitionId,
+                    ranchId,
+                    currentPersonId
+                );
+
+                JsonElement account = JsonSerializer.Deserialize<JsonElement>(accountJson);
+
+                return Ok(account);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetMyCompetitionAccount: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת חשבון המשלם שלך");
+            }
+        }
+
+        [HttpGet("secretary/competition-payers")]
+        public IActionResult GetCompetitionPayersForSecretary(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (competitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                var items = Payer.GetCompetitionPayersForSecretary(competitionId, personId);
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetCompetitionPayersForSecretary: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
     }
 }

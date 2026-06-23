@@ -1,0 +1,142 @@
+-- ============================================================================
+-- Modifications to existing SPs (Daniel — please apply)
+-- ============================================================================
+-- These edits surface data the UI already needs.
+--   A) Payment charges: expose HasPendingChange / HasPendingCancellation flags
+--   B) Entry list SPs: expose FineName alongside FineAmount
+--   C) Auto-apply fine when a change/cancel request is created
+--
+-- This file is NOT a runnable function. It documents the diffs.
+-- ============================================================================
+
+-- ============================================================================
+-- A) usp_GetPaymentChargesByCompetitionAndRanch  (Task 8)
+-- ============================================================================
+--
+-- Add two columns to the RETURNS TABLE and SELECT list:
+--
+--   hasPendingChange         boolean
+--   hasPendingCancellation   boolean
+--
+-- Compute them per source row (Entry / ProductRequest / PaidTimeRequest):
+--
+-- For sourcetype = 'Entry':
+--
+--   EXISTS (
+--       SELECT 1 FROM public.changeentryrequest cer
+--       WHERE cer.originalentryid = bc.sourceid
+--         AND cer.status = 'Pending'
+--         AND cer.iscancelled = FALSE
+--   )                                                          AS hasPendingChange,
+--
+--   EXISTS (
+--       SELECT 1 FROM public.changeentryrequest cer
+--       WHERE cer.originalentryid = bc.sourceid
+--         AND cer.status = 'Pending'
+--         AND cer.iscancelled = TRUE
+--   )                                                          AS hasPendingCancellation
+--
+-- For sourcetype = 'ProductRequest':
+--
+--   EXISTS (
+--       SELECT 1 FROM public.productchangerequest pcr
+--       WHERE pcr.originalprequestid = bc.sourceid
+--         AND pcr.status = 'Pending'
+--         AND pcr.iscancelled = FALSE
+--   )                                                          AS hasPendingChange,
+--
+--   EXISTS (
+--       SELECT 1 FROM public.productchangerequest pcr
+--       WHERE pcr.originalprequestid = bc.sourceid
+--         AND pcr.status = 'Pending'
+--         AND pcr.iscancelled = TRUE
+--   )                                                          AS hasPendingCancellation
+--
+-- For sourcetype = 'PaidTimeRequest': both flags can be FALSE (no change-
+-- request table for paid time; cancellation is direct).
+--
+-- One clean way is a CASE expression in the SELECT list. The UI already
+-- reads `hasPendingChange` / `HasPendingChange` in PaymentChargesTable.jsx —
+-- once the SP returns them, the existing badge lights up.
+--
+-- DTO/DAL changes:
+--   - Add HasPendingChange (bool) + HasPendingCancellation (bool) to whatever
+--     C# DTO represents a charge row.
+--   - Read them in the relevant DAL method.
+
+
+-- ============================================================================
+-- B) usp_GetMyCompetitionEntries  +  usp_GetSecretaryCompetitionEntries  (G1)
+-- ============================================================================
+--
+-- Add the column to the RETURNS TABLE:
+--
+--   finename   varchar
+--
+-- And to the SELECT body — JOIN the fine table (LEFT JOIN: not every entry
+-- has a fine):
+--
+--   LEFT JOIN public.fine f ON f.fineid = e.fineid
+--
+-- and select:
+--
+--   f.finename::varchar AS finename
+--
+-- The DAL already reads `fineamount`. Add a sibling read for `finename`:
+--
+--   FineName = reader["finename"] == DBNull.Value ? null : reader["finename"].ToString()
+--
+-- Mobile already has a FineBadge that uses item.fineAmount. Web entry views
+-- can now display a tag like "כולל קנס: {finename} ₪{fineamount}".
+
+
+-- ============================================================================
+-- C) Auto-apply fine when a change/cancel request is created (G1)
+-- ============================================================================
+--
+-- Goal: when ChangeEntryRequest is inserted (cancel or modify), look up the
+-- right active fine in `fine` and stamp fineid + fineamountsnapshot on the
+-- request automatically.
+--
+-- The matching rule depends on fine.triggermode. Suggested interpretation
+-- (please confirm with Daniel — schema doesn't pin this down):
+--
+--   triggermode = 'EntryCancellation'   → fires on iscancelled = TRUE
+--   triggermode = 'EntryChange'         → fires on iscancelled = FALSE
+--                                         AND newentryid IS NOT NULL
+--   triggermode = 'EntryCancellation:LessThan24h'
+--                                       → fires on iscancelled = TRUE
+--                                         AND requestdatetime is within
+--                                         24h of the entry's class start
+--
+-- Implementation choice (pick one):
+--
+--   1) Modify usp_InsertChangeEntryRequest to compute the fine inline before
+--      INSERT, then write fineid + fineamountsnapshot.
+--   2) Trigger AFTER INSERT ON changeentryrequest that computes + UPDATEs the
+--      row in place. Cleaner separation, recommended.
+--
+-- Both options need a small helper to find the matching active fine row
+-- based on the trigger condition + (optionally) the entry's class start
+-- time. The relevant entry can be reached via:
+--
+--   public.entry e
+--   JOIN public.classincompetition cic ON cic.classincompid = e.classincompid
+--   WHERE e.entryid = NEW.originalentryid
+--
+-- The class start is `cic.classdatetime`. The cancellation cutoff window
+-- is then `(cic.classdatetime - NEW.requestdatetime)`.
+
+
+-- ============================================================================
+-- HOW TO APPLY
+-- ============================================================================
+-- 1. Open each existing SP in Supabase SQL editor:
+--      SELECT pg_get_functiondef('public.usp_getpaymentchargesbycompetitionandranch'::regproc::oid);
+--      SELECT pg_get_functiondef('public.usp_getmycompetitionentries'::regproc::oid);
+--      SELECT pg_get_functiondef('public.usp_getsecretarycompetitionentries'::regproc::oid);
+--      SELECT pg_get_functiondef('public.usp_insertchangeentryrequest'::regproc::oid);
+-- 2. Apply the diff shown above.
+-- 3. DROP FUNCTION IF EXISTS <name>(<arg types>); then CREATE OR REPLACE.
+--    (RETURNS TABLE changes can't be done via CREATE OR REPLACE alone.)
+-- ============================================================================

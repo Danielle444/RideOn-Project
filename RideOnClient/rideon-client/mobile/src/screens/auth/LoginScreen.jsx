@@ -39,7 +39,7 @@ export default function LoginScreen() {
     setIsLoading(true);
 
     try {
-      const result = await loginAndInitialize(username, password);
+      const result = await loginAndInitialize(username, password, rememberMe);
 
       if (!result.ok) {
         Alert.alert("שגיאה", result.message);

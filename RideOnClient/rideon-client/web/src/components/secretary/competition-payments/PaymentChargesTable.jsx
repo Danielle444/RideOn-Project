@@ -82,6 +82,18 @@ function getStatusLabel(status) {
     return "לא שולם";
   }
 
+  if (status === "PendingApproval") {
+    return "ממתין לאישור שינוי";
+  }
+
+  if (status === "Cancelled") {
+    return "בוטל";
+  }
+
+  if (status === "Replaced") {
+    return "הוחלף";
+  }
+
   return status || "-";
 }
 
@@ -94,7 +106,27 @@ function getStatusClass(status) {
     return "bg-[#FFF4E5] text-[#B26A00]";
   }
 
+  if (status === "PendingApproval") {
+    return "bg-[#FFF7E0] text-[#8A5A00] border border-[#E6C681]";
+  }
+
+  if (status === "Cancelled" || status === "Replaced") {
+    return "bg-[#EFE4DD] text-[#6B5448]";
+  }
+
   return "bg-[#F1ECE8] text-[#7A655C]";
+}
+
+function hasPendingChangeFlag(charge) {
+  // Backend may surface this either via chargeStatus='PendingApproval' or via
+  // an explicit boolean flag once Daniel adds it to the SP.
+  if (charge && (charge.hasPendingChange || charge.HasPendingChange)) {
+    return true;
+  }
+  if (charge && (charge.hasPendingCancellation || charge.HasPendingCancellation)) {
+    return true;
+  }
+  return false;
 }
 
 function getChargeId(charge) {
@@ -466,14 +498,25 @@ export default function PaymentChargesTable(props) {
                   </td>
 
                   <td className="px-4 py-4">
-                    <span
-                      className={
-                        "inline-flex rounded-full px-3 py-1 text-xs font-black " +
-                        getStatusClass(status)
-                      }
-                    >
-                      {getStatusLabel(status)}
-                    </span>
+                    <div className="flex flex-col gap-1 items-end">
+                      <span
+                        className={
+                          "inline-flex rounded-full px-3 py-1 text-xs font-black " +
+                          getStatusClass(status)
+                        }
+                      >
+                        {getStatusLabel(status)}
+                      </span>
+
+                      {status !== "PendingApproval" && hasPendingChangeFlag(charge) ? (
+                        <span
+                          className="inline-flex rounded-full border border-[#E6C681] bg-[#FFF7E0] px-2 py-0.5 text-[10px] font-black text-[#8A5A00]"
+                          title="קיימת בקשת שינוי/ביטול ממתינה — הסכום עלול להשתנות"
+                        >
+                          בקשת שינוי ממתינה
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
 
                   <td className="px-4 py-4 text-sm">

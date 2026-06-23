@@ -1,11 +1,13 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
@@ -24,6 +26,44 @@ import { useCompetition } from "../../../../context/CompetitionContext";
 import useAdminCompetitionPayerAccount from "../../../../hooks/useAdminCompetitionPayerAccount";
 
 import styles from "../../../../styles/adminCompetitionPayerAccountStyles";
+
+import { createChangeEntryRequest } from "../../../../services/entriesService";
+
+import { cancelPaidTimeRequest } from "../../../../services/paidTimeRequestsService";
+
+import { createStallBookingCancelRequest } from "../../../../services/stallBookingsService";
+
+import CompetitionEntryCreateModal from "../../../../components/competitions/CompetitionEntryCreateModal";
+
+import PaidTimeEditModal from "../../../../components/competitions/adminPaidTimes/PaidTimeEditModal";
+
+import StallBookingEditModal from "../../../../components/competitions/StallBookingEditModal";
+
+function extractErrorMessage(err) {
+  if (!err) return "אירעה שגיאה";
+  var data = err.response && err.response.data;
+  if (data) {
+    if (typeof data === "string") return data;
+    if (data.message) return String(data.message);
+    if (data.error) return String(data.error);
+    try {
+      return JSON.stringify(data);
+    } catch {
+      return "אירעה שגיאה";
+    }
+  }
+  if (err.message) return err.message;
+  return "אירעה שגיאה";
+}
+
+function pickDateKey(dateValue) {
+  if (!dateValue) return "no-date";
+  try {
+    return new Date(dateValue).toISOString().slice(0, 10);
+  } catch {
+    return String(dateValue);
+  }
+}
 
 function formatCurrency(value) {
   var numberValue = Number(value || 0);
@@ -100,7 +140,12 @@ function getDisplayName(payer) {
   return ((payer.firstName || "") + " " + (payer.lastName || "")).trim();
 }
 
-function renderPaymentBadge(isPaid) {
+function renderPaymentBadge(isPaid, amount) {
+  // Skip badge when there's nothing to pay
+  if (amount !== undefined && Number(amount || 0) <= 0) {
+    return null;
+  }
+
   var status = isPaid
     ? getStatusInfo("Paid")
     : getStatusInfo("Unpaid");
@@ -148,6 +193,28 @@ export default function AdminCompetitionPayerAccountScreen(props) {
 
   var summary = account.summary || {};
 
+  var [cancellingId, setCancellingId] = useState(null);
+
+  var [searchText, setSearchText] = useState("");
+
+  var [dateFilter, setDateFilter] = useState("all");
+
+  var [paymentFilter, setPaymentFilter] = useState("all");
+
+  var [showFilters, setShowFilters] = useState(false);
+
+  var [showEntryCreateModal, setShowEntryCreateModal] = useState(false);
+
+  var [editEntryItem, setEditEntryItem] = useState(null);
+
+  var [editPaidTimeItem, setEditPaidTimeItem] = useState(null);
+
+  var [editStallItem, setEditStallItem] = useState(null);
+
+  var lockedPayerPersonId = payer
+    ? payer.personId || payer.PersonId || null
+    : null;
+
   function handleCompetitionMenuPress(item) {
     props.navigation.navigate(item.screen);
   }
@@ -156,6 +223,463 @@ export default function AdminCompetitionPayerAccountScreen(props) {
     await competitionContext.clearCompetition();
 
     props.navigation.navigate("AdminCompetitionsBoard");
+  }
+
+  function confirmCancelEntry(item) {
+    Alert.alert(
+      "ביטול הרשמה",
+      "האם לשלוח בקשת ביטול למזכירה?",
+      [
+        { text: "לא", style: "cancel" },
+        {
+          text: "כן",
+          style: "destructive",
+          onPress: function () {
+            doCancelEntry(item);
+          },
+        },
+      ],
+    );
+  }
+
+  async function doCancelEntry(item) {
+    try {
+      setCancellingId("entry:" + item.entryId);
+
+      await createChangeEntryRequest({
+        competitionId: activeCompetition?.competitionId,
+        originalEntryId: item.entryId,
+        newEntryId: null,
+        isCancelled: true,
+      });
+
+      Alert.alert("נשלח", "בקשת הביטול נשלחה למזכירה");
+
+      await account.reload();
+    } catch (err) {
+      Alert.alert("שגיאה", extractErrorMessage(err));
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
+  function confirmCancelPaidTime(item) {
+    Alert.alert("ביטול פייד טיים", "האם לבטל את הבקשה?", [
+      { text: "לא", style: "cancel" },
+      {
+        text: "כן",
+        style: "destructive",
+        onPress: function () {
+          doCancelPaidTime(item);
+        },
+      },
+    ]);
+  }
+
+  async function doCancelPaidTime(item) {
+    try {
+      setCancellingId("paidTime:" + item.paidTimeRequestId);
+
+      await cancelPaidTimeRequest({
+        paidTimeRequestId: item.paidTimeRequestId,
+        ranchId: activeRole?.ranchId,
+      });
+
+      Alert.alert("בוטל", "הבקשה בוטלה");
+
+      await account.reload();
+    } catch (err) {
+      Alert.alert("שגיאה", extractErrorMessage(err));
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
+  function confirmCancelStall(item) {
+    Alert.alert("ביטול תא", "האם לשלוח בקשת ביטול למזכירה?", [
+      { text: "לא", style: "cancel" },
+      {
+        text: "כן",
+        style: "destructive",
+        onPress: function () {
+          doCancelStall(item);
+        },
+      },
+    ]);
+  }
+
+  async function doCancelStall(item) {
+    try {
+      setCancellingId("stall:" + item.stallBookingId);
+
+      await createStallBookingCancelRequest({
+        stallBookingId: item.stallBookingId,
+        ranchId: activeRole?.ranchId,
+      });
+
+      Alert.alert("נשלח", "בקשת הביטול נשלחה למזכירה");
+
+      await account.reload();
+    } catch (err) {
+      Alert.alert("שגיאה", extractErrorMessage(err));
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
+  function renderActions(idKey, isLocked, onEdit, onCancel, lockedLabel) {
+    if (isLocked) {
+      return (
+        <View
+          style={{
+            marginTop: 10,
+            padding: 8,
+            backgroundColor: "#F0E5DC",
+            borderRadius: 8,
+          }}
+        >
+          <Text
+            style={{
+              color: "#8A7268",
+              fontSize: 12,
+              textAlign: "right",
+            }}
+          >
+            {lockedLabel}
+          </Text>
+        </View>
+      );
+    }
+
+    var isBusy = cancellingId === idKey;
+
+    return (
+      <View
+        style={{
+          flexDirection: "row-reverse",
+          marginTop: 10,
+          gap: 8,
+        }}
+      >
+        {onEdit ? (
+          <Pressable
+            onPress={onEdit}
+            disabled={isBusy}
+            style={{
+              flex: 1,
+              backgroundColor: "#F0E5DC",
+              borderWidth: 1,
+              borderColor: "#7B5A4D",
+              borderRadius: 10,
+              paddingVertical: 9,
+              alignItems: "center",
+            }}
+          >
+            <Text style={{ color: "#7B5A4D", fontWeight: "800" }}>ערוך</Text>
+          </Pressable>
+        ) : null}
+
+        {onCancel ? (
+          <Pressable
+            onPress={onCancel}
+            disabled={isBusy}
+            style={{
+              flex: 1,
+              backgroundColor: isBusy ? "#C9B7AC" : "#A0522D",
+              borderRadius: 10,
+              paddingVertical: 9,
+              alignItems: "center",
+            }}
+          >
+            <Text style={{ color: "#FFFFFF", fontWeight: "800" }}>
+              {isBusy ? "שולח..." : "בטל"}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  }
+
+  function matchesSearch(text, targets) {
+    if (!text) return true;
+    var lower = String(text).toLowerCase().trim();
+    if (!lower) return true;
+    for (var i = 0; i < targets.length; i++) {
+      var t = String(targets[i] || "").toLowerCase();
+      if (t.indexOf(lower) >= 0) return true;
+    }
+    return false;
+  }
+
+  var filteredClasses = useMemo(
+    function () {
+      var list = Array.isArray(account.classes) ? account.classes : [];
+
+      return list.filter(function (item) {
+        if (
+          paymentFilter === "paid" && !item.isPaid
+        ) return false;
+        if (
+          paymentFilter === "unpaid" && item.isPaid
+        ) return false;
+
+        if (
+          dateFilter !== "all" &&
+          pickDateKey(item.classDateTime) !== dateFilter
+        ) {
+          return false;
+        }
+
+        return matchesSearch(searchText, [
+          item.className,
+          item.horseName,
+          item.barnName,
+          item.riderName,
+          item.coachName,
+        ]);
+      });
+    },
+    [account.classes, searchText, dateFilter, paymentFilter],
+  );
+
+  var filteredPaidTimes = useMemo(
+    function () {
+      var list = Array.isArray(account.paidTimes) ? account.paidTimes : [];
+
+      return list.filter(function (item) {
+        if (paymentFilter === "paid" && !item.isPaid) return false;
+        if (paymentFilter === "unpaid" && item.isPaid) return false;
+
+        if (
+          dateFilter !== "all" &&
+          pickDateKey(item.displaySlotDate) !== dateFilter
+        ) {
+          return false;
+        }
+
+        return matchesSearch(searchText, [
+          item.productName,
+          item.horseName,
+          item.barnName,
+          item.riderName,
+          item.coachName,
+        ]);
+      });
+    },
+    [account.paidTimes, searchText, dateFilter, paymentFilter],
+  );
+
+  var filteredStalls = useMemo(
+    function () {
+      var list = Array.isArray(account.stalls) ? account.stalls : [];
+
+      return list.filter(function (item) {
+        if (paymentFilter === "paid" && !item.isPaid) return false;
+        if (paymentFilter === "unpaid" && item.isPaid) return false;
+
+        if (
+          dateFilter !== "all" &&
+          pickDateKey(item.startDate) !== dateFilter
+        ) {
+          return false;
+        }
+
+        return matchesSearch(searchText, [
+          item.productName,
+          item.horseName,
+          item.barnName,
+        ]);
+      });
+    },
+    [account.stalls, searchText, dateFilter, paymentFilter],
+  );
+
+  var availableDates = useMemo(
+    function () {
+      var keys = new Set();
+
+      (account.classes || []).forEach(function (item) {
+        var k = pickDateKey(item.classDateTime);
+        if (k !== "no-date") keys.add(k);
+      });
+
+      (account.paidTimes || []).forEach(function (item) {
+        var k = pickDateKey(item.displaySlotDate);
+        if (k !== "no-date") keys.add(k);
+      });
+
+      (account.stalls || []).forEach(function (item) {
+        var k = pickDateKey(item.startDate);
+        if (k !== "no-date") keys.add(k);
+      });
+
+      return Array.from(keys).sort();
+    },
+    [account.classes, account.paidTimes, account.stalls],
+  );
+
+  function renderChip(label, isActive, onPress, keyValue) {
+    return (
+      <Pressable
+        key={keyValue || label}
+        onPress={onPress}
+        style={{
+          paddingHorizontal: 12,
+          paddingVertical: 7,
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: isActive ? "#7B5A4D" : "#D6C5B8",
+          backgroundColor: isActive ? "#7B5A4D" : "#FFFFFF",
+          marginLeft: 6,
+          marginBottom: 6,
+        }}
+      >
+        <Text
+          style={{
+            color: isActive ? "#FFFFFF" : "#5A4036",
+            fontWeight: "700",
+            fontSize: 12,
+          }}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    );
+  }
+
+  function renderFiltersBlock() {
+    return (
+      <View
+        style={{
+          backgroundColor: "#FFFFFF",
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: "#E8DDD6",
+          padding: 12,
+          marginBottom: 14,
+        }}
+      >
+        <Pressable
+          onPress={function () {
+            setShowFilters(!showFilters);
+          }}
+          style={{
+            flexDirection: "row-reverse",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Text style={{ fontWeight: "800", color: "#4F3B31" }}>
+            סינון וחיפוש
+          </Text>
+          <Text style={{ color: "#7B5A4D" }}>
+            {showFilters ? "הסתר ▲" : "הצג ▼"}
+          </Text>
+        </Pressable>
+
+        {showFilters ? (
+          <View style={{ marginTop: 10 }}>
+            <TextInput
+              value={searchText}
+              onChangeText={setSearchText}
+              placeholder="חיפוש לפי שם מקצה, סוס, רוכב, מאמן..."
+              placeholderTextColor="#9E8A7F"
+              style={{
+                borderWidth: 1,
+                borderColor: "#D6C5B8",
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 9,
+                textAlign: "right",
+                color: "#4F3B31",
+                marginBottom: 10,
+              }}
+            />
+
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: "700",
+                color: "#5A4036",
+                marginBottom: 6,
+                textAlign: "right",
+              }}
+            >
+              סטטוס תשלום
+            </Text>
+
+            <View
+              style={{
+                flexDirection: "row-reverse",
+                flexWrap: "wrap",
+                marginBottom: 8,
+              }}
+            >
+              {renderChip("הכל", paymentFilter === "all", function () {
+                setPaymentFilter("all");
+              })}
+              {renderChip("שולם", paymentFilter === "paid", function () {
+                setPaymentFilter("paid");
+              })}
+              {renderChip("לא שולם", paymentFilter === "unpaid", function () {
+                setPaymentFilter("unpaid");
+              })}
+            </View>
+
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: "700",
+                color: "#5A4036",
+                marginBottom: 6,
+                textAlign: "right",
+              }}
+            >
+              תאריך
+            </Text>
+
+            <View
+              style={{
+                flexDirection: "row-reverse",
+                flexWrap: "wrap",
+              }}
+            >
+              {renderChip("כל התאריכים", dateFilter === "all", function () {
+                setDateFilter("all");
+              })}
+              {availableDates.map(function (dKey) {
+                return renderChip(
+                  formatDate(dKey),
+                  dateFilter === dKey,
+                  function () {
+                    setDateFilter(dKey);
+                  },
+                  "date-" + dKey,
+                );
+              })}
+            </View>
+
+            <Pressable
+              onPress={function () {
+                setSearchText("");
+                setDateFilter("all");
+                setPaymentFilter("all");
+              }}
+              style={{
+                marginTop: 10,
+                alignSelf: "flex-end",
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+              }}
+            >
+              <Text style={{ color: "#7B5A4D", fontWeight: "700" }}>
+                נקה סינונים
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+    );
   }
 
   function renderTabButton(key, label) {
@@ -323,12 +847,105 @@ export default function AdminCompetitionPayerAccountScreen(props) {
     );
   }
 
+  function renderAddEntryButton() {
+    return (
+      <Pressable
+        onPress={function () {
+          setShowEntryCreateModal(true);
+        }}
+        style={{
+          backgroundColor: "#7B5A4D",
+          borderRadius: 12,
+          paddingVertical: 12,
+          alignItems: "center",
+          marginBottom: 12,
+        }}
+      >
+        <Text style={{ color: "#FFFFFF", fontWeight: "800", fontSize: 14 }}>
+          + הוסף הרשמה למקצה
+        </Text>
+      </Pressable>
+    );
+  }
+
+  function renderAddPaidTimeButton() {
+    return (
+      <Pressable
+        onPress={function () {
+          props.navigation.navigate("AdminCompetitionRegistrations");
+        }}
+        style={{
+          backgroundColor: "#FFFFFF",
+          borderWidth: 1,
+          borderColor: "#7B5A4D",
+          borderRadius: 12,
+          paddingVertical: 11,
+          alignItems: "center",
+          marginBottom: 12,
+        }}
+      >
+        <Text style={{ color: "#7B5A4D", fontWeight: "800", fontSize: 13 }}>
+          + הוסף פייד טיים (מסך הרשמות)
+        </Text>
+      </Pressable>
+    );
+  }
+
+  function renderAddStallButton() {
+    return (
+      <Pressable
+        onPress={function () {
+          props.navigation.navigate("AdminCompetitionStallsShavings");
+        }}
+        style={{
+          backgroundColor: "#FFFFFF",
+          borderWidth: 1,
+          borderColor: "#7B5A4D",
+          borderRadius: 12,
+          paddingVertical: 11,
+          alignItems: "center",
+          marginBottom: 12,
+        }}
+      >
+        <Text style={{ color: "#7B5A4D", fontWeight: "800", fontSize: 13 }}>
+          + הוסף תא (מסך תאים ונסורת)
+        </Text>
+      </Pressable>
+    );
+  }
+
   function renderClassesTab() {
     if (!account.classes || account.classes.length === 0) {
-      return renderEmpty("לא נמצאו מקצים בחשבון של משלם זה");
+      return (
+        <>
+          {renderAddEntryButton()}
+          {renderEmpty("לא נמצאו מקצים בחשבון של משלם זה")}
+        </>
+      );
     }
 
-    return account.classes.map(function (item) {
+    if (filteredClasses.length === 0) {
+      return (
+        <>
+          {renderAddEntryButton()}
+          {renderEmpty("לא נמצאו מקצים שתואמים לסינון")}
+        </>
+      );
+    }
+
+    var listContent = filteredClasses.map(function (item) {
+      var isLocked =
+        item.isPaid === true ||
+        item.hasPendingCancellation === true ||
+        item.isCancelled === true ||
+        String(item.entryStatus || "").toLowerCase() === "cancelled";
+
+      var lockedLabel = item.isPaid
+        ? "כבר שולם — לא ניתן לבטל"
+        : item.hasPendingCancellation
+          ? "בקשת ביטול ממתינה למזכירה"
+          : "בוטל";
+
       return (
         <View key={String(item.entryId)} style={styles.itemCard}>
           <View style={styles.itemTopRow}>
@@ -368,17 +985,56 @@ export default function AdminCompetitionPayerAccountScreen(props) {
               </Text>
             </View>
           </View>
+
+          {renderActions(
+            "entry:" + item.entryId,
+            isLocked,
+            function () {
+              setEditEntryItem(item);
+            },
+            function () {
+              confirmCancelEntry(item);
+            },
+            lockedLabel,
+          )}
         </View>
       );
     });
+
+    return (
+      <>
+        {renderAddEntryButton()}
+        {listContent}
+      </>
+    );
   }
 
   function renderPaidTimesTab() {
     if (!account.paidTimes || account.paidTimes.length === 0) {
-      return renderEmpty("לא נמצאו פייד טיימים בחשבון של משלם זה");
+      return (
+        <>
+          {renderAddPaidTimeButton()}
+          {renderEmpty("לא נמצאו פייד טיימים בחשבון של משלם זה")}
+        </>
+      );
     }
 
-    return account.paidTimes.map(function (item) {
+    if (filteredPaidTimes.length === 0) {
+      return (
+        <>
+          {renderAddPaidTimeButton()}
+          {renderEmpty("לא נמצאו פייד טיימים שתואמים לסינון")}
+        </>
+      );
+    }
+
+    var paidTimeContent = filteredPaidTimes.map(function (item) {
+      var status = String(item.status || "").toLowerCase();
+      var isLocked = item.isPaid === true || status === "cancelled";
+      var lockedLabel = item.isPaid
+        ? "כבר שולם — לא ניתן לבטל"
+        : "בוטל";
+
       return (
         <View
           key={String(item.paidTimeRequestId)}
@@ -412,20 +1068,67 @@ export default function AdminCompetitionPayerAccountScreen(props) {
           </Text>
 
           <Text style={styles.itemMutedText}>סטטוס: {item.status || "-"}</Text>
+
+          {renderActions(
+            "paidTime:" + item.paidTimeRequestId,
+            isLocked,
+            function () {
+              setEditPaidTimeItem(item);
+            },
+            function () {
+              confirmCancelPaidTime(item);
+            },
+            lockedLabel,
+          )}
         </View>
       );
     });
+
+    return (
+      <>
+        {renderAddPaidTimeButton()}
+        {paidTimeContent}
+      </>
+    );
   }
 
   function renderStallsTab() {
     if (!account.stalls || account.stalls.length === 0) {
-      return renderEmpty("לא נמצאו תאים בחשבון של משלם זה");
+      return (
+        <>
+          {renderAddStallButton()}
+          {renderEmpty("לא נמצאו תאים בחשבון של משלם זה")}
+        </>
+      );
     }
 
-    return account.stalls.map(function (item) {
+    if (filteredStalls.length === 0) {
+      return (
+        <>
+          {renderAddStallButton()}
+          {renderEmpty("לא נמצאו תאים שתואמים לסינון")}
+        </>
+      );
+    }
+
+    var stallsContent = filteredStalls.map(function (item) {
       var shavingsOrders = Array.isArray(item.shavingsOrders)
         ? item.shavingsOrders
         : [];
+
+      var isLocked =
+        item.isPaid === true ||
+        item.isCancelled === true ||
+        item.hasPendingCancellation === true ||
+        item.hasPendingChange === true;
+
+      var lockedLabel = item.isPaid
+        ? "כבר שולם — לא ניתן לבטל"
+        : item.isCancelled
+          ? "בוטל"
+          : item.hasPendingCancellation
+            ? "בקשת ביטול ממתינה"
+            : "בקשת שינוי ממתינה";
 
       return (
         <View key={String(item.stallBookingId)} style={styles.itemCard}>
@@ -453,7 +1156,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
             תא: {item.stallId ? "#" + item.stallId : "טרם שובץ"}
           </Text>
 
-          {renderPaymentBadge(item.isPaid)}
+          {renderPaymentBadge(item.isPaid, item.stallAmountToPay)}
 
           {shavingsOrders.length > 0 ? (
             <View style={{ marginTop: 12 }}>
@@ -473,9 +1176,28 @@ export default function AdminCompetitionPayerAccountScreen(props) {
               })}
             </View>
           ) : null}
+
+          {renderActions(
+            "stall:" + item.stallBookingId,
+            isLocked,
+            function () {
+              setEditStallItem(item);
+            },
+            function () {
+              confirmCancelStall(item);
+            },
+            lockedLabel,
+          )}
         </View>
       );
     });
+
+    return (
+      <>
+        {renderAddStallButton()}
+        {stallsContent}
+      </>
+    );
   }
 
   function renderActiveTab() {
@@ -521,6 +1243,11 @@ export default function AdminCompetitionPayerAccountScreen(props) {
       );
     }
 
+    var showFiltersForTab =
+      activeTab === "classes" ||
+      activeTab === "paidTimes" ||
+      activeTab === "stalls";
+
     return (
       <>
         {renderHeader()}
@@ -531,6 +1258,8 @@ export default function AdminCompetitionPayerAccountScreen(props) {
           {renderTabButton("paidTimes", "פייד")}
           {renderTabButton("stalls", "תאים")}
         </View>
+
+        {showFiltersForTab ? renderFiltersBlock() : null}
 
         {renderActiveTab()}
       </>
@@ -570,6 +1299,47 @@ export default function AdminCompetitionPayerAccountScreen(props) {
       >
         {renderContent()}
       </ScrollView>
+
+      <CompetitionEntryCreateModal
+        visible={showEntryCreateModal}
+        editItem={null}
+        lockedPayerPersonId={lockedPayerPersonId}
+        onClose={function () {
+          setShowEntryCreateModal(false);
+        }}
+        onCreated={account.reload}
+      />
+
+      <CompetitionEntryCreateModal
+        visible={!!editEntryItem}
+        editItem={editEntryItem}
+        lockedPayerPersonId={lockedPayerPersonId}
+        onClose={function () {
+          setEditEntryItem(null);
+        }}
+        onCreated={account.reload}
+      />
+
+      <PaidTimeEditModal
+        visible={!!editPaidTimeItem}
+        item={editPaidTimeItem}
+        competitionId={activeCompetition?.competitionId}
+        ranchId={activeRole?.ranchId}
+        roleId={activeRole?.roleId}
+        onClose={function () {
+          setEditPaidTimeItem(null);
+        }}
+        onSaved={account.reload}
+      />
+
+      <StallBookingEditModal
+        visible={!!editStallItem}
+        item={editStallItem}
+        onClose={function () {
+          setEditStallItem(null);
+        }}
+        onUpdated={account.reload}
+      />
     </MobileScreenLayout>
   );
 }

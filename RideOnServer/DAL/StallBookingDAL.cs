@@ -358,5 +358,166 @@ namespace RideOnServer.DAL
             return Convert.ToInt32(result);
         }
 
+        public static int CancelStallBookingByPayer(int stallBookingId, int payerPersonId)
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                @"SELECT public.usp_cancelstallbookingbypayer(
+                    p_stallbookingid := @stallBookingId,
+                    p_payerpersonid  := @payerPersonId
+                );",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
+            cmd.Parameters.AddWithValue("@payerPersonId", payerPersonId);
+
+            object? result = cmd.ExecuteScalar();
+
+            if (result == null || result == DBNull.Value)
+            {
+                throw new Exception("Failed to create payer stall cancel request");
+            }
+
+            return Convert.ToInt32(result);
+        }
+
+        public static int CreateStallChangeRequestByPayer(int stallBookingId, int payerPersonId)
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                @"SELECT public.usp_createstallchangerequestbypayer(
+                    p_stallbookingid := @stallBookingId,
+                    p_payerpersonid  := @payerPersonId
+                );",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
+            cmd.Parameters.AddWithValue("@payerPersonId", payerPersonId);
+
+            object? result = cmd.ExecuteScalar();
+
+            if (result == null || result == DBNull.Value)
+            {
+                throw new Exception("Failed to create payer stall change request");
+            }
+
+            return Convert.ToInt32(result);
+        }
+
+        public static int SecretaryDeleteStallBooking(int stallBookingId, int secretarySystemUserId)
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                @"SELECT public.usp_secretarydeletestallbooking(
+                    p_stallbookingid        := @stallBookingId,
+                    p_secretarysystemuserid := @secretaryId
+                );",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
+            cmd.Parameters.AddWithValue("@secretaryId", secretarySystemUserId);
+
+            object? result = cmd.ExecuteScalar();
+            if (result == null || result == DBNull.Value)
+            {
+                throw new Exception("Failed to delete stall booking");
+            }
+            return Convert.ToInt32(result);
+        }
+
+        public static void SecretaryUpdateStallBooking(
+            int stallBookingId,
+            int secretarySystemUserId,
+            DateTime newStartDate,
+            DateTime newEndDate,
+            string? newNotes,
+            bool? isForTack,
+            int? horseId
+        )
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                @"SELECT public.usp_secretaryupdatestallbooking(
+                    p_stallbookingid        := @stallBookingId,
+                    p_secretarysystemuserid := @secretaryId,
+                    p_newstartdate          := @newStartDate::date,
+                    p_newenddate            := @newEndDate::date,
+                    p_newnotes              := @newNotes,
+                    p_isfortack             := @isForTack,
+                    p_horseid               := @horseId
+                );",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
+            cmd.Parameters.AddWithValue("@secretaryId", secretarySystemUserId);
+            cmd.Parameters.Add("@newStartDate", NpgsqlDbType.Date).Value = newStartDate.Date;
+            cmd.Parameters.Add("@newEndDate", NpgsqlDbType.Date).Value = newEndDate.Date;
+            cmd.Parameters.AddWithValue("@newNotes", (object?)newNotes ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@isForTack", (object?)isForTack ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@horseId", (object?)horseId ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        public static int SecretaryCreateStallBookingForPayer(
+            int competitionId,
+            int secretarySystemUserId,
+            int payerPersonId,
+            int? horseId,
+            DateTime startDate,
+            DateTime endDate,
+            bool isForTack,
+            short productId,
+            string? notes
+        )
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                @"SELECT public.usp_secretarycreatestallbookingforpayer(
+                    p_competitionid         := @competitionId,
+                    p_secretarysystemuserid := @secretaryId,
+                    p_payerpersonid         := @payerId,
+                    p_horseid               := @horseId,
+                    p_startdate             := @startDate::date,
+                    p_enddate               := @endDate::date,
+                    p_isfortack             := @isForTack,
+                    p_productid             := @productId,
+                    p_notes                 := @notes
+                );",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@competitionId", competitionId);
+            cmd.Parameters.AddWithValue("@secretaryId", secretarySystemUserId);
+            cmd.Parameters.AddWithValue("@payerId", payerPersonId);
+            cmd.Parameters.AddWithValue("@horseId", (object?)horseId ?? DBNull.Value);
+            cmd.Parameters.Add("@startDate", NpgsqlDbType.Date).Value = startDate.Date;
+            cmd.Parameters.Add("@endDate", NpgsqlDbType.Date).Value = endDate.Date;
+            cmd.Parameters.AddWithValue("@isForTack", isForTack);
+            cmd.Parameters.Add("@productId", NpgsqlDbType.Smallint).Value = productId;
+            cmd.Parameters.AddWithValue("@notes", (object?)notes ?? DBNull.Value);
+
+            object? result = cmd.ExecuteScalar();
+            if (result == null || result == DBNull.Value)
+            {
+                throw new Exception("Failed to create stall booking");
+            }
+            return Convert.ToInt32(result);
+        }
+
     }
 }

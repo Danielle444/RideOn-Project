@@ -1,5 +1,11 @@
-import GenericPlaceholderScreen from "../../../common/GenericPlaceholderScreen";
+import PayerCompetitionAccountScreen from "./PayerCompetitionAccountScreen";
 
 export default function PayerCompetitionStallsScreen(props) {
-  return <GenericPlaceholderScreen {...props} title="תאים" />;
+  var routeWithTab = Object.assign({}, props.route || {}, {
+    params: Object.assign({}, props.route?.params || {}, {
+      initialTab: "stalls",
+    }),
+  });
+
+  return <PayerCompetitionAccountScreen {...props} route={routeWithTab} />;
 }

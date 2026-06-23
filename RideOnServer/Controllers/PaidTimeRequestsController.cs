@@ -361,6 +361,78 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("cancel-by-payer")]
+        public IActionResult CancelPaidTimeRequestByPayer(
+            [FromBody] CancelPaidTimeRequestRequest request)
+        {
+            try
+            {
+                if (request == null || request.PaidTimeRequestId <= 0 || request.RanchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.Payer
+                );
+
+                PaidTimeRequest.CancelByPayer(request.PaidTimeRequestId, personId);
+
+                return Ok("הבקשה בוטלה בהצלחה");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in CancelPaidTimeRequestByPayer: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("update-notes-by-payer")]
+        public IActionResult UpdatePaidTimeNotesByPayer(
+            [FromBody] UpdatePaidTimeRequestNotesRequest request)
+        {
+            try
+            {
+                if (request == null || request.PaidTimeRequestId <= 0 || request.RanchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.Payer
+                );
+
+                PaidTimeRequest.UpdateNotesByPayer(
+                    request.PaidTimeRequestId,
+                    personId,
+                    request.Notes
+                );
+
+                return Ok("ההערות עודכנו בהצלחה");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in UpdatePaidTimeNotesByPayer: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpPost("update-notes")]
         public IActionResult UpdatePaidTimeRequestNotes([FromBody] UpdatePaidTimeRequestNotesRequest request)
         {
@@ -390,6 +462,79 @@ namespace RideOnServer.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in UpdatePaidTimeRequestNotes: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("slot-registrations")]
+        public IActionResult GetPaidTimeSlotRegistrations(
+            [FromQuery] int slotInCompId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (slotInCompId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                var items = PaidTimeRequest.GetPaidTimeSlotRegistrations(slotInCompId, personId);
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetPaidTimeSlotRegistrations: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("transfer-to-slot")]
+        public IActionResult TransferPaidTimeRequestToSlot(
+            [FromBody] TransferPaidTimeRequestToSlotRequest request)
+        {
+            try
+            {
+                if (request == null ||
+                    request.PaidTimeRequestId <= 0 ||
+                    request.RanchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
+                PaidTimeRequest.TransferPaidTimeRequestToSlot(
+                    request.PaidTimeRequestId,
+                    request.NewSlotInCompId,
+                    personId);
+
+                return Ok(new { Message = "Slot updated" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in TransferPaidTimeRequestToSlot: {ex.Message}");
                 return BadRequest(ex.Message);
             }
         }

@@ -17,7 +17,15 @@ import {
   getCompetitionCashDeskOverview,
   saveCompetitionCashCount,
   saveCompetitionCashSafeTransfer,
+  importFederationCreditsFromExcel,
 } from "../../services/competitionSummaryService";
+import {
+  approveFederationMatchingSuggestion as approveFederationMatchingSuggestionRequest,
+  getCompetitionPaymentPayers,
+  getFederationChargesForPayer,
+  getFederationMatchingSuggestions,
+  searchFederationExternalCredits,
+} from "../../services/competitionPaymentsService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 function getEmptySummary() {
@@ -89,6 +97,41 @@ export default function useCompetitionSummaryPage(options) {
   var [loading, setLoading] = useState(false);
   var [error, setError] = useState("");
 
+  var [federationInvoiceImporting, setFederationInvoiceImporting] =
+    useState(false);
+  var [federationInvoiceImportError, setFederationInvoiceImportError] =
+    useState("");
+  var [federationInvoiceImportSuccess, setFederationInvoiceImportSuccess] =
+    useState("");
+  var [federationInvoiceImportResult, setFederationInvoiceImportResult] =
+    useState(null);
+
+  var [federationMatchingOpen, setFederationMatchingOpen] = useState(false);
+  var [federationMatchingItems, setFederationMatchingItems] = useState([]);
+  var [federationMatchingLoading, setFederationMatchingLoading] =
+    useState(false);
+  var [federationMatchingApproving, setFederationMatchingApproving] =
+    useState(false);
+  var [federationMatchingError, setFederationMatchingError] = useState("");
+  var [federationMatchingSuccess, setFederationMatchingSuccess] = useState("");
+
+  var [federationMatchingActiveTab, setFederationMatchingActiveTab] =
+    useState("suggestions");
+
+  var [manualCreditSearchText, setManualCreditSearchText] = useState("");
+  var [manualCredits, setManualCredits] = useState([]);
+  var [manualCreditsLoading, setManualCreditsLoading] = useState(false);
+  var [selectedManualCredit, setSelectedManualCredit] = useState(null);
+
+  var [manualPayerSearchText, setManualPayerSearchText] = useState("");
+  var [manualPayers, setManualPayers] = useState([]);
+  var [manualPayersLoading, setManualPayersLoading] = useState(false);
+  var [selectedManualPayer, setSelectedManualPayer] = useState(null);
+
+  var [manualFederationCharges, setManualFederationCharges] = useState([]);
+  var [manualChargesLoading, setManualChargesLoading] = useState(false);
+  var [manualAllocationAmount, setManualAllocationAmount] = useState("");
+
   var [detailsModal, setDetailsModal] = useState(null);
   var [detailsItems, setDetailsItems] = useState([]);
   var [detailsLoading, setDetailsLoading] = useState(false);
@@ -149,6 +192,401 @@ export default function useCompetitionSummaryPage(options) {
       setSummary(getEmptySummary());
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function importFederationInvoices(file) {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    if (!file) {
+      setFederationInvoiceImportError("יש לבחור קובץ אקסל לייבוא");
+      return;
+    }
+
+    try {
+      setFederationInvoiceImporting(true);
+      setFederationInvoiceImportError("");
+      setFederationInvoiceImportSuccess("");
+      setFederationInvoiceImportResult(null);
+
+      var response = await importFederationCreditsFromExcel(
+        competitionId,
+        ranchId,
+        file,
+      );
+
+      var result = response.data || null;
+
+      setFederationInvoiceImportResult(result);
+      setFederationInvoiceImportSuccess(
+        "ייבוא חשבוניות ההתאחדות הסתיים בהצלחה",
+      );
+
+      await loadSummary();
+    } catch (error) {
+      console.error(error);
+
+      setFederationInvoiceImportError(
+        getErrorMessage(error, "שגיאה בייבוא חשבוניות התאחדות"),
+      );
+
+      setFederationInvoiceImportResult(null);
+    } finally {
+      setFederationInvoiceImporting(false);
+    }
+  }
+
+  async function loadFederationMatchingSuggestions() {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    try {
+      setFederationMatchingLoading(true);
+      setFederationMatchingError("");
+      setFederationMatchingSuccess("");
+
+      var response = await getFederationMatchingSuggestions(
+        competitionId,
+        ranchId,
+      );
+
+      setFederationMatchingItems(
+        Array.isArray(response.data) ? response.data : [],
+      );
+    } catch (error) {
+      console.error(error);
+      setFederationMatchingError(
+        getErrorMessage(error, "שגיאה בטעינת הצעות התאמה"),
+      );
+      setFederationMatchingItems([]);
+    } finally {
+      setFederationMatchingLoading(false);
+    }
+  }
+
+  async function openFederationMatchingModal() {
+    setFederationMatchingOpen(true);
+    await loadFederationMatchingSuggestions();
+  }
+
+  function closeFederationMatchingModal() {
+    if (federationMatchingApproving) {
+      return;
+    }
+
+    setFederationMatchingOpen(false);
+    setFederationMatchingItems([]);
+    setFederationMatchingError("");
+    setFederationMatchingSuccess("");
+    setFederationMatchingActiveTab("suggestions");
+    setManualCreditSearchText("");
+    setManualCredits([]);
+    setSelectedManualCredit(null);
+    setManualPayerSearchText("");
+    setManualPayers([]);
+    setSelectedManualPayer(null);
+    setManualFederationCharges([]);
+    setManualAllocationAmount("");
+  }
+
+  async function approveFederationMatchingSuggestion(item) {
+    if (!competitionId || !ranchId || !item) {
+      return;
+    }
+
+    var federationExternalCreditId = getValue(
+      item,
+      "federationExternalCreditId",
+      "FederationExternalCreditId",
+      0,
+    );
+
+    var paidByPersonId = getValue(item, "paidByPersonId", "PaidByPersonId", 0);
+
+    var suggestedAllocatedAmount = Number(
+      getValue(item, "suggestedAllocatedAmount", "SuggestedAllocatedAmount", 0),
+    );
+
+    if (
+      !federationExternalCreditId ||
+      !paidByPersonId ||
+      suggestedAllocatedAmount <= 0
+    ) {
+      setFederationMatchingError("הצעת ההתאמה אינה תקינה");
+      return;
+    }
+
+    try {
+      setFederationMatchingApproving(true);
+      setFederationMatchingError("");
+      setFederationMatchingSuccess("");
+
+      var response = await approveFederationMatchingSuggestionRequest({
+        competitionId: Number(competitionId),
+        ranchId: Number(ranchId),
+        federationExternalCreditId: federationExternalCreditId,
+        paidByPersonId: paidByPersonId,
+        amount: suggestedAllocatedAmount,
+        notes: "אישור הצעת התאמה ממסך סיכום תחרות",
+      });
+
+      var result = response.data || null;
+      var message =
+        result && (result.message || result.Message)
+          ? result.message || result.Message
+          : "הצעת ההתאמה אושרה בהצלחה";
+
+      setFederationMatchingSuccess(message);
+
+      await loadFederationMatchingSuggestions();
+      await loadSummary();
+    } catch (error) {
+      console.error(error);
+      setFederationMatchingError(
+        getErrorMessage(error, "שגיאה באישור הצעת התאמה"),
+      );
+    } finally {
+      setFederationMatchingApproving(false);
+    }
+  }
+
+  function changeFederationMatchingTab(tabName) {
+    setFederationMatchingActiveTab(tabName);
+    setFederationMatchingError("");
+    setFederationMatchingSuccess("");
+  }
+
+  function changeManualCreditSearchText(value) {
+    setManualCreditSearchText(value);
+  }
+
+  function changeManualPayerSearchText(value) {
+    setManualPayerSearchText(value);
+  }
+
+  function getCreditId(credit) {
+    return getValue(
+      credit,
+      "federationExternalCreditId",
+      "FederationExternalCreditId",
+      0,
+    );
+  }
+
+  function getCreditAvailableAmount(credit) {
+    return Number(getValue(credit, "availableAmount", "AvailableAmount", 0));
+  }
+
+  function getPayerId(payer) {
+    return getValue(payer, "payerPersonId", "PayerPersonId", 0);
+  }
+
+  function getPayerName(payer) {
+    return getValue(payer, "payerName", "PayerName", "");
+  }
+
+  async function searchManualFederationCredits() {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    try {
+      setManualCreditsLoading(true);
+      setFederationMatchingError("");
+      setFederationMatchingSuccess("");
+
+      var response = await searchFederationExternalCredits(
+        competitionId,
+        ranchId,
+        manualCreditSearchText,
+        true,
+      );
+
+      setManualCredits(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error(error);
+      setFederationMatchingError(
+        getErrorMessage(error, "שגיאה בחיפוש קבלות התאחדות"),
+      );
+      setManualCredits([]);
+    } finally {
+      setManualCreditsLoading(false);
+    }
+  }
+
+  async function searchManualPayers() {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    try {
+      setManualPayersLoading(true);
+      setFederationMatchingError("");
+      setFederationMatchingSuccess("");
+
+      var response = await getCompetitionPaymentPayers(competitionId, ranchId);
+      var items = Array.isArray(response.data) ? response.data : [];
+      var text = (manualPayerSearchText || "").trim().toLowerCase();
+
+      if (text) {
+        items = items.filter(function (payer) {
+          var payerName = getPayerName(payer).toLowerCase();
+
+          return payerName.indexOf(text) >= 0;
+        });
+      }
+
+      setManualPayers(items);
+    } catch (error) {
+      console.error(error);
+      setFederationMatchingError(getErrorMessage(error, "שגיאה בחיפוש משלמים"));
+      setManualPayers([]);
+    } finally {
+      setManualPayersLoading(false);
+    }
+  }
+
+  async function selectManualCredit(credit) {
+    setSelectedManualCredit(credit);
+    setFederationMatchingError("");
+    setFederationMatchingSuccess("");
+
+    var availableAmount = getCreditAvailableAmount(credit);
+
+    if (availableAmount > 0) {
+      setManualAllocationAmount(String(availableAmount));
+    }
+  }
+
+  async function selectManualPayer(payer) {
+    var payerPersonId = getPayerId(payer);
+
+    if (!competitionId || !ranchId || !payerPersonId) {
+      return;
+    }
+
+    try {
+      setSelectedManualPayer(payer);
+      setManualChargesLoading(true);
+      setFederationMatchingError("");
+      setFederationMatchingSuccess("");
+      setManualFederationCharges([]);
+
+      var response = await getFederationChargesForPayer(
+        competitionId,
+        ranchId,
+        payerPersonId,
+      );
+
+      var charges = Array.isArray(response.data) ? response.data : [];
+
+      charges = charges.filter(function (charge) {
+        var missingAmount = Number(
+          getValue(charge, "missingAmount", "MissingAmount", 0),
+        );
+
+        return missingAmount > 0;
+      });
+
+      setManualFederationCharges(charges);
+
+      var totalMissing = charges.reduce(function (sum, charge) {
+        return (
+          sum + Number(getValue(charge, "missingAmount", "MissingAmount", 0))
+        );
+      }, 0);
+
+      var selectedCreditAvailable = selectedManualCredit
+        ? getCreditAvailableAmount(selectedManualCredit)
+        : 0;
+
+      if (selectedCreditAvailable > 0 && totalMissing > 0) {
+        setManualAllocationAmount(
+          String(Math.min(selectedCreditAvailable, totalMissing)),
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      setFederationMatchingError(
+        getErrorMessage(error, "שגיאה בטעינת חיובי התאחדות למשלם"),
+      );
+      setManualFederationCharges([]);
+    } finally {
+      setManualChargesLoading(false);
+    }
+  }
+
+  function changeManualAllocationAmount(value) {
+    setManualAllocationAmount(value);
+  }
+
+  async function approveManualFederationAllocation() {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    if (!selectedManualCredit) {
+      setFederationMatchingError("יש לבחור קבלה / יתרה לשיוך");
+      return;
+    }
+
+    if (!selectedManualPayer) {
+      setFederationMatchingError("יש לבחור משלם לשיוך");
+      return;
+    }
+
+    var federationExternalCreditId = getCreditId(selectedManualCredit);
+    var paidByPersonId = getPayerId(selectedManualPayer);
+    var amount = Number(manualAllocationAmount);
+
+    if (
+      !federationExternalCreditId ||
+      !paidByPersonId ||
+      !amount ||
+      amount <= 0
+    ) {
+      setFederationMatchingError("יש להזין סכום שיוך תקין");
+      return;
+    }
+
+    try {
+      setFederationMatchingApproving(true);
+      setFederationMatchingError("");
+      setFederationMatchingSuccess("");
+
+      var response = await approveFederationMatchingSuggestionRequest({
+        competitionId: Number(competitionId),
+        ranchId: Number(ranchId),
+        federationExternalCreditId: federationExternalCreditId,
+        paidByPersonId: paidByPersonId,
+        amount: amount,
+        notes: "שיוך ידני ממסך סיכום תחרות",
+      });
+
+      var result = response.data || null;
+      var message =
+        result && (result.message || result.Message)
+          ? result.message || result.Message
+          : "השיוך הידני נשמר בהצלחה";
+
+      setFederationMatchingSuccess(message);
+
+      setSelectedManualCredit(null);
+      setSelectedManualPayer(null);
+      setManualFederationCharges([]);
+      setManualAllocationAmount("");
+
+      await searchManualFederationCredits();
+      await loadFederationMatchingSuggestions();
+      await loadSummary();
+    } catch (error) {
+      console.error(error);
+      setFederationMatchingError(getErrorMessage(error, "שגיאה בשיוך ידני"));
+    } finally {
+      setFederationMatchingApproving(false);
     }
   }
 
@@ -685,5 +1123,47 @@ export default function useCompetitionSummaryPage(options) {
     openPaymentBatchDetails: openPaymentBatchDetails,
     backInPaymentsModal: backInPaymentsModal,
     closePaymentsModal: closePaymentsModal,
+
+    federationInvoiceImporting: federationInvoiceImporting,
+    federationInvoiceImportError: federationInvoiceImportError,
+    federationInvoiceImportSuccess: federationInvoiceImportSuccess,
+    federationInvoiceImportResult: federationInvoiceImportResult,
+    importFederationInvoices: importFederationInvoices,
+
+    federationMatchingOpen: federationMatchingOpen,
+    federationMatchingItems: federationMatchingItems,
+    federationMatchingLoading: federationMatchingLoading,
+    federationMatchingApproving: federationMatchingApproving,
+    federationMatchingError: federationMatchingError,
+    federationMatchingSuccess: federationMatchingSuccess,
+    openFederationMatchingModal: openFederationMatchingModal,
+    closeFederationMatchingModal: closeFederationMatchingModal,
+    loadFederationMatchingSuggestions: loadFederationMatchingSuggestions,
+    approveFederationMatchingSuggestion: approveFederationMatchingSuggestion,
+
+    federationMatchingActiveTab: federationMatchingActiveTab,
+    changeFederationMatchingTab: changeFederationMatchingTab,
+
+    manualCreditSearchText: manualCreditSearchText,
+    manualCredits: manualCredits,
+    manualCreditsLoading: manualCreditsLoading,
+    selectedManualCredit: selectedManualCredit,
+    changeManualCreditSearchText: changeManualCreditSearchText,
+    searchManualFederationCredits: searchManualFederationCredits,
+    selectManualCredit: selectManualCredit,
+
+    manualPayerSearchText: manualPayerSearchText,
+    manualPayers: manualPayers,
+    manualPayersLoading: manualPayersLoading,
+    selectedManualPayer: selectedManualPayer,
+    changeManualPayerSearchText: changeManualPayerSearchText,
+    searchManualPayers: searchManualPayers,
+    selectManualPayer: selectManualPayer,
+
+    manualFederationCharges: manualFederationCharges,
+    manualChargesLoading: manualChargesLoading,
+    manualAllocationAmount: manualAllocationAmount,
+    changeManualAllocationAmount: changeManualAllocationAmount,
+    approveManualFederationAllocation: approveManualFederationAllocation,
   };
 }

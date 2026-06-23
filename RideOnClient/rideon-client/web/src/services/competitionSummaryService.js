@@ -243,6 +243,26 @@ function saveCompetitionCashSafeTransfer(data) {
   );
 }
 
+function importFederationCreditsFromExcel(competitionId, ranchId, file) {
+  var formData = new FormData();
+
+  formData.append("competitionId", competitionId);
+  formData.append("ranchId", ranchId);
+  formData.append("file", file);
+
+  var auth = getAuthHeaders();
+
+  return axios.post(
+    `${API}/CompetitionPayments/federation/credits/import-excel`,
+    formData,
+    {
+      headers: {
+        Authorization: auth.headers.Authorization,
+      },
+    },
+  );
+}
+
 export {
   getCompetitionSummary,
   getCompetitionSummaryClassDetails,
@@ -261,4 +281,5 @@ export {
   getCompetitionCashDeskOverview,
   saveCompetitionCashCount,
   saveCompetitionCashSafeTransfer,
+  importFederationCreditsFromExcel,
 };

@@ -46,6 +46,8 @@ export default function CompetitionEntryCreateModal(props) {
 
   var isEditMode = !!editItem;
 
+  var lockedPayerPersonId = props.lockedPayerPersonId || null;
+
   useEffect(
     function () {
       if (!props.visible || !editItem) {
@@ -91,6 +93,34 @@ export default function CompetitionEntryCreateModal(props) {
       registrations.horses,
       registrations.riders,
       registrations.trainers,
+      registrations.payers,
+    ],
+  );
+
+  // Hard-bind payer when caller passes a locked payer id (Q2 — admin opens
+  // create form from inside payer's account screen).
+  useEffect(
+    function () {
+      if (!props.visible || !lockedPayerPersonId) return;
+      if (!registrations.payers || registrations.payers.length === 0) return;
+
+      var lockedPayer = registrations.payers.find(function (item) {
+        return item.personId === lockedPayerPersonId;
+      });
+
+      if (!lockedPayer) return;
+
+      registrations.setSelectedPayer(lockedPayer);
+
+      // Engage the lock so handleCreateEntry retains the payer between submits
+      // and the FormCard shows the field as locked (read-only UI).
+      if (!registrations.locks?.payer) {
+        registrations.handleToggleLock("payer");
+      }
+    },
+    [
+      props.visible,
+      lockedPayerPersonId,
       registrations.payers,
     ],
   );

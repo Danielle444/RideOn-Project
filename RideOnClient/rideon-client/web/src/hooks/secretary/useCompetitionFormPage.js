@@ -3,6 +3,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import useCompetitionDetailsStep from "./useCompetitionDetailsStep";
 import useCompetitionClassesStep from "./useCompetitionClassesStep";
 import useCompetitionPaidTimeStep from "./useCompetitionPaidTimeStep";
+import {
+  getCompetitionsByHostRanch,
+  duplicateCompetitionFromSelection,
+} from "../../services/competitionService";
+import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function useCompetitionFormPage(options) {
   var navigate = useNavigate();
@@ -15,11 +20,20 @@ export default function useCompetitionFormPage(options) {
     : null;
 
   var [activeStep, setActiveStep] = useState("details");
+  var [creationMode, setCreationMode] = useState("manual");
+
   var [toast, setToast] = useState({
     isOpen: false,
     type: "success",
     message: "",
   });
+
+  var [duplicateSourceCompetitions, setDuplicateSourceCompetitions] = useState(
+    [],
+  );
+  var [loadingDuplicateSources, setLoadingDuplicateSources] = useState(false);
+  var [savingDuplicate, setSavingDuplicate] = useState(false);
+  var [duplicateError, setDuplicateError] = useState("");
 
   function showToast(type, message) {
     setToast({
@@ -128,6 +142,67 @@ export default function useCompetitionFormPage(options) {
     ],
   );
 
+  useEffect(
+    function () {
+      if (isEdit) {
+        return;
+      }
+
+      if (creationMode !== "duplicate") {
+        return;
+      }
+
+      loadDuplicateSourceCompetitions();
+    },
+    [creationMode, currentRanchId],
+  );
+
+  async function loadDuplicateSourceCompetitions() {
+    if (!currentRanchId) {
+      showToast("error", "לא נבחרה חווה פעילה");
+      return;
+    }
+
+    try {
+      setDuplicateError("");
+      setLoadingDuplicateSources(true);
+
+      var response = await getCompetitionsByHostRanch({
+        ranchId: currentRanchId,
+        searchText: null,
+        status: null,
+        fieldId: null,
+        dateFrom: null,
+        dateTo: null,
+      });
+
+      setDuplicateSourceCompetitions(
+        Array.isArray(response.data) ? response.data : [],
+      );
+    } catch (error) {
+      console.error(error);
+      setDuplicateSourceCompetitions([]);
+      setDuplicateError(
+        getErrorMessage(error, "שגיאה בטעינת תחרויות מקור לשכפול"),
+      );
+    } finally {
+      setLoadingDuplicateSources(false);
+    }
+  }
+
+  function handleCreationModeChange(nextMode) {
+    if (details.competitionId) {
+      return;
+    }
+
+    setCreationMode(nextMode);
+    setDuplicateError("");
+
+    if (nextMode === "manual") {
+      setActiveStep("details");
+    }
+  }
+
   async function handleSaveDetails(intent) {
     var result = await details.saveDetails(
       intent,
@@ -167,12 +242,39 @@ export default function useCompetitionFormPage(options) {
     showToast("info", "ניתן לחזור ולהגדיר פייד־טיים בהמשך");
   }
 
+  async function handleDuplicateCompetition(payload) {
+    try {
+      setSavingDuplicate(true);
+      setDuplicateError("");
+
+      var response = await duplicateCompetitionFromSelection(payload);
+      var newCompetitionId = response.data?.newCompetitionId;
+
+      if (!newCompetitionId) {
+        throw new Error("לא התקבל מזהה לתחרות החדשה");
+      }
+
+      showToast("success", "התחרות שוכפלה בהצלחה");
+
+      navigate("/competitions", {
+        replace: true,
+      });
+    } catch (error) {
+      console.error(error);
+      setDuplicateError(getErrorMessage(error, "שגיאה בשכפול התחרות"));
+    } finally {
+      setSavingDuplicate(false);
+    }
+  }
+
   return {
     navigate,
     toast,
     closeToast,
     activeStep,
     setActiveStep,
+    creationMode,
+    setCreationMode: handleCreationModeChange,
     loadingPage: details.loadingPage,
     savingDetails: details.savingDetails,
     fields: details.fields,
@@ -221,5 +323,11 @@ export default function useCompetitionFormPage(options) {
     handleDeletePaidTime: paidTime.handleDeletePaidTime,
     shouldShowPaidTimeStep: shouldShowPaidTimeStep,
     handleSkipPaidTimeStep: handleSkipPaidTimeStep,
+    duplicateSourceCompetitions: duplicateSourceCompetitions,
+    loadingDuplicateSources: loadingDuplicateSources,
+    savingDuplicate: savingDuplicate,
+    duplicateError: duplicateError,
+    handleDuplicateCompetition: handleDuplicateCompetition,
+    reloadDuplicateSourceCompetitions: loadDuplicateSourceCompetitions,
   };
 }

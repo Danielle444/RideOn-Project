@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import {
   Clock3,
   Home,
@@ -48,13 +49,94 @@ function getCategoryIcon(categoryKey) {
   return <Trophy size={20} />;
 }
 
+function ImportResultBox(props) {
+  var result = props.result;
+
+  if (!result) {
+    return null;
+  }
+
+  return (
+    <div className="mb-6 grid grid-cols-2 gap-3 rounded-2xl border border-[#E6DCD5] bg-[#FCFAF8] p-4 text-sm xl:grid-cols-5">
+      <div>
+        <p className="text-xs font-bold text-[#8A7268]">שורות</p>
+        <p className="mt-1 font-black text-[#3F312B]">
+          {getValue(result, "totalRows", "TotalRows", 0)}
+        </p>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold text-[#8A7268]">נקלטו</p>
+        <p className="mt-1 font-black text-[#2E7D32]">
+          {getValue(result, "importedCreditsCount", "ImportedCreditsCount", 0)}
+        </p>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold text-[#8A7268]">כפילויות</p>
+        <p className="mt-1 font-black text-[#7B5A4D]">
+          {getValue(
+            result,
+            "skippedDuplicatesCount",
+            "SkippedDuplicatesCount",
+            0,
+          )}
+        </p>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold text-[#8A7268]">ללא סכום</p>
+        <p className="mt-1 font-black text-[#7B5A4D]">
+          {getValue(
+            result,
+            "skippedZeroAmountCount",
+            "SkippedZeroAmountCount",
+            0,
+          )}
+        </p>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold text-[#8A7268]">שגיאות</p>
+        <p className="mt-1 font-black text-[#C62828]">
+          {getValue(result, "failedRowsCount", "FailedRowsCount", 0)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function CompetitionSummarySection(props) {
   var categories = Array.isArray(props.categories) ? props.categories : [];
   var showCategoriesTable = props.showCategoriesTable !== false;
+  var fileInputRef = useRef(null);
+
+  function openFilePicker() {
+    if (props.actionLoading) {
+      return;
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  }
+
+  function handleFileChange(event) {
+    var file =
+      event.target.files && event.target.files.length > 0
+        ? event.target.files[0]
+        : null;
+
+    if (file && props.onInvoiceFileSelected) {
+      props.onInvoiceFileSelected(file);
+    }
+
+    event.target.value = "";
+  }
 
   return (
     <section className="rounded-[28px] border border-[#E6DCD5] bg-white p-8 shadow-sm">
-      <div className="mb-7 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_260px]">
+      <div className="mb-7 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_260px_220px]">
         <div>
           <h2 className="text-3xl font-black text-[#3F312B]">{props.title}</h2>
 
@@ -75,17 +157,53 @@ export default function CompetitionSummarySection(props) {
         ) : null}
 
         {props.actionType === "invoice" ? (
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            <button
+              type="button"
+              onClick={openFilePicker}
+              disabled={props.actionLoading}
+              className="flex h-16 w-full items-center justify-center gap-3 rounded-2xl bg-[#8B5E4C] px-6 text-lg font-bold text-white transition-colors hover:bg-[#765041] disabled:cursor-not-allowed disabled:opacity-60"
+              title="ייבוא אקסל תשלומי התאחדות"
+            >
+              <Upload size={22} />
+              {props.actionLoading ? "מעלה..." : "העלאת חשבוניות"}
+            </button>
+          </div>
+        ) : null}
+
+        {props.secondaryActionLabel ? (
           <button
             type="button"
-            disabled
-            className="flex h-16 items-center justify-center gap-3 rounded-2xl bg-[#8B5E4C] px-6 text-lg font-bold text-white opacity-70"
-            title="העלאת חשבוניות תחובר בהמשך"
+            onClick={props.onSecondaryActionClick}
+            disabled={props.actionLoading}
+            className="flex h-16 items-center justify-center gap-3 rounded-2xl border border-[#8B5E4C] bg-white px-6 text-lg font-bold text-[#6D4C41] transition-colors hover:bg-[#FCF8F5] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <Upload size={22} />
-            העלאת חשבוניות
+            {props.secondaryActionLabel}
           </button>
         ) : null}
       </div>
+
+      {props.actionError ? (
+        <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+          {props.actionError}
+        </div>
+      ) : null}
+
+      {props.actionSuccess ? (
+        <div className="mb-5 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-bold text-green-700">
+          {props.actionSuccess}
+        </div>
+      ) : null}
+
+      <ImportResultBox result={props.invoiceImportResult} />
 
       <SummaryAmountCards
         totals={props.totals}

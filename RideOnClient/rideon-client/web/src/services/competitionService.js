@@ -41,7 +41,23 @@ function createCompetition(data) {
 }
 
 function updateCompetition(competitionId, data) {
-  return axios.put(`${API}/Competitions/${competitionId}`, data, getAuthHeaders());
+  return axios.put(
+    `${API}/Competitions/${competitionId}`,
+    data,
+    getAuthHeaders(),
+  );
+}
+
+function duplicateCompetition(data) {
+  return axios.post(`${API}/Competitions/duplicate`, data, getAuthHeaders());
+}
+
+function duplicateCompetitionFromSelection(data) {
+  return axios.post(
+    `${API}/Competitions/duplicate-from-selection`,
+    data,
+    getAuthHeaders(),
+  );
 }
 
 export {
@@ -49,4 +65,6 @@ export {
   getCompetitionById,
   createCompetition,
   updateCompetition,
+  duplicateCompetition,
+  duplicateCompetitionFromSelection,
 };

@@ -21,6 +21,8 @@ import ToastMessage from "../../components/common/ToastMessage";
 import StallMapGrid from "../../components/secretary/stall-map/StallMapGrid";
 import StallMapUploader from "../../components/secretary/stall-map/StallMapUploader";
 import StallBookingsOverviewTable from "../../components/secretary/stall-map/StallBookingsOverviewTable";
+import SecretaryCreateStallBookingModal from "../../components/secretary/stall-map/SecretaryCreateStallBookingModal";
+import SecretaryUpdateStallBookingModal from "../../components/secretary/stall-map/SecretaryUpdateStallBookingModal";
 import StallAssignmentSidebar from "../../components/secretary/stall-map/StallAssignmentSidebar";
 import StallAssignmentRanchTabs from "../../components/secretary/stall-map/StallAssignmentRanchTabs";
 import useCompetitionStallsPage from "../../hooks/secretary/useCompetitionStallsPage";
@@ -60,6 +62,28 @@ export default function CompetitionStallsPage() {
   const page = useCompetitionStallsPage(Number(competitionId), ranchId);
 
   const [activeItem, setActiveItem] = useState(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+
+  async function handleDeleteBooking(item) {
+    try {
+      await page.handleDeleteStallBooking(item.stallBookingId);
+    } catch (err) {
+      alert(String(err?.response?.data || err?.message || "שגיאה בביטול תא"));
+    }
+  }
+
+  function handleEditBooking(item) {
+    setEditTarget(item);
+  }
+
+  async function handleSubmitCreate(payload) {
+    await page.handleCreateStallBookingForPayer(payload);
+  }
+
+  async function handleSubmitUpdate(stallBookingId, payload) {
+    await page.handleUpdateStallBooking(stallBookingId, payload);
+  }
   const [toast, setToast] = useState({
     isOpen: false,
     type: "success",
@@ -196,9 +220,23 @@ export default function CompetitionStallsPage() {
               <h2 className="text-base font-bold">רשימת הזמנות תאים</h2>
             </div>
 
+            <div className="mb-3 flex justify-end">
+              <button
+                type="button"
+                onClick={function () {
+                  setCreateModalOpen(true);
+                }}
+                className="rounded-2xl bg-[#7B5A4D] px-4 py-2 text-sm font-black text-white hover:bg-[#6B4D42]"
+              >
+                + הוסף תא
+              </button>
+            </div>
+
             <StallBookingsOverviewTable
               items={page.overviewItems}
               compounds={page.compounds}
+              onDeleteBooking={handleDeleteBooking}
+              onEditBooking={handleEditBooking}
             />
           </div>
         )}
@@ -319,6 +357,27 @@ export default function CompetitionStallsPage() {
             return { ...current, isOpen: false };
           });
         }}
+      />
+
+      <SecretaryCreateStallBookingModal
+        isOpen={createModalOpen}
+        competitionId={Number(competitionId)}
+        ranchId={ranchId}
+        onClose={function () {
+          setCreateModalOpen(false);
+        }}
+        onSubmit={handleSubmitCreate}
+      />
+
+      <SecretaryUpdateStallBookingModal
+        isOpen={!!editTarget}
+        booking={editTarget}
+        competitionId={Number(competitionId)}
+        ranchId={ranchId}
+        onClose={function () {
+          setEditTarget(null);
+        }}
+        onSubmit={handleSubmitUpdate}
       />
     </CompetitionWorkspaceLayout>
   );

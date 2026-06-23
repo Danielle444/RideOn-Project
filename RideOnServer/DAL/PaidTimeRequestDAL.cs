@@ -555,6 +555,57 @@ namespace RideOnServer.DAL
             }
         }
 
+        public void CancelPaidTimeRequestByPayer(int paidTimeRequestId, int payerPersonId)
+        {
+            try
+            {
+                using NpgsqlConnection connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using NpgsqlCommand command = new NpgsqlCommand(@"
+                    SELECT public.usp_cancelpaidtimerequestbypayer(
+                        p_paidtimerequestid := @id,
+                        p_payerpersonid     := @payerPersonId
+                    );", connection);
+
+                command.Parameters.Add("@id", NpgsqlDbType.Integer).Value = paidTimeRequestId;
+                command.Parameters.Add("@payerPersonId", NpgsqlDbType.Integer).Value = payerPersonId;
+
+                command.ExecuteNonQuery();
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public void UpdatePaidTimeNotesByPayer(int paidTimeRequestId, int payerPersonId, string? notes)
+        {
+            try
+            {
+                using NpgsqlConnection connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using NpgsqlCommand command = new NpgsqlCommand(@"
+                    SELECT public.usp_updatepaidtimenotesbypayer(
+                        p_paidtimerequestid := @id,
+                        p_payerpersonid     := @payerPersonId,
+                        p_notes             := @notes
+                    );", connection);
+
+                command.Parameters.Add("@id", NpgsqlDbType.Integer).Value = paidTimeRequestId;
+                command.Parameters.Add("@payerPersonId", NpgsqlDbType.Integer).Value = payerPersonId;
+                command.Parameters.Add("@notes", NpgsqlDbType.Text).Value =
+                    (object?)notes ?? DBNull.Value;
+
+                command.ExecuteNonQuery();
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
         public void UpdatePaidTimeRequest(
             int paidTimeRequestId,
             int orderedBySystemUserId,
@@ -598,6 +649,109 @@ namespace RideOnServer.DAL
                         command.ExecuteNonQuery();
                     }
                 }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        public List<PaidTimeSlotRegistrationItem> GetPaidTimeSlotRegistrations(
+            int slotInCompId,
+            int secretarySystemUserId)
+        {
+            List<PaidTimeSlotRegistrationItem> result =
+                new List<PaidTimeSlotRegistrationItem>();
+
+            try
+            {
+                using NpgsqlConnection connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using NpgsqlCommand command = new NpgsqlCommand(@"
+                    SELECT *
+                    FROM public.usp_getpaidtimeslotregistrations(
+                        p_slotincompid          := @slotId,
+                        p_secretarysystemuserid := @secretaryId
+                    );", connection);
+
+                command.Parameters.Add("@slotId", NpgsqlDbType.Integer).Value = slotInCompId;
+                command.Parameters.Add("@secretaryId", NpgsqlDbType.Integer).Value = secretarySystemUserId;
+
+                using NpgsqlDataReader reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    result.Add(new PaidTimeSlotRegistrationItem
+                    {
+                        PaidTimeRequestId = Convert.ToInt32(reader["paidtimerequestid"]),
+                        RequestStatus = reader["requeststatus"]?.ToString() ?? "Pending",
+                        IsAssignedToThisSlot =
+                            reader["isassignedtothisslot"] != DBNull.Value &&
+                            Convert.ToBoolean(reader["isassignedtothisslot"]),
+                        IsRequestedForThisSlot =
+                            reader["isrequestedforthisslot"] != DBNull.Value &&
+                            Convert.ToBoolean(reader["isrequestedforthisslot"]),
+                        AssignedStartTime = reader["assignedstarttime"] == DBNull.Value
+                            ? null
+                            : Convert.ToDateTime(reader["assignedstarttime"]),
+                        AssignedOrder = reader["assignedorder"] == DBNull.Value
+                            ? null
+                            : Convert.ToInt32(reader["assignedorder"]),
+                        ProductName = reader["productname"] == DBNull.Value
+                            ? null
+                            : reader["productname"].ToString(),
+                        DurationMinutes = reader["durationminutes"] == DBNull.Value
+                            ? null
+                            : Convert.ToInt32(reader["durationminutes"]),
+                        HorseId = Convert.ToInt32(reader["horseid"]),
+                        HorseName = reader["horsename"]?.ToString() ?? string.Empty,
+                        BarnName = reader["barnname"] == DBNull.Value
+                            ? null
+                            : reader["barnname"].ToString(),
+                        RiderFederationMemberId = Convert.ToInt32(reader["riderfederationmemberid"]),
+                        RiderName = reader["ridername"]?.ToString() ?? string.Empty,
+                        CoachFederationMemberId = reader["coachfederationmemberid"] == DBNull.Value
+                            ? null
+                            : Convert.ToInt32(reader["coachfederationmemberid"]),
+                        CoachName = reader["coachname"] == DBNull.Value
+                            ? null
+                            : reader["coachname"].ToString(),
+                        PaidByPersonId = Convert.ToInt32(reader["paidbypersonid"]),
+                        PayerName = reader["payername"]?.ToString() ?? string.Empty,
+                        Notes = reader["notes"] == DBNull.Value ? null : reader["notes"].ToString(),
+                    });
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+
+            return result;
+        }
+
+        public void TransferPaidTimeRequestToSlot(
+            int paidTimeRequestId,
+            int? newSlotInCompId,
+            int secretarySystemUserId)
+        {
+            try
+            {
+                using NpgsqlConnection connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using NpgsqlCommand command = new NpgsqlCommand(@"
+                    SELECT public.usp_transferpaidtimerequesttoslot(
+                        p_paidtimerequestid     := @requestId,
+                        p_newslotincompid       := @newSlotId,
+                        p_secretarysystemuserid := @secretaryId
+                    );", connection);
+
+                command.Parameters.Add("@requestId", NpgsqlDbType.Integer).Value = paidTimeRequestId;
+                command.Parameters.AddWithValue("@newSlotId", (object?)newSlotInCompId ?? DBNull.Value);
+                command.Parameters.Add("@secretaryId", NpgsqlDbType.Integer).Value = secretarySystemUserId;
+
+                command.ExecuteNonQuery();
             }
             catch (NpgsqlException ex)
             {

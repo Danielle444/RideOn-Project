@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Info, X } from "lucide-react";
 import DroppableBox from "../../common/dnd/DroppableBox";
 
 export default function PaidTimeScheduleCell({
@@ -6,6 +6,7 @@ export default function PaidTimeScheduleCell({
   assignment,
   onUnassign,
   selectedCoach,
+  onOpenDetails,
 }) {
   var requestId = assignment
     ? assignment.paidTimeRequestId || assignment.PaidTimeRequestId
@@ -44,6 +45,20 @@ export default function PaidTimeScheduleCell({
       ].join(" ")}
       overClassName="bg-[#F5EDE8] ring-2 ring-[#795548]"
     >
+      {onOpenDetails ? (
+        <button
+          type="button"
+          onClick={function (e) {
+            e.stopPropagation();
+            onOpenDetails(timeCell);
+          }}
+          title="צפייה ברשומים לסלוט"
+          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white/80 text-[#7B5A4D] shadow-sm hover:bg-white"
+        >
+          <Info size={13} />
+        </button>
+      ) : null}
+
       {assignment ? (
         <div className="flex items-center justify-between gap-3">
           <div>

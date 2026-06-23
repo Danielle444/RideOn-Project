@@ -7,6 +7,7 @@ import CashDeskModal from "../../components/secretary/competition-summary/CashDe
 import { getCompetitionById } from "../../services/competitionService";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import useCompetitionSummaryPage from "../../hooks/secretary/useCompetitionSummaryPage";
+import FederationMatchingSuggestionsModal from "../../components/secretary/competition-summary/FederationMatchingSuggestionsModal";
 
 function SummaryPageContent(props) {
   var layout = props.layout;
@@ -101,9 +102,16 @@ function SummaryPageContent(props) {
             totals={page.summary.federation}
             categories={page.summary.federationCategories}
             actionType="invoice"
+            actionLoading={page.federationInvoiceImporting}
+            actionError={page.federationInvoiceImportError}
+            actionSuccess={page.federationInvoiceImportSuccess}
+            invoiceImportResult={page.federationInvoiceImportResult}
             showQuantity={true}
             quantity={federationQuantity}
             showCategoriesTable={false}
+            onInvoiceFileSelected={page.importFederationInvoices}
+            onSecondaryActionClick={page.openFederationMatchingModal}
+            secondaryActionLabel="התאמת קבלות"
             onExpectedAmountClick={page.openFederationClassesDetails}
           />
         </>
@@ -150,6 +158,39 @@ function SummaryPageContent(props) {
         onClose={page.closeCashDesk}
         onSaveCount={page.saveCashCount}
         onSaveSafeTransfer={page.saveCashSafeTransfer}
+      />
+
+      <FederationMatchingSuggestionsModal
+        open={page.federationMatchingOpen}
+        items={page.federationMatchingItems}
+        loading={page.federationMatchingLoading}
+        approving={page.federationMatchingApproving}
+        error={page.federationMatchingError}
+        success={page.federationMatchingSuccess}
+        activeTab={page.federationMatchingActiveTab}
+        manualCreditSearchText={page.manualCreditSearchText}
+        manualCredits={page.manualCredits}
+        manualCreditsLoading={page.manualCreditsLoading}
+        selectedManualCredit={page.selectedManualCredit}
+        manualPayerSearchText={page.manualPayerSearchText}
+        manualPayers={page.manualPayers}
+        manualPayersLoading={page.manualPayersLoading}
+        selectedManualPayer={page.selectedManualPayer}
+        manualFederationCharges={page.manualFederationCharges}
+        manualChargesLoading={page.manualChargesLoading}
+        manualAllocationAmount={page.manualAllocationAmount}
+        onClose={page.closeFederationMatchingModal}
+        onReload={page.loadFederationMatchingSuggestions}
+        onApprove={page.approveFederationMatchingSuggestion}
+        onChangeTab={page.changeFederationMatchingTab}
+        onManualCreditSearchTextChange={page.changeManualCreditSearchText}
+        onSearchManualCredits={page.searchManualFederationCredits}
+        onSelectManualCredit={page.selectManualCredit}
+        onManualPayerSearchTextChange={page.changeManualPayerSearchText}
+        onSearchManualPayers={page.searchManualPayers}
+        onSelectManualPayer={page.selectManualPayer}
+        onManualAllocationAmountChange={page.changeManualAllocationAmount}
+        onApproveManualAllocation={page.approveManualFederationAllocation}
       />
     </div>
   );

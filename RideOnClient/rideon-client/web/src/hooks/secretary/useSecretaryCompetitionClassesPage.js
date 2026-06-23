@@ -1,11 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
-import { getClassesByCompetitionId } from "../../services/classInCompetitionService";
+import {
+  getClassesByCompetitionId,
+  updateClassInCompetition,
+  deleteClassInCompetition,
+} from "../../services/classInCompetitionService";
 import {
   getSecretaryCompetitionEntries,
   updateGroupEntriesDrawOrder,
   previewGroupEntriesDrawOrder,
   clearGroupEntriesDrawOrder,
+  secretaryDeleteEntry,
 } from "../../services/entryService";
+import { getCompetitionById } from "../../services/competitionService";
+import {
+  getAllFields,
+  getAllClassTypes,
+  getAllJudges,
+  getAllPrizeTypes,
+  getAllPatternsWithManeuvers,
+} from "../../services/superUserService";
+import { getArenasByRanchId } from "../../services/arenaService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 function normalizeDateOnly(value) {
@@ -234,6 +248,9 @@ export default function useSecretaryCompetitionClassesPage(options) {
   var [classEntriesFilter, setClassEntriesFilter] = useState("all");
   var [classDrawFilter, setClassDrawFilter] = useState("all");
 
+  // Cancelled-entries toggle (Task 7): "hide" | "only" | "all"
+  var [cancelledFilter, setCancelledFilter] = useState("hide");
+
   var [drawOrderEditMode, setDrawOrderEditMode] = useState(false);
   var [drawOrderDraftEntries, setDrawOrderDraftEntries] = useState([]);
   var [savingDrawOrder, setSavingDrawOrder] = useState(false);
@@ -244,11 +261,170 @@ export default function useSecretaryCompetitionClassesPage(options) {
   var [drawOrderSummaryMessage, setDrawOrderSummaryMessage] = useState("");
   var [generatingDrawPreview, setGeneratingDrawPreview] = useState(false);
 
+  // Class edit/delete state (Task 1a)
+  var [classModalOpen, setClassModalOpen] = useState(false);
+  var [editClassItem, setEditClassItem] = useState(null);
+  var [savingClass, setSavingClass] = useState(false);
+  var [classModalError, setClassModalError] = useState("");
+  var [deletingClassId, setDeletingClassId] = useState(null);
+
+  // Lookups for ClassInCompetitionModal
+  var [competitionDetails, setCompetitionDetails] = useState(null);
+  var [arenas, setArenas] = useState([]);
+  var [classTypes, setClassTypes] = useState([]);
+  var [judges, setJudges] = useState([]);
+  var [prizeTypes, setPrizeTypes] = useState([]);
+  var [patterns, setPatterns] = useState([]);
+  var [fields, setFields] = useState([]);
+
   useEffect(
     function () {
       loadPageData();
+      loadLookups();
     },
     [competitionId, ranchId],
+  );
+
+  async function loadLookups() {
+    if (!competitionId || !ranchId) return;
+
+    try {
+      var compRes = await getCompetitionById(competitionId, ranchId);
+      var comp = compRes.data || null;
+      setCompetitionDetails(comp);
+
+      var fieldId = comp ? (comp.fieldId || comp.FieldId) : null;
+
+      var results = await Promise.all([
+        getAllFields(),
+        getArenasByRanchId(ranchId),
+        getAllPrizeTypes(),
+        getAllPatternsWithManeuvers(),
+        fieldId ? getAllClassTypes(fieldId) : Promise.resolve({ data: [] }),
+        fieldId ? getAllJudges(fieldId) : Promise.resolve({ data: [] }),
+      ]);
+
+      setFields(Array.isArray(results[0].data) ? results[0].data : []);
+      setArenas(Array.isArray(results[1].data) ? results[1].data : []);
+      setPrizeTypes(Array.isArray(results[2].data) ? results[2].data : []);
+      setPatterns(Array.isArray(results[3].data) ? results[3].data : []);
+      setClassTypes(Array.isArray(results[4].data) ? results[4].data : []);
+      setJudges(Array.isArray(results[5].data) ? results[5].data : []);
+    } catch (err) {
+      console.error("loadLookups error", err);
+    }
+  }
+
+  function openEditClassModal(item) {
+    setEditClassItem(item);
+    setClassModalError("");
+    setClassModalOpen(true);
+  }
+
+  function closeClassModal() {
+    setClassModalOpen(false);
+    setEditClassItem(null);
+    setClassModalError("");
+  }
+
+  async function handleSubmitClass(formData) {
+    if (!editClassItem) return;
+
+    var classInCompId =
+      editClassItem.classInCompId || editClassItem.ClassInCompId;
+
+    var hostRanchId =
+      (competitionDetails &&
+        (competitionDetails.hostRanchId || competitionDetails.HostRanchId)) ||
+      ranchId;
+
+    var payload = Object.assign({}, formData, {
+      classInCompId: classInCompId,
+      competitionId: competitionId,
+      hostRanchId: hostRanchId,
+    });
+
+    try {
+      setSavingClass(true);
+      setClassModalError("");
+      await updateClassInCompetition(classInCompId, payload);
+      await loadClasses();
+      closeClassModal();
+    } catch (err) {
+      setClassModalError(getErrorMessage(err, "שגיאה בעדכון מקצה"));
+    } finally {
+      setSavingClass(false);
+    }
+  }
+
+  async function handleDeleteClass(item) {
+    var classInCompId = item.classInCompId || item.ClassInCompId;
+    if (!classInCompId) return;
+
+    var confirmed = window.confirm(
+      "האם למחוק את המקצה? פעולה זו אינה הפיכה.",
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingClassId(classInCompId);
+      await deleteClassInCompetition(classInCompId, competitionId, ranchId);
+      await loadClasses();
+    } catch (err) {
+      alert(getErrorMessage(err, "שגיאה במחיקת מקצה"));
+    } finally {
+      setDeletingClassId(null);
+    }
+  }
+
+  async function handleDeleteEntry(item) {
+    var entryId = item.entryId || item.EntryId;
+    if (!entryId) return;
+
+    var confirmed = window.confirm(
+      "האם לבטל את ההרשמה? הפעולה תסומן כביטול מאושר.",
+    );
+    if (!confirmed) return;
+
+    try {
+      await secretaryDeleteEntry(entryId, ranchId);
+      await loadEntries();
+    } catch (err) {
+      alert(getErrorMessage(err, "שגיאה בביטול הרשמה"));
+    }
+  }
+
+  var selectedFieldName = useMemo(
+    function () {
+      var fieldId =
+        competitionDetails &&
+        (competitionDetails.fieldId || competitionDetails.FieldId);
+      if (!fieldId || !fields.length) return "";
+      var match = fields.find(function (f) {
+        return (f.fieldId || f.FieldId) === fieldId;
+      });
+      return match ? match.fieldName || match.FieldName || "" : "";
+    },
+    [competitionDetails, fields],
+  );
+
+  var isReiningField = useMemo(
+    function () {
+      return String(selectedFieldName || "").indexOf("ריינינג") >= 0;
+    },
+    [selectedFieldName],
+  );
+
+  var selectedCompetitionJudgeIds = useMemo(
+    function () {
+      if (!competitionDetails) return [];
+      var ids =
+        competitionDetails.competitionJudgeIds ||
+        competitionDetails.CompetitionJudgeIds ||
+        [];
+      return Array.isArray(ids) ? ids : [];
+    },
+    [competitionDetails],
   );
 
   async function loadPageData() {
@@ -517,6 +693,23 @@ export default function useSecretaryCompetitionClassesPage(options) {
 
       var items = selectedEntriesBase;
 
+      // Cancelled toggle (Task 7)
+      if (cancelledFilter === "hide") {
+        items = items.filter(function (entry) {
+          var status = String(
+            entry.entryStatus || entry.EntryStatus || "Active",
+          ).toLowerCase();
+          return status !== "cancelled" && status !== "cancelledafterstart";
+        });
+      } else if (cancelledFilter === "only") {
+        items = items.filter(function (entry) {
+          var status = String(
+            entry.entryStatus || entry.EntryStatus || "Active",
+          ).toLowerCase();
+          return status === "cancelled" || status === "cancelledafterstart";
+        });
+      }
+
       if (paymentFilter === "paid") {
         items = items.filter(function (entry) {
           return getEntryIsPaid(entry);
@@ -554,6 +747,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
     [
       selectedEntriesBase,
       paymentFilter,
+      cancelledFilter,
       searchText,
       drawOrderEditMode,
       drawOrderDraftEntries,
@@ -920,6 +1114,8 @@ export default function useSecretaryCompetitionClassesPage(options) {
 
     setSearchText,
     setPaymentFilter,
+    cancelledFilter,
+    setCancelledFilter,
     setClassSearchText,
     setClassPrizeFilter,
     setClassEntriesFilter,
@@ -945,5 +1141,25 @@ export default function useSecretaryCompetitionClassesPage(options) {
     generateSmartDrawOrderPreview,
     saveDrawOrder,
     clearDrawOrder,
+
+    // Class edit/delete (Task 1a)
+    classModalOpen,
+    editClassItem,
+    savingClass,
+    classModalError,
+    deletingClassId,
+    arenas,
+    classTypes,
+    judges,
+    prizeTypes,
+    patterns,
+    selectedFieldName,
+    isReiningField,
+    selectedCompetitionJudgeIds,
+    openEditClassModal,
+    closeClassModal,
+    handleSubmitClass,
+    handleDeleteClass,
+    handleDeleteEntry,
   };
 }

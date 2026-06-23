@@ -368,6 +368,36 @@ namespace RideOnServer.BL
             dal.CancelPaidTimeRequest(paidTimeRequestId, orderedBySystemUserId);
         }
 
+        internal static void CancelByPayer(int paidTimeRequestId, int payerPersonId)
+        {
+            if (paidTimeRequestId <= 0)
+            {
+                throw new Exception("Invalid PaidTimeRequestId");
+            }
+            if (payerPersonId <= 0)
+            {
+                throw new Exception("Invalid PayerPersonId");
+            }
+
+            PaidTimeRequestDAL dal = new PaidTimeRequestDAL();
+            dal.CancelPaidTimeRequestByPayer(paidTimeRequestId, payerPersonId);
+        }
+
+        internal static void UpdateNotesByPayer(int paidTimeRequestId, int payerPersonId, string? notes)
+        {
+            if (paidTimeRequestId <= 0)
+            {
+                throw new Exception("Invalid PaidTimeRequestId");
+            }
+            if (payerPersonId <= 0)
+            {
+                throw new Exception("Invalid PayerPersonId");
+            }
+
+            PaidTimeRequestDAL dal = new PaidTimeRequestDAL();
+            dal.UpdatePaidTimeNotesByPayer(paidTimeRequestId, payerPersonId, notes);
+        }
+
         internal static void UpdateMyPaidTimeRequest(UpdatePaidTimeRequestNotesRequest request, int orderedBySystemUserId)
         {
             if (request == null)
@@ -405,6 +435,47 @@ namespace RideOnServer.BL
                 pcId,
                 slotId
             );
+        }
+
+        internal static List<DTOs.Competition.PaidTimeRequests.PaidTimeSlotRegistrationItem>
+            GetPaidTimeSlotRegistrations(int slotInCompId, int secretarySystemUserId)
+        {
+            if (slotInCompId <= 0)
+            {
+                throw new Exception("Invalid SlotInCompId");
+            }
+
+            if (secretarySystemUserId <= 0)
+            {
+                throw new Exception("Invalid SecretarySystemUserId");
+            }
+
+            PaidTimeRequestDAL dal = new PaidTimeRequestDAL();
+            return dal.GetPaidTimeSlotRegistrations(slotInCompId, secretarySystemUserId);
+        }
+
+        internal static void TransferPaidTimeRequestToSlot(
+            int paidTimeRequestId,
+            int? newSlotInCompId,
+            int secretarySystemUserId)
+        {
+            if (paidTimeRequestId <= 0)
+            {
+                throw new Exception("Invalid PaidTimeRequestId");
+            }
+
+            if (secretarySystemUserId <= 0)
+            {
+                throw new Exception("Invalid SecretarySystemUserId");
+            }
+
+            if (newSlotInCompId.HasValue && newSlotInCompId.Value <= 0)
+            {
+                throw new Exception("Invalid NewSlotInCompId");
+            }
+
+            PaidTimeRequestDAL dal = new PaidTimeRequestDAL();
+            dal.TransferPaidTimeRequestToSlot(paidTimeRequestId, newSlotInCompId, secretarySystemUserId);
         }
     }
 }

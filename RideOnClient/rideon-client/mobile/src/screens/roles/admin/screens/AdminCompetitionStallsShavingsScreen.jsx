@@ -32,6 +32,8 @@ import StallBookingEditModal from "../../../../components/competitions/StallBook
 
 import StallBookingCreateModal from "../../../../components/competitions/StallBookingCreateModal";
 
+import StallMapModal from "../../../../components/competitions/StallMapModal";
+
 import { createStallBookingCancelRequest } from "../../../../services/stallBookingsService";
 
 import styles from "../../../../styles/adminCompetitionStallsStyles";
@@ -54,6 +56,29 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
   var [showEditModal, setShowEditModal] = useState(false);
 
   var [selectedStallForEdit, setSelectedStallForEdit] = useState(null);
+
+  var [showStallMap, setShowStallMap] = useState(false);
+
+  var [stallMapFocus, setStallMapFocus] = useState(null);
+
+  function handleOpenStallMap() {
+    setStallMapFocus(null);
+    setShowStallMap(true);
+  }
+
+  function handleViewCompoundForStall(item) {
+    if (!item || !item.assignedStallNumber) return;
+    setStallMapFocus({
+      compoundId: item.assignedCompoundId,
+      stallNumber: item.assignedStallNumber,
+    });
+    setShowStallMap(true);
+  }
+
+  function handleCloseStallMap() {
+    setShowStallMap(false);
+    setStallMapFocus(null);
+  }
 
   var overview = useAdminCompetitionStallsOverview({
     competitionId: activeCompetition?.competitionId,
@@ -241,6 +266,7 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           onAddShavings={handleAddShavingsForStall}
           onDelete={handleCancelStallBooking}
           onEdit={handleEditStallBooking}
+          onViewCompound={handleViewCompoundForStall}
         />
       );
     });
@@ -295,6 +321,27 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           </Pressable>
         </View>
 
+        <Pressable
+          onPress={handleOpenStallMap}
+          style={{
+            flexDirection: "row-reverse",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "#FFFFFF",
+            borderWidth: 1,
+            borderColor: "#7B5A4D",
+            paddingVertical: 10,
+            paddingHorizontal: 14,
+            borderRadius: 10,
+            gap: 8,
+            marginBottom: 12,
+          }}
+        >
+          <Text style={{ color: "#7B5A4D", fontWeight: "700", fontSize: 14 }}>
+            צפה במפת תאים
+          </Text>
+        </Pressable>
+
         {renderContent()}
 
         <StallBookingCreateModal
@@ -322,6 +369,15 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           competitionId={activeCompetition?.competitionId}
           onClose={handleCloseEditModal}
           onUpdated={handleEditCreated}
+        />
+
+        <StallMapModal
+          isOpen={showStallMap}
+          competitionId={activeCompetition?.competitionId}
+          ranchId={activeRole?.ranchId}
+          focusCompoundId={stallMapFocus?.compoundId}
+          focusStallNumber={stallMapFocus?.stallNumber}
+          onClose={handleCloseStallMap}
         />
       </ScrollView>
     </MobileScreenLayout>

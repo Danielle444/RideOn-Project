@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { ArrowRight, RefreshCw } from "lucide-react";
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import CreatePaymentModal from "../../components/secretary/competition-payments/CreatePaymentModal";
+import FederationCoverageApplyModal from "../../components/secretary/competition-payments/FederationCoverageApplyModal";
 import PayerAccountCards from "../../components/secretary/competition-payments/PayerAccountCards";
 import PayersList from "../../components/secretary/competition-payments/PayersList";
 import PaymentCategoriesSidebar from "../../components/secretary/competition-payments/PaymentCategoriesSidebar";
@@ -38,6 +39,9 @@ function PaymentsPageContent(props) {
     competitionId: Number(layout.competitionId),
     ranchId: activeRole?.ranchId || null,
   });
+
+  var paymentActionText =
+    page.selectedOwner === "Federation" ? "שייך כיסוי התאחדות" : "הוספת תשלום";
 
   useEffect(
     function () {
@@ -148,9 +152,21 @@ function PaymentsPageContent(props) {
         </div>
       ) : null}
 
+      {page.paymentError ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {page.paymentError}
+        </div>
+      ) : null}
+
       {page.paymentSuccess ? (
         <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
           {page.paymentSuccess}
+        </div>
+      ) : null}
+
+      {page.federationCoverageError ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {page.federationCoverageError}
         </div>
       ) : null}
 
@@ -164,6 +180,9 @@ function PaymentsPageContent(props) {
             items={page.accountSummary}
             activeOwner={page.selectedOwner}
             onSelectOwner={page.selectOwner}
+            federationCoverageStatus={page.federationCoverageStatus}
+            federationValidation={page.federationValidation}
+            federationCoverageLoading={page.federationCoverageLoading}
           />
 
           <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
@@ -206,7 +225,7 @@ function PaymentsPageContent(props) {
                     disabled={page.selectedChargeIds.length === 0}
                     className="rounded-2xl bg-[#8B5E4C] px-6 py-3 font-bold text-white transition-colors hover:bg-[#765041] disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    הוספת תשלום
+                    {paymentActionText}
                   </button>
                 </div>
               </div>
@@ -236,6 +255,40 @@ function PaymentsPageContent(props) {
         error={page.paymentError}
         onClose={page.closePaymentModal}
         onSubmit={page.submitPayment}
+      />
+
+      <FederationCoverageApplyModal
+        open={page.federationApplyModalOpen}
+        selectedChargesCount={page.selectedFederationCharges.length}
+        selectedMissingAmount={page.selectedFederationMissingAmount}
+        credits={page.filteredFederationCredits}
+        selectedCredit={page.selectedFederationCredit}
+        searchText={page.federationCreditSearchText}
+        onlyAvailable={page.federationOnlyAvailable}
+        searching={page.federationCreditsSearching}
+        loading={page.federationApplyLoading}
+        error={page.federationApplyError}
+        success={page.federationApplySuccess}
+        manualCreditOpen={page.manualCreditOpen}
+        creatingManualCredit={page.creatingManualCredit}
+        manualCreditForm={page.manualCreditForm}
+        selectedCreditAllocations={page.selectedCreditAllocations}
+        creditAllocationsLoading={page.creditAllocationsLoading}
+        creditAllocationsError={page.creditAllocationsError}
+        allocationsCreditId={page.allocationsCreditId}
+        onClose={page.closeFederationCoverageModal}
+        onSearchTextChange={page.changeFederationCreditSearchText}
+        onOnlyAvailableChange={page.changeFederationOnlyAvailable}
+        onSearch={page.searchFederationCredits}
+        onSelectCredit={page.selectFederationCredit}
+        onSubmit={page.submitFederationCoverageAllocation}
+        onToggleManualCreditForm={page.toggleManualCreditForm}
+        onManualCreditFieldChange={page.updateManualCreditField}
+        onSubmitManualCredit={page.submitManualFederationCredit}
+        onViewAllocations={page.loadFederationCreditAllocations}
+        onClearAllocations={page.clearFederationCreditAllocations}
+        creditStatusFilter={page.federationCreditStatusFilter}
+        onCreditStatusFilterChange={page.changeFederationCreditStatusFilter}
       />
     </div>
   );

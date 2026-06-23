@@ -121,11 +121,18 @@ export default function useAdminCompetitionEntriesList(
           activeRole.ranchId,
         );
 
-      setItems(
-        Array.isArray(response.data)
-          ? response.data
-          : [],
-      );
+      // Dedup by entryId: defensive guard for SPs that may return the same
+      // entry multiple times after 1-to-many joins.
+      var raw = Array.isArray(response.data) ? response.data : [];
+      var seen = new Set();
+      var deduped = [];
+      raw.forEach(function (it) {
+        var k = String(it.entryId);
+        if (seen.has(k)) return;
+        seen.add(k);
+        deduped.push(it);
+      });
+      setItems(deduped);
     } catch (error) {
       setScreenError(
         String(

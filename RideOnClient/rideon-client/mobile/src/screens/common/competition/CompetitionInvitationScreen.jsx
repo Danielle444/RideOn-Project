@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, Text, View } from "react-native";
 import MobileScreenLayout from "../../../components/mobile-nav/MobileScreenLayout";
 import SideMenuTemplate from "../../../components/mobile-nav/SideMenuTemplate";
+import CompetitionMenuTemplate from "../../../components/mobile-nav/CompetitionMenuTemplate";
 
 import CompetitionInfoSection from "../../../components/competitions/CompetitionInfoSection";
 import CompetitionDatesSection from "../../../components/competitions/CompetitionDatesSection";
@@ -26,6 +27,8 @@ import {
   getAdminMenuItems,
   getPayerMenuItems,
 } from "../../../navigation/sideMenuConfigs";
+
+import { getAdminCompetitionMenuItems } from "../../../navigation/competitionMenuConfigs";
 
 import { getCompetitionInvitationDetails } from "../../../services/competitionService";
 
@@ -301,6 +304,31 @@ export default function CompetitionInvitationScreen(props) {
       activeBottomTab="menu"
       bottomNavItems={getBottomNavItems()}
       menuContent={function ({ closeMenu }) {
+        // אם נכנסנו לפרטי תחרות מתוך תחרות פעילה (אדמין) - הצג את תפריט התחרות
+        // (לא תפריט הבית הראשי). זה משאיר את האדמין בהקשר התחרות.
+        if (isAdmin && competitionContext?.activeCompetition?.competitionId) {
+          return (
+            <CompetitionMenuTemplate
+              activeKey="competition-details"
+              closeMenu={closeMenu}
+              competitionName={
+                details?.competition?.competitionName ||
+                competitionNameParam ||
+                competitionContext.activeCompetition.competitionName ||
+                ""
+              }
+              items={getAdminCompetitionMenuItems()}
+              onItemPress={function (item) {
+                props.navigation.navigate(item.screen);
+              }}
+              onExitCompetition={async function () {
+                await competitionContext.clearCompetition();
+                props.navigation.navigate("AdminCompetitionsBoard");
+              }}
+            />
+          );
+        }
+
         return (
           <SideMenuTemplate
             userName={fullName}
