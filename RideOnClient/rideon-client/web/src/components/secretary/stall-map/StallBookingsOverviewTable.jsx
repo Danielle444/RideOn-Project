@@ -145,7 +145,12 @@ function itemMatchesSearch(item, searchValue) {
   });
 }
 
-export default function StallBookingsOverviewTable({ items, compounds }) {
+export default function StallBookingsOverviewTable({
+  items,
+  compounds,
+  onEditBooking,
+  onDeleteBooking,
+}) {
   const [searchValue, setSearchValue] = useState("");
 
   const filteredItems = useMemo(
@@ -268,11 +273,11 @@ export default function StallBookingsOverviewTable({ items, compounds }) {
 
                 <td className="whitespace-nowrap px-2 py-3">
                   <div className="flex items-center justify-end gap-1">
-                    {props.onEditBooking ? (
+                    {onEditBooking ? (
                       <button
                         type="button"
                         onClick={function () {
-                          props.onEditBooking(item);
+                          onEditBooking(item);
                         }}
                         title="עריכה"
                         className="rounded-lg border border-[#E2D5CE] bg-white p-1.5 text-[#5D4037] hover:bg-[#F5EDE8]"
@@ -281,11 +286,11 @@ export default function StallBookingsOverviewTable({ items, compounds }) {
                       </button>
                     ) : null}
 
-                    {props.onDeleteBooking ? (
+                    {onDeleteBooking ? (
                       <button
                         type="button"
                         onClick={function () {
-                          props.onDeleteBooking(item);
+                          onDeleteBooking(item);
                         }}
                         title="ביטול"
                         className="rounded-lg border border-[#E7BABA] bg-white p-1.5 text-[#A54848] hover:bg-[#F9E5E5]"

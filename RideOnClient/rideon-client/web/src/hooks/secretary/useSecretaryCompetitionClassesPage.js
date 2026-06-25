@@ -338,11 +338,26 @@ export default function useSecretaryCompetitionClassesPage(options) {
         (competitionDetails.hostRanchId || competitionDetails.HostRanchId)) ||
       ranchId;
 
-    var payload = Object.assign({}, formData, {
+    // Build payload matching the existing creation flow (useCompetitionClassesStep)
+    // so the backend DTO is fully populated. ArenaRanchId is required.
+    var payload = {
       classInCompId: classInCompId,
       competitionId: competitionId,
       hostRanchId: hostRanchId,
-    });
+      classTypeId: formData.classTypeId,
+      arenaRanchId: hostRanchId,
+      arenaId: formData.arenaId,
+      classDateTime: formData.classDateTime,
+      startTime: formData.startTime,
+      orderInDay: formData.orderInDay,
+      organizerCost: formData.organizerCost,
+      federationCost: formData.federationCost,
+      classNotes: formData.classNotes,
+      judgeIds: Array.isArray(formData.judgeIds) ? formData.judgeIds : [],
+      prizeTypeId: formData.prizeTypeId,
+      prizeAmount: formData.prizeAmount,
+      patternNumber: formData.patternNumber,
+    };
 
     try {
       setSavingClass(true);
