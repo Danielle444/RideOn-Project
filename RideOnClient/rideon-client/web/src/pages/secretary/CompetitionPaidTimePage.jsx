@@ -122,6 +122,12 @@ export default function CompetitionPaidTimePage() {
   const [slotDetailsOpen, setSlotDetailsOpen] = useState(false);
   const [slotDetailsTarget, setSlotDetailsTarget] = useState(null);
 
+  const page = useCompetitionPaidTimePage({
+    competitionId: Number(competitionId),
+    ranchId: ranchId,
+    onShowToast: showToast,
+  });
+
   function handleOpenSlotDetails(timeCell) {
     var slotId = timeCell && timeCell.slotId;
     if (!slotId) return;
@@ -155,12 +161,6 @@ export default function CompetitionPaidTimePage() {
     },
     [page.slots],
   );
-
-  const page = useCompetitionPaidTimePage({
-    competitionId: Number(competitionId),
-    ranchId: ranchId,
-    onShowToast: showToast,
-  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
