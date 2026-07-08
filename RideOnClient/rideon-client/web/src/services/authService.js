@@ -1,24 +1,29 @@
 import axios from "./axiosInstance";
+import { normalizeIdentifier } from "../../../shared/auth/utils/normalizeIdentifier";
 
 
 const API = import.meta.env.VITE_API_BASE_URL;
 
 function login(username, password) {
   return axios.post(`${API}/SystemUsers/login`, {
-    username: username,
+    username: normalizeIdentifier(username),
     password: password,
   });
 }
 
 function loginSuperUser(email, password) {
   return axios.post(`${API}/SuperUsers/login`, {
-    email: email,
+    email: normalizeIdentifier(email),
     password: password,
   });
 }
 
 function register(data) {
-  return axios.post(`${API}/SystemUsers/register`, data);
+  return axios.post(`${API}/SystemUsers/register`, {
+    ...data,
+    username: normalizeIdentifier(data.username),
+    email: normalizeIdentifier(data.email),
+  });
 }
 
 function createRanchRequest(data) {
@@ -74,7 +79,7 @@ function changeSuperUserPassword(currentPassword, newPassword) {
 
 function checkUsername(username) {
   return axios.get(`${API}/SystemUsers/check-username`, {
-    params: { username: username },
+    params: { username: normalizeIdentifier(username) },
   });
 }
 
@@ -85,11 +90,11 @@ function getPersonByNationalIdForRegistration(nationalId) {
 }
 
 function sendOtp(email) {
-  return axios.post(`${API}/SystemUsers/send-otp`, { email });
+  return axios.post(`${API}/SystemUsers/send-otp`, { email: normalizeIdentifier(email) });
 }
 
 function forgotPassword(email) {
-  return axios.post(`${API}/SystemUsers/forgot-password`, { email });
+  return axios.post(`${API}/SystemUsers/forgot-password`, { email: normalizeIdentifier(email) });
 }
 
 function resetPassword(token, newPassword) {
@@ -97,11 +102,15 @@ function resetPassword(token, newPassword) {
 }
 
 function superUserForgotPassword(email) {
-  return axios.post(`${API}/SuperUsers/forgot-password`, { email });
+  return axios.post(`${API}/SuperUsers/forgot-password`, { email: normalizeIdentifier(email) });
 }
 
 function superUserResetPassword(email, otpCode, newPassword) {
-  return axios.post(`${API}/SuperUsers/reset-password`, { email, otpCode, newPassword });
+  return axios.post(`${API}/SuperUsers/reset-password`, {
+    email: normalizeIdentifier(email),
+    otpCode,
+    newPassword,
+  });
 }
 
 export {

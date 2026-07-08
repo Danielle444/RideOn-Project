@@ -12,7 +12,7 @@ BEGIN
     SELECT su.systemuserid, su.username, su.isactive
     FROM public.systemuser su
     INNER JOIN public.person p ON p.personid = su.systemuserid
-    WHERE p.email = p_email
+    WHERE LOWER(p.email) = LOWER(p_email)
     LIMIT 1;
 END;
 $$;

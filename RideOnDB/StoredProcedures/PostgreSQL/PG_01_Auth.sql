@@ -1,6 +1,22 @@
 -- ============================================================
+-- ⚠ DEPRECATED — DO NOT RUN THIS FILE ⚠
 -- FILE 1: AUTH MODULE (PostgreSQL / Supabase)
--- Run this in Supabase SQL Editor
+--
+-- This aggregate file is stale and out of sync with the live schema:
+-- it predates the numbered per-function source of truth and still has
+-- CASE-SENSITIVE username/email comparisons that were fixed in the
+-- Individual/ versions (2026-07-07 login-normalization change).
+--
+-- The current, actively maintained versions of these functions live in
+-- RideOnDB/StoredProcedures/PostgreSQL/Individual/ (see 01_, 03_, 04_
+-- usp_CheckUsernameExists / usp_RegisterSystemUserWithRoles /
+-- usp_GetSystemUserForLogin). Several functions referenced by app code
+-- (e.g. usp_GetSystemUserByEmail, the OTP and password-reset procedures)
+-- were never added here at all — they only exist in Individual/.
+--
+-- Re-running this file would silently reintroduce the case-sensitive
+-- login bug. If you need to (re)apply auth stored procedures, use the
+-- files in Individual/ instead.
 -- ============================================================
 
 -- 1. Check if username already exists

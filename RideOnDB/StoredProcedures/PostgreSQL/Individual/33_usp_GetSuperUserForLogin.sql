@@ -15,6 +15,6 @@ BEGIN
     SELECT su.superuserid, su.email, su.passwordhash, su.passwordsalt,
            su.isactive, su.mustchangepassword
     FROM superuser su
-    WHERE su.email = p_Email;
+    WHERE LOWER(su.email) = LOWER(p_Email);
 END;
 $$;
