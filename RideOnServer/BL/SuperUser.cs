@@ -16,7 +16,7 @@ namespace RideOnServer.BL
         internal static SuperUser? GetSuperUserForLogin(string email)
         {
             SuperUserDAL dal = new SuperUserDAL();
-            return dal.GetSuperUserForLogin(email);
+            return dal.GetSuperUserForLogin(IdentifierNormalizer.Normalize(email));
         }
 
         internal static SuperUser? GetSuperUserById(int superUserId)
@@ -28,7 +28,7 @@ namespace RideOnServer.BL
         internal static bool CheckSuperUserEmailExists(string email)
         {
             SuperUserDAL dal = new SuperUserDAL();
-            return dal.CheckSuperUserEmailExists(email);
+            return dal.CheckSuperUserEmailExists(IdentifierNormalizer.Normalize(email));
         }
 
         internal static SuperUser? Login(string email, string password)
@@ -57,13 +57,15 @@ namespace RideOnServer.BL
             if (string.IsNullOrWhiteSpace(email))
                 throw new Exception("Email is required");
 
-            if (!IsValidEmail(email))
+            string normalizedEmail = IdentifierNormalizer.Normalize(email);
+
+            if (!IsValidEmail(normalizedEmail))
                 throw new Exception("Invalid email format");
 
             if (string.IsNullOrWhiteSpace(password))
                 throw new Exception("Password is required");
 
-            if (dal.CheckSuperUserEmailExists(email))
+            if (dal.CheckSuperUserEmailExists(normalizedEmail))
                 throw new Exception("Email already exists");
 
             PasswordPolicyValidator.ValidateOrThrow(password);
@@ -71,7 +73,7 @@ namespace RideOnServer.BL
             string passwordSalt = PasswordHelper.GenerateSalt();
             string passwordHash = PasswordHelper.HashPassword(password, passwordSalt);
 
-            return dal.InsertSuperUser(email, passwordHash, passwordSalt, true);
+            return dal.InsertSuperUser(normalizedEmail, passwordHash, passwordSalt, true);
         }
 
         internal static void ChangePassword(int superUserId, string currentPassword, string newPassword)

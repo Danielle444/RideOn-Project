@@ -1,16 +1,16 @@
 CREATE OR REPLACE FUNCTION usp_RegisterSystemUserWithRoles(
-    p_NationalId    TEXT,
-    p_FirstName     TEXT,
-    p_LastName      TEXT,
-    p_Username      TEXT,
-    p_PasswordHash  TEXT,
-    p_PasswordSalt  TEXT,
-    p_RanchIds      INTEGER[],
-    p_RoleIds       SMALLINT[],
-    p_Gender        TEXT        DEFAULT NULL,
-    p_DateOfBirth   DATE        DEFAULT NULL,
-    p_CellPhone     TEXT        DEFAULT NULL,
-    p_Email         TEXT        DEFAULT NULL
+    nationalid_param    TEXT,
+    firstname_param     TEXT,
+    lastname_param      TEXT,
+    username_param      TEXT,
+    passwordhash_param  TEXT,
+    passwordsalt_param  TEXT,
+    ranchids_param      INTEGER[],
+    roleids_param       SMALLINT[],
+    gender_param        TEXT        DEFAULT NULL,
+    dateofbirth_param   DATE        DEFAULT NULL,
+    cellphone_param     TEXT        DEFAULT NULL,
+    email_param         TEXT        DEFAULT NULL
 )
 RETURNS TABLE("NewPersonId" INTEGER)
 LANGUAGE plpgsql AS $$
@@ -19,18 +19,18 @@ DECLARE
     i           INTEGER;
 BEGIN
     -- Validate: username must be unique
-    IF EXISTS (SELECT 1 FROM systemuser su WHERE su.username = p_Username) THEN
+    IF EXISTS (SELECT 1 FROM systemuser su WHERE LOWER(su.username) = LOWER(username_param)) THEN
         RAISE EXCEPTION 'Username already exists';
     END IF;
 
     -- Validate: at least one ranch-role pair
-    IF p_RanchIds IS NULL OR array_length(p_RanchIds, 1) IS NULL THEN
+    IF ranchids_param IS NULL OR array_length(ranchids_param, 1) IS NULL THEN
         RAISE EXCEPTION 'At least one ranch-role pair is required';
     END IF;
 
     -- Validate: all ranches exist
     IF EXISTS (
-        SELECT 1 FROM unnest(p_RanchIds) AS rid
+        SELECT 1 FROM unnest(ranchids_param) AS rid
         LEFT JOIN ranch r ON r.ranchid = rid
         WHERE r.ranchid IS NULL
     ) THEN
@@ -39,7 +39,7 @@ BEGIN
 
     -- Validate: all roles exist
     IF EXISTS (
-        SELECT 1 FROM unnest(p_RoleIds) AS rid
+        SELECT 1 FROM unnest(roleids_param) AS rid
         LEFT JOIN role r ON r.roleid = rid
         WHERE r.roleid IS NULL
     ) THEN
@@ -49,7 +49,7 @@ BEGIN
     -- Check if person already exists
     SELECT p.personid INTO v_person_id
     FROM person p
-    WHERE p.nationalid = p_NationalId;
+    WHERE p.nationalid = nationalid_param;
 
     IF v_person_id IS NOT NULL THEN
         -- Person exists: must not already be a system user
@@ -59,34 +59,34 @@ BEGIN
 
         -- Update blank/null person fields only
         UPDATE person SET
-            firstname   = CASE WHEN (firstname   IS NULL OR TRIM(firstname)   = '') THEN p_FirstName   ELSE firstname   END,
-            lastname    = CASE WHEN (lastname    IS NULL OR TRIM(lastname)    = '') THEN p_LastName    ELSE lastname    END,
-            gender      = CASE WHEN (gender      IS NULL OR TRIM(gender)      = '') THEN p_Gender      ELSE gender      END,
-            dateofbirth = CASE WHEN dateofbirth  IS NULL                           THEN p_DateOfBirth ELSE dateofbirth END,
-            cellphone   = CASE WHEN (cellphone   IS NULL OR TRIM(cellphone)   = '') THEN p_CellPhone   ELSE cellphone   END,
-            email       = CASE WHEN (email       IS NULL OR TRIM(email)       = '') THEN p_Email       ELSE email       END
+            firstname   = CASE WHEN (firstname   IS NULL OR TRIM(firstname)   = '') THEN firstname_param   ELSE firstname   END,
+            lastname    = CASE WHEN (lastname    IS NULL OR TRIM(lastname)    = '') THEN lastname_param    ELSE lastname    END,
+            gender      = CASE WHEN (gender      IS NULL OR TRIM(gender)      = '') THEN gender_param      ELSE gender      END,
+            dateofbirth = CASE WHEN dateofbirth  IS NULL                           THEN dateofbirth_param ELSE dateofbirth END,
+            cellphone   = CASE WHEN (cellphone   IS NULL OR TRIM(cellphone)   = '') THEN cellphone_param   ELSE cellphone   END,
+            email       = CASE WHEN (email       IS NULL OR TRIM(email)       = '') THEN email_param       ELSE email       END
         WHERE personid = v_person_id;
     ELSE
         -- Insert new person
         INSERT INTO person (nationalid, firstname, lastname, gender, dateofbirth, cellphone, email)
-        VALUES (p_NationalId, p_FirstName, p_LastName, p_Gender, p_DateOfBirth, p_CellPhone, p_Email)
+        VALUES (nationalid_param, firstname_param, lastname_param, gender_param, dateofbirth_param, cellphone_param, email_param)
         RETURNING personid INTO v_person_id;
     END IF;
 
     -- Insert SystemUser
     INSERT INTO systemuser (systemuserid, username, passwordhash, passwordsalt)
-    VALUES (v_person_id, p_Username, p_PasswordHash, p_PasswordSalt);
+    VALUES (v_person_id, username_param, passwordhash_param, passwordsalt_param);
 
     -- Insert PersonRanch (distinct ranch IDs)
     INSERT INTO personranch (personid, ranchid)
     SELECT DISTINCT v_person_id, r
-    FROM unnest(p_RanchIds) AS r
+    FROM unnest(ranchids_param) AS r
     ON CONFLICT DO NOTHING;
 
     -- Insert PersonRanchRole (each ranch-role pair by index)
-    FOR i IN 1..array_length(p_RanchIds, 1) LOOP
+    FOR i IN 1..array_length(ranchids_param, 1) LOOP
         INSERT INTO personranchrole (personid, ranchid, roleid, rolestatus)
-        VALUES (v_person_id, p_RanchIds[i], p_RoleIds[i], 'Pending')
+        VALUES (v_person_id, ranchids_param[i], roleids_param[i], 'Pending')
         ON CONFLICT DO NOTHING;
     END LOOP;
 

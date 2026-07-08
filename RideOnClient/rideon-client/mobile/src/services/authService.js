@@ -1,12 +1,13 @@
 import axios from "./axiosInstance";
 import { API_BASE_URL } from "../config/apiBaseUrl";
+import { normalizeIdentifier } from "../../../shared/auth/utils/normalizeIdentifier";
 
 
 function login(username, password) {
   return axios.post(
     `${API_BASE_URL}/SystemUsers/login`,
     {
-      username: username,
+      username: normalizeIdentifier(username),
       password: password,
     },
     {
@@ -16,9 +17,17 @@ function login(username, password) {
 }
 
 function register(data) {
-  return axios.post(`${API_BASE_URL}/SystemUsers/register`, data, {
-    timeout: 8000,
-  });
+  return axios.post(
+    `${API_BASE_URL}/SystemUsers/register`,
+    {
+      ...data,
+      username: normalizeIdentifier(data.username),
+      email: normalizeIdentifier(data.email),
+    },
+    {
+      timeout: 8000,
+    }
+  );
 }
 
 function getRanchesForRegistration() {
@@ -41,7 +50,7 @@ function getRoles() {
 
 function checkUsername(username) {
   return axios.get(`${API_BASE_URL}/SystemUsers/check-username`, {
-    params: { username: username },
+    params: { username: normalizeIdentifier(username) },
     timeout: 8000,
   });
 }

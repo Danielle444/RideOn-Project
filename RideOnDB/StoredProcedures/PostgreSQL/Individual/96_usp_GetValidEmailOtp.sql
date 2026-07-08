@@ -11,7 +11,7 @@ BEGIN
     RETURN QUERY
     SELECT otpid, otphash, expiresat
     FROM public.emailotp
-    WHERE email = p_email
+    WHERE LOWER(email) = LOWER(p_email)
       AND isused = false
       AND expiresat > now()
     ORDER BY createdat DESC

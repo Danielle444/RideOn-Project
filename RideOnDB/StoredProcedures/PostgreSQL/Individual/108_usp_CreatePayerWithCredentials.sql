@@ -19,7 +19,7 @@ DECLARE
     v_username   TEXT;
 BEGIN
     IF p_Username IS NOT NULL AND EXISTS (
-        SELECT 1 FROM systemuser su WHERE su.username = p_Username
+        SELECT 1 FROM systemuser su WHERE LOWER(su.username) = LOWER(p_Username)
     ) THEN
         RAISE EXCEPTION 'Username already exists: %', p_Username;
     END IF;
@@ -27,7 +27,7 @@ BEGIN
     IF p_Email IS NOT NULL AND EXISTS (
         SELECT 1 FROM person pe
         INNER JOIN systemuser su ON su.systemuserid = pe.personid
-        WHERE pe.email = p_Email
+        WHERE LOWER(pe.email) = LOWER(p_Email)
     ) THEN
         RAISE EXCEPTION 'A system user with this email already exists';
     END IF;
@@ -36,7 +36,7 @@ BEGIN
 
     SELECT p.personid INTO v_person_id
     FROM person p
-    WHERE (p_Email IS NOT NULL AND p.email = p_Email)
+    WHERE (p_Email IS NOT NULL AND LOWER(p.email) = LOWER(p_Email))
        OR (p_CellPhone IS NOT NULL AND p.cellphone = p_CellPhone)
     LIMIT 1;
 

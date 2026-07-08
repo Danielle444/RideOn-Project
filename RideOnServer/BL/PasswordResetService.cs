@@ -16,8 +16,10 @@ namespace RideOnServer.BL
 
         public void RequestReset(string email)
         {
+            string normalizedEmail = IdentifierNormalizer.Normalize(email);
+
             PasswordResetDAL dal = new PasswordResetDAL();
-            var user = dal.GetSystemUserByEmail(email);
+            var user = dal.GetSystemUserByEmail(normalizedEmail);
 
             // תמיד מחזיר תגובה זהה — לא מגלים אם המייל קיים
             if (user == null || !user.Value.IsActive)
@@ -32,7 +34,7 @@ namespace RideOnServer.BL
             string clientBaseUrl = _configuration["ClientBaseUrl"] ?? "http://localhost:5173";
             string resetLink = $"{clientBaseUrl}/reset-password?token={rawToken}";
 
-            _emailService.SendPasswordResetEmail(email, resetLink);
+            _emailService.SendPasswordResetEmail(normalizedEmail, resetLink);
         }
 
         public void ResetPassword(string rawToken, string newPassword)

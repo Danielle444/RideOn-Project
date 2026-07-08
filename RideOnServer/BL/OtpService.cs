@@ -14,20 +14,24 @@ namespace RideOnServer.BL
 
         public void SendAndStoreOtp(string email)
         {
+            string normalizedEmail = IdentifierNormalizer.Normalize(email);
+
             string otpCode = GenerateOtp();
             string otpHash = PasswordHelper.HashPassword(otpCode, "otp-salt");
             DateTime expiresAt = DateTime.UtcNow.AddMinutes(10);
 
             OtpDAL dal = new OtpDAL();
-            dal.SaveOtp(email, otpHash, expiresAt);
+            dal.SaveOtp(normalizedEmail, otpHash, expiresAt);
 
-            _emailService.SendOtpEmail(email, otpCode);
+            _emailService.SendOtpEmail(normalizedEmail, otpCode);
         }
 
         public bool VerifyOtp(string email, string code)
         {
+            string normalizedEmail = IdentifierNormalizer.Normalize(email);
+
             OtpDAL dal = new OtpDAL();
-            var record = dal.GetValidOtp(email);
+            var record = dal.GetValidOtp(normalizedEmail);
 
             if (record == null)
                 return false;

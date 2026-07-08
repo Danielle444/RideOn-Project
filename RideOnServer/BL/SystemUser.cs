@@ -16,7 +16,7 @@ namespace RideOnServer.BL
         internal static SystemUser? GetSystemUserForLogin(string username)
         {
             SystemUserDAL dal = new SystemUserDAL();
-            return dal.GetSystemUserForLogin(username);
+            return dal.GetSystemUserForLogin(IdentifierNormalizer.Normalize(username));
         }
 
 
@@ -122,6 +122,9 @@ namespace RideOnServer.BL
                 throw new Exception("Username is required");
             }
 
+            request.Username = IdentifierNormalizer.Normalize(request.Username);
+            request.Email = request.Email?.Trim() ?? string.Empty;
+
             if (dal.CheckUsernameExists(request.Username))
             {
                 throw new Exception("Username already exists");
@@ -211,7 +214,7 @@ namespace RideOnServer.BL
         internal static bool CheckUsernameExists(string username)
         {
             SystemUserDAL dal = new SystemUserDAL();
-            return dal.CheckUsernameExists(username);
+            return dal.CheckUsernameExists(IdentifierNormalizer.Normalize(username));
         }
 
         internal static int CreatePendingRanchRequest(CreateRanchRequest request)
