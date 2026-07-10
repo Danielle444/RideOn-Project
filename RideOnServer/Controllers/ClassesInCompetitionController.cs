@@ -81,6 +81,10 @@ namespace RideOnServer.Controllers
             {
                 return StatusCode(403, ex.Message);
             }
+            catch (ValidationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in CreateClassInCompetition: {ex.Message}");
@@ -126,6 +130,10 @@ namespace RideOnServer.Controllers
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(403, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                return BadRequest(ex.Message);
             }
             catch (Exception ex)
             {

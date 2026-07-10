@@ -1,13 +1,14 @@
 -- Matches the live deployed definition exactly (verified against class 87, which has
 -- two classprize rows -- returns exactly one row with PrizesDisplay populated).
-CREATE FUNCTION public.usp_getclassesbycompetitionid(competitionid_param integer)
+CREATE FUNCTION public.usp_getclassbyid(classincompid_param integer)
 RETURNS TABLE(
     "ClassInCompId" integer, "CompetitionId" integer, "ClassTypeId" smallint,
-    "ClassName" text, "ArenaRanchId" integer, "ArenaId" smallint, "ArenaName" text,
-    "ClassDateTime" timestamptz, "StartTime" time, "OrderInDay" smallint,
-    "OrganizerCost" numeric, "FederationCost" numeric, "ClassNotes" text,
-    "JudgesDisplay" text, "JudgeIds" integer[],
-    "PrizeTypeId" smallint, "PrizeTypeName" text, "PrizeAmount" numeric,
+    "ArenaRanchId" integer, "ArenaId" smallint, "ArenaName" character varying,
+    "ClassDateTime" timestamptz, "ClassName" character varying,
+    "OrganizerCost" numeric, "FederationCost" numeric,
+    "StartTime" time, "OrderInDay" smallint, "ClassNotes" character varying,
+    "JudgesDisplay" text,
+    "PrizeTypeId" smallint, "PrizeTypeName" character varying, "PrizeAmount" numeric,
     "PatternNumber" smallint,
     "PrizesDisplay" text
 )
@@ -18,36 +19,31 @@ begin
         cic.classincompid,
         cic.competitionid,
         cic.classtypeid,
-        ct.classname::text,
         cic.arenaranchid,
-        cic.arenaid::smallint,
-        a.arenaname::text,
+        cic.arenaid,
+        a.arenaname,
         cic.classdatetime,
-        cic.starttime,
-        cic.orderinday::smallint,
+        ct.classname,
         cic.organizercost,
         cic.federationcost,
-        cic.classnotes::text,
+        cic.starttime,
+        cic.orderinday,
+        cic.classnotes,
         (
             select string_agg(
-                concat_ws(' ', j.firstnamehebrew, j.lastnamehebrew),
-                ', ' order by j.firstnamehebrew, j.lastnamehebrew)::text
+                trim(coalesce(j.firstnamehebrew, '') || ' ' || coalesce(j.lastnamehebrew, '')),
+                ', ' order by cj.judgeid)
             from classjudge cj
-            inner join judge j on cj.judgeid = j.judgeid
+            inner join judge j on j.judgeid = cj.judgeid
             where cj.classincompid = cic.classincompid
         ) as judgesdisplay,
         (
-            select array_agg(cj.judgeid order by cj.judgeid)
-            from classjudge cj
-            where cj.classincompid = cic.classincompid
-        ) as judgeids,
-        (
-            select cp.prizetypeid::smallint from classprize cp
+            select cp.prizetypeid from classprize cp
             where cp.classincompid = cic.classincompid
             order by cp.prizetypeid limit 1
         ) as prizetypeid,
         (
-            select pt.prizetypename::text
+            select pt.prizetypename
             from classprize cp
             inner join prizetype pt on pt.prizetypeid = cp.prizetypeid
             where cp.classincompid = cic.classincompid
@@ -58,7 +54,7 @@ begin
             where cp.classincompid = cic.classincompid
             order by cp.prizetypeid limit 1
         ) as prizeamount,
-        rt.patternnumber::smallint,
+        rt.patternnumber,
         (
             select string_agg(pt.prizetypename || ': ' || cp.prizeamount::text,
                               ', ' order by cp.prizetypeid)
@@ -67,14 +63,9 @@ begin
             where cp.classincompid = cic.classincompid
         ) as prizesdisplay
     from classincompetition cic
-    inner join classtype ct on cic.classtypeid = ct.classtypeid
-    inner join arena a on cic.arenaranchid = a.ranchid and cic.arenaid = a.arenaid
-    left join reiningtype rt on cic.classincompid = rt.reiningclassincompid
-    where cic.competitionid = competitionid_param
-    order by
-        cic.classdatetime asc nulls last,
-        cic.orderinday asc nulls last,
-        cic.starttime asc nulls last,
-        cic.classincompid asc;
+    inner join classtype ct on ct.classtypeid = cic.classtypeid
+    inner join arena a on a.ranchid = cic.arenaranchid and a.arenaid = cic.arenaid
+    left join reiningtype rt on rt.reiningclassincompid = cic.classincompid
+    where cic.classincompid = classincompid_param;
 end;
 $function$;

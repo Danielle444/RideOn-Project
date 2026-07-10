@@ -44,18 +44,8 @@ function getPatternNumber(item) {
   return item.patternNumber || item.PatternNumber;
 }
 
-function getPrizeTypeName(item) {
-  return item.prizeTypeName || item.PrizeTypeName || "-";
-}
-
-function getPrizeAmount(item) {
-  var value = item.prizeAmount;
-
-  if (value === null || value === undefined) {
-    value = item.PrizeAmount;
-  }
-
-  return value;
+function getPrizesDisplay(item) {
+  return item.prizesDisplay || item.PrizesDisplay || "-";
 }
 
 function getOrganizerCost(item) {
@@ -129,19 +119,18 @@ export default function SecretaryClassesOverviewTable(props) {
             <th className="px-4 py-3">עלות מארגן</th>
             <th className="px-4 py-3">עלות התאחדות</th>
             <th className="px-4 py-3">סה״כ מחיר</th>
-            <th className="px-4 py-3">סוג פרס</th>
-            <th className="px-4 py-3">סכום פרס</th>
+            <th className="px-4 py-3">פרסים</th>
             <th className="px-4 py-3">פעולות</th>
           </tr>
         </thead>
 
         <tbody>
           {props.loading ? (
-            <DataTableLoadingState colSpan={14} message="טוען מקצים..." />
+            <DataTableLoadingState colSpan={13} message="טוען מקצים..." />
           ) : null}
 
           {!props.loading && items.length === 0 ? (
-            <DataTableEmptyState colSpan={14} message="לא נמצאו מקצים להצגה" />
+            <DataTableEmptyState colSpan={13} message="לא נמצאו מקצים להצגה" />
           ) : null}
 
           {!props.loading
@@ -232,11 +221,7 @@ export default function SecretaryClassesOverviewTable(props) {
                       {formatMoney(getTotalCost(item))}
                     </td>
 
-                    <td className="px-4 py-3">{getPrizeTypeName(item)}</td>
-
-                    <td className="px-4 py-3">
-                      {formatMoney(getPrizeAmount(item))}
-                    </td>
+                    <td className="px-4 py-3">{getPrizesDisplay(item)}</td>
 
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap justify-end gap-2">

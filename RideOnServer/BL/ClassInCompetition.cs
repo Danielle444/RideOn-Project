@@ -1,4 +1,4 @@
-﻿using RideOnServer.BL.DTOs.Competition.ClassInCompetition;
+using RideOnServer.BL.DTOs.Competition.ClassInCompetition;
 using RideOnServer.DAL;
 
 namespace RideOnServer.BL
@@ -18,9 +18,8 @@ namespace RideOnServer.BL
         public byte? OrderInDay { get; set; }
 
         public List<int> JudgeIds { get; set; } = new List<int>();
-        public byte? PrizeTypeId { get; set; }
-        public string? PrizeTypeName { get; set; }
-        public decimal? PrizeAmount { get; set; }
+        public List<ClassPrizeItem> Prizes { get; set; } = new List<ClassPrizeItem>();
+        public string? PrizesDisplay { get; set; }
 
         public short? PatternNumber { get; set; }
 
@@ -52,6 +51,8 @@ namespace RideOnServer.BL
 
         internal static int CreateClassInCompetition(CreateClassInCompetitionRequest request)
         {
+            List<ClassPrizeItem> prizes = NormalizePrizes(request.Prizes);
+
             ValidateRequest(
                 request.CompetitionId,
                 request.ClassTypeId,
@@ -60,8 +61,7 @@ namespace RideOnServer.BL
                 request.OrganizerCost,
                 request.FederationCost,
                 request.JudgeIds,
-                request.PrizeTypeId,
-                request.PrizeAmount,
+                prizes,
                 request.PatternNumber
             );
 
@@ -78,8 +78,7 @@ namespace RideOnServer.BL
                 FederationCost = request.FederationCost,
                 ClassNotes = string.IsNullOrWhiteSpace(request.ClassNotes) ? null : request.ClassNotes.Trim(),
                 JudgeIds = request.JudgeIds?.Distinct().ToList() ?? new List<int>(),
-                PrizeTypeId = request.PrizeTypeId,
-                PrizeAmount = request.PrizeAmount,
+                Prizes = prizes,
                 PatternNumber = request.PatternNumber
             };
 
@@ -94,6 +93,8 @@ namespace RideOnServer.BL
                 throw new Exception("ClassInCompId is invalid");
             }
 
+            List<ClassPrizeItem> prizes = NormalizePrizes(request.Prizes);
+
             ValidateRequest(
                 request.CompetitionId,
                 request.ClassTypeId,
@@ -102,8 +103,7 @@ namespace RideOnServer.BL
                 request.OrganizerCost,
                 request.FederationCost,
                 request.JudgeIds,
-                request.PrizeTypeId,
-                request.PrizeAmount,
+                prizes,
                 request.PatternNumber
             );
 
@@ -121,8 +121,7 @@ namespace RideOnServer.BL
                 FederationCost = request.FederationCost,
                 ClassNotes = string.IsNullOrWhiteSpace(request.ClassNotes) ? null : request.ClassNotes.Trim(),
                 JudgeIds = request.JudgeIds?.Distinct().ToList() ?? new List<int>(),
-                PrizeTypeId = request.PrizeTypeId,
-                PrizeAmount = request.PrizeAmount,
+                Prizes = prizes,
                 PatternNumber = request.PatternNumber
             };
 
@@ -141,6 +140,18 @@ namespace RideOnServer.BL
             dal.DeleteClassInCompetition(classInCompId);
         }
 
+        private static List<ClassPrizeItem> NormalizePrizes(List<ClassPrizeItem>? prizes)
+        {
+            if (prizes == null)
+            {
+                return new List<ClassPrizeItem>();
+            }
+
+            return prizes
+                .Where(prize => prize.PrizeTypeId.HasValue || prize.PrizeAmount.HasValue)
+                .ToList();
+        }
+
         private static void ValidateRequest(
             int competitionId,
             short classTypeId,
@@ -149,8 +160,7 @@ namespace RideOnServer.BL
             decimal? organizerCost,
             decimal? federationCost,
             List<int>? judgeIds,
-            byte? prizeTypeId,
-            decimal? prizeAmount,
+            List<ClassPrizeItem> prizes,
             short? patternNumber)
         {
             if (competitionId <= 0)
@@ -160,7 +170,7 @@ namespace RideOnServer.BL
 
             if (classTypeId <= 0)
             {
-                throw new Exception("ClassTypeId is invalid");
+                throw new ValidationException("יש לבחור סוג מקצה");
             }
 
             if (arenaRanchId <= 0)
@@ -170,50 +180,63 @@ namespace RideOnServer.BL
 
             if (arenaId <= 0)
             {
-                throw new Exception("ArenaId is invalid");
+                throw new ValidationException("יש לבחור מגרש");
             }
 
-            if (organizerCost.HasValue && organizerCost.Value < 0)
+            if (!organizerCost.HasValue || organizerCost.Value < 0)
             {
-                throw new Exception("OrganizerCost cannot be negative");
+                throw new ValidationException("יש להזין עלות מארגן (0 ומעלה)");
             }
 
-            if (federationCost.HasValue && federationCost.Value < 0)
+            if (!federationCost.HasValue || federationCost.Value < 0)
             {
-                throw new Exception("FederationCost cannot be negative");
+                throw new ValidationException("יש להזין עלות התאחדות (0 ומעלה)");
             }
 
-            if (judgeIds == null || judgeIds.Count == 0)
-            {
-                throw new Exception("At least one judge must be selected for the class");
-            }
-
-            if (judgeIds.Any(id => id <= 0))
+            if (judgeIds != null && judgeIds.Any(id => id <= 0))
             {
                 throw new Exception("JudgeIds contain invalid values");
             }
 
-            bool hasPrizeType = prizeTypeId.HasValue;
-            bool hasPrizeAmount = prizeAmount.HasValue;
-
-            if (hasPrizeType && !hasPrizeAmount)
-            {
-                throw new Exception("Prize amount is required when prize type is selected");
-            }
-
-            if (!hasPrizeType && hasPrizeAmount)
-            {
-                throw new Exception("Prize type is required when prize amount is entered");
-            }
-
-            if (prizeAmount.HasValue && prizeAmount.Value < 0)
-            {
-                throw new Exception("Prize amount cannot be negative");
-            }
+            ValidatePrizes(prizes);
 
             if (patternNumber.HasValue && patternNumber.Value <= 0)
             {
                 throw new Exception("PatternNumber is invalid");
+            }
+        }
+
+        private static void ValidatePrizes(List<ClassPrizeItem> prizes)
+        {
+            foreach (ClassPrizeItem prize in prizes)
+            {
+                bool hasPrizeType = prize.PrizeTypeId.HasValue;
+                bool hasPrizeAmount = prize.PrizeAmount.HasValue;
+
+                if (hasPrizeType && !hasPrizeAmount)
+                {
+                    throw new ValidationException("יש להזין סכום פרס עבור כל סוג פרס שנבחר");
+                }
+
+                if (!hasPrizeType && hasPrizeAmount)
+                {
+                    throw new ValidationException("יש לבחור סוג פרס עבור כל סכום שהוזן");
+                }
+
+                if (prize.PrizeAmount.HasValue && prize.PrizeAmount.Value < 0)
+                {
+                    throw new ValidationException("סכום הפרס אינו יכול להיות שלילי");
+                }
+            }
+
+            var duplicateTypeIds = prizes
+                .Where(prize => prize.PrizeTypeId.HasValue)
+                .GroupBy(prize => prize.PrizeTypeId!.Value)
+                .Where(group => group.Count() > 1);
+
+            if (duplicateTypeIds.Any())
+            {
+                throw new ValidationException("לא ניתן לבחור אותו סוג פרס יותר מפעם אחת באותו מקצה");
             }
         }
     }

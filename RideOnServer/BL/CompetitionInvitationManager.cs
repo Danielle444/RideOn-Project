@@ -69,8 +69,7 @@ namespace RideOnServer.BL
                     OrganizerCost = x.OrganizerCost,
                     FederationCost = x.FederationCost,
                     TotalPrice = (x.OrganizerCost ?? 0) + (x.FederationCost ?? 0),
-                    PrizeTypeName = x.PrizeTypeName,
-                    PrizeAmount = x.PrizeAmount
+                    PrizesDisplay = x.PrizesDisplay
                 }).ToList(),
                 PaidTimeSlots = paidTimeSlots.Select(x => new CompetitionPaidTimeInvitationItemDto
                 {

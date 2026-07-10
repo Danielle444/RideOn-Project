@@ -150,8 +150,7 @@ export default function useCompetitionClassesStep(options) {
         federationCost: formData.federationCost,
         classNotes: formData.classNotes,
         judgeIds: Array.isArray(formData.judgeIds) ? formData.judgeIds : [],
-        prizeTypeId: formData.prizeTypeId,
-        prizeAmount: formData.prizeAmount,
+        prizes: Array.isArray(formData.prizes) ? formData.prizes : [],
         patternNumber: formData.patternNumber,
       };
 

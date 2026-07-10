@@ -232,8 +232,7 @@ function buildClassesPreview(classes, sourceCompetition, newStartDate) {
       arenaName: item.arenaName || "-",
       organizerCost: item.organizerCost,
       federationCost: item.federationCost,
-      prizeTypeName: item.prizeTypeName,
-      prizeAmount: item.prizeAmount,
+      prizesDisplay: item.prizesDisplay,
       patternNumber: item.patternNumber,
     };
   });
@@ -1415,16 +1414,7 @@ export default function DuplicateCompetitionSetupSection(props) {
                                     );
                                   }}
                                 />
-                                <span>
-                                  {[
-                                    item.prizeTypeName,
-                                    formatMoney(item.prizeAmount),
-                                  ]
-                                    .filter(function (value) {
-                                      return value && value !== "-";
-                                    })
-                                    .join(" · ") || "-"}
-                                </span>
+                                <span>{item.prizesDisplay || "-"}</span>
                               </label>
                             </td>
 

@@ -12,7 +12,6 @@
         public decimal? OrganizerCost { get; set; }
         public decimal? FederationCost { get; set; }
         public decimal? TotalPrice { get; set; }
-        public string? PrizeTypeName { get; set; }
-        public decimal? PrizeAmount { get; set; }
+        public string? PrizesDisplay { get; set; }
     }
 }

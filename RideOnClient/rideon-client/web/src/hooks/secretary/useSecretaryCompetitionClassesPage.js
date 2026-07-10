@@ -72,18 +72,8 @@ function getEntryAmount(item) {
   return Number(item.amountToPay || item.AmountToPay || 0);
 }
 
-function getClassPrizeTypeName(item) {
-  return item.prizeTypeName || item.PrizeTypeName || "";
-}
-
-function getClassPrizeAmount(item) {
-  var value = item.prizeAmount;
-
-  if (value === null || value === undefined) {
-    value = item.PrizeAmount;
-  }
-
-  return value;
+function getClassPrizesDisplay(item) {
+  return item.prizesDisplay || item.PrizesDisplay || "";
 }
 
 function getClassSearchText(item) {
@@ -92,7 +82,7 @@ function getClassSearchText(item) {
     item.arenaName || item.ArenaName,
     item.judgesDisplay || item.JudgesDisplay,
     item.patternNumber || item.PatternNumber,
-    item.prizeTypeName || item.PrizeTypeName,
+    getClassPrizesDisplay(item),
   ]
     .filter(Boolean)
     .join(" ")
@@ -354,8 +344,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
       federationCost: formData.federationCost,
       classNotes: formData.classNotes,
       judgeIds: Array.isArray(formData.judgeIds) ? formData.judgeIds : [],
-      prizeTypeId: formData.prizeTypeId,
-      prizeAmount: formData.prizeAmount,
+      prizes: Array.isArray(formData.prizes) ? formData.prizes : [],
       patternNumber: formData.patternNumber,
     };
 
@@ -583,13 +572,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
         }
 
         if (classPrizeFilter !== "all") {
-          var prizeTypeName = getClassPrizeTypeName(item);
-          var prizeAmount = getClassPrizeAmount(item);
-          var hasPrize =
-            !!prizeTypeName ||
-            (prizeAmount !== null &&
-              prizeAmount !== undefined &&
-              Number(prizeAmount) > 0);
+          var hasPrize = !!getClassPrizesDisplay(item);
 
           if (classPrizeFilter === "withPrize" && !hasPrize) {
             return false;

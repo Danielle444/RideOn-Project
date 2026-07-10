@@ -134,12 +134,9 @@ export default function CompetitionClassesSection(props) {
                       להתאחדות: {formatPrice(item.federationCost)}
                     </Text>
 
-                    {item.prizeTypeName ? (
+                    {item.prizesDisplay ? (
                       <Text style={competitionInvitationStyles.itemMeta}>
-                        פרס: {item.prizeTypeName}
-                        {item.prizeAmount !== null && item.prizeAmount !== undefined
-                          ? " • " + formatPrice(item.prizeAmount)
-                          : ""}
+                        פרסים: {item.prizesDisplay}
                       </Text>
                     ) : null}
                   </View>
