@@ -49,13 +49,35 @@ var FIELD_VALIDATION_RULES = [
       return !Number.isNaN(numericValue) && numericValue >= 0;
     },
   },
+  {
+    key: "classDate",
+    message: "תאריך המקצה חייב להיות בטווח תאריכי התחרות",
+    isValid: function (value, context) {
+      if (!value) {
+        return true;
+      }
+
+      var competitionStartDate = context?.competitionStartDate;
+      var competitionEndDate = context?.competitionEndDate;
+
+      if (competitionStartDate && value < competitionStartDate) {
+        return false;
+      }
+
+      if (competitionEndDate && value > competitionEndDate) {
+        return false;
+      }
+
+      return true;
+    },
+  },
 ];
 
-function getFieldErrors(formData) {
+function getFieldErrors(formData, context) {
   var errors = {};
 
   FIELD_VALIDATION_RULES.forEach(function (rule) {
-    if (!rule.isValid(formData[rule.key])) {
+    if (!rule.isValid(formData[rule.key], context)) {
       errors[rule.key] = rule.message;
     }
   });
@@ -410,7 +432,12 @@ export default function ClassInCompetitionModal(props) {
   function handleSubmit(e) {
     e.preventDefault();
 
-    var nextFieldErrors = getFieldErrors(formData);
+    var validationContext = {
+      competitionStartDate: props.competitionStartDate || "",
+      competitionEndDate: props.competitionEndDate || "",
+    };
+
+    var nextFieldErrors = getFieldErrors(formData, validationContext);
     var prizeValidation = validatePrizeRows(formData.prizeRows);
 
     setFieldErrors(nextFieldErrors);
@@ -422,11 +449,20 @@ export default function ClassInCompetitionModal(props) {
       Object.keys(prizeValidation.rowErrors).length > 0 ||
       prizeValidation.duplicateError
     ) {
+      if (props.onShowToast) {
+        props.onShowToast("error", "המקצה לא נשמר. יש למלא את השדות המסומנים.");
+      }
+
       return;
     }
 
     if (shouldShowPatternField && !formData.patternNumber) {
       setLocalError("בענף ריינינג חובה לבחור מסלול");
+
+      if (props.onShowToast) {
+        props.onShowToast("error", "המקצה לא נשמר. יש למלא את השדות המסומנים.");
+      }
+
       return;
     }
 
@@ -554,11 +590,19 @@ export default function ClassInCompetitionModal(props) {
               <input
                 type="date"
                 value={formData.classDate}
+                min={props.competitionStartDate || undefined}
+                max={props.competitionEndDate || undefined}
                 onChange={function (e) {
                   handleChange("classDate", e.target.value);
                 }}
                 className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right"
               />
+
+              {fieldErrors.classDate ? (
+                <div className="mt-1.5 text-right text-xs text-red-600">
+                  {fieldErrors.classDate}
+                </div>
+              ) : null}
             </div>
 
             <div>

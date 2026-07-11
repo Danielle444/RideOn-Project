@@ -270,6 +270,7 @@ export default function useCompetitionFormPage(options) {
   return {
     navigate,
     toast,
+    showToast,
     closeToast,
     activeStep,
     setActiveStep,

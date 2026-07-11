@@ -190,7 +190,9 @@ export default function useCompetitionClassesStep(options) {
       return true;
     } catch (error) {
       console.error(error);
-      setClassModalError(getErrorMessage(error, "שגיאה בשמירת המקצה"));
+      var errorMessage = getErrorMessage(error, "שגיאה בשמירת המקצה");
+      setClassModalError(errorMessage);
+      onShowToast("error", errorMessage);
       return false;
     } finally {
       setSavingClass(false);

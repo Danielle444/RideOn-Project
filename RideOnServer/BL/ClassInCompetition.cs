@@ -49,7 +49,10 @@ namespace RideOnServer.BL
             return dal.GetClassById(classInCompId);
         }
 
-        internal static int CreateClassInCompetition(CreateClassInCompetitionRequest request)
+        internal static int CreateClassInCompetition(
+            CreateClassInCompetitionRequest request,
+            DateTime competitionStartDate,
+            DateTime competitionEndDate)
         {
             List<ClassPrizeItem> prizes = NormalizePrizes(request.Prizes);
 
@@ -58,11 +61,14 @@ namespace RideOnServer.BL
                 request.ClassTypeId,
                 request.ArenaRanchId,
                 request.ArenaId,
+                request.ClassDateTime,
                 request.OrganizerCost,
                 request.FederationCost,
                 request.JudgeIds,
                 prizes,
-                request.PatternNumber
+                request.PatternNumber,
+                competitionStartDate,
+                competitionEndDate
             );
 
             ClassInCompetition item = new ClassInCompetition
@@ -86,7 +92,10 @@ namespace RideOnServer.BL
             return dal.InsertClassInCompetition(item);
         }
 
-        internal static void UpdateClassInCompetition(UpdateClassInCompetitionRequest request)
+        internal static void UpdateClassInCompetition(
+            UpdateClassInCompetitionRequest request,
+            DateTime competitionStartDate,
+            DateTime competitionEndDate)
         {
             if (request.ClassInCompId <= 0)
             {
@@ -100,11 +109,14 @@ namespace RideOnServer.BL
                 request.ClassTypeId,
                 request.ArenaRanchId,
                 request.ArenaId,
+                request.ClassDateTime,
                 request.OrganizerCost,
                 request.FederationCost,
                 request.JudgeIds,
                 prizes,
-                request.PatternNumber
+                request.PatternNumber,
+                competitionStartDate,
+                competitionEndDate
             );
 
             ClassInCompetition item = new ClassInCompetition
@@ -157,11 +169,14 @@ namespace RideOnServer.BL
             short classTypeId,
             int arenaRanchId,
             byte arenaId,
+            DateTime? classDateTime,
             decimal? organizerCost,
             decimal? federationCost,
             List<int>? judgeIds,
             List<ClassPrizeItem> prizes,
-            short? patternNumber)
+            short? patternNumber,
+            DateTime competitionStartDate,
+            DateTime competitionEndDate)
         {
             if (competitionId <= 0)
             {
@@ -181,6 +196,13 @@ namespace RideOnServer.BL
             if (arenaId <= 0)
             {
                 throw new ValidationException("יש לבחור מגרש");
+            }
+
+            if (classDateTime.HasValue &&
+                (classDateTime.Value.Date < competitionStartDate.Date ||
+                 classDateTime.Value.Date > competitionEndDate.Date))
+            {
+                throw new ValidationException("תאריך המקצה חייב להיות בטווח תאריכי התחרות");
             }
 
             if (!organizerCost.HasValue || organizerCost.Value < 0)

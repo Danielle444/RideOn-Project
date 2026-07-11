@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.Competition.ClassInCompetition;
+using System.Linq;
 
 namespace RideOnServer.Controllers
 {
@@ -53,6 +54,10 @@ namespace RideOnServer.Controllers
                 if (request == null)
                     return BadRequest("Invalid request");
 
+                // TEMP DEBUG (Issue C): remove once the drop point is confirmed.
+                Console.WriteLine($"[ISSUE-C] CreateClassInCompetition request.Prizes count={request.Prizes?.Count ?? -1} " +
+                    $"types=[{string.Join(",", (request.Prizes ?? new List<ClassPrizeItem>()).Select(p => p.PrizeTypeId))}]");
+
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
@@ -69,7 +74,11 @@ namespace RideOnServer.Controllers
                 if (competition.HostRanchId != request.HostRanchId)
                     return StatusCode(403, "אין לך הרשאה להוסיף מקצים לתחרות זו");
 
-                int newId = ClassInCompetition.CreateClassInCompetition(request);
+                int newId = ClassInCompetition.CreateClassInCompetition(
+                    request,
+                    competition.CompetitionStartDate,
+                    competition.CompetitionEndDate
+                );
                 var newItem = ClassInCompetition.GetClassById(newId);
 
                 if (newItem == null)
@@ -103,6 +112,10 @@ namespace RideOnServer.Controllers
                 if (classInCompId != request.ClassInCompId)
                     return BadRequest("ClassInCompId mismatch");
 
+                // TEMP DEBUG (Issue C): remove once the drop point is confirmed.
+                Console.WriteLine($"[ISSUE-C] UpdateClassInCompetition request.Prizes count={request.Prizes?.Count ?? -1} " +
+                    $"types=[{string.Join(",", (request.Prizes ?? new List<ClassPrizeItem>()).Select(p => p.PrizeTypeId))}]");
+
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
@@ -119,7 +132,11 @@ namespace RideOnServer.Controllers
                 if (competition.HostRanchId != request.HostRanchId)
                     return StatusCode(403, "אין לך הרשאה לערוך מקצים בתחרות זו");
 
-                ClassInCompetition.UpdateClassInCompetition(request);
+                ClassInCompetition.UpdateClassInCompetition(
+                    request,
+                    competition.CompetitionStartDate,
+                    competition.CompetitionEndDate
+                );
                 var updatedItem = ClassInCompetition.GetClassById(classInCompId);
 
                 if (updatedItem == null)
