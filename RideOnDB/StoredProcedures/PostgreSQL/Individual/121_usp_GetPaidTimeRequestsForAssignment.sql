@@ -10,7 +10,7 @@ RETURNS TABLE(
     "PaidTimeRequestId"         INTEGER,
     "RequestedCompSlotId"       INTEGER,
     "AssignedCompSlotId"        INTEGER,
-    "AssignedStartTime"         TIMESTAMP,
+    "AssignedStartTime"         TIMESTAMP WITH TIME ZONE,
     "AssignedOrder"             INTEGER,
     "Status"                    TEXT,
     "Notes"                     TEXT,
@@ -48,12 +48,12 @@ begin
         ptr.assignedcompslotid,
         ptr.assignedstarttime,
         ptr.assignedorder,
-        ptr.status,
-        ptr.notes,
+        ptr.status::text,
+        ptr.notes::text,
 
         h.horseid,
-        h.horsename,
-        h.barnname,
+        h.horsename::text,
+        h.barnname::text,
         h.ranchid,
 
         sr.riderfederationmemberid,
@@ -69,19 +69,19 @@ begin
         (payer_person.firstname || ' ' || payer_person.lastname) as payername,
 
         pc.productid,
-        p.productname,
+        p.productname::text,
         ptp.durationminutes,
         ptp.durationminutes + 1 as effectivedurationminutes,
 
         requested_slot.slotdate,
         requested_slot.starttime,
         requested_slot.endtime,
-        requested_arena.arenaname,
+        requested_arena.arenaname::text,
 
         assigned_slot.slotdate,
         assigned_slot.starttime,
         assigned_slot.endtime,
-        assigned_arena.arenaname,
+        assigned_arena.arenaname::text,
 
         ptr.batchid,
         batch.payload
