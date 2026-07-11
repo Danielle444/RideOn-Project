@@ -7,6 +7,7 @@ import SecretaryClassesOverviewTable from "../../components/secretary/classes/Se
 import SecretaryClassEntriesTable from "../../components/secretary/classes/SecretaryClassEntriesTable";
 import SecretaryClassEntriesSummaryCards from "../../components/secretary/classes/SecretaryClassEntriesSummaryCards";
 import ClassInCompetitionModal from "../../components/secretary/ClassInCompetitionModal";
+import ToastMessage from "../../components/common/ToastMessage";
 import useSecretaryCompetitionClassesPage from "../../hooks/secretary/useSecretaryCompetitionClassesPage";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 
@@ -428,6 +429,7 @@ export default function CompetitionClassesPage() {
         isOpen={page.classModalOpen}
         onClose={page.closeClassModal}
         onSubmit={page.handleSubmitClass}
+        onShowToast={page.showToast}
         initialValue={page.editClassItem}
         defaultJudgeIds={page.selectedCompetitionJudgeIds}
         classTypes={page.classTypes}
@@ -437,8 +439,17 @@ export default function CompetitionClassesPage() {
         arenas={page.arenas}
         fieldName={page.selectedFieldName}
         isReiningField={page.isReiningField}
+        competitionStartDate={page.competitionStartDate}
+        competitionEndDate={page.competitionEndDate}
         error={page.classModalError}
         saving={page.savingClass}
+      />
+
+      <ToastMessage
+        isOpen={page.toast.isOpen}
+        type={page.toast.type}
+        message={page.toast.message}
+        onClose={page.closeToast}
       />
     </CompetitionWorkspaceLayout>
   );

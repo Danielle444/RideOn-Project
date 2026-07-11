@@ -1,5 +1,7 @@
 using Npgsql;
 using RideOnServer.BL;
+using RideOnServer.BL.DTOs.Competition.ClassInCompetition;
+using System.Linq;
 
 namespace RideOnServer.DAL
 {
@@ -41,9 +43,7 @@ namespace RideOnServer.DAL
                                 OrderInDay = reader["OrderInDay"] == DBNull.Value ? null : Convert.ToByte(reader["OrderInDay"]),
                                 ClassNotes = reader["ClassNotes"] == DBNull.Value ? null : reader["ClassNotes"].ToString(),
                                 JudgesDisplay = reader["JudgesDisplay"] == DBNull.Value ? null : reader["JudgesDisplay"].ToString(),
-                                PrizeTypeId = reader["PrizeTypeId"] == DBNull.Value ? null : Convert.ToByte(reader["PrizeTypeId"]),
-                                PrizeTypeName = reader["PrizeTypeName"] == DBNull.Value ? null : reader["PrizeTypeName"].ToString(),
-                                PrizeAmount = reader["PrizeAmount"] == DBNull.Value ? null : Convert.ToDecimal(reader["PrizeAmount"]),
+                                PrizesDisplay = reader["PrizesDisplay"] == DBNull.Value ? null : reader["PrizesDisplay"].ToString(),
                                 PatternNumber = reader["PatternNumber"] == DBNull.Value ? null : Convert.ToInt16(reader["PatternNumber"]),
                                 JudgeIds = reader["JudgeIds"] == DBNull.Value
                                     ? new List<int>()
@@ -96,9 +96,7 @@ namespace RideOnServer.DAL
                                 OrderInDay = reader["OrderInDay"] == DBNull.Value ? null : Convert.ToByte(reader["OrderInDay"]),
                                 ClassNotes = reader["ClassNotes"] == DBNull.Value ? null : reader["ClassNotes"].ToString(),
                                 JudgesDisplay = reader["JudgesDisplay"] == DBNull.Value ? null : reader["JudgesDisplay"].ToString(),
-                                PrizeTypeId = reader["PrizeTypeId"] == DBNull.Value ? null : Convert.ToByte(reader["PrizeTypeId"]),
-                                PrizeTypeName = reader["PrizeTypeName"] == DBNull.Value ? null : reader["PrizeTypeName"].ToString(),
-                                PrizeAmount = reader["PrizeAmount"] == DBNull.Value ? null : Convert.ToDecimal(reader["PrizeAmount"]),
+                                PrizesDisplay = reader["PrizesDisplay"] == DBNull.Value ? null : reader["PrizesDisplay"].ToString(),
                                 PatternNumber = reader["PatternNumber"] == DBNull.Value ? null : Convert.ToInt16(reader["PatternNumber"]),
                                 JudgeIds = new List<int>()
                             };
@@ -108,6 +106,7 @@ namespace RideOnServer.DAL
                     if (item != null)
                     {
                         item.JudgeIds = GetJudgeIdsByClassId(item.ClassInCompId, connection);
+                        item.Prizes = GetClassPrizesByClassId(item.ClassInCompId, connection);
                     }
 
                     return item;
@@ -155,7 +154,7 @@ namespace RideOnServer.DAL
                             }
 
                             ReplaceClassJudges(newClassInCompId, item.JudgeIds, connection, transaction);
-                            SaveClassPrize(newClassInCompId, item.PrizeTypeId, item.PrizeAmount, connection, transaction);
+                            SaveClassPrizes(newClassInCompId, item.Prizes, connection, transaction);
                             SaveReiningType(newClassInCompId, item.PatternNumber, connection, transaction);
 
                             transaction.Commit();
@@ -208,7 +207,7 @@ namespace RideOnServer.DAL
                             }
 
                             ReplaceClassJudges(item.ClassInCompId, item.JudgeIds, connection, transaction);
-                            SaveClassPrize(item.ClassInCompId, item.PrizeTypeId, item.PrizeAmount, connection, transaction);
+                            SaveClassPrizes(item.ClassInCompId, item.Prizes, connection, transaction);
                             SaveReiningType(item.ClassInCompId, item.PatternNumber, connection, transaction);
 
                             transaction.Commit();
@@ -315,32 +314,78 @@ namespace RideOnServer.DAL
             }
         }
 
-        private void SaveClassPrize(
+        private void SaveClassPrizes(
             int classInCompId,
-            byte? prizeTypeId,
-            decimal? prizeAmount,
+            List<ClassPrizeItem> prizes,
             NpgsqlConnection connection,
             NpgsqlTransaction transaction)
         {
+            // TEMP DEBUG (Issue C): remove once the drop point is confirmed.
+            Console.WriteLine($"[ISSUE-C] SaveClassPrizes classInCompId={classInCompId} incomingCount={prizes.Count} " +
+                $"types=[{string.Join(",", prizes.Select(p => p.PrizeTypeId))}]");
+
             DeleteClassPrizeByClassId(classInCompId, connection, transaction);
+            Console.WriteLine($"[ISSUE-C] after delete-all, classprize count={CountClassPrizes(classInCompId, connection, transaction)}");
 
-            if (!prizeTypeId.HasValue || !prizeAmount.HasValue)
+            foreach (ClassPrizeItem prize in prizes)
             {
-                return;
-            }
+                if (!prize.PrizeTypeId.HasValue || !prize.PrizeAmount.HasValue)
+                {
+                    Console.WriteLine($"[ISSUE-C] skipping incomplete prize row: prizeTypeId={prize.PrizeTypeId}, prizeAmount={prize.PrizeAmount}");
+                    continue;
+                }
 
+                Dictionary<string, object> paramDic = new Dictionary<string, object>
+                {
+                    { "@ClassInCompId", classInCompId },
+                    { "@PrizeTypeId", prize.PrizeTypeId.Value },
+                    { "@PrizeAmount", prize.PrizeAmount.Value }
+                };
+
+                using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpsertClassPrize", connection, paramDic))
+                {
+                    command.Transaction = transaction;
+                    command.ExecuteNonQuery();
+                }
+
+                Console.WriteLine($"[ISSUE-C] after upsert prizeTypeId={prize.PrizeTypeId.Value}, classprize count={CountClassPrizes(classInCompId, connection, transaction)}");
+            }
+        }
+
+        // TEMP DEBUG (Issue C): remove once the drop point is confirmed.
+        private int CountClassPrizes(int classInCompId, NpgsqlConnection connection, NpgsqlTransaction transaction)
+        {
+            using (NpgsqlCommand command = new NpgsqlCommand(
+                "SELECT COUNT(*) FROM classprize WHERE classincompid = @classInCompId", connection, transaction))
+            {
+                command.Parameters.AddWithValue("@classInCompId", classInCompId);
+                return Convert.ToInt32(command.ExecuteScalar());
+            }
+        }
+
+        private List<ClassPrizeItem> GetClassPrizesByClassId(int classInCompId, NpgsqlConnection connection)
+        {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
-                { "@ClassInCompId", classInCompId },
-                { "@PrizeTypeId", prizeTypeId.Value },
-                { "@PrizeAmount", prizeAmount.Value }
+                { "@ClassInCompId", classInCompId }
             };
 
-            using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_UpsertClassPrize", connection, paramDic))
+            List<ClassPrizeItem> prizes = new List<ClassPrizeItem>();
+
+            using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetClassPrizesByClassId", connection, paramDic))
+            using (NpgsqlDataReader reader = command.ExecuteReader())
             {
-                command.Transaction = transaction;
-                command.ExecuteNonQuery();
+                while (reader.Read())
+                {
+                    prizes.Add(new ClassPrizeItem
+                    {
+                        PrizeTypeId = reader["PrizeTypeId"] == DBNull.Value ? null : Convert.ToByte(reader["PrizeTypeId"]),
+                        PrizeAmount = reader["PrizeAmount"] == DBNull.Value ? null : Convert.ToDecimal(reader["PrizeAmount"])
+                    });
+                }
             }
+
+            return prizes;
         }
 
         private void SaveReiningType(

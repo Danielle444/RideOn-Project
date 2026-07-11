@@ -20,7 +20,7 @@ import {
   getAllPatternsWithManeuvers,
 } from "../../services/superUserService";
 import { getArenasByRanchId } from "../../services/arenaService";
-import { getErrorMessage } from "../../utils/competitionForm.utils";
+import { getErrorMessage, toInputDate } from "../../utils/competitionForm.utils";
 
 function normalizeDateOnly(value) {
   if (!value) {
@@ -72,18 +72,8 @@ function getEntryAmount(item) {
   return Number(item.amountToPay || item.AmountToPay || 0);
 }
 
-function getClassPrizeTypeName(item) {
-  return item.prizeTypeName || item.PrizeTypeName || "";
-}
-
-function getClassPrizeAmount(item) {
-  var value = item.prizeAmount;
-
-  if (value === null || value === undefined) {
-    value = item.PrizeAmount;
-  }
-
-  return value;
+function getClassPrizesDisplay(item) {
+  return item.prizesDisplay || item.PrizesDisplay || "";
 }
 
 function getClassSearchText(item) {
@@ -92,7 +82,7 @@ function getClassSearchText(item) {
     item.arenaName || item.ArenaName,
     item.judgesDisplay || item.JudgesDisplay,
     item.patternNumber || item.PatternNumber,
-    item.prizeTypeName || item.PrizeTypeName,
+    getClassPrizesDisplay(item),
   ]
     .filter(Boolean)
     .join(" ")
@@ -236,6 +226,28 @@ export default function useSecretaryCompetitionClassesPage(options) {
 
   var [error, setError] = useState("");
 
+  var [toast, setToast] = useState({
+    isOpen: false,
+    type: "success",
+    message: "",
+  });
+
+  function showToast(type, message) {
+    setToast({
+      isOpen: true,
+      type: type,
+      message: message,
+    });
+  }
+
+  function closeToast() {
+    setToast({
+      isOpen: false,
+      type: "success",
+      message: "",
+    });
+  }
+
   var [selectedDate, setSelectedDate] = useState("");
   var [viewMode, setViewMode] = useState("classes");
   var [selectedClass, setSelectedClass] = useState(null);
@@ -354,8 +366,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
       federationCost: formData.federationCost,
       classNotes: formData.classNotes,
       judgeIds: Array.isArray(formData.judgeIds) ? formData.judgeIds : [],
-      prizeTypeId: formData.prizeTypeId,
-      prizeAmount: formData.prizeAmount,
+      prizes: Array.isArray(formData.prizes) ? formData.prizes : [],
       patternNumber: formData.patternNumber,
     };
 
@@ -365,8 +376,11 @@ export default function useSecretaryCompetitionClassesPage(options) {
       await updateClassInCompetition(classInCompId, payload);
       await loadClasses();
       closeClassModal();
+      showToast("success", "המקצה עודכן בהצלחה");
     } catch (err) {
-      setClassModalError(getErrorMessage(err, "שגיאה בעדכון מקצה"));
+      var errorMessage = getErrorMessage(err, "שגיאה בעדכון מקצה");
+      setClassModalError(errorMessage);
+      showToast("error", errorMessage);
     } finally {
       setSavingClass(false);
     }
@@ -428,6 +442,28 @@ export default function useSecretaryCompetitionClassesPage(options) {
       return String(selectedFieldName || "").indexOf("ריינינג") >= 0;
     },
     [selectedFieldName],
+  );
+
+  var competitionStartDate = useMemo(
+    function () {
+      return toInputDate(
+        competitionDetails &&
+          (competitionDetails.competitionStartDate ||
+            competitionDetails.CompetitionStartDate),
+      );
+    },
+    [competitionDetails],
+  );
+
+  var competitionEndDate = useMemo(
+    function () {
+      return toInputDate(
+        competitionDetails &&
+          (competitionDetails.competitionEndDate ||
+            competitionDetails.CompetitionEndDate),
+      );
+    },
+    [competitionDetails],
   );
 
   var selectedCompetitionJudgeIds = useMemo(
@@ -583,13 +619,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
         }
 
         if (classPrizeFilter !== "all") {
-          var prizeTypeName = getClassPrizeTypeName(item);
-          var prizeAmount = getClassPrizeAmount(item);
-          var hasPrize =
-            !!prizeTypeName ||
-            (prizeAmount !== null &&
-              prizeAmount !== undefined &&
-              Number(prizeAmount) > 0);
+          var hasPrize = !!getClassPrizesDisplay(item);
 
           if (classPrizeFilter === "withPrize" && !hasPrize) {
             return false;
@@ -1105,6 +1135,10 @@ export default function useSecretaryCompetitionClassesPage(options) {
     loadingEntries,
     error,
 
+    toast,
+    showToast,
+    closeToast,
+
     selectedDate,
     viewMode,
     selectedClass,
@@ -1170,6 +1204,8 @@ export default function useSecretaryCompetitionClassesPage(options) {
     patterns,
     selectedFieldName,
     isReiningField,
+    competitionStartDate,
+    competitionEndDate,
     selectedCompetitionJudgeIds,
     openEditClassModal,
     closeClassModal,

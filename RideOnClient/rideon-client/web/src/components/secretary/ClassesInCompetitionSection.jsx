@@ -52,14 +52,13 @@ export default function ClassesInCompetitionSection(props) {
   return (
     <div className="overflow-x-auto rounded-[24px] border border-[#E8DDD7] bg-white">
       <div className="min-w-[1500px]">
-        <div className="grid grid-cols-[0.55fr_1.4fr_1fr_1fr_1.3fr_1fr_1fr_1fr_0.9fr] gap-3 bg-[#FAF7F5] px-6 py-4 text-center text-sm font-bold text-[#4E342E]">
+        <div className="grid grid-cols-[0.55fr_1.4fr_1fr_1fr_1.3fr_1.3fr_1fr_0.9fr] gap-3 bg-[#FAF7F5] px-6 py-4 text-center text-sm font-bold text-[#4E342E]">
           <div>מס׳</div>
           <div>שם מקצה</div>
           <div>מגרש</div>
           <div>מסלול</div>
           <div>שופטים</div>
-          <div>סוג פרס</div>
-          <div>סכום פרס</div>
+          <div>פרסים</div>
           <div>עלות מארגן</div>
           <div>פעולות</div>
         </div>
@@ -69,7 +68,7 @@ export default function ClassesInCompetitionSection(props) {
             <div
               key={item.classInCompId}
               className={
-                "grid grid-cols-[0.55fr_1.4fr_1fr_1fr_1.3fr_1fr_1fr_1fr_0.9fr] items-center gap-3 border-t border-[#F1E8E3] px-6 py-5 text-center text-[#3F312B] " +
+                "grid grid-cols-[0.55fr_1.4fr_1fr_1fr_1.3fr_1.3fr_1fr_0.9fr] items-center gap-3 border-t border-[#F1E8E3] px-6 py-5 text-center text-[#3F312B] " +
                 (index % 2 === 0 ? "bg-white" : "bg-[#FFFEFD]")
               }
             >
@@ -87,9 +86,7 @@ export default function ClassesInCompetitionSection(props) {
                 {item.judgesDisplay || "-"}
               </div>
 
-              <div>{item.prizeTypeName || "-"}</div>
-
-              <div>{formatMoney(item.prizeAmount)}</div>
+              <div>{item.prizesDisplay || "-"}</div>
 
               <div>{formatMoney(item.organizerCost)}</div>
 

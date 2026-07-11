@@ -150,8 +150,7 @@ export default function useCompetitionClassesStep(options) {
         federationCost: formData.federationCost,
         classNotes: formData.classNotes,
         judgeIds: Array.isArray(formData.judgeIds) ? formData.judgeIds : [],
-        prizeTypeId: formData.prizeTypeId,
-        prizeAmount: formData.prizeAmount,
+        prizes: Array.isArray(formData.prizes) ? formData.prizes : [],
         patternNumber: formData.patternNumber,
       };
 
@@ -191,7 +190,9 @@ export default function useCompetitionClassesStep(options) {
       return true;
     } catch (error) {
       console.error(error);
-      setClassModalError(getErrorMessage(error, "שגיאה בשמירת המקצה"));
+      var errorMessage = getErrorMessage(error, "שגיאה בשמירת המקצה");
+      setClassModalError(errorMessage);
+      onShowToast("error", errorMessage);
       return false;
     } finally {
       setSavingClass(false);

@@ -229,6 +229,7 @@ export default function CompetitionFormPage(props) {
         isOpen={page.classModalOpen}
         onClose={page.closeClassModal}
         onSubmit={page.handleSubmitClass}
+        onShowToast={page.showToast}
         initialValue={page.editClassItem}
         defaultDate={page.createClassDefaultDate}
         defaultJudgeIds={page.selectedCompetitionJudgeIds || []}
@@ -240,6 +241,8 @@ export default function CompetitionFormPage(props) {
         fieldName={selectedFieldName}
         isReiningField={isReiningField}
         fieldId={page.detailsForm.fieldId}
+        competitionStartDate={page.detailsForm.competitionStartDate}
+        competitionEndDate={page.detailsForm.competitionEndDate}
         error={page.classModalError}
         saving={page.savingClass}
       />
