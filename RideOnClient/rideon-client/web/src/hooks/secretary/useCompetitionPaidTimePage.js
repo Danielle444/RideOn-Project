@@ -15,7 +15,8 @@ import {
 } from "../../services/paidTimeSlotInCompetitionService";
 
 import { getArenasByRanchId } from "../../services/arenaService";
-import { getErrorMessage } from "../../utils/competitionForm.utils";
+import { getCompetitionById } from "../../services/competitionService";
+import { getErrorMessage, toInputDate } from "../../utils/competitionForm.utils";
 
 /* =======================
    helpers
@@ -114,6 +115,8 @@ export default function useCompetitionPaidTimePage(options) {
 
   var [arenas, setArenas] = useState([]);
   var [baseSlots, setBaseSlots] = useState([]);
+  var [competitionStartDate, setCompetitionStartDate] = useState("");
+  var [competitionEndDate, setCompetitionEndDate] = useState("");
 
   var [loadingSlots, setLoadingSlots] = useState(false);
   var [loadingRequests, setLoadingRequests] = useState(false);
@@ -144,6 +147,7 @@ export default function useCompetitionPaidTimePage(options) {
       loadSlots();
       loadArenas();
       loadBaseSlots();
+      loadCompetitionDates();
     },
     [competitionId, ranchId],
   );
@@ -174,6 +178,22 @@ export default function useCompetitionPaidTimePage(options) {
     try {
       var res = await getArenasByRanchId(ranchId);
       setArenas(res.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function loadCompetitionDates() {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    try {
+      var res = await getCompetitionById(competitionId, ranchId);
+      var competition = res.data || {};
+
+      setCompetitionStartDate(toInputDate(competition.competitionStartDate));
+      setCompetitionEndDate(toInputDate(competition.competitionEndDate));
     } catch (err) {
       console.error(err);
     }
@@ -233,7 +253,9 @@ export default function useCompetitionPaidTimePage(options) {
         SlotNotes: data.slotNotes,
       };
 
-      if (editPaidTimeSlotItem) {
+      var isEdit = !!editPaidTimeSlotItem;
+
+      if (isEdit) {
         var id = getSlotId(editPaidTimeSlotItem);
 
         await updatePaidTimeSlotInCompetition(id, {
@@ -247,7 +269,10 @@ export default function useCompetitionPaidTimePage(options) {
       closePaidTimeSlotModal();
       await loadSlots();
 
-      onShowToast?.("success", "הסלוט נשמר בהצלחה");
+      onShowToast?.(
+        "success",
+        isEdit ? "פייד-טיים סלוט עודכן בהצלחה" : "פייד-טיים סלוט נוסף בהצלחה",
+      );
     } catch (err) {
       setPaidTimeSlotModalError(getErrorMessage(err));
     } finally {
@@ -568,6 +593,8 @@ export default function useCompetitionPaidTimePage(options) {
 
     arenas,
     baseSlots,
+    competitionStartDate,
+    competitionEndDate,
 
     loadingSlots,
     loadingRequests,

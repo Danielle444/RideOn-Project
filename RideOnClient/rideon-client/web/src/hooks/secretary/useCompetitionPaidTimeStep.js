@@ -145,7 +145,7 @@ export default function useCompetitionPaidTimeStep(options) {
           return sortPaidTimeSlots(next);
         });
 
-        onShowToast("success", "סלוט הפייד־טיים עודכן בהצלחה");
+        onShowToast("success", "פייד-טיים סלוט עודכן בהצלחה");
       } else {
         var createResponse = await createPaidTimeSlotInCompetition({
           competitionId: competitionId,
@@ -166,7 +166,7 @@ export default function useCompetitionPaidTimeStep(options) {
           return sortPaidTimeSlots([...prev, newItem]);
         });
 
-        onShowToast("success", "סלוט הפייד־טיים נוסף בהצלחה");
+        onShowToast("success", "פייד-טיים סלוט נוסף בהצלחה");
       }
 
       closePaidTimeModal();

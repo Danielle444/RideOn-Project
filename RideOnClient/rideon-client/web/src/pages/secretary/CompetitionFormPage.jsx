@@ -251,9 +251,12 @@ export default function CompetitionFormPage(props) {
         isOpen={page.paidTimeModalOpen}
         onClose={page.closePaidTimeModal}
         onSubmit={page.handleSubmitPaidTime}
+        onShowToast={page.showToast}
         initialValue={page.editPaidTimeItem}
         baseSlots={page.paidTimeBaseSlots}
         arenas={page.arenas}
+        competitionStartDate={page.detailsForm.competitionStartDate}
+        competitionEndDate={page.detailsForm.competitionEndDate}
         error={page.paidTimeModalError}
         saving={page.savingPaidTime}
       />
