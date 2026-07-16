@@ -165,29 +165,51 @@ function findBaseSlotId(baseSlots, dayName, timeOfDay) {
   return match.paidTimeSlotId || match.PaidTimeSlotId || null;
 }
 
-function buildQuarterHourOptions() {
+var MINUTE_OPTIONS = ["00", "15", "30", "45"];
+
+function buildHourOptions() {
   var options = [];
 
   for (var hour = 0; hour < 24; hour++) {
-    [0, 15, 30, 45].forEach(function (minute) {
-      options.push(
-        String(hour).padStart(2, "0") + ":" + String(minute).padStart(2, "0"),
-      );
-    });
+    options.push(String(hour).padStart(2, "0"));
   }
 
   return options;
+}
+
+function splitTimeValue(value) {
+  if (!value) {
+    return { hour: "", minute: "" };
+  }
+
+  var parts = String(value).split(":");
+
+  return {
+    hour: parts[0] || "",
+    minute: parts[1] || "",
+  };
+}
+
+function combineTimeValue(hour, minute) {
+  if (!hour || !minute) {
+    return "";
+  }
+
+  return hour + ":" + minute;
 }
 
 export {
   WEEKDAY_NAMES_BY_INDEX,
   TIMING_OPTIONS,
   BEFORE_WINDOW_DAYS,
+  MINUTE_OPTIONS,
   addDaysToDateOnly,
   formatDateOnlyForDisplay,
   buildDayOptions,
   getTimeOfDayOptions,
   getTimingForDate,
   findBaseSlotId,
-  buildQuarterHourOptions,
+  buildHourOptions,
+  splitTimeValue,
+  combineTimeValue,
 };

@@ -8,12 +8,15 @@ import {
 } from "../../utils/competitionForm.utils";
 import {
   TIMING_OPTIONS,
+  MINUTE_OPTIONS,
   buildDayOptions,
   getTimeOfDayOptions,
   getTimingForDate,
   findBaseSlotId,
   formatDateOnlyForDisplay,
-  buildQuarterHourOptions,
+  buildHourOptions,
+  splitTimeValue,
+  combineTimeValue,
 } from "../../utils/paidTimeSlotForm.utils";
 
 // Required-field rules for the paid-time slot form. Adding another mandatory
@@ -101,8 +104,8 @@ export default function PaidTimeSlotInCompetitionModal(props) {
   var [fieldErrors, setFieldErrors] = useState({});
   var [openDropdownKey, setOpenDropdownKey] = useState("");
 
-  var quarterHourOptions = useMemo(function () {
-    return buildQuarterHourOptions();
+  var hourOptions = useMemo(function () {
+    return buildHourOptions();
   }, []);
 
   useEffect(
@@ -174,6 +177,19 @@ export default function PaidTimeSlotInCompetitionModal(props) {
       return {
         ...prev,
         [fieldName]: value,
+      };
+    });
+  }
+
+  function handleTimePartChange(fieldName, part, value) {
+    setFormData(function (prev) {
+      var current = splitTimeValue(prev[fieldName]);
+      var nextHour = part === "hour" ? value : current.hour;
+      var nextMinute = part === "minute" ? value : current.minute;
+
+      return {
+        ...prev,
+        [fieldName]: combineTimeValue(nextHour, nextMinute),
       };
     });
   }
@@ -324,18 +340,6 @@ export default function PaidTimeSlotInCompetitionModal(props) {
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
-                תאריך (מחושב אוטומטית)
-              </label>
-
-              <div className="flex h-11 w-full items-center rounded-xl border border-[#D7CCC8] bg-[#F3ECE8] px-4 text-right text-[#6D4C41]">
-                {formData.slotDateValue
-                  ? formatDateOnlyForDisplay(formData.slotDateValue)
-                  : "-"}
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 מועד ביום
               </label>
 
@@ -418,24 +422,48 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                 שעת התחלה
               </label>
 
-              <CustomDropdown
-                dropdownKey="paid-time-start-time"
-                openDropdownKey={openDropdownKey}
-                setOpenDropdownKey={setOpenDropdownKey}
-                options={quarterHourOptions}
-                value={formData.startTime}
-                placeholder="בחרי שעת התחלה"
-                searchable={true}
-                getOptionValue={function (item) {
-                  return item;
-                }}
-                getOptionLabel={function (item) {
-                  return item;
-                }}
-                onChange={function (e) {
-                  handleChange("startTime", e.target.value);
-                }}
-              />
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <CustomDropdown
+                    dropdownKey="paid-time-start-time-hour"
+                    openDropdownKey={openDropdownKey}
+                    setOpenDropdownKey={setOpenDropdownKey}
+                    options={hourOptions}
+                    value={splitTimeValue(formData.startTime).hour}
+                    placeholder="שעה"
+                    searchable={true}
+                    getOptionValue={function (item) {
+                      return item;
+                    }}
+                    getOptionLabel={function (item) {
+                      return item;
+                    }}
+                    onChange={function (e) {
+                      handleTimePartChange("startTime", "hour", e.target.value);
+                    }}
+                  />
+                </div>
+
+                <div className="flex-1">
+                  <CustomDropdown
+                    dropdownKey="paid-time-start-time-minute"
+                    openDropdownKey={openDropdownKey}
+                    setOpenDropdownKey={setOpenDropdownKey}
+                    options={MINUTE_OPTIONS}
+                    value={splitTimeValue(formData.startTime).minute}
+                    placeholder="דקות"
+                    getOptionValue={function (item) {
+                      return item;
+                    }}
+                    getOptionLabel={function (item) {
+                      return item;
+                    }}
+                    onChange={function (e) {
+                      handleTimePartChange("startTime", "minute", e.target.value);
+                    }}
+                  />
+                </div>
+              </div>
 
               {fieldErrors.startTime ? (
                 <div className="mt-1.5 text-right text-xs text-red-600">
@@ -449,24 +477,48 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                 שעת סיום
               </label>
 
-              <CustomDropdown
-                dropdownKey="paid-time-end-time"
-                openDropdownKey={openDropdownKey}
-                setOpenDropdownKey={setOpenDropdownKey}
-                options={quarterHourOptions}
-                value={formData.endTime}
-                placeholder="בחרי שעת סיום"
-                searchable={true}
-                getOptionValue={function (item) {
-                  return item;
-                }}
-                getOptionLabel={function (item) {
-                  return item;
-                }}
-                onChange={function (e) {
-                  handleChange("endTime", e.target.value);
-                }}
-              />
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <CustomDropdown
+                    dropdownKey="paid-time-end-time-hour"
+                    openDropdownKey={openDropdownKey}
+                    setOpenDropdownKey={setOpenDropdownKey}
+                    options={hourOptions}
+                    value={splitTimeValue(formData.endTime).hour}
+                    placeholder="שעה"
+                    searchable={true}
+                    getOptionValue={function (item) {
+                      return item;
+                    }}
+                    getOptionLabel={function (item) {
+                      return item;
+                    }}
+                    onChange={function (e) {
+                      handleTimePartChange("endTime", "hour", e.target.value);
+                    }}
+                  />
+                </div>
+
+                <div className="flex-1">
+                  <CustomDropdown
+                    dropdownKey="paid-time-end-time-minute"
+                    openDropdownKey={openDropdownKey}
+                    setOpenDropdownKey={setOpenDropdownKey}
+                    options={MINUTE_OPTIONS}
+                    value={splitTimeValue(formData.endTime).minute}
+                    placeholder="דקות"
+                    getOptionValue={function (item) {
+                      return item;
+                    }}
+                    getOptionLabel={function (item) {
+                      return item;
+                    }}
+                    onChange={function (e) {
+                      handleTimePartChange("endTime", "minute", e.target.value);
+                    }}
+                  />
+                </div>
+              </div>
 
               {fieldErrors.endTime ? (
                 <div className="mt-1.5 text-right text-xs text-red-600">
