@@ -1,4 +1,4 @@
-﻿using RideOnServer.BL.DTOs;
+using RideOnServer.BL.DTOs;
 using RideOnServer.BL.DTOs.Competition.PaidTimeSlotInCompetition;
 using RideOnServer.DAL;
 
@@ -6,6 +6,22 @@ namespace RideOnServer.BL
 {
     public class PaidTimeSlotInCompetition
     {
+        private const int BeforeWindowDays = 3;
+
+        private static readonly HashSet<string> DuringTimeOfDayValues = new HashSet<string> { "בוקר", "ערב" };
+        private static readonly HashSet<string> BeforeTimeOfDayValues = new HashSet<string> { "בוקר", "צהריים", "ערב" };
+
+        private static readonly Dictionary<DayOfWeek, string> HebrewDayNameByDayOfWeek = new Dictionary<DayOfWeek, string>
+        {
+            { DayOfWeek.Sunday, "ראשון" },
+            { DayOfWeek.Monday, "שני" },
+            { DayOfWeek.Tuesday, "שלישי" },
+            { DayOfWeek.Wednesday, "רביעי" },
+            { DayOfWeek.Thursday, "חמישי" },
+            { DayOfWeek.Friday, "שישי" },
+            { DayOfWeek.Saturday, "שבת" }
+        };
+
         public int PaidTimeSlotInCompId { get; set; }
         public int CompetitionId { get; set; }
         public int PaidTimeSlotId { get; set; }
@@ -36,15 +52,21 @@ namespace RideOnServer.BL
             return dal.GetPaidTimeSlotsByCompetitionId(competitionId);
         }
 
-        internal static int CreatePaidTimeSlotInCompetition(CreatePaidTimeSlotInCompetitionRequest request)
+        internal static int CreatePaidTimeSlotInCompetition(
+            CreatePaidTimeSlotInCompetitionRequest request,
+            DateTime competitionStartDate,
+            DateTime competitionEndDate)
         {
             ValidateRequest(
                 request.CompetitionId,
                 request.PaidTimeSlotId,
                 request.ArenaRanchId,
                 request.ArenaId,
+                request.SlotDate,
                 request.StartTime,
-                request.EndTime
+                request.EndTime,
+                competitionStartDate,
+                competitionEndDate
             );
 
             PaidTimeSlotInCompetition item = new PaidTimeSlotInCompetition
@@ -64,7 +86,10 @@ namespace RideOnServer.BL
             return dal.InsertPaidTimeSlotInCompetition(item);
         }
 
-        internal static void UpdatePaidTimeSlotInCompetition(UpdatePaidTimeSlotInCompetitionRequest request)
+        internal static void UpdatePaidTimeSlotInCompetition(
+            UpdatePaidTimeSlotInCompetitionRequest request,
+            DateTime competitionStartDate,
+            DateTime competitionEndDate)
         {
             if (request.PaidTimeSlotInCompId <= 0)
             {
@@ -76,8 +101,11 @@ namespace RideOnServer.BL
                 request.PaidTimeSlotId,
                 request.ArenaRanchId,
                 request.ArenaId,
+                request.SlotDate,
                 request.StartTime,
-                request.EndTime
+                request.EndTime,
+                competitionStartDate,
+                competitionEndDate
             );
 
             PaidTimeSlotInCompetition item = new PaidTimeSlotInCompetition
@@ -114,17 +142,15 @@ namespace RideOnServer.BL
             int paidTimeSlotId,
             int arenaRanchId,
             byte arenaId,
+            DateTime slotDate,
             TimeSpan startTime,
-            TimeSpan endTime)
+            TimeSpan endTime,
+            DateTime competitionStartDate,
+            DateTime competitionEndDate)
         {
             if (competitionId <= 0)
             {
                 throw new Exception("CompetitionId is invalid");
-            }
-
-            if (paidTimeSlotId <= 0)
-            {
-                throw new Exception("PaidTimeSlotId is invalid");
             }
 
             if (arenaRanchId <= 0)
@@ -132,15 +158,63 @@ namespace RideOnServer.BL
                 throw new Exception("ArenaRanchId is invalid");
             }
 
+            if (paidTimeSlotId <= 0)
+            {
+                throw new ValidationException("יש לבחור יום בשבוע");
+            }
+
             if (arenaId <= 0)
             {
-                throw new Exception("ArenaId is invalid");
+                throw new ValidationException("יש לבחור מגרש");
             }
 
             if (endTime <= startTime)
             {
-                throw new Exception("EndTime must be later than StartTime");
+                throw new ValidationException("שעת הסיום חייבת להיות מאוחרת משעת ההתחלה");
             }
+
+            if (!IsOnQuarterHourBoundary(startTime) || !IsOnQuarterHourBoundary(endTime))
+            {
+                throw new ValidationException("השעות חייבות להיות בכפולות של רבע שעה (00, 15, 30, 45 דקות)");
+            }
+
+            PaidTimeSlot? baseSlot = PaidTimeSlot.GetAllPaidTimeBaseSlots()
+                .FirstOrDefault(slot => slot.PaidTimeSlotId == paidTimeSlotId);
+
+            if (baseSlot == null)
+            {
+                throw new ValidationException("יש לבחור יום בשבוע");
+            }
+
+            DateTime beforeWindowStart = competitionStartDate.Date.AddDays(-BeforeWindowDays);
+            DateTime beforeWindowEnd = competitionStartDate.Date.AddDays(-1);
+            DateTime slotDateOnly = slotDate.Date;
+
+            bool isDuringWindow = slotDateOnly >= competitionStartDate.Date && slotDateOnly <= competitionEndDate.Date;
+            bool isBeforeWindow = slotDateOnly >= beforeWindowStart && slotDateOnly <= beforeWindowEnd;
+
+            if (!isDuringWindow && !isBeforeWindow)
+            {
+                throw new ValidationException("התאריך אינו תואם את זמן התחרות");
+            }
+
+            if (!HebrewDayNameByDayOfWeek.TryGetValue(slotDateOnly.DayOfWeek, out string? expectedDayName) ||
+                expectedDayName != baseSlot.DayOfWeek)
+            {
+                throw new ValidationException("התאריך אינו תואם את זמן התחרות");
+            }
+
+            HashSet<string> allowedTimeOfDayValues = isDuringWindow ? DuringTimeOfDayValues : BeforeTimeOfDayValues;
+
+            if (!allowedTimeOfDayValues.Contains(baseSlot.TimeOfDay))
+            {
+                throw new ValidationException("מועד זה אינו זמין עבור הבחירה שנעשתה (לפני/במהלך התחרות)");
+            }
+        }
+
+        private static bool IsOnQuarterHourBoundary(TimeSpan value)
+        {
+            return value.Seconds == 0 && value.Minutes % 15 == 0;
         }
 
         internal static PaidTimeSlotInCompetition? GetById(int PaidTimeSlotInCompId)

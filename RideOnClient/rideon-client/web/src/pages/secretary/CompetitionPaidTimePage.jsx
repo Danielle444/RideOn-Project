@@ -726,10 +726,13 @@ export default function CompetitionPaidTimePage() {
         initialValue={page.editPaidTimeSlotItem}
         baseSlots={page.baseSlots || []}
         arenas={page.arenas || []}
+        competitionStartDate={page.competitionStartDate}
+        competitionEndDate={page.competitionEndDate}
         saving={page.savingPaidTimeSlot}
         error={page.paidTimeSlotModalError}
         onClose={page.closePaidTimeSlotModal}
         onSubmit={page.handleSubmitPaidTimeSlot}
+        onShowToast={showToast}
       />
 
       <ToastMessage

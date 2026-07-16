@@ -105,7 +105,11 @@ namespace RideOnServer.Controllers
                     return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה להוסיף פייד-טיים לתחרות זו");
                 }
 
-                int newId = PaidTimeSlotInCompetition.CreatePaidTimeSlotInCompetition(request);
+                int newId = PaidTimeSlotInCompetition.CreatePaidTimeSlotInCompetition(
+                    request,
+                    competition.CompetitionStartDate,
+                    competition.CompetitionEndDate
+                );
                 var newItem = PaidTimeSlotInCompetition.GetById(newId);
 
                 if (newItem == null)
@@ -118,6 +122,10 @@ namespace RideOnServer.Controllers
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                return BadRequest(ex.Message);
             }
             catch (Exception ex)
             {
@@ -159,7 +167,11 @@ namespace RideOnServer.Controllers
                     return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לערוך פייד-טיים בתחרות זו");
                 }
 
-                PaidTimeSlotInCompetition.UpdatePaidTimeSlotInCompetition(request);
+                PaidTimeSlotInCompetition.UpdatePaidTimeSlotInCompetition(
+                    request,
+                    competition.CompetitionStartDate,
+                    competition.CompetitionEndDate
+                );
                 var updatedItem = PaidTimeSlotInCompetition.GetById(PaidTimeSlotInCompId);
 
                 if (updatedItem == null)
@@ -172,6 +184,10 @@ namespace RideOnServer.Controllers
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                return BadRequest(ex.Message);
             }
             catch (Exception ex)
             {
