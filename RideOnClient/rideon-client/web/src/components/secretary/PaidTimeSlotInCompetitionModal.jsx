@@ -69,16 +69,25 @@ var FIELD_VALIDATION_RULES = [
 function getFieldErrors(formData) {
   var errors = {};
 
+  var derivedValues = {
+    timing: formData.timing,
+    slotDateValue: formData.slotDateValue,
+    timeOfDay: formData.timeOfDay,
+    arenaId: formData.arenaId,
+    startTime: combineTimeValue(formData.startTimeHour, formData.startTimeMinute),
+    endTime: combineTimeValue(formData.endTimeHour, formData.endTimeMinute),
+  };
+
   FIELD_VALIDATION_RULES.forEach(function (rule) {
-    if (!rule.isValid(formData[rule.key])) {
+    if (!rule.isValid(derivedValues[rule.key])) {
       errors[rule.key] = rule.message;
     }
   });
 
   if (
-    formData.startTime &&
-    formData.endTime &&
-    formData.endTime <= formData.startTime
+    derivedValues.startTime &&
+    derivedValues.endTime &&
+    derivedValues.endTime <= derivedValues.startTime
   ) {
     errors.endTime = "שעת הסיום חייבת להיות מאוחרת משעת ההתחלה";
   }
@@ -91,8 +100,10 @@ var EMPTY_FORM_DATA = {
   slotDateValue: "",
   timeOfDay: "",
   arenaId: "",
-  startTime: "",
-  endTime: "",
+  startTimeHour: "",
+  startTimeMinute: "",
+  endTimeHour: "",
+  endTimeMinute: "",
   slotStatus: "",
   slotNotes: "",
 };
@@ -128,6 +139,12 @@ export default function PaidTimeSlotInCompetitionModal(props) {
         props.competitionStartDate,
         props.competitionEndDate,
       );
+      var startTimeParts = splitTimeValue(
+        normalizeTimeForInput(props.initialValue.startTime),
+      );
+      var endTimeParts = splitTimeValue(
+        normalizeTimeForInput(props.initialValue.endTime),
+      );
 
       setFormData({
         timing: timing,
@@ -137,8 +154,10 @@ export default function PaidTimeSlotInCompetitionModal(props) {
         arenaId: props.initialValue.arenaId
           ? String(props.initialValue.arenaId)
           : "",
-        startTime: normalizeTimeForInput(props.initialValue.startTime),
-        endTime: normalizeTimeForInput(props.initialValue.endTime),
+        startTimeHour: startTimeParts.hour,
+        startTimeMinute: startTimeParts.minute,
+        endTimeHour: endTimeParts.hour,
+        endTimeMinute: endTimeParts.minute,
         slotStatus: props.initialValue.slotStatus || "",
         slotNotes: props.initialValue.slotNotes || "",
       });
@@ -177,19 +196,6 @@ export default function PaidTimeSlotInCompetitionModal(props) {
       return {
         ...prev,
         [fieldName]: value,
-      };
-    });
-  }
-
-  function handleTimePartChange(fieldName, part, value) {
-    setFormData(function (prev) {
-      var current = splitTimeValue(prev[fieldName]);
-      var nextHour = part === "hour" ? value : current.hour;
-      var nextMinute = part === "minute" ? value : current.minute;
-
-      return {
-        ...prev,
-        [fieldName]: combineTimeValue(nextHour, nextMinute),
       };
     });
   }
@@ -238,8 +244,12 @@ export default function PaidTimeSlotInCompetitionModal(props) {
       paidTimeSlotId: paidTimeSlotId,
       arenaId: formData.arenaId ? Number(formData.arenaId) : "",
       slotDate: formData.slotDateValue || null,
-      startTime: normalizeTimeForServer(formData.startTime),
-      endTime: normalizeTimeForServer(formData.endTime),
+      startTime: normalizeTimeForServer(
+        combineTimeValue(formData.startTimeHour, formData.startTimeMinute),
+      ),
+      endTime: normalizeTimeForServer(
+        combineTimeValue(formData.endTimeHour, formData.endTimeMinute),
+      ),
       slotStatus: formData.slotStatus.trim() || null,
       slotNotes: formData.slotNotes.trim() || null,
     });
@@ -429,7 +439,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                     openDropdownKey={openDropdownKey}
                     setOpenDropdownKey={setOpenDropdownKey}
                     options={hourOptions}
-                    value={splitTimeValue(formData.startTime).hour}
+                    value={formData.startTimeHour}
                     placeholder="שעה"
                     searchable={true}
                     getOptionValue={function (item) {
@@ -439,7 +449,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                       return item;
                     }}
                     onChange={function (e) {
-                      handleTimePartChange("startTime", "hour", e.target.value);
+                      handleChange("startTimeHour", e.target.value);
                     }}
                   />
                 </div>
@@ -450,7 +460,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                     openDropdownKey={openDropdownKey}
                     setOpenDropdownKey={setOpenDropdownKey}
                     options={MINUTE_OPTIONS}
-                    value={splitTimeValue(formData.startTime).minute}
+                    value={formData.startTimeMinute}
                     placeholder="דקות"
                     getOptionValue={function (item) {
                       return item;
@@ -459,7 +469,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                       return item;
                     }}
                     onChange={function (e) {
-                      handleTimePartChange("startTime", "minute", e.target.value);
+                      handleChange("startTimeMinute", e.target.value);
                     }}
                   />
                 </div>
@@ -484,7 +494,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                     openDropdownKey={openDropdownKey}
                     setOpenDropdownKey={setOpenDropdownKey}
                     options={hourOptions}
-                    value={splitTimeValue(formData.endTime).hour}
+                    value={formData.endTimeHour}
                     placeholder="שעה"
                     searchable={true}
                     getOptionValue={function (item) {
@@ -494,7 +504,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                       return item;
                     }}
                     onChange={function (e) {
-                      handleTimePartChange("endTime", "hour", e.target.value);
+                      handleChange("endTimeHour", e.target.value);
                     }}
                   />
                 </div>
@@ -505,7 +515,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                     openDropdownKey={openDropdownKey}
                     setOpenDropdownKey={setOpenDropdownKey}
                     options={MINUTE_OPTIONS}
-                    value={splitTimeValue(formData.endTime).minute}
+                    value={formData.endTimeMinute}
                     placeholder="דקות"
                     getOptionValue={function (item) {
                       return item;
@@ -514,7 +524,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                       return item;
                     }}
                     onChange={function (e) {
-                      handleTimePartChange("endTime", "minute", e.target.value);
+                      handleChange("endTimeMinute", e.target.value);
                     }}
                   />
                 </div>
