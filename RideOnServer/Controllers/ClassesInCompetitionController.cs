@@ -183,7 +183,7 @@ namespace RideOnServer.Controllers
                 if (competition.HostRanchId != ranchId)
                     return StatusCode(403, "אין לך הרשאה למחוק מקצים מתחרות זו");
 
-                ClassInCompetition.DeleteClassInCompetition(classInCompId);
+                ClassInCompetition.DeleteClassInCompetition(classInCompId, competitionId);
                 return Ok("Class deleted successfully");
             }
             catch (UnauthorizedAccessException ex)
