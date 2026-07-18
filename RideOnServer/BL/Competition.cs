@@ -266,7 +266,9 @@ namespace RideOnServer.BL
             }
 
             CompetitionDAL dal = new CompetitionDAL();
-            return dal.DuplicateCompetition(request, createdBySystemUserId);
+            DuplicateCompetitionResponse response = dal.DuplicateCompetition(request, createdBySystemUserId);
+            PredictionService.RecomputeCompetition(response.NewCompetitionId);
+            return response;
         }
 
         internal static DuplicateCompetitionResponse DuplicateCompetitionFromSelection(
@@ -335,7 +337,9 @@ namespace RideOnServer.BL
             }
 
             CompetitionDAL dal = new CompetitionDAL();
-            return dal.DuplicateCompetitionFromSelection(request, createdBySystemUserId);
+            DuplicateCompetitionResponse response = dal.DuplicateCompetitionFromSelection(request, createdBySystemUserId);
+            PredictionService.RecomputeCompetition(response.NewCompetitionId);
+            return response;
         }
 
         private static void ValidateCompetitionRequest(

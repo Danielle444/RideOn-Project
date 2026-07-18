@@ -89,7 +89,9 @@ namespace RideOnServer.BL
             };
 
             ClassInCompetitionDAL dal = new ClassInCompetitionDAL();
-            return dal.InsertClassInCompetition(item);
+            int newClassInCompId = dal.InsertClassInCompetition(item);
+            PredictionService.RecomputeCompetition(item.CompetitionId);
+            return newClassInCompId;
         }
 
         internal static void UpdateClassInCompetition(
@@ -139,9 +141,10 @@ namespace RideOnServer.BL
 
             ClassInCompetitionDAL dal = new ClassInCompetitionDAL();
             dal.UpdateClassInCompetition(item);
+            PredictionService.RecomputeCompetition(item.CompetitionId);
         }
 
-        internal static void DeleteClassInCompetition(int classInCompId)
+        internal static void DeleteClassInCompetition(int classInCompId, int competitionId)
         {
             if (classInCompId <= 0)
             {
@@ -150,6 +153,7 @@ namespace RideOnServer.BL
 
             ClassInCompetitionDAL dal = new ClassInCompetitionDAL();
             dal.DeleteClassInCompetition(classInCompId);
+            PredictionService.RecomputeCompetition(competitionId);
         }
 
         private static List<ClassPrizeItem> NormalizePrizes(List<ClassPrizeItem>? prizes)
