@@ -93,5 +93,14 @@ Before modifying a DAL file or `DBServices.cs`, read the corresponding stored pr
 ### Bundler configs and the shared folder
 `metro.config.js` sets `watchFolders`, `nodeModulesPaths`, and an `extraNodeModules` alias (`shared`) so Metro can resolve files outside `mobile/` — do not remove these. `vite.config.js` has no alias for `shared/`; the web app reaches shared code via relative paths. Do not modify either config regarding the shared folder unless explicitly asked.
 
+## Session Protocol (Oren's working rules)
+
+Division of labor: Claude Code works on repo files ONLY and has no DB credentials. All live DB reads, writes, migrations, and proc deployments go through claude.ai. Any SQL you write is a repo file plus a deployment request, never assume it is live.
+Domain knowledge lives in .claude/skills/ (RideOn skills). Read the relevant SKILL.md at session start for any RideOn task.
+Investigation first: for any nontrivial task, investigate and report findings before writing code. Mark explicitly what was read vs inferred, and state what you cannot verify. Flag path or spec corrections instead of silently fixing them.
+Show diffs before applying changes. After any backend change: dotnet build, then grep for call paths that bypass the changed validation or logic.
+Branching: feature branches off main, never integrate branches into main or delete branches without Oren's explicit approval, and before any branch integration confirm no other Claude Code session is active in this working tree.
+End of session: report commit hashes, what changed, and anything learned that belongs in a skill update.
+
 
 
