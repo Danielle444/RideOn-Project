@@ -180,6 +180,9 @@ plt.show()
 df['classdatetime'] = pd.to_datetime(df['classdatetime'], utc=True)
 df['day_of_week']   = df['classdatetime'].dt.dayofweek   # 0=Mon … 6=Sun
 df['month']         = df['classdatetime'].dt.month
+# STALE — the actual trained model has no `season` feature; it one-hot encodes `month` directly
+# (month_4/5/6/8/9/10/11/12 only — see the correction banner at the top of this file). This block
+# predates that model and was never removed. Don't copy it forward.
 df['season']        = df['month'].map({
     12: 'Winter', 1: 'Winter', 2: 'Winter',
     3:  'Spring', 4: 'Spring', 5: 'Spring',
@@ -213,7 +216,7 @@ df['horse_none']     = (
 
 ```python
 df['rider_youth']      = name.str.contains(
-    r'נוער|עד\s*\d+|עד\s*גיל|youth|young', na=False, regex=True
+    r'נוער|עד\s*\d+|עד\s*גיל|\b1[0-9]\b|youth|young', na=False, regex=True
 ).astype(int)
 
 df['rider_adult_plus'] = (
@@ -241,16 +244,21 @@ df['fed_IEF']  = (
 #### Dimension 4 — Rider Level (multi-label, multiple flags can be 1)
 
 ```python
-df['rider_open']    = name.str.contains(r'\bפתוח\b|open', na=False, regex=True).astype(int)
+# rider_open INCLUDES לא מוגבל/unrestricted as a positive trigger — verified against the actual
+# trained notebook July 2026 (Smart_Element/01_data_prep.ipynb cell nb01-4b). This exact code
+# block previously had `\bפתוח\b|open` with no unrestricted carve-out at all, silently disagreeing
+# with both the correction banner at the top of this file and the Dimension-4 table in
+# ride-on-system-knowledge — always diff against the notebook, not this file, before trusting it.
+df['rider_open']    = name.str.contains(r'פתוח|לא מוגבל|unrestricted|\bopen\b', na=False, regex=True).astype(int)
 df['rider_non_pro'] = name.str.contains('נונ פרו|נונפרו|non pro|nonpro', na=False).astype(int)
-df['rider_yaroki']  = name.str.contains('ירוקי רוכב|רוכב ירוקי|רוכב חדש', na=False).astype(int)
+df['rider_yaroki']  = name.str.contains(r'ירוקי|ירוקי רוכב|רוכב ירוקי|רוכב חדש', na=False, regex=True).astype(int)
 df['rider_pro']     = (
     name.str.contains(r'\bpro\b', na=False, regex=True) &
     ~df['rider_non_pro'].astype(bool)
 ).astype(int)
 df['rider_limited'] = (
     name.str.contains('מוגבל|limited|limit rider', na=False) &
-    ~name.str.contains('לא מוגבל', na=False)
+    ~name.str.contains('לא מוגבל|unrestricted', na=False)
 ).astype(int)
 ```
 
@@ -283,6 +291,10 @@ df['is_practice'] = name.str.contains('אימון', na=False).astype(int)
 ```
 
 ### 4c. Weather feature (Open-Meteo API — free, no key needed)
+
+> **STALE, not in the trained model.** The real pipeline dropped weather entirely (see the
+> banner at the top of this file: "NO weather features") — redundant with month dummies and
+> cost 70 rows to missing ranch coordinates. Kept below for historical reference only.
 
 ```python
 import requests
@@ -373,6 +385,9 @@ print(f"Prize coverage: {(df['no_prize'] == 0).sum()} classes with prizes, "
 ### 4e. Encode remaining categoricals and drop unused columns
 
 ```python
+# STALE — the real model doesn't one-hot encode `fieldname` (dropped for field_avg_past_entries,
+# which captures the same signal more precisely) or `season` (never existed in the trained model).
+# Real 4e only one-hot encodes `month`. See the correction banner.
 df = pd.get_dummies(df, columns=['season', 'fieldname'], drop_first=True, dtype=int)
 
 drop_cols = [
@@ -457,6 +472,10 @@ plt.show()
 ---
 
 ## Feature Reference (complete list)
+
+> **STALE — describes an earlier draft pipeline (weather, season, fieldname dummies), not the
+> actual 44-feature trained model.** For the real list, read
+> `models/entry_prediction_model_v1.json`'s `features` array. Kept for historical reference only.
 
 | Feature | Source | Notes |
 |---|---|---|

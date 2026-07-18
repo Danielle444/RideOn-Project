@@ -178,6 +178,10 @@ Any new auth-adjacent lookup must follow this pattern at all three layers.
 
 The C# DAL (`DBServices.cs`) calls stored procs **positionally** (`SELECT * FROM fn(@p1, @p2)`), so proc parameter names are invisible to the app.
 
+The dictionary keys passed to `CreateCommandWithStoredProcedure` do matter for one thing: `AddParameterWithType` resolves `NpgsqlDbType` by matching the (trimmed, lowercased) key against a fixed list of known names (e.g. `classdatetime`/`prequestdatetime`/etc. → `TimestampTz`, `startdate`/`enddate` → `Date`, keys containing `notes`/`name`/`status`/`text`/`url` → `Text`) before falling back to a switch on the value's .NET type. A new DAL param whose key isn't recognized and whose value type doesn't hit a primitive branch falls through to `AddWithValue`, which can silently pick the wrong Postgres type — check `AddParameterWithType` before adding a new date/text-like param key.
+
+**Backend layering has no DI container for BL/DAL.** `Program.cs` only registers ASP.NET infra (controllers, Swagger, JWT auth, CORS) — there is no `AddScoped`/`AddSingleton`/`AddTransient` anywhere for a BL or DAL type. Every BL method is `internal static` and instantiates its own DAL directly: `SomeDAL dal = new SomeDAL(); return dal.Method(...);`. New services should follow this shape, not introduce interfaces/constructor injection — every existing service in the repo does it this way.
+
 ---
 
 ## Stored Procedure Deployment Rules (critical)
@@ -217,17 +221,37 @@ The trained entry count model (linear regression, 44 features, R2 0.766, RMSE 3.
 
 **Deployed procs:** `usp_GetEntryPredictionFeatureInputs(p_classincompid)` (repo file 160) and `usp_GetActiveModelParameters()` (repo file 161).
 
-**Backend components (main):** `ClassNameFeatureExtractor` (pure C#, ports the notebook regexes exactly — NO prefix stripping or typo normalization; those rules belong to historical insert matching only), `FeatureVectorBuilder` (assembles by featurename from DB featureorder, never positional in code), `EntryPredictionDAL`, `PredictionUnavailableException`.
+**Backend components (main):** `ClassNameFeatureExtractor` (pure C#, ports the notebook regexes exactly — NO prefix stripping or typo normalization; those rules belong to historical insert matching only), `FeatureVectorBuilder` (assembles by featurename from DB featureorder, never positional in code — has two overloads, `Build(classIncompId)` fetches `usp_GetActiveModelParameters()` itself, `Build(classIncompId, modelParameters)` accepts an already-fetched set; any code scoring more than one class in a loop must use the second form and fetch parameters once, not once per row), `EntryPredictionDAL`, `PredictionUnavailableException`.
 
 **Non-obvious rules learned:**
 - Aggregate features (field_avg_past_entries, classname_avg_past_entries) use completed competitions only, grouped by name text, NO self exclusion, no date cutoff — exact training reproduction.
 - Fallbacks: unseen classname falls back to field average; field with no completed history (jumping, dressage) = refuse to predict, never silent zeros.
 - classname_avg_past_entries is the dominant feature (coef 6.21) — never default it to 0.
-- day_of_week is pandas convention Monday=0 computed on the UTC instant in C#: `((int)dow + 6) % 7`. Never use EXTRACT(DOW) or raw .NET DayOfWeek (both are Sunday=0). Npgsql returns Kind=Utc (verified empirically).
+- day_of_week is pandas convention Monday=0 computed on the UTC instant in C#: `((int)dow + 6) % 7`. Never use EXTRACT(DOW) or raw .NET DayOfWeek (both are Sunday=0). Npgsql returns Kind=Utc (verified empirically against live data, July 2026).
 - Month dummies exist only for 4,5,6,8,9,10,11,12; other months map to all zeros (months 1,2,7 are unseen by training — extrapolation).
 - has_prize flags = amount > 0 (a zero amount prize row is a false flag). Prizes matched by prizetypeid, never name patterns.
 - classes_per_competition counts ALL sibling classes regardless of status — so adding or removing any class changes the feature vector of ALL siblings in that competition (recompute the whole competition, not one class).
-- Prediction must never break a main flow: recompute failures are caught, logged, swallowed.
+- `models/parity_reference_v1.csv`'s `predicted_entrycount` column is the **raw, unclamped** `model.predict()` output (three historical rows are genuinely negative — classincompid 10, 838, 846). Comparing against a clamped prediction will show false mismatches; clamp only when serving a prediction to a caller, never when validating against this CSV.
+- **Not yet implemented, forward guidance only:** whatever eventually calls `FeatureVectorBuilder` from a main flow (e.g. saving a class) must catch and log `PredictionUnavailableException`/other failures rather than letting them block the save — there is no such caller yet (`FeatureVectorBuilder` is not wired to any controller as of this integration), so as of now a failure here **throws**, it does not get caught/logged/swallowed anywhere.
+
+### Local Verification (Parity Harness)
+
+`RideOnServer.Tests` (new xUnit project, first test project in this repo) has `FeatureVectorBuilderParityTests`, a live-DB harness comparing the C# builder against all 965 rows of `parity_reference_v1.csv`. Gated behind an env var so `dotnet test` is safe to run without a DB — it no-ops instead of failing when the gate is off. To actually run it:
+
+```powershell
+cd RideOnServer   # DBServices.Connect() uses Directory.GetCurrentDirectory() to find appsettings.json
+$env:ConnectionStrings__DefaultConnection = "..."   # only this one — this path never touches Jwt/auth config
+$env:RIDEON_RUN_PARITY_HARNESS = "1"
+dotnet test ..\RideOnServer.Tests\RideOnServer.Tests.csproj `
+    --filter FullyQualifiedName~FeatureVectorBuilderParityTests `
+    --logger "console;verbosity=detailed"
+```
+
+The `--logger "console;verbosity=detailed"` flag is required, not optional — the harness writes its report via `ITestOutputHelper`, which `dotnet test`'s default logger suppresses even on a passing run. Runs with bounded parallelism (`MaxDegreeOfParallelism = 6`, tune down if the Supabase pooler struggles) and fetches `usp_GetActiveModelParameters()` exactly once for the whole run, not once per row.
+
+`RideOnServer.Tests` pins `FluentAssertions` to `7.1.0` deliberately — versions 8+ introduced a commercial license requirement; do not let a future `dotnet add package FluentAssertions` bump it past 7.x without checking that.
+
+Headless notebook execution (`jupyter nbconvert --to notebook --execute --inplace`) requires `nbconvert`, `nbclient`, and an `ipykernel` registered as `python3`. None were present on Oren's machine as of July 2026 and had to be pip installed; they're local tooling, not committed.
 
 ---
 
@@ -350,6 +374,8 @@ Oren keeps this as a script OUTSIDE the repo (`rideon-local.ps1`) and dot-source
 Frontend (web): `.env.local` in `RideOnClient/rideon-client/web` with `VITE_API_BASE_URL=http://localhost:5268/api` — the `/api` suffix is mandatory (404 on `/SystemUsers/login` without it). Vite reads env files only at startup; restart `npm run dev` after changes. Verify local vs Render via DevTools Network tab request URLs.
 
 Port 5268 "address already in use": a stale process holds it — `Get-Process -Name RideOnServer | Stop-Process -Force`. A stale running server also locks `RideOnServer.exe` and fails `dotnet build`.
+
+`DBServices.Connect()` prints `=== DB HOST/PORT/USER/DATABASE ===` on **every single call** (RideOnServer/DAL/DBServices.cs:23-26) — pre-existing, not tied to any one feature. Expect four lines of this per DB round trip in any local run or loop-heavy harness; noisy but harmless. Logged as issue 34 in the QA tracker, fix pending on a dedicated branch.
 
 The root repo `.env` (SUPABASE_URL/SUPABASE_KEY) serves Python scripts only — not the backend.
 
