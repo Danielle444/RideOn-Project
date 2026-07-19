@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import DataTableShell from "../../common/table/DataTableShell";
 import DataTableEmptyState from "../../common/table/DataTableEmptyState";
@@ -78,6 +79,14 @@ function getTotalCost(item) {
   );
 }
 
+function formatPredictionNumber(value) {
+  if (value === null || value === undefined) {
+    return "-";
+  }
+
+  return Math.round(Number(value));
+}
+
 function getStatusClass(statusKey) {
   if (statusKey === "drawn") {
     return "bg-[#EEF8F0] text-[#2F6B3B]";
@@ -92,6 +101,7 @@ function getStatusClass(statusKey) {
 
 export default function SecretaryClassesOverviewTable(props) {
   var items = Array.isArray(props.items) ? props.items : [];
+  var [predictionViewMode, setPredictionViewMode] = useState("value");
 
   return (
     <section className="rounded-3xl border border-[#EFE5DF] bg-[#FFFDFB] p-4 shadow-sm">
@@ -112,6 +122,43 @@ export default function SecretaryClassesOverviewTable(props) {
             <th className="px-4 py-3">שם מקצה</th>
             <th className="px-4 py-3">סטטוס</th>
             <th className="px-4 py-3">כניסות</th>
+            <th className="px-4 py-3">
+              <div className="flex flex-col items-center gap-1">
+                <span>תחזית כניסות</span>
+                <div className="flex overflow-hidden rounded-full border border-[#E3D5CC] text-[10px]">
+                  <button
+                    type="button"
+                    onClick={function () {
+                      setPredictionViewMode("value");
+                    }}
+                    className={
+                      "px-2 py-0.5 transition-colors " +
+                      (predictionViewMode === "value"
+                        ? "bg-[#7B5A4D] text-white"
+                        : "bg-transparent text-[#7B5A4D]")
+                    }
+                    title="הצגת התחזית כמספר בודד"
+                  >
+                    מספר
+                  </button>
+                  <button
+                    type="button"
+                    onClick={function () {
+                      setPredictionViewMode("band");
+                    }}
+                    className={
+                      "px-2 py-0.5 transition-colors " +
+                      (predictionViewMode === "band"
+                        ? "bg-[#7B5A4D] text-white"
+                        : "bg-transparent text-[#7B5A4D]")
+                    }
+                    title="הצגת התחזית כטווח (מינימום–מקסימום)"
+                  >
+                    טווח
+                  </button>
+                </div>
+              </div>
+            </th>
             <th className="px-4 py-3">מסלול</th>
             <th className="px-4 py-3">שופטים</th>
             <th className="px-4 py-3">מגרש</th>
@@ -126,11 +173,11 @@ export default function SecretaryClassesOverviewTable(props) {
 
         <tbody>
           {props.loading ? (
-            <DataTableLoadingState colSpan={13} message="טוען מקצים..." />
+            <DataTableLoadingState colSpan={14} message="טוען מקצים..." />
           ) : null}
 
           {!props.loading && items.length === 0 ? (
-            <DataTableEmptyState colSpan={13} message="לא נמצאו מקצים להצגה" />
+            <DataTableEmptyState colSpan={14} message="לא נמצאו מקצים להצגה" />
           ) : null}
 
           {!props.loading
@@ -193,6 +240,40 @@ export default function SecretaryClassesOverviewTable(props) {
                           {groupEntriesCount} במס׳ זה
                         </span>
                       </div>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      {(function () {
+                        var prediction = props.getPredictionForClass
+                          ? props.getPredictionForClass(item)
+                          : null;
+
+                        if (!prediction) {
+                          return null;
+                        }
+
+                        if (predictionViewMode === "band") {
+                          return (
+                            <span className="text-[#6B574F]">
+                              {formatPredictionNumber(
+                                prediction.minPredictedEntries,
+                              )}
+                              {" – "}
+                              {formatPredictionNumber(
+                                prediction.maxPredictedEntries,
+                              )}
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <span className="font-semibold text-[#3F312B]">
+                            {formatPredictionNumber(
+                              prediction.predictedEntries,
+                            )}
+                          </span>
+                        );
+                      })()}
                     </td>
 
                     <td className="px-4 py-3">

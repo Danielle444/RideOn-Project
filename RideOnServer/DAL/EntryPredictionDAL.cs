@@ -97,6 +97,46 @@ namespace RideOnServer.DAL
             }
         }
 
+        public List<EntryPredictionCacheRow> GetPredictionsByCompetitionId(int competitionId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@CompetitionId", competitionId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    List<EntryPredictionCacheRow> list = new List<EntryPredictionCacheRow>();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetEntryPredictionsByCompetitionId", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(new EntryPredictionCacheRow
+                            {
+                                ClassInCompId = Convert.ToInt32(reader["classincompid"]),
+                                PredictedEntries = Convert.ToDecimal(reader["predictedentries"]),
+                                ModelVersionId = Convert.ToInt32(reader["modelversionid"]),
+                                ComputedAt = Convert.ToDateTime(reader["computedat"]),
+                                Rmse = Convert.ToDouble(reader["rmse"])
+                            });
+                        }
+                    }
+
+                    return list;
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
         public void UpsertEntryPrediction(int classIncompId, decimal predictedEntries, int modelVersionId)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>

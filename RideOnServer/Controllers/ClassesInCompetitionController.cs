@@ -46,6 +46,41 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("{competitionId}/predictions")]
+        public IActionResult GetPredictionsByCompetitionId(int competitionId, [FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                Competition? competition = Competition.GetCompetitionById(competitionId);
+
+                if (competition == null)
+                    return NotFound("Competition not found");
+
+                if (competition.HostRanchId != ranchId)
+                    return StatusCode(403, "אין לך הרשאה לצפות בתחזיות של תחרות זו");
+
+                var predictions = PredictionService.GetPredictionsByCompetitionId(competitionId);
+                return Ok(predictions);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetPredictionsByCompetitionId: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת תחזיות כניסות");
+            }
+        }
+
         [HttpPost]
         public IActionResult CreateClassInCompetition([FromBody] CreateClassInCompetitionRequest request)
         {
