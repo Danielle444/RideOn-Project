@@ -3,6 +3,7 @@ name: ride-on-system-knowledge
 description: "Use this skill at the start of ANY Claude Code session involving the RIDE ON equestrian competition management system. Provides full system context so the user does not need to re-explain the database schema, class taxonomy, ranch mappings, or conventions. Triggers for any RIDE ON task: data insertion, analytics, schema changes, bug fixes, or queries."
 ---
 
+
 # RIDE ON — System Knowledge Reference
 
 ## What is RIDE ON
@@ -219,7 +220,7 @@ The trained entry count model (linear regression, 44 features, R2 0.766, RMSE 3.
 - `fieldconfig` — per field: minutesperentrymin/max (NULL = exempt from scheduling recommendations, e.g. אולארונד), maxhorseclassesperday (reining 1, cutting 3, all around 5, extreme 5)
 - `smartconfig` — global key value: shavingsperstallmin 2 / max 3, betweenclassgapminutes 10, latefinishyellowhour 23 / orangehour 24 / redhour 25 (hours past midnight notation), flatteningguidance (free text; frequency is secretary discretion per competition)
 
-**Deployed procs:** `usp_GetEntryPredictionFeatureInputs(p_classincompid)` (repo file 160), `usp_GetActiveModelParameters()` (repo file 161), `usp_UpsertEntryPrediction(p_classincompid, p_predictedentries, p_modelversionid)` (repo file 162, Phase 5 — upserts the `entryprediction` cache row, `ON CONFLICT (classincompid) DO UPDATE`). `usp_DeleteClassInCompetition` (repo file 19, pre-dates this integration) was reconciled in Phase 5 to match live: it now deletes the `entryprediction` cache row (alongside `reiningtype`/`classprize`/`classjudge`) before deleting the `classincompetition` row itself.
+**Deployed procs:** `usp_GetEntryPredictionFeatureInputs(p_classincompid)` (repo file 160), `usp_GetActiveModelParameters()` (repo file 161), `usp_UpsertEntryPrediction(p_classincompid, p_predictedentries, p_modelversionid)` (repo file 162, Phase 5 — upserts the `entryprediction` cache row, `ON CONFLICT (classincompid) DO UPDATE`, always fed already-clamped values). `usp_DeleteClassInCompetition` (repo file 19, pre-dates this integration) was reconciled in Phase 5 to match live: it now deletes the `entryprediction` cache row (alongside `reiningtype`/`classprize`/`classjudge`) before deleting the `classincompetition` row itself. The explicit-delete convention was chosen over ON DELETE CASCADE after a live audit showed the project's FKs are overwhelmingly NO ACTION with explicit child deletes in procs (only 4 CASCADE exceptions: cashcountline + three on stallassignment).
 
 **Backend components (main):** `ClassNameFeatureExtractor` (pure C#, ports the notebook regexes exactly — NO prefix stripping or typo normalization; those rules belong to historical insert matching only), `FeatureVectorBuilder` (assembles by featurename from DB featureorder, never positional in code — has two overloads, `Build(classIncompId)` fetches `usp_GetActiveModelParameters()` itself, `Build(classIncompId, modelParameters)` accepts an already-fetched set; any code scoring more than one class in a loop must use the second form and fetch parameters once, not once per row), `EntryPredictionDAL` (gained `UpsertEntryPrediction(classIncompId, predictedEntries, modelVersionId)` in Phase 5, calling `usp_UpsertEntryPrediction`), `PredictionUnavailableException`, `PredictionService` (Phase 5 — computes, clamps, caches, and never throws; see Recompute Triggers below).
 
@@ -238,10 +239,11 @@ The trained entry count model (linear regression, 44 features, R2 0.766, RMSE 3.
 Merged via merge commit `85bf48a`, deployed to production via Render's auto-deploy on `main`.
 
 `PredictionService` (`RideOnServer/BL/PredictionService.cs`):
-- `RecomputeCompetition(competitionId)` — public. Fetches `ActiveModelParameters` once, `ClassInCompetition.GetClassesByCompetitionId(competitionId)` once, then loops sequentially (no batch proc — the current one-class-per-proc-call design was judged not worth rewriting for the class counts this system actually sees).
+- `RecomputeCompetition(competitionId)` — public. Fetches `ActiveModelParameters` once, `ClassInCompetition.GetClassesByCompetitionId(competitionId)` once, then loops sequentially (no batch proc — the current one-class-per-proc-call design was judged not worth rewriting for the class counts this system actually sees; a set-based rewrite risks subtle bugs in the parity-verified aggregate CTEs).
 - `RecomputeClass` — private, called only from the loop above; no external caller exists yet, so it stays private rather than being exposed speculatively.
 - `ComputePrediction(vector)` — public, not `internal` (a deliberate choice to avoid adding `InternalsVisibleTo` just for the test project). Pure function: `intercept + sum(coefficient * (value - scalerMean) / scalerScale)`, clamped at 0.
 - **Never throws.** Every public method catches broad `Exception`, logs via `Console.WriteLine` (same convention as the rest of the codebase), and returns without rethrowing. Per-class failures inside a competition's recompute loop (e.g. `PredictionUnavailableException` for a field with no completed-competition history) are caught and logged individually — one bad class does not stop its siblings from being recomputed.
+- **Placement rationale:** the try/catch lives INSIDE `PredictionService`, not at BL call sites — the class BL methods have no try/catch of their own, so a throwing hook there would propagate to the controller's generic catch and turn a successful save into an error response.
 
 Recompute always covers the whole competition, never just the touched class — see the `classes_per_competition` rule above.
 
@@ -253,13 +255,13 @@ Recompute always covers the whole competition, never just the touched class — 
 Prizes have no separate hook: they are always saved as part of one of the three `ClassInCompetition` methods above (see Multiple Prizes Per Class below), so the class-level hook covers them.
 
 **Verification state (July 2026):**
-- Create, edit, and delete are verified end to end against live, including production after the Render deploy: the deployed backend rewrote all 25 `entryprediction` rows of a 25-class test competition (competition 41) in one batch, zero negative values, all on the active model version.
-- **Duplication is NOT verified end to end.** The hook is wired and reviewed, but duplication itself fails first, before the hook is ever reached: a pre-existing bug on `main` (unrelated to Phase 5), tracked as **QA issue 36**, fix branch `fix/duplication-date-param-types`. Symptom: the duplication procs fail with Postgres error `42883` when registration date fields are filled. Hypothesis (**unconfirmed**): `AddParameterWithType`'s fallthrough sends a `Timestamp`-typed parameter for a `date`-typed proc parameter. Live has **two overloads** of each duplication proc (one taking `date`, one taking `timestamptz`, for the registration/paid-time start/end params) — both declare the registration and paid-time date params as `date`, so a `Timestamp` argument from the C# side doesn't match either overload's signature, producing `42883` (no matching function). The duplication hook gets its end-to-end verification as part of the issue-36 fix flow, not before.
+- Create, edit, and delete are verified end to end against live, including production after the Render deploy: the deployed backend rewrote all 25 `entryprediction` rows of a 25-class test competition (competition 41) in one batch, zero negative values, all on the active model version. Production populates the cache live since the merge: every class save/delete on the deployed app rewrites the whole competition's rows in one batch.
+- **Duplication is NOT verified end to end.** The hook is wired and reviewed, but duplication itself fails first, before the hook is ever reached — a pre-existing bug on `main` (unrelated to Phase 5), tracked as **QA issue 36** (see Competition Duplication below); the hook is unreachable while duplication fails, and cannot break duplication when it works. The duplication hook gets its end-to-end verification as part of the issue-36 fix flow, not before.
 - **Verification principle worth keeping:** because `PredictionService` swallows failures by design, a successful save in the UI proves nothing about whether recompute actually ran — a silently-swallowed exception looks identical to success from the caller's side. Only fresh `entryprediction` rows, or backend logs (every failure path logs with the `classincompid`/`competitionid` in the message), prove recompute happened.
 
 ### Local Verification (Parity Harness)
 
-`RideOnServer.Tests` (new xUnit project, first test project in this repo) has `FeatureVectorBuilderParityTests`, a live-DB harness comparing the C# builder against all 965 rows of `parity_reference_v1.csv`. Gated behind an env var so `dotnet test` is safe to run without a DB — it no-ops instead of failing when the gate is off. As of Phase 5, `dotnet test` discovers and passes 29 tests total (verified via `--list-tests`, not just the reported count): 23 `ClassNameFeatureExtractorTests`, the 1 gated `FeatureVectorBuilderParityTests` (counts as passed when it no-ops), and 5 `PredictionServiceTests` (clamp-at-0 math, and the never-throws swallow contract exercised via a real failure — an unconfigured connection string — rather than a mock). Only the parity test needs the env-var gate to do real work; the other 28 run fully with no DB required. To actually run the parity harness:
+`RideOnServer.Tests` (new xUnit project, first test project in this repo) has `FeatureVectorBuilderParityTests`, a live-DB harness comparing the C# builder against all 965 rows of `parity_reference_v1.csv`. Gated behind an env var so `dotnet test` is safe to run without a DB — it no-ops instead of failing when the gate is off. As of Phase 5, `dotnet test` discovers and passes 29 tests total (verified via `--list-tests`, not just the reported count — an earlier "24 + 5" breakdown was off by one): 23 `ClassNameFeatureExtractorTests`, the 1 gated `FeatureVectorBuilderParityTests` (counts as passed when it no-ops), and 5 `PredictionServiceTests` (clamp-at-0 math, and the never-throws swallow contract exercised via a real failure — an unconfigured connection string — rather than a mock). Only the parity test needs the env-var gate to do real work; the other 28 run fully with no DB required. To actually run the parity harness:
 
 ```powershell
 cd RideOnServer   # DBServices.Connect() uses Directory.GetCurrentDirectory() to find appsettings.json
@@ -275,6 +277,14 @@ The `--logger "console;verbosity=detailed"` flag is required, not optional — t
 `RideOnServer.Tests` pins `FluentAssertions` to `7.1.0` deliberately — versions 8+ introduced a commercial license requirement; do not let a future `dotnet add package FluentAssertions` bump it past 7.x without checking that.
 
 Headless notebook execution (`jupyter nbconvert --to notebook --execute --inplace`) requires `nbconvert`, `nbclient`, and an `ipykernel` registered as `python3`. None were present on Oren's machine as of July 2026 and had to be pip installed; they're local tooling, not committed.
+
+---
+
+## Competition Duplication (July 2026)
+
+- `usp_duplicatecompetition` and `usp_duplicatecompetitionfromselection` each exist on live in **TWO overloads** differing only in start/end date param types (`date` vs `timestamp with time zone`) — drift debt from a past caller-type mismatch patched by adding an overload instead of fixing the caller. Collapse decision pending, live DB change via claude.ai only.
+- ALL overloads declare `p_registrationopendate`, `p_registrationenddate`, `p_paidtimeregistrationdate`, `p_paidtimepublicationdate` as `date`.
+- **QA issue 36 (open, hypothesis unconfirmed):** duplication fails with 42883 when registration dates are filled — the DAL sends them as `timestamp without time zone` (the `AddParameterWithType` unrecognized-key fallthrough), and timestamp→date is not an implicit cast, so no overload matches. Untyped NULLs coerce fine, which is why empty-date duplications always worked. Fix branch: fix/duplication-date-param-types, repo only.
 
 ---
 
