@@ -383,6 +383,7 @@ export default function CompetitionClassesPage() {
             <SecretaryClassesOverviewTable
               items={page.visibleClasses}
               loading={page.loadingClasses}
+              getPredictionForClass={page.getPredictionForClass}
               onOpenClassEntries={page.openClassEntries}
               onOpenGroupEntries={page.openGroupEntries}
               getEntriesCountForClass={page.getEntriesCountForClass}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   getClassesByCompetitionId,
+  getPredictionsByCompetitionId,
   updateClassInCompetition,
   deleteClassInCompetition,
 } from "../../services/classInCompetitionService";
@@ -43,6 +44,10 @@ function getClassInCompId(item) {
 }
 
 function getEntryClassInCompId(item) {
+  return item.classInCompId || item.ClassInCompId;
+}
+
+function getPredictionClassInCompId(item) {
   return item.classInCompId || item.ClassInCompId;
 }
 
@@ -220,6 +225,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
 
   var [classes, setClasses] = useState([]);
   var [entries, setEntries] = useState([]);
+  var [predictions, setPredictions] = useState([]);
 
   var [loadingClasses, setLoadingClasses] = useState(false);
   var [loadingEntries, setLoadingEntries] = useState(false);
@@ -483,7 +489,31 @@ export default function useSecretaryCompetitionClassesPage(options) {
       return;
     }
 
-    await Promise.all([loadClasses(), loadEntries()]);
+    await Promise.all([loadClasses(), loadEntries(), loadPredictions()]);
+  }
+
+  // Best-effort only: never sets `error`, never shows a toast, never blocks the classes/entries
+  // load. A failed or empty fetch just means no class shows a prediction.
+  async function loadPredictions() {
+    try {
+      var response = await getPredictionsByCompetitionId(competitionId, ranchId);
+      var items = Array.isArray(response.data) ? response.data : [];
+      setPredictions(items);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  function getPredictionForClass(item) {
+    var classId = getClassInCompId(item);
+
+    return (
+      predictions.find(function (prediction) {
+        return (
+          Number(getPredictionClassInCompId(prediction)) === Number(classId)
+        );
+      }) || null
+    );
   }
 
   async function loadClasses() {
@@ -1125,6 +1155,8 @@ export default function useSecretaryCompetitionClassesPage(options) {
   return {
     classes,
     entries,
+    predictions,
+    getPredictionForClass,
     visibleClasses,
     selectedEntries,
     entriesSummary,

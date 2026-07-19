@@ -1,5 +1,6 @@
 using RideOnServer.BL.DTOs.Prediction;
 using RideOnServer.DAL;
+using System.Linq;
 
 namespace RideOnServer.BL
 {
@@ -10,6 +11,26 @@ namespace RideOnServer.BL
     // forget line; no try/catch is needed at the call site.
     public static class PredictionService
     {
+        // Read-side lookup for the classes page. Unlike RecomputeCompetition/RecomputeClass this
+        // does NOT catch-and-log -- it's a request/response read path, not fire-and-forget, so
+        // failures propagate to the controller's normal catch block. The frontend is responsible
+        // for treating a failed fetch here as "show nothing," not this layer.
+        public static List<ClassEntryPrediction> GetPredictionsByCompetitionId(int competitionId)
+        {
+            EntryPredictionDAL dal = new EntryPredictionDAL();
+            List<EntryPredictionCacheRow> rows = dal.GetPredictionsByCompetitionId(competitionId);
+
+            return rows.Select(row => new ClassEntryPrediction
+            {
+                ClassInCompId = row.ClassInCompId,
+                PredictedEntries = row.PredictedEntries,
+                MinPredictedEntries = Math.Max(row.PredictedEntries - (decimal)row.Rmse, 0),
+                MaxPredictedEntries = row.PredictedEntries + (decimal)row.Rmse,
+                ModelVersionId = row.ModelVersionId,
+                ComputedAt = row.ComputedAt
+            }).ToList();
+        }
+
         // classes_per_competition is a feature (see FeatureVectorBuilder), so adding, editing, or
         // deleting any one class changes every sibling class's feature vector. Recompute always
         // covers the whole competition, never just the touched class.
