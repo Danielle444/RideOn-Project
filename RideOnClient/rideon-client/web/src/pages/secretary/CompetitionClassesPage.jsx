@@ -391,6 +391,12 @@ export default function CompetitionClassesPage() {
               getClassStatus={page.getClassStatus}
               onEditClass={page.openEditClassModal}
               onDeleteClass={page.handleDeleteClass}
+              showScheduleColumns={page.showScheduleColumns}
+              scheduleViewMode={page.scheduleViewMode}
+              onScheduleViewModeChange={page.setScheduleViewMode}
+              getScheduleForClass={page.getScheduleForClass}
+              onApplyStartTimeSuggestion={page.applyStartTimeSuggestion}
+              applyingSuggestionClassId={page.applyingSuggestionClassId}
             />
           </>
         ) : (

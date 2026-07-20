@@ -11,6 +11,48 @@ namespace RideOnServer.Controllers
     [Authorize]
     public class ClassesInCompetitionController : ControllerBase
     {
+        // Route is "class/{classInCompId}" rather than "{classInCompId}" because the latter
+        // would collide with GetClassesByCompetitionId's "{competitionId}" template below --
+        // both are single-int-segment GETs on the same controller root.
+        [HttpGet("class/{classInCompId}")]
+        public IActionResult GetClassById(int classInCompId, [FromQuery] int competitionId, [FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                Competition? competition = Competition.GetCompetitionById(competitionId);
+
+                if (competition == null)
+                    return NotFound("Competition not found");
+
+                if (competition.HostRanchId != ranchId)
+                    return StatusCode(403, "אין לך הרשאה לצפות במקצה זה");
+
+                var item = ClassInCompetition.GetClassById(classInCompId);
+
+                if (item == null)
+                    return NotFound("Class not found");
+
+                return Ok(item);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetClassById: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת מקצה");
+            }
+        }
+
         [HttpGet("{competitionId}")]
         public IActionResult GetClassesByCompetitionId(int competitionId, [FromQuery] int ranchId)
         {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getClassesByCompetitionId,
   getPredictionsByCompetitionId,
+  getClassById,
   updateClassInCompetition,
   deleteClassInCompetition,
 } from "../../services/classInCompetitionService";
@@ -21,7 +22,17 @@ import {
   getAllPatternsWithManeuvers,
 } from "../../services/superUserService";
 import { getArenasByRanchId } from "../../services/arenaService";
-import { getErrorMessage, toInputDate } from "../../utils/competitionForm.utils";
+import { getScheduleConfigByFieldId } from "../../services/scheduleConfigService";
+import {
+  getErrorMessage,
+  toInputDate,
+  normalizeTimeForServer,
+} from "../../utils/competitionForm.utils";
+import {
+  computeScheduleColumn,
+  getScheduleCellForClass,
+  isScheduleExempt,
+} from "../../utils/classSchedule.utils";
 
 function normalizeDateOnly(value) {
   if (!value) {
@@ -295,6 +306,11 @@ export default function useSecretaryCompetitionClassesPage(options) {
   var [patterns, setPatterns] = useState([]);
   var [fields, setFields] = useState([]);
 
+  // Schedule view (Phase 7): predicted/live schedule columns on the classes page
+  var [scheduleConfig, setScheduleConfig] = useState(null);
+  var [scheduleViewMode, setScheduleViewMode] = useState("avg");
+  var [applyingSuggestionClassId, setApplyingSuggestionClassId] = useState(null);
+
   useEffect(
     function () {
       loadPageData();
@@ -330,6 +346,35 @@ export default function useSecretaryCompetitionClassesPage(options) {
       setJudges(Array.isArray(results[5].data) ? results[5].data : []);
     } catch (err) {
       console.error("loadLookups error", err);
+    }
+  }
+
+  // A competition has exactly one field, so the schedule config is fetched once per
+  // competition load, not per class.
+  useEffect(
+    function () {
+      var fieldId =
+        competitionDetails &&
+        (competitionDetails.fieldId || competitionDetails.FieldId);
+
+      if (!fieldId) {
+        return;
+      }
+
+      loadScheduleConfig(fieldId);
+    },
+    [competitionDetails],
+  );
+
+  // Best-effort only, same convention as loadPredictions: never sets `error`, never shows
+  // a toast. A failed fetch just means the schedule columns don't render.
+  async function loadScheduleConfig(fieldId) {
+    try {
+      var response = await getScheduleConfigByFieldId(fieldId);
+      setScheduleConfig(response.data || null);
+    } catch (err) {
+      console.error("loadScheduleConfig error", err);
+      setScheduleConfig(null);
     }
   }
 
@@ -1152,6 +1197,123 @@ export default function useSecretaryCompetitionClassesPage(options) {
     }
   }
 
+  // Schedule view (Phase 7). Deliberately its own explicit Active-only filter rather than
+  // reusing getEntriesCountForClass, which counts every status -- the documented system-wide
+  // convention for "entries" is Active-only, and the live schedule column must match it.
+  function getActiveEntriesCountForClass(item) {
+    var classId = getClassInCompId(item);
+
+    return entries.filter(function (entry) {
+      if (Number(getEntryClassInCompId(entry)) !== Number(classId)) {
+        return false;
+      }
+
+      var status = entry.entryStatus || entry.EntryStatus || "Active";
+      return status === "Active";
+    }).length;
+  }
+
+  function getPredictedEntriesForClass(item) {
+    var prediction = getPredictionForClass(item);
+
+    if (!prediction) {
+      return 0;
+    }
+
+    var value = prediction.predictedEntries;
+
+    if (value === null || value === undefined) {
+      value = prediction.PredictedEntries;
+    }
+
+    return Number(value) || 0;
+  }
+
+  // Computed over the full unfiltered `classes` list (not `visibleClasses`) so a search or
+  // entries/prize/draw filter never changes the objective rolled-forward schedule -- only
+  // which rows get rendered changes.
+  var predictedScheduleColumn = useMemo(
+    function () {
+      return computeScheduleColumn(
+        classes,
+        scheduleConfig,
+        scheduleViewMode,
+        getPredictedEntriesForClass,
+      );
+    },
+    [classes, predictions, scheduleConfig, scheduleViewMode],
+  );
+
+  var liveScheduleColumn = useMemo(
+    function () {
+      return computeScheduleColumn(
+        classes,
+        scheduleConfig,
+        scheduleViewMode,
+        getActiveEntriesCountForClass,
+      );
+    },
+    [classes, entries, scheduleConfig, scheduleViewMode],
+  );
+
+  var showScheduleColumns = !!scheduleConfig && !isScheduleExempt(scheduleConfig);
+
+  function getScheduleForClass(item) {
+    return {
+      predicted: getScheduleCellForClass(predictedScheduleColumn, item),
+      live: getScheduleCellForClass(liveScheduleColumn, item),
+    };
+  }
+
+  // Reuses the single existing class-update path (updateClassInCompetition). Fetches the
+  // class's current full row first so every other field -- including judges and prizes,
+  // which the update proc fully overwrites on every call -- is resent unchanged alongside
+  // the new starttime.
+  async function applyStartTimeSuggestion(targetClassId, newStartTime) {
+    if (!targetClassId || !newStartTime) {
+      return;
+    }
+
+    try {
+      setApplyingSuggestionClassId(targetClassId);
+
+      var freshResponse = await getClassById(targetClassId, competitionId, ranchId);
+      var freshItem = freshResponse.data;
+
+      var hostRanchId =
+        (competitionDetails &&
+          (competitionDetails.hostRanchId || competitionDetails.HostRanchId)) ||
+        ranchId;
+
+      var payload = {
+        classInCompId: targetClassId,
+        competitionId: competitionId,
+        hostRanchId: hostRanchId,
+        classTypeId: freshItem.classTypeId,
+        arenaRanchId: hostRanchId,
+        arenaId: freshItem.arenaId,
+        classDateTime: freshItem.classDateTime,
+        startTime: normalizeTimeForServer(newStartTime),
+        orderInDay: freshItem.orderInDay,
+        organizerCost: freshItem.organizerCost,
+        federationCost: freshItem.federationCost,
+        classNotes: freshItem.classNotes,
+        judgeIds: Array.isArray(freshItem.judgeIds) ? freshItem.judgeIds : [],
+        prizes: Array.isArray(freshItem.prizes) ? freshItem.prizes : [],
+        patternNumber: freshItem.patternNumber,
+      };
+
+      await updateClassInCompetition(targetClassId, payload);
+      await loadClasses();
+      showToast("success", "שעת ההתחלה עודכנה בהצלחה");
+    } catch (err) {
+      console.error(err);
+      showToast("error", getErrorMessage(err, "שגיאה בעדכון שעת ההתחלה"));
+    } finally {
+      setApplyingSuggestionClassId(null);
+    }
+  }
+
   return {
     classes,
     entries,
@@ -1244,5 +1406,13 @@ export default function useSecretaryCompetitionClassesPage(options) {
     handleSubmitClass,
     handleDeleteClass,
     handleDeleteEntry,
+
+    // Schedule view (Phase 7)
+    scheduleViewMode,
+    setScheduleViewMode,
+    showScheduleColumns,
+    getScheduleForClass,
+    applyStartTimeSuggestion,
+    applyingSuggestionClassId,
   };
 }

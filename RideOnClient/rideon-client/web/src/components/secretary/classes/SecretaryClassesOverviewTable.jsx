@@ -99,9 +99,99 @@ function getStatusClass(statusKey) {
   return "bg-[#F4F0ED] text-[#7A655C]";
 }
 
+function getTierClass(tier) {
+  if (tier === "red") {
+    return "bg-[#FBE4E2] text-[#A23B32]";
+  }
+
+  if (tier === "orange") {
+    return "bg-[#FCE7D6] text-[#9A5216]";
+  }
+
+  if (tier === "yellow") {
+    return "bg-[#FDF3D0] text-[#8A6D1D]";
+  }
+
+  return "";
+}
+
+function renderScheduleCell(cell, onApplySuggestion, applyingSuggestionClassId) {
+  if (!cell) {
+    return <span className="text-[#8D6E63]">-</span>;
+  }
+
+  if (!cell.hasClockTime) {
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="text-[#4A3A34]">{cell.durationMinutes} דק׳</span>
+        {cell.isFirstOfDay ? (
+          <span className="text-[10px] text-[#9A5B00]">
+            יש להזין שעת התחלה למקצה הראשון כדי להציג לוח הזמנים
+          </span>
+        ) : null}
+      </div>
+    );
+  }
+
+  var tierClass = cell.isLastOfDay ? getTierClass(cell.tier) : "";
+  var isApplying =
+    !!cell.suggestion && applyingSuggestionClassId === cell.suggestion.targetClassId;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span
+        className={
+          "inline-block w-fit rounded px-2 py-0.5 font-semibold text-[#4A3A34] " + tierClass
+        }
+      >
+        {cell.startTime}
+        {" – "}
+        {cell.finishTime}
+      </span>
+
+      {cell.isLastOfDay && cell.tier === "yellow" ? (
+        <span className="text-[10px] text-[#8A6D1D]">שעת הסיום המשוערת גבולית</span>
+      ) : null}
+
+      {cell.isLastOfDay && (cell.tier === "orange" || cell.tier === "red") ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] text-[#9A5216]">
+            שעת הסיום צפויה להיות מאוחרת מאוד
+          </span>
+          {cell.suggestion ? (
+            <button
+              type="button"
+              disabled={isApplying}
+              onClick={function () {
+                if (onApplySuggestion) {
+                  onApplySuggestion(
+                    cell.suggestion.targetClassId,
+                    cell.suggestion.newStartTime,
+                  );
+                }
+              }}
+              className="w-fit rounded-full border border-[#E3D5CC] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#7B5A4D] transition-colors hover:bg-[#F5EDE8] disabled:opacity-50"
+            >
+              {"הקדם את שעת ההתחלה ל-" + cell.suggestion.newStartTime}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+var SCHEDULE_VIEW_MODES = [
+  { key: "avg", label: "רגיל" },
+  { key: "min", label: "מינימום" },
+  { key: "max", label: "מקסימום" },
+];
+
 export default function SecretaryClassesOverviewTable(props) {
   var items = Array.isArray(props.items) ? props.items : [];
   var [predictionViewMode, setPredictionViewMode] = useState("value");
+  var showScheduleColumns = !!props.showScheduleColumns;
+  var columnCount = showScheduleColumns ? 16 : 14;
 
   return (
     <section className="rounded-3xl border border-[#EFE5DF] bg-[#FFFDFB] p-4 shadow-sm">
@@ -118,6 +208,42 @@ export default function SecretaryClassesOverviewTable(props) {
       <DataTableShell>
         <thead className="bg-[#FAF5F1] text-sm text-[#6B574F]">
           <tr>
+            {showScheduleColumns ? (
+              <th className="px-4 py-3">
+                <div className="flex flex-col items-center gap-1">
+                  <span>לוח זמנים משוער</span>
+                  <div className="flex overflow-hidden rounded-full border border-[#E3D5CC] text-[10px]">
+                    {SCHEDULE_VIEW_MODES.map(function (mode) {
+                      return (
+                        <button
+                          key={mode.key}
+                          type="button"
+                          onClick={function () {
+                            if (props.onScheduleViewModeChange) {
+                              props.onScheduleViewModeChange(mode.key);
+                            }
+                          }}
+                          className={
+                            "px-2 py-0.5 transition-colors " +
+                            (props.scheduleViewMode === mode.key
+                              ? "bg-[#7B5A4D] text-white"
+                              : "bg-transparent text-[#7B5A4D]")
+                          }
+                          title="הצגת לוח הזמנים לפי משך ממוצע / מינימלי / מקסימלי למקצה"
+                        >
+                          {mode.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </th>
+            ) : null}
+
+            {showScheduleColumns ? (
+              <th className="px-4 py-3">לוח זמנים בפועל</th>
+            ) : null}
+
             <th className="px-4 py-3">מס׳</th>
             <th className="px-4 py-3">שם מקצה</th>
             <th className="px-4 py-3">סטטוס</th>
@@ -173,11 +299,11 @@ export default function SecretaryClassesOverviewTable(props) {
 
         <tbody>
           {props.loading ? (
-            <DataTableLoadingState colSpan={14} message="טוען מקצים..." />
+            <DataTableLoadingState colSpan={columnCount} message="טוען מקצים..." />
           ) : null}
 
           {!props.loading && items.length === 0 ? (
-            <DataTableEmptyState colSpan={14} message="לא נמצאו מקצים להצגה" />
+            <DataTableEmptyState colSpan={columnCount} message="לא נמצאו מקצים להצגה" />
           ) : null}
 
           {!props.loading
@@ -189,11 +315,35 @@ export default function SecretaryClassesOverviewTable(props) {
                   ? props.getClassStatus(item)
                   : { key: "empty", label: "אין כניסות" };
 
+                var schedule = showScheduleColumns && props.getScheduleForClass
+                  ? props.getScheduleForClass(item)
+                  : null;
+
                 return (
                   <tr
                     key={getClassId(item)}
                     className="border-t border-[#F1E7E1] text-sm text-[#4A3A34]"
                   >
+                    {showScheduleColumns ? (
+                      <td className="px-4 py-3">
+                        {renderScheduleCell(
+                          schedule ? schedule.predicted : null,
+                          props.onApplyStartTimeSuggestion,
+                          props.applyingSuggestionClassId,
+                        )}
+                      </td>
+                    ) : null}
+
+                    {showScheduleColumns ? (
+                      <td className="px-4 py-3">
+                        {renderScheduleCell(
+                          schedule ? schedule.live : null,
+                          props.onApplyStartTimeSuggestion,
+                          props.applyingSuggestionClassId,
+                        )}
+                      </td>
+                    ) : null}
+
                     <td className="px-4 py-3 font-bold">
                       <button
                         type="button"

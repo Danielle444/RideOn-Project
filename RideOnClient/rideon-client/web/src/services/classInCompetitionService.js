@@ -31,6 +31,16 @@ function getPredictionsByCompetitionId(competitionId, ranchId) {
   });
 }
 
+function getClassById(classInCompId, competitionId, ranchId) {
+  return axios.get(`${API}/ClassesInCompetition/class/${classInCompId}`, {
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
+    ...getAuthHeaders(),
+  });
+}
+
 function createClassInCompetition(data) {
   return axios.post(`${API}/ClassesInCompetition`, data, getAuthHeaders());
 }
@@ -56,6 +66,7 @@ function deleteClassInCompetition(classInCompId, competitionId, ranchId) {
 export {
   getClassesByCompetitionId,
   getPredictionsByCompetitionId,
+  getClassById,
   createClassInCompetition,
   updateClassInCompetition,
   deleteClassInCompetition,
