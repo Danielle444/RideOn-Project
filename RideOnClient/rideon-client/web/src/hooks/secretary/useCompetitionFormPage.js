@@ -214,7 +214,9 @@ export default function useCompetitionFormPage(options) {
     }
 
     if (intent === "draft") {
-      navigate("/competitions");
+      navigate("/competitions", {
+        state: result.toast ? { toast: result.toast } : undefined,
+      });
       return;
     }
 
@@ -224,7 +226,9 @@ export default function useCompetitionFormPage(options) {
     }
 
     if (intent === "publish") {
-      navigate("/competitions");
+      navigate("/competitions", {
+        state: result.toast ? { toast: result.toast } : undefined,
+      });
       return;
     }
   }
@@ -254,10 +258,11 @@ export default function useCompetitionFormPage(options) {
         throw new Error("לא התקבל מזהה לתחרות החדשה");
       }
 
-      showToast("success", "התחרות שוכפלה בהצלחה");
-
       navigate("/competitions", {
         replace: true,
+        state: {
+          toast: { type: "success", message: "התחרות שוכפלה בהצלחה" },
+        },
       });
     } catch (error) {
       console.error(error);
