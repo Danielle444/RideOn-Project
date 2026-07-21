@@ -40,12 +40,17 @@ function extremeConfig() {
   );
 }
 
-function makeClass(id, startTime, orderInDay) {
+// `arenaId` is carried on the fixture only to prove it does NOT affect the math: simultaneity
+// is keyed on orderInDay alone. Verified against live 2026-07-21 -- of 25 tied groups in the
+// database, 22 are same-arena, so an arena-keyed model would miss almost all of them.
+function makeClass(id, startTime, orderInDay, arenaId) {
   return {
     classInCompId: id,
     classDateTime: "2026-08-14T00:00:00Z",
     orderInDay: orderInDay === undefined ? 1 : orderInDay,
     startTime: startTime,
+    arenaRanchId: 11,
+    arenaId: arenaId === undefined ? 1 : arenaId,
   };
 }
 
@@ -172,6 +177,157 @@ describe("insufficient suggestion after the 06:00 clamp", () => {
     expect(cell.finishTime).toBe("26:10");
     expect(cell.suggestion.newStartTime).toBe("06:00");
     expect(cell.suggestion.isInsufficient).toBe(true);
+  });
+});
+
+// QA iss 40. Classes sharing an orderInDay run SIMULTANEOUSLY, so the day advances once per
+// POSITION: a position costs the MAX of its classes' durations, never their sum, and the
+// between-class gap falls once per position boundary. `extremeConfig` is used throughout
+// (6 minutes per entry, no gaps of any kind) so every expected clock time is plain arithmetic.
+describe("tied orderInDay positions run simultaneously", () => {
+  it("leaves a day with no ties rolling forward exactly as before", () => {
+    var classes = [
+      makeClass(1, "08:00", 1),
+      makeClass(2, null, 2),
+      makeClass(3, null, 3),
+    ];
+
+    var entries = { 1: 10, 2: 10, 3: 10 };
+    var config = extremeConfig();
+
+    expect(cellFor(classes, config, entries, 2).startTime).toBe("09:00");
+    expect(cellFor(classes, config, entries, 3).startTime).toBe("10:00");
+    expect(cellFor(classes, config, entries, 3).dayFinishTime).toBe("11:00");
+  });
+
+  it("charges a 5-class tie one duration, not five", () => {
+    // The live reining shape: comps 7, 39 and 43 each carry a 5-class tie at orderinday 4,
+    // all in the same arena. Longest tied class is 10 entries = 60 minutes.
+    var classes = [
+      makeClass(1, "08:00", 4),
+      makeClass(2, null, 4),
+      makeClass(3, null, 4),
+      makeClass(4, null, 4),
+      makeClass(5, null, 4),
+    ];
+
+    var entries = { 1: 10, 2: 5, 3: 5, 4: 5, 5: 5 };
+    var config = extremeConfig();
+
+    // Every tied class shares the position's start and finish.
+    [1, 2, 3, 4, 5].forEach(function (id) {
+      var cell = cellFor(classes, config, entries, id);
+
+      expect(cell.startTime).toBe("08:00");
+      expect(cell.finishTime).toBe("09:00");
+    });
+
+    // Serialized this day would have ended at 10:00.
+    expect(cellFor(classes, config, entries, 5).dayFinishTime).toBe("09:00");
+  });
+
+  it("keeps each tied class's own durationMinutes even though they share a finish", () => {
+    var classes = [makeClass(1, "08:00", 1), makeClass(2, null, 1)];
+    var entries = { 1: 10, 2: 5 };
+
+    expect(cellFor(classes, extremeConfig(), entries, 1).durationMinutes).toBe(60);
+    expect(cellFor(classes, extremeConfig(), entries, 2).durationMinutes).toBe(30);
+    expect(cellFor(classes, extremeConfig(), entries, 2).finishTime).toBe("09:00");
+  });
+
+  it("walks several tied positions across one day", () => {
+    var classes = [
+      makeClass(1, "08:00", 1),
+      makeClass(2, null, 1),
+      makeClass(3, null, 2),
+      makeClass(4, null, 2),
+      makeClass(5, null, 3),
+    ];
+
+    // Position 1 max 60 -> 08:00-09:00. Position 2 max 30 -> 09:00-09:30.
+    // Position 3 is a lone 60 -> 09:30-10:30.
+    var entries = { 1: 10, 2: 5, 3: 5, 4: 3, 5: 10 };
+    var config = extremeConfig();
+
+    expect(cellFor(classes, config, entries, 3).startTime).toBe("09:00");
+    expect(cellFor(classes, config, entries, 4).startTime).toBe("09:00");
+    expect(cellFor(classes, config, entries, 5).startTime).toBe("09:30");
+    expect(cellFor(classes, config, entries, 5).dayFinishTime).toBe("10:30");
+  });
+
+  it("applies the between-class gap once per position boundary, not once per class", () => {
+    // Reining: 10-minute gap. Three classes tied at position 1, one at position 2 -- exactly
+    // one gap falls, at the single boundary between them.
+    var classes = [
+      makeClass(1, "08:00", 1),
+      makeClass(2, null, 1),
+      makeClass(3, null, 1),
+      makeClass(4, null, 2),
+    ];
+
+    // 6 entries at 5 minutes = 30 minutes, and 6 runs trips no mid-class flattening gap.
+    var entries = { 1: 6, 2: 6, 3: 6, 4: 6 };
+    var cell = cellFor(classes, reiningConfig(), entries, 4);
+
+    expect(cell.startTime).toBe("08:40");
+    expect(cell.dayFinishTime).toBe("09:10");
+  });
+
+  it("gives the same answer for a tie spanning two arenas as for one inside a single arena", () => {
+    // Arena is not a key. Only THREE tied groups in the live database span two arenas, and
+    // they must behave identically to the 22 that do not.
+    var sameArena = [makeClass(1, "08:00", 1, 2), makeClass(2, null, 1, 2)];
+    var twoArenas = [makeClass(1, "08:00", 1, 1), makeClass(2, null, 1, 2)];
+    var entries = { 1: 10, 2: 5 };
+    var config = extremeConfig();
+
+    var sameArenaCell = cellFor(sameArena, config, entries, 2);
+    var twoArenasCell = cellFor(twoArenas, config, entries, 2);
+
+    expect(twoArenasCell.startTime).toBe(sameArenaCell.startTime);
+    expect(twoArenasCell.finishTime).toBe(sameArenaCell.finishTime);
+    expect(twoArenasCell.dayFinishTime).toBe(sameArenaCell.dayFinishTime);
+    expect(twoArenasCell.dayFinishTime).toBe("09:00");
+  });
+
+  it("does not let a tie inflate the day into a late-finish tier", () => {
+    // Two tied classes of 100 entries: 600 minutes each. Tied, the day ends 18:00 and trips
+    // no tier. Serialized it would end at 04:00 the next day, deep into red.
+    var classes = [makeClass(1, "08:00", 1), makeClass(2, null, 1)];
+    var cell = cellFor(classes, extremeConfig(), { 1: 100, 2: 100 }, 2);
+
+    expect(cell.dayFinishTime).toBe("18:00");
+    expect(cell.tier).toBe("none");
+  });
+});
+
+describe("null orderInDay", () => {
+  // Live shape: competition 45 on 2026-07-07 has four null-order classes. Nulls each take
+  // their own position and stay sequential -- absence of an order is not an assertion of
+  // simultaneity, and collapsing them would under-state the day.
+  it("keeps null-order classes sequential instead of collapsing them into one position", () => {
+    var classes = [
+      makeClass(1, "08:00", null, 3),
+      makeClass(2, null, null, 2),
+      makeClass(3, null, null, 2),
+      makeClass(4, null, null, 1),
+    ];
+
+    var entries = { 1: 10, 2: 10, 3: 10, 4: 10 };
+    var config = extremeConfig();
+
+    expect(cellFor(classes, config, entries, 1).startTime).toBe("08:00");
+    expect(cellFor(classes, config, entries, 2).startTime).toBe("09:00");
+    expect(cellFor(classes, config, entries, 3).startTime).toBe("10:00");
+    expect(cellFor(classes, config, entries, 4).startTime).toBe("11:00");
+    expect(cellFor(classes, config, entries, 4).dayFinishTime).toBe("12:00");
+  });
+
+  it("does not tie a null-order class to a numbered one", () => {
+    var classes = [makeClass(1, "08:00", null), makeClass(2, null, 1)];
+    var entries = { 1: 10, 2: 10 };
+
+    expect(cellFor(classes, extremeConfig(), entries, 2).startTime).toBe("09:00");
   });
 });
 

@@ -29,6 +29,23 @@ function getOrderInDay(item) {
   return value === null || value === undefined ? null : Number(value);
 }
 
+// The day position a class occupies. Classes sharing a position run SIMULTANEOUSLY.
+//
+// A null `orderinday` gets a position of its OWN rather than joining the other nulls,
+// so null-order classes stay sequential. Two reasons. Sharing an order number is a
+// deliberate act -- the secretary typed the same number twice -- whereas null is simply
+// the absence of an answer, and absence is not an assertion that two classes run at once.
+// And the error directions are not symmetric: collapsing nulls into one tied position
+// would UNDER-state the day, silently promising a finish time that will not happen --
+// the same silent failure this fix exists to remove, only pointing the other way.
+//
+// Live shape this covers: competition 45 on 2026-07-07 has four null-order classes.
+function getPositionKey(item) {
+  var value = getOrderInDay(item);
+
+  return value === null ? "null:" + getClassInCompId(item) : "order:" + value;
+}
+
 function getStartTimeMinutes(item) {
   var raw = item.startTime || item.StartTime;
 
@@ -139,6 +156,28 @@ function groupClassesByDay(classes) {
 
   return order.map(function (date) {
     return { date: date, classes: byDate[date] };
+  });
+}
+
+// Groups one day's classes into consecutive orderInDay positions, preserving the order the
+// classes arrive in (the caller sorts by date -> orderInDay -> startTime).
+function groupClassesByPosition(dayClasses) {
+  var order = [];
+  var byKey = {};
+
+  dayClasses.forEach(function (item) {
+    var key = getPositionKey(item);
+
+    if (!byKey[key]) {
+      byKey[key] = [];
+      order.push(key);
+    }
+
+    byKey[key].push(item);
+  });
+
+  return order.map(function (key) {
+    return byKey[key];
   });
 }
 
@@ -270,35 +309,55 @@ function computeDaySchedule(dayClasses, scheduleConfig, viewMode, getEntryCount)
     };
   }
 
+  // The day advances once per POSITION, not once per class. Classes sharing an orderInDay
+  // run simultaneously, so a position costs the MAX of its classes' durations, never their
+  // sum, and the between-class gap falls once per position boundary rather than once per
+  // class. A 5-class tie -- routine in reining -- costs one duration and one gap, not five
+  // and four.
+  //
+  // `dayClasses` is required to be in ascending orderInDay order. The caller's sortClasses
+  // guarantees it, and resolveDayOrigin above already depends on it.
+  var positions = groupClassesByPosition(dayClasses);
   var cursor = origin.startMinutes;
 
-  dayClasses.forEach(function (item, index) {
+  positions.forEach(function (positionClasses, index) {
     if (index > 0) {
       cursor += gapMinutes;
     }
 
     var startMinutes = cursor;
-    var entries = Number(getEntryCount(item) || 0);
-    var duration = computeClassDuration(
-      entries,
-      minutesPerEntry,
-      gapMinutes,
-      runsPerGap,
-    );
-    var finishMinutes = startMinutes + duration;
+    var durations = positionClasses.map(function (item) {
+      var entries = Number(getEntryCount(item) || 0);
 
-    perClass[getClassInCompId(item)] = {
-      hasClockTime: true,
-      startMinutes: startMinutes,
-      finishMinutes: finishMinutes,
-      durationMinutes: duration,
-    };
+      return computeClassDuration(entries, minutesPerEntry, gapMinutes, runsPerGap);
+    });
+
+    var positionDuration = durations.reduce(function (longest, duration) {
+      return duration > longest ? duration : longest;
+    }, 0);
+
+    var finishMinutes = startMinutes + positionDuration;
+
+    positionClasses.forEach(function (item, classIndex) {
+      perClass[getClassInCompId(item)] = {
+        hasClockTime: true,
+        // Every class in a tied position shares the position's start AND finish: they run
+        // together and the position is not done until its longest class is. `durationMinutes`
+        // stays the class's OWN run length, so for a shorter tied class it is deliberately
+        // less than finish - start.
+        startMinutes: startMinutes,
+        finishMinutes: finishMinutes,
+        durationMinutes: durations[classIndex],
+      };
+    });
 
     cursor = finishMinutes;
   });
 
-  var finishMinutesOfDay = perClass[lastClassId].finishMinutes;
-  var finishHours = finishMinutesOfDay / 60;
+  // The day ends when its last POSITION ends -- never the last row's own finish, which for
+  // a short class tied to a long one is earlier than the day actually runs.
+  var dayFinishMinutes = cursor;
+  var finishHours = dayFinishMinutes / 60;
   var tier = classifyLateFinishTier(finishHours, scheduleConfig);
   var suggestion = null;
 
@@ -340,7 +399,11 @@ function computeDaySchedule(dayClasses, scheduleConfig, viewMode, getEntryCount)
     isAssumedOrigin: isAssumedOrigin,
     perClass: perClass,
     firstClassId: firstClassId,
+    // The day's last ROW in order -- the anchor the view renders day-level facts beside.
+    // Its own finish is NOT the day's finish when it is the short half of a tied position,
+    // which is why dayFinishMinutes is carried separately rather than read back from it.
     lastClassId: lastClassId,
+    dayFinishMinutes: dayFinishMinutes,
     tier: tier,
     suggestion: suggestion,
   };
@@ -426,6 +489,11 @@ function getScheduleCellForClass(scheduleColumn, item) {
     startTime: cell.hasClockTime ? formatMinutesAsClock(cell.startMinutes) : null,
     finishTime: cell.hasClockTime ? formatMinutesAsClock(cell.finishMinutes) : null,
     durationMinutes: cell.durationMinutes,
+    // Day-level fact, answerable from any row of the day: when its last POSITION finishes.
+    dayFinishTime:
+      dayResult && dayResult.dayFinishMinutes !== undefined
+        ? formatMinutesAsClock(dayResult.dayFinishMinutes)
+        : null,
     dayHasOrigin: dayResult ? dayResult.hasOrigin : true,
     isAssumedOrigin: dayResult ? !!dayResult.isAssumedOrigin : false,
     isFirstOfDay: isFirstOfDay,
