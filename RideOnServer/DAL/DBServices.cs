@@ -88,6 +88,8 @@ namespace RideOnServer.DAL
             // Date-only fields
             if (key == "competitionstartdate" ||
                 key == "competitionenddate" ||
+                key == "newcompetitionstartdate" ||
+                key == "newcompetitionenddate" ||
                 key == "registrationopendate" ||
                 key == "registrationenddate" ||
                 key == "paidtimeregistrationdate" ||

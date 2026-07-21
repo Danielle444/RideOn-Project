@@ -393,95 +393,34 @@ namespace RideOnServer.DAL
                 jsonOptions
             );
 
+            // Order MUST match usp_DuplicateCompetitionFromSelection's parameter list:
+            // CreateCommandWithStoredProcedure binds positionally (@p1..@p13). Key names
+            // only drive NpgsqlDbType resolution in AddParameterWithType.
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@SourceCompetitionId", request.SourceCompetitionId },
+                { "@CreatedBySystemUserId", createdBySystemUserId },
+                { "@NewCompetitionName", request.NewCompetitionName },
+                { "@NewCompetitionStartDate", request.NewCompetitionStartDate.Date },
+                { "@NewCompetitionEndDate", request.NewCompetitionEndDate.Date },
+                { "@RegistrationOpenDate", request.RegistrationOpenDate?.Date },
+                { "@RegistrationEndDate", request.RegistrationEndDate?.Date },
+                { "@PaidTimeRegistrationDate", request.PaidTimeRegistrationDate?.Date },
+                { "@PaidTimePublicationDate", request.PaidTimePublicationDate?.Date },
+                { "@Notes", string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim() },
+                { "@ClassJudgeIds", request.ClassJudgeIds == null ? Array.Empty<int>() : request.ClassJudgeIds.ToArray() },
+                { "@ClassesJson", classesJson },
+                { "@PaidTimeSlotsJson", paidTimeSlotsJson }
+            };
+
             try
             {
                 using (NpgsqlConnection connection = Connect("DefaultConnection"))
                 {
                     connection.Open();
 
-                    using (NpgsqlCommand command = new NpgsqlCommand("usp_DuplicateCompetitionFromSelection", connection))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_DuplicateCompetitionFromSelection", connection, paramDic))
                     {
-                        command.CommandType = CommandType.StoredProcedure;
-
-                        command.Parameters.AddWithValue(
-                            "p_sourcecompetitionid",
-                            request.SourceCompetitionId
-                        );
-
-                        command.Parameters.AddWithValue(
-                            "p_createdbysystemuserid",
-                            createdBySystemUserId
-                        );
-
-                        command.Parameters.AddWithValue(
-                            "p_newcompetitionname",
-                            request.NewCompetitionName
-                        );
-
-                        command.Parameters.AddWithValue(
-                            "p_newcompetitionstartdate",
-                            request.NewCompetitionStartDate.Date
-                        );
-
-                        command.Parameters.AddWithValue(
-                            "p_newcompetitionenddate",
-                            request.NewCompetitionEndDate.Date
-                        );
-
-                        command.Parameters.AddWithValue(
-                            "p_registrationopendate",
-                            request.RegistrationOpenDate.HasValue
-                                ? request.RegistrationOpenDate.Value.Date
-                                : DBNull.Value
-                        );
-
-                        command.Parameters.AddWithValue(
-                            "p_registrationenddate",
-                            request.RegistrationEndDate.HasValue
-                                ? request.RegistrationEndDate.Value.Date
-                                : DBNull.Value
-                        );
-
-                        command.Parameters.AddWithValue(
-                            "p_paidtimeregistrationdate",
-                            request.PaidTimeRegistrationDate.HasValue
-                                ? request.PaidTimeRegistrationDate.Value.Date
-                                : DBNull.Value
-                        );
-
-                        command.Parameters.AddWithValue(
-                            "p_paidtimepublicationdate",
-                            request.PaidTimePublicationDate.HasValue
-                                ? request.PaidTimePublicationDate.Value.Date
-                                : DBNull.Value
-                        );
-
-                        command.Parameters.AddWithValue(
-                            "p_notes",
-                            string.IsNullOrWhiteSpace(request.Notes)
-                                ? DBNull.Value
-                                : request.Notes.Trim()
-                        );
-
-                        command.Parameters.AddWithValue(
-                            "p_classjudgeids",
-                            request.ClassJudgeIds == null
-                                ? Array.Empty<int>()
-                                : request.ClassJudgeIds.ToArray()
-                        );
-
-                        NpgsqlParameter classesJsonParameter = command.Parameters.Add(
-                            "p_classesjson",
-                            NpgsqlDbType.Jsonb
-                        );
-                        classesJsonParameter.Value = classesJson;
-
-                        NpgsqlParameter paidTimeSlotsJsonParameter = command.Parameters.Add(
-                            "p_paidtimeslotsjson",
-                            NpgsqlDbType.Jsonb
-                        );
-                        paidTimeSlotsJsonParameter.Value = paidTimeSlotsJson;
-
                         using (NpgsqlDataReader reader = command.ExecuteReader())
                         {
                             if (reader.Read())
