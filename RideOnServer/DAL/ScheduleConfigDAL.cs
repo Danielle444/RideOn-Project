@@ -32,7 +32,8 @@ namespace RideOnServer.DAL
                                 BetweenClassGapMinutes = reader["betweenclassgapminutes"] == DBNull.Value ? null : Convert.ToDecimal(reader["betweenclassgapminutes"]),
                                 LateFinishYellowHour = reader["latefinishyellowhour"] == DBNull.Value ? null : Convert.ToDecimal(reader["latefinishyellowhour"]),
                                 LateFinishOrangeHour = reader["latefinishorangehour"] == DBNull.Value ? null : Convert.ToDecimal(reader["latefinishorangehour"]),
-                                LateFinishRedHour = reader["latefinishredhour"] == DBNull.Value ? null : Convert.ToDecimal(reader["latefinishredhour"])
+                                LateFinishRedHour = reader["latefinishredhour"] == DBNull.Value ? null : Convert.ToDecimal(reader["latefinishredhour"]),
+                                DefaultFirstClassStartHour = reader["defaultfirstclassstarthour"] == DBNull.Value ? null : Convert.ToDecimal(reader["defaultfirstclassstarthour"])
                             };
                         }
                     }

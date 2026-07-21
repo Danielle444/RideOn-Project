@@ -191,7 +191,26 @@ function computeDaySchedule(dayClasses, scheduleConfig, viewMode, getEntryCount)
     "BetweenClassGapMinutes",
   ) || 0;
 
+  // When no class on the day carries a starttime, fall back to the configured assumed start
+  // hour so the day still gets a real rolled-forward timeline instead of bare durations. The
+  // day stays flagged as assumed so the view can say so and offer to make it real.
+  var assumedStartHour = readConfigValue(
+    scheduleConfig,
+    "defaultFirstClassStartHour",
+    "DefaultFirstClassStartHour",
+  );
+
   var origin = resolveDayOrigin(dayClasses);
+  var isAssumedOrigin = false;
+
+  if (origin.startMinutes === null && assumedStartHour !== null) {
+    origin = {
+      startMinutes: Math.round(assumedStartHour * 60),
+      targetClassId: origin.targetClassId,
+    };
+    isAssumedOrigin = true;
+  }
+
   var perClass = {};
   var firstClassId = getClassInCompId(dayClasses[0]);
   var lastClassId = getClassInCompId(dayClasses[dayClasses.length - 1]);
@@ -209,6 +228,7 @@ function computeDaySchedule(dayClasses, scheduleConfig, viewMode, getEntryCount)
 
     return {
       hasOrigin: false,
+      isAssumedOrigin: false,
       perClass: perClass,
       firstClassId: firstClassId,
       lastClassId: lastClassId,
@@ -244,7 +264,18 @@ function computeDaySchedule(dayClasses, scheduleConfig, viewMode, getEntryCount)
   var tier = classifyLateFinishTier(finishHours, scheduleConfig);
   var suggestion = null;
 
-  if (tier === "orange" || tier === "red") {
+  if (isAssumedOrigin) {
+    // The origin was invented, so the finish time is too -- suggesting a shift off it would
+    // be false precision. Offer instead to make the assumption real. Writes the single class
+    // the rest of the machinery already treats as the day's origin, never the whole tied
+    // group: `orderInDay` may be null across every class, in which case the tied group is
+    // the entire day and a bulk write would stamp the assumed hour onto all of it.
+    suggestion = {
+      kind: "set",
+      targetClassId: origin.targetClassId,
+      newStartTime: formatMinutesAsClock(origin.startMinutes),
+    };
+  } else if (tier === "orange" || tier === "red") {
     var overageMinutes = Math.max(0, finishHours - MIDNIGHT_HOUR) * 60;
     var roundedOverage =
       Math.ceil(overageMinutes / SUGGESTION_ROUND_MINUTES) * SUGGESTION_ROUND_MINUTES;
@@ -254,6 +285,7 @@ function computeDaySchedule(dayClasses, scheduleConfig, viewMode, getEntryCount)
     );
 
     suggestion = {
+      kind: "advance",
       targetClassId: origin.targetClassId,
       newStartTime: formatMinutesAsClock(newOriginMinutes),
     };
@@ -261,6 +293,7 @@ function computeDaySchedule(dayClasses, scheduleConfig, viewMode, getEntryCount)
 
   return {
     hasOrigin: true,
+    isAssumedOrigin: isAssumedOrigin,
     perClass: perClass,
     firstClassId: firstClassId,
     lastClassId: lastClassId,
@@ -286,6 +319,7 @@ function computeScheduleColumn(classes, scheduleConfig, viewMode, getEntryCount)
 
   var days = groupClassesByDay(classes);
   var byClassId = {};
+  var dayByClassId = {};
   var dayResults = [];
 
   days.forEach(function (day) {
@@ -297,12 +331,15 @@ function computeScheduleColumn(classes, scheduleConfig, viewMode, getEntryCount)
 
     Object.keys(result.perClass).forEach(function (classId) {
       byClassId[classId] = result.perClass[classId];
+      // Every class maps back to its day, not just the first and last, so day-level facts
+      // (assumed origin, tier) are answerable for a mid-day row too.
+      dayByClassId[classId] = result;
     });
 
     dayResults.push(result);
   });
 
-  return { byClassId: byClassId, dayResults: dayResults };
+  return { byClassId: byClassId, dayByClassId: dayByClassId, dayResults: dayResults };
 }
 
 /**
@@ -322,12 +359,23 @@ function getScheduleCellForClass(scheduleColumn, item) {
     return null;
   }
 
-  var dayResult = scheduleColumn.dayResults.find(function (day) {
-    return day.firstClassId === classId || day.lastClassId === classId;
-  });
+  var dayResult = scheduleColumn.dayByClassId[classId] || null;
 
   var isFirstOfDay = !!dayResult && dayResult.firstClassId === classId;
   var isLastOfDay = !!dayResult && dayResult.lastClassId === classId;
+
+  // A "set" suggestion belongs beside the nudge on the day's first row; an "advance"
+  // suggestion belongs beside the late-finish warning on its last row.
+  var suggestion = null;
+
+  if (dayResult && dayResult.suggestion) {
+    var isSetOnFirstRow = dayResult.suggestion.kind === "set" && isFirstOfDay;
+    var isAdvanceOnLastRow = dayResult.suggestion.kind === "advance" && isLastOfDay;
+
+    if (isSetOnFirstRow || isAdvanceOnLastRow) {
+      suggestion = dayResult.suggestion;
+    }
+  }
 
   return {
     hasClockTime: cell.hasClockTime,
@@ -335,10 +383,11 @@ function getScheduleCellForClass(scheduleColumn, item) {
     finishTime: cell.hasClockTime ? formatMinutesAsClock(cell.finishMinutes) : null,
     durationMinutes: cell.durationMinutes,
     dayHasOrigin: dayResult ? dayResult.hasOrigin : true,
+    isAssumedOrigin: dayResult ? !!dayResult.isAssumedOrigin : false,
     isFirstOfDay: isFirstOfDay,
     isLastOfDay: isLastOfDay,
     tier: isLastOfDay && dayResult ? dayResult.tier : "none",
-    suggestion: isLastOfDay && dayResult ? dayResult.suggestion : null,
+    suggestion: suggestion,
   };
 }
 

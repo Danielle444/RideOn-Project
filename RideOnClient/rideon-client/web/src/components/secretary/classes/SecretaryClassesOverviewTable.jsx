@@ -115,6 +115,32 @@ function getTierClass(tier) {
   return "";
 }
 
+// Both schedule suggestions ("set" beside the assumed-start nudge, "advance" beside the
+// late-finish warning) write through the same single-class update path, so they share a
+// button and differ only in their label.
+function renderApplyButton(suggestion, label, onApplySuggestion, applyingSuggestionClassId) {
+  if (!suggestion) {
+    return null;
+  }
+
+  var isApplying = applyingSuggestionClassId === suggestion.targetClassId;
+
+  return (
+    <button
+      type="button"
+      disabled={isApplying}
+      onClick={function () {
+        if (onApplySuggestion) {
+          onApplySuggestion(suggestion.targetClassId, suggestion.newStartTime);
+        }
+      }}
+      className="w-fit rounded-full border border-[#E3D5CC] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#7B5A4D] transition-colors hover:bg-[#F5EDE8] disabled:opacity-50"
+    >
+      {label + suggestion.newStartTime}
+    </button>
+  );
+}
+
 function renderScheduleCell(cell, onApplySuggestion, applyingSuggestionClassId) {
   if (!cell) {
     return <span className="text-[#8D6E63]">-</span>;
@@ -134,8 +160,6 @@ function renderScheduleCell(cell, onApplySuggestion, applyingSuggestionClassId) 
   }
 
   var tierClass = cell.isLastOfDay ? getTierClass(cell.tier) : "";
-  var isApplying =
-    !!cell.suggestion && applyingSuggestionClassId === cell.suggestion.targetClassId;
 
   return (
     <div className="flex flex-col gap-1">
@@ -149,6 +173,22 @@ function renderScheduleCell(cell, onApplySuggestion, applyingSuggestionClassId) 
         {cell.finishTime}
       </span>
 
+      {cell.isAssumedOrigin && cell.isFirstOfDay ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] text-[#9A5B00]">
+            {"לוח הזמנים מבוסס על שעת התחלה משוערת (" +
+              cell.startTime +
+              "). יש להזין שעת התחלה למקצה הראשון על מנת לקבל לוח זמנים מדויק"}
+          </span>
+          {renderApplyButton(
+            cell.suggestion,
+            "קבע את שעת ההתחלה ל-",
+            onApplySuggestion,
+            applyingSuggestionClassId,
+          )}
+        </div>
+      ) : null}
+
       {cell.isLastOfDay && cell.tier === "yellow" ? (
         <span className="text-[10px] text-[#8A6D1D]">שעת הסיום המשוערת גבולית</span>
       ) : null}
@@ -158,23 +198,12 @@ function renderScheduleCell(cell, onApplySuggestion, applyingSuggestionClassId) 
           <span className="text-[10px] text-[#9A5216]">
             שעת הסיום צפויה להיות מאוחרת מאוד
           </span>
-          {cell.suggestion ? (
-            <button
-              type="button"
-              disabled={isApplying}
-              onClick={function () {
-                if (onApplySuggestion) {
-                  onApplySuggestion(
-                    cell.suggestion.targetClassId,
-                    cell.suggestion.newStartTime,
-                  );
-                }
-              }}
-              className="w-fit rounded-full border border-[#E3D5CC] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#7B5A4D] transition-colors hover:bg-[#F5EDE8] disabled:opacity-50"
-            >
-              {"הקדם את שעת ההתחלה ל-" + cell.suggestion.newStartTime}
-            </button>
-          ) : null}
+          {renderApplyButton(
+            cell.suggestion,
+            "הקדם את שעת ההתחלה ל-",
+            onApplySuggestion,
+            applyingSuggestionClassId,
+          )}
         </div>
       ) : null}
     </div>

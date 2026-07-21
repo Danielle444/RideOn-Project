@@ -8,5 +8,6 @@ namespace RideOnServer.BL.DTOs.Schedule
         public decimal? LateFinishYellowHour { get; set; }
         public decimal? LateFinishOrangeHour { get; set; }
         public decimal? LateFinishRedHour { get; set; }
+        public decimal? DefaultFirstClassStartHour { get; set; }
     }
 }
