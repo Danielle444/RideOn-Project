@@ -108,7 +108,10 @@ function ScheduleNotice(props) {
         <p className="font-semibold">{copy.columnHeader}</p>
         {dayFinishTime ? (
           <p className="text-sm font-bold">
-            {copy.dayFinishLabel + ": " + dayFinishTime}
+            {copy.dayFinishLabel +
+              ": " +
+              dayFinishTime +
+              (dayResult.dayFinishesAfterMidnight ? SCHEDULE_COPY.nextDaySuffix : "")}
           </p>
         ) : null}
       </div>

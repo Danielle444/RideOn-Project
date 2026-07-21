@@ -1411,6 +1411,38 @@ export default function useSecretaryCompetitionClassesPage(options) {
     });
   }
 
+  // Forecast totals for the selected day, replacing the paid/unpaid actuals cards in the
+  // planning view. Income is GROSS -- predicted entries x cost, no prize deduction.
+  var planningForecast = useMemo(
+    function () {
+      var dayClasses = classes.filter(function (item) {
+        return !selectedDate || getClassDate(item) === selectedDate;
+      });
+
+      var predictedEntries = 0;
+      var ranchIncome = 0;
+      var federationIncome = 0;
+
+      dayClasses.forEach(function (item) {
+        var predicted = getPredictedEntriesForClass(item);
+        var organizerCost = Number(item.organizerCost || item.OrganizerCost || 0);
+        var federationCost = Number(item.federationCost || item.FederationCost || 0);
+
+        predictedEntries += predicted;
+        ranchIncome += predicted * organizerCost;
+        federationIncome += predicted * federationCost;
+      });
+
+      return {
+        predictedEntries: predictedEntries,
+        ranchIncome: ranchIncome,
+        federationIncome: federationIncome,
+        totalIncome: ranchIncome + federationIncome,
+      };
+    },
+    [classes, predictions, selectedDate],
+  );
+
   // Registration-window instrument. Competition-wide, not per day: registration is not a
   // per-day thing, and the forecast total it is measured against spans the whole event.
   var registrationWindow = useMemo(
@@ -1591,6 +1623,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
     plannedVsActualSummary,
     getPlannedVsActualForClass,
 
+    planningForecast,
     dayRecommendations,
     recommendationResponses,
     respondToRecommendation,

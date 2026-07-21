@@ -9,9 +9,11 @@ import ScheduleDayNotices from "../../components/secretary/classes/ScheduleDayNo
 import PlannedVsActualPanel from "../../components/secretary/classes/PlannedVsActualPanel";
 import DayRecommendationsPanel from "../../components/secretary/classes/DayRecommendationsPanel";
 import RegistrationWindowPanel from "../../components/secretary/classes/RegistrationWindowPanel";
+import PlanningForecastCards from "../../components/secretary/classes/PlanningForecastCards";
 import {
   CLASSES_VIEW_ACTUALS,
   CLASSES_VIEW_FINANCIAL,
+  CLASSES_VIEW_PLANNING,
 } from "../../utils/classesView.utils";
 import SecretaryClassEntriesTable from "../../components/secretary/classes/SecretaryClassEntriesTable";
 import SecretaryClassEntriesSummaryCards from "../../components/secretary/classes/SecretaryClassEntriesSummaryCards";
@@ -225,10 +227,17 @@ export default function CompetitionClassesPage() {
               onChangeView={page.changeActiveView}
             />
 
-            <SecretaryClassEntriesSummaryCards
-              summary={page.visibleClassesSummary}
-              titlePrefix="כניסות ביום"
-            />
+            {/* The paid/unpaid actuals cards are meaningless before registration closes --
+                nothing has been paid yet -- so the planning view gets forecast cards
+                instead. Financial keeps the money-flavoured actuals cards. */}
+            {page.activeView === CLASSES_VIEW_PLANNING ? (
+              <PlanningForecastCards forecast={page.planningForecast} />
+            ) : (
+              <SecretaryClassEntriesSummaryCards
+                summary={page.visibleClassesSummary}
+                titlePrefix="כניסות ביום"
+              />
+            )}
 
             {page.activeView === CLASSES_VIEW_ACTUALS ? (
               <PlannedVsActualPanel summary={page.plannedVsActualSummary} />

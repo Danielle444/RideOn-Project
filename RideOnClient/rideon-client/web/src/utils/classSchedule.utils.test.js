@@ -156,7 +156,9 @@ describe("insufficient suggestion after the 06:00 clamp", () => {
     var classes = [makeClass(1, "08:00")];
     var cell = cellFor(classes, config, { 1: 33 }, 1);
 
-    expect(cell.finishTime).toBe("24:30");
+    // Displayed wrapped past midnight, and flagged as belonging to the next day.
+    expect(cell.finishTime).toBe("00:30");
+    expect(cell.finishesAfterMidnight).toBe(true);
     expect(cell.suggestion.newStartTime).toBe("07:30");
     expect(cell.suggestion.isInsufficient).toBe(false);
   });
@@ -174,9 +176,56 @@ describe("insufficient suggestion after the 06:00 clamp", () => {
     var classes = [makeClass(1, "06:30")];
     var cell = cellFor(classes, config, { 1: 118 }, 1);
 
-    expect(cell.finishTime).toBe("26:10");
+    expect(cell.finishTime).toBe("02:10");
+    expect(cell.finishesAfterMidnight).toBe(true);
     expect(cell.suggestion.newStartTime).toBe("06:00");
     expect(cell.suggestion.isInsufficient).toBe(true);
+  });
+});
+
+// The clock display wraps at midnight but the rolled-forward minute count must NOT: the
+// late-finish tiers are expressed as hours past midnight (yellow 23, orange 24, red 25), so
+// classifying a wrapped value would read a 00:30 finish as half past midnight that same
+// morning and drop every late day out of its tier entirely.
+describe("post-midnight display wraps without breaking the tiers", () => {
+  function longDayConfig() {
+    return reiningConfig({
+      minutesPerEntryMin: 30,
+      minutesPerEntryMax: 30,
+      betweenClassGapMinutes: 0,
+      flatteningRunsPerGap: 0,
+    });
+  }
+
+  it("keeps a past-midnight finish in its tier even though it displays wrapped", () => {
+    // 33 entries at 30 min from 08:00 -> 24:30 unwrapped, which is the orange tier.
+    var cell = cellFor([makeClass(1, "08:00")], longDayConfig(), { 1: 33 }, 1);
+
+    expect(cell.finishTime).toBe("00:30");
+    expect(cell.tier).toBe("orange");
+  });
+
+  it("reaches the red tier past 25:00 while displaying 01:00", () => {
+    // 34 entries at 30 min from 08:00 -> 25:00 unwrapped.
+    var cell = cellFor([makeClass(1, "08:00")], longDayConfig(), { 1: 34 }, 1);
+
+    expect(cell.finishTime).toBe("01:00");
+    expect(cell.tier).toBe("red");
+  });
+
+  it("does not flag a same-day finish as next-day", () => {
+    var cell = cellFor([makeClass(1, "08:00")], longDayConfig(), { 1: 10 }, 1);
+
+    expect(cell.finishTime).toBe("13:00");
+    expect(cell.finishesAfterMidnight).toBe(false);
+    expect(cell.dayFinishesAfterMidnight).toBe(false);
+  });
+
+  it("marks the day-level finish as next-day too", () => {
+    var cell = cellFor([makeClass(1, "08:00")], longDayConfig(), { 1: 33 }, 1);
+
+    expect(cell.dayFinishTime).toBe("00:30");
+    expect(cell.dayFinishesAfterMidnight).toBe(true);
   });
 });
 

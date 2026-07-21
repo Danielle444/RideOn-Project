@@ -64,13 +64,31 @@ function getStartTimeMinutes(item) {
   return hours * 60 + minutes;
 }
 
+var MINUTES_PER_DAY = 24 * 60;
+
+// Clock times WRAP past midnight: a day finishing 1470 minutes after its origin reads
+// "00:30", not "24:30".
+//
+// The rolled-forward minute count itself stays unwrapped everywhere else in this file --
+// the late-finish tiers are expressed as hours past midnight (yellow 23, orange 24, red 25),
+// so classifying against a wrapped value would read 00:30 as half past midnight on the same
+// morning and silently drop every late day out of its tier. Wrapping is a display concern
+// and lives only here.
 function formatMinutesAsClock(totalMinutes) {
-  var hours = Math.floor(totalMinutes / 60);
-  var minutes = Math.round(totalMinutes % 60);
+  var wrapped = ((totalMinutes % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+  var hours = Math.floor(wrapped / 60);
+  var minutes = Math.round(wrapped % 60);
   var hh = hours < 10 ? "0" + hours : String(hours);
   var mm = minutes < 10 ? "0" + minutes : String(minutes);
 
   return hh + ":" + mm;
+}
+
+// Whether a rolled-forward time has crossed into the following calendar day. Once the clock
+// wraps, "00:30" alone cannot say whether it means tonight or this morning, so callers mark
+// it.
+function isAfterMidnight(totalMinutes) {
+  return totalMinutes >= MINUTES_PER_DAY;
 }
 
 function readConfigValue(scheduleConfig, camelKey, pascalKey) {
@@ -488,12 +506,19 @@ function getScheduleCellForClass(scheduleColumn, item) {
     hasClockTime: cell.hasClockTime,
     startTime: cell.hasClockTime ? formatMinutesAsClock(cell.startMinutes) : null,
     finishTime: cell.hasClockTime ? formatMinutesAsClock(cell.finishMinutes) : null,
+    // The clock wraps at midnight, so these say which side of it the time falls on.
+    startsAfterMidnight: cell.hasClockTime && isAfterMidnight(cell.startMinutes),
+    finishesAfterMidnight: cell.hasClockTime && isAfterMidnight(cell.finishMinutes),
     durationMinutes: cell.durationMinutes,
     // Day-level fact, answerable from any row of the day: when its last POSITION finishes.
     dayFinishTime:
       dayResult && dayResult.dayFinishMinutes !== undefined
         ? formatMinutesAsClock(dayResult.dayFinishMinutes)
         : null,
+    dayFinishesAfterMidnight:
+      !!dayResult &&
+      dayResult.dayFinishMinutes !== undefined &&
+      isAfterMidnight(dayResult.dayFinishMinutes),
     dayHasOrigin: dayResult ? dayResult.hasOrigin : true,
     isAssumedOrigin: dayResult ? !!dayResult.isAssumedOrigin : false,
     isFirstOfDay: isFirstOfDay,
@@ -528,6 +553,9 @@ function getScheduleDayResult(scheduleColumn, item) {
       dayResult.dayFinishMinutes === undefined
         ? null
         : formatMinutesAsClock(dayResult.dayFinishMinutes),
+    dayFinishesAfterMidnight:
+      dayResult.dayFinishMinutes !== undefined &&
+      isAfterMidnight(dayResult.dayFinishMinutes),
   };
 }
 

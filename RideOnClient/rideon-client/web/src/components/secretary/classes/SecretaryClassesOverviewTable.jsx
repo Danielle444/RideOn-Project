@@ -148,6 +148,7 @@ function renderScheduleCell(cell) {
       {cell.startTime}
       {" – "}
       {cell.finishTime}
+      {cell.finishesAfterMidnight ? SCHEDULE_COPY.nextDaySuffix : ""}
     </span>
   );
 }

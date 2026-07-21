@@ -25,7 +25,13 @@ var CLASSES_VIEW_TABS_COPY = {
   },
 };
 
+// Marks a time that has wrapped past midnight into the following calendar day. Without it
+// a finish of "00:30" is indistinguishable from half past midnight that same morning.
+var NEXT_DAY_SUFFIX = " (למחרת)";
+
 var SCHEDULE_COPY = {
+  nextDaySuffix: NEXT_DAY_SUFFIX,
+
   planning: {
     columnHeader: "לוח זמנים משוער",
     dayFinishLabel: "סיום משוער",
@@ -237,10 +243,21 @@ var REGISTRATION_WINDOW_COPY = {
   demoNotice: "הדגמה בלבד — שליחת התראות אינה פעילה עדיין במערכת.",
 };
 
+// Forecast summary cards for the planning view. Suggestion/expectation voice: everything
+// here is צפוי, never a statement of fact.
+var PLANNING_FORECAST_COPY = {
+  predictedEntries: "כניסות צפויות ביום",
+  totalIncome: "הכנסה צפויה ביום",
+  ranchIncome: "הכנסה צפויה לחווה",
+  federationIncome: "הכנסה צפויה להתאחדות",
+  caveat: "המספרים מבוססים על תחזית הכניסות. ההכנסה מוצגת ברוטו, ללא ניכוי פרסים.",
+};
+
 export {
   CLASSES_VIEW_TABS_COPY,
   SCHEDULE_COPY,
   PLANNED_VS_ACTUAL_COPY,
   DAY_RECOMMENDATIONS_COPY,
   REGISTRATION_WINDOW_COPY,
+  PLANNING_FORECAST_COPY,
 };
