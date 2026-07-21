@@ -419,3 +419,7 @@ FodyWeavers.xsd
 
 # Claude Code local (personal, per-machine) settings
 .claude/settings.local.json
+
+# BMad Method (installed via `npx bmad-method install`, not tracked)
+_bmad/
+.claude/skills/bmad-*/
