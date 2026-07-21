@@ -503,9 +503,38 @@ function getScheduleCellForClass(scheduleColumn, item) {
   };
 }
 
+/**
+ * Day-level schedule facts for one day, for the notices panel above the table. Returns null
+ * when the day has no computed schedule. Takes any class of the day -- every class maps back
+ * to its own day result.
+ */
+function getScheduleDayResult(scheduleColumn, item) {
+  if (!scheduleColumn || !item) {
+    return null;
+  }
+
+  var dayResult = scheduleColumn.dayByClassId[getClassInCompId(item)];
+
+  if (!dayResult) {
+    return null;
+  }
+
+  return {
+    hasOrigin: dayResult.hasOrigin,
+    isAssumedOrigin: !!dayResult.isAssumedOrigin,
+    tier: dayResult.tier,
+    suggestion: dayResult.suggestion,
+    dayFinishTime:
+      dayResult.dayFinishMinutes === undefined
+        ? null
+        : formatMinutesAsClock(dayResult.dayFinishMinutes),
+  };
+}
+
 export {
   computeScheduleColumn,
   getScheduleCellForClass,
+  getScheduleDayResult,
   isScheduleExempt,
   getMinutesPerEntry,
 };

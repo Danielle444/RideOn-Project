@@ -4,6 +4,13 @@ import { ArrowRight, RefreshCw, RotateCcw } from "lucide-react";
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import TableActionButton from "../../components/common/table/TableActionButton";
 import SecretaryClassesOverviewTable from "../../components/secretary/classes/SecretaryClassesOverviewTable";
+import SecretaryClassesViewTabs from "../../components/secretary/classes/SecretaryClassesViewTabs";
+import ScheduleDayNotices from "../../components/secretary/classes/ScheduleDayNotices";
+import PlannedVsActualPanel from "../../components/secretary/classes/PlannedVsActualPanel";
+import {
+  CLASSES_VIEW_ACTUALS,
+  CLASSES_VIEW_FINANCIAL,
+} from "../../utils/classesView.utils";
 import SecretaryClassEntriesTable from "../../components/secretary/classes/SecretaryClassEntriesTable";
 import SecretaryClassEntriesSummaryCards from "../../components/secretary/classes/SecretaryClassEntriesSummaryCards";
 import ClassInCompetitionModal from "../../components/secretary/ClassInCompetitionModal";
@@ -210,10 +217,30 @@ export default function CompetitionClassesPage() {
               </div>
             </section>
 
+            <SecretaryClassesViewTabs
+              activeView={page.activeView}
+              isViewAvailable={page.isViewAvailable}
+              onChangeView={page.changeActiveView}
+            />
+
             <SecretaryClassEntriesSummaryCards
               summary={page.visibleClassesSummary}
               titlePrefix="כניסות ביום"
             />
+
+            {page.activeView === CLASSES_VIEW_ACTUALS ? (
+              <PlannedVsActualPanel summary={page.plannedVsActualSummary} />
+            ) : null}
+
+            {/* The notices belong to the schedule, so they follow it: absent from the
+                financial view, present in both time-phase views. */}
+            {page.activeView !== CLASSES_VIEW_FINANCIAL ? (
+              <ScheduleDayNotices
+                notices={page.scheduleDayNotices}
+                onApplySuggestion={page.applyStartTimeSuggestion}
+                applyingSuggestionClassId={page.applyingSuggestionClassId}
+              />
+            ) : null}
 
             <section className="rounded-3xl border border-[#EFE5DF] bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-4">
@@ -395,8 +422,8 @@ export default function CompetitionClassesPage() {
               scheduleViewMode={page.scheduleViewMode}
               onScheduleViewModeChange={page.setScheduleViewMode}
               getScheduleForClass={page.getScheduleForClass}
-              onApplyStartTimeSuggestion={page.applyStartTimeSuggestion}
-              applyingSuggestionClassId={page.applyingSuggestionClassId}
+              activeView={page.activeView}
+              getPlannedVsActualForClass={page.getPlannedVsActualForClass}
             />
           </>
         ) : (

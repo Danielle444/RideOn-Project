@@ -31,8 +31,17 @@ import {
 import {
   computeScheduleColumn,
   getScheduleCellForClass,
+  getScheduleDayResult,
   isScheduleExempt,
 } from "../../utils/classSchedule.utils";
+import {
+  isClassesViewAvailable,
+  resolveDefaultClassesView,
+} from "../../utils/classesView.utils";
+import {
+  compareClassToPrediction,
+  summarizePlannedVsActual,
+} from "../../utils/plannedVsActual.utils";
 
 function normalizeDateOnly(value) {
   if (!value) {
@@ -310,6 +319,36 @@ export default function useSecretaryCompetitionClassesPage(options) {
   var [scheduleConfig, setScheduleConfig] = useState(null);
   var [scheduleViewMode, setScheduleViewMode] = useState("avg");
   var [applyingSuggestionClassId, setApplyingSuggestionClassId] = useState(null);
+
+  // Three-view tabs. `null` means "not resolved yet" -- the default is DERIVED from the
+  // competition's registration window, so it cannot be chosen until the competition loads.
+  // Once the secretary picks a tab herself the derived default stops applying.
+  var [activeView, setActiveView] = useState(null);
+  var [hasChosenView, setHasChosenView] = useState(false);
+
+  useEffect(
+    function () {
+      if (!competitionDetails || hasChosenView) {
+        return;
+      }
+
+      setActiveView(resolveDefaultClassesView(competitionDetails));
+    },
+    [competitionDetails, hasChosenView],
+  );
+
+  function changeActiveView(viewKey) {
+    if (!isClassesViewAvailable(viewKey, competitionDetails)) {
+      return;
+    }
+
+    setHasChosenView(true);
+    setActiveView(viewKey);
+  }
+
+  function isViewAvailable(viewKey) {
+    return isClassesViewAvailable(viewKey, competitionDetails);
+  }
 
   useEffect(
     function () {
@@ -1275,6 +1314,62 @@ export default function useSecretaryCompetitionClassesPage(options) {
     };
   }
 
+  // Day-level schedule facts for the day currently selected, so the notices panel can state
+  // them once above the table instead of squeezing them into a cell. Keyed off the full
+  // `classes` list, not `visibleClasses`: a search filter must not silence a day's warning.
+  var scheduleDayNotices = useMemo(
+    function () {
+      if (!showScheduleColumns || !selectedDate) {
+        return null;
+      }
+
+      var dayClass = classes.find(function (item) {
+        return getClassDate(item) === selectedDate;
+      });
+
+      if (!dayClass) {
+        return null;
+      }
+
+      return {
+        predicted: getScheduleDayResult(predictedScheduleColumn, dayClass),
+        live: getScheduleDayResult(liveScheduleColumn, dayClass),
+      };
+    },
+    [
+      showScheduleColumns,
+      selectedDate,
+      classes,
+      predictedScheduleColumn,
+      liveScheduleColumn,
+    ],
+  );
+
+  // Planned-vs-actual diagnosis for the selected day. Scoped to the day rather than the whole
+  // competition because that is the unit the secretary is looking at, and a three-day
+  // competition can easily have one day the forecast got right and one it did not.
+  var plannedVsActualSummary = useMemo(
+    function () {
+      var dayClasses = classes.filter(function (item) {
+        return !selectedDate || getClassDate(item) === selectedDate;
+      });
+
+      return summarizePlannedVsActual(
+        dayClasses,
+        getActiveEntriesCountForClass,
+        getPredictionForClass,
+      );
+    },
+    [classes, entries, predictions, selectedDate],
+  );
+
+  function getPlannedVsActualForClass(item) {
+    return compareClassToPrediction(
+      getActiveEntriesCountForClass(item),
+      getPredictionForClass(item),
+    );
+  }
+
   // Reuses the single existing class-update path (updateClassInCompetition). Fetches the
   // class's current full row first so every other field -- including judges and prizes,
   // which the update proc fully overwrites on every call -- is resent unchanged alongside
@@ -1422,7 +1517,15 @@ export default function useSecretaryCompetitionClassesPage(options) {
     setScheduleViewMode,
     showScheduleColumns,
     getScheduleForClass,
+    scheduleDayNotices,
     applyStartTimeSuggestion,
     applyingSuggestionClassId,
+
+    // Three-view tabs (Phase 7)
+    activeView,
+    changeActiveView,
+    isViewAvailable,
+    plannedVsActualSummary,
+    getPlannedVsActualForClass,
   };
 }
