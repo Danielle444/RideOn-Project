@@ -143,12 +143,19 @@ immediately after its observation — never batch restores to the end.
 ## QA tracker entry format
 
 When drafting tracker entries, output a JSON array (wrapped in `[]`) even
-for a single entry. Latest issue number: 42 (37 update-model recompute
+for a single entry. Latest issue number: **45** (37 update-model recompute
 button, 38 wizard prediction display, 39 duplication-hook verification
-blocked on 36, 40 parallel-arena schedule serialization, 41 competitionday
-entity parked, 42 registration-window push recommendations parked).
-NOTE: 40-42 were drafted Claude-Code-side 2026-07-21 and must be pasted
-into the tracker; confirm they landed before assuming 43 is next.
+blocked on 36, 41 competitionday entity parked, 45 day origin ignores a real
+starttime when null-orderInDay classes sort ahead of it).
+NOTE: entries drafted Claude-Code-side on 2026-07-21 were accepted into the
+tracker under DIFFERENT numbers than drafted — the schedule-serialization and
+registration-window items were drafted as 40 and 42 but renumbered on entry,
+and the day-origin item drafted as 43 landed as 45. **Never assume a drafted
+number survives; confirm the assigned number with Oren before citing it in
+code comments, commit messages or skill notes.** Issue 40 is nonetheless
+referenced as "iss 40" throughout the Phase 7 schedule work and commit
+`a3ade7b` — that reference predates the renumbering and may point at a
+different tracker row.
 Fields, in this order:
 
 - `id`: `"iss_<epoch ms>"` matching `createdAt`
