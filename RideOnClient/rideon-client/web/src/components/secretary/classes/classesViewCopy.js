@@ -77,8 +77,8 @@ var PLANNED_VS_ACTUAL_COPY = {
   panelTitle: "השוואת תחזית לתוצאה בפועל",
 
   withinBand: "בתוך טווח התחזית",
-  belowBand: "מתחת לטווח התחזית",
-  aboveBand: "מעל טווח התחזית",
+  belowBand: "מתחת לתחזית",
+  aboveBand: "מעל לתחזית",
 
   // The verdicts are about the FORECAST, not about the competition. That distinction is the
   // reason this panel exists: a shortfall that is really a modelling error must not read as
@@ -97,15 +97,16 @@ var PLANNED_VS_ACTUAL_COPY = {
       detail:
         "יש פערים בין התחזית לבין התוצאה בפועל, אך הם אינם באותו כיוון. הפערים נובעים ממקצים מסוימים ולא מהטיה של התחזית.",
     },
+    // The TITLE carries the diagnosis (the forecast was wrong); the detail just states the
+    // observation. Keep that split -- if the title ever softens, the panel goes back to
+    // being a scoreboard.
     forecastHigh: {
       title: "התחזית הייתה גבוהה מדי",
-      detail:
-        "רוב המקצים סיימו מתחת לטווח התחזית. הפער נובע מהתחזית עצמה ולא בהכרח מהיקף ההרשמה לתחרות.",
+      detail: "ההרשמה למקצים הינה מתחת לטווח התחזית.",
     },
     forecastLow: {
       title: "התחזית הייתה נמוכה מדי",
-      detail:
-        "רוב המקצים סיימו מעל טווח התחזית. התחזית הייתה שמרנית מדי עבור תחרות זו.",
+      detail: "ההרשמה למקצים הינה מעל לטווח התחזית.",
     },
   },
 
@@ -133,4 +134,113 @@ var PLANNED_VS_ACTUAL_COPY = {
   },
 };
 
-export { CLASSES_VIEW_TABS_COPY, SCHEDULE_COPY, PLANNED_VS_ACTUAL_COPY };
+// Advice about things the app does not track (judge rotations, worker shifts). Suggestion
+// voice throughout -- these are always forward-looking, never a statement of fact.
+var DAY_RECOMMENDATIONS_COPY = {
+  panelTitle: "המלצות לתפעול היום",
+
+  judges: {
+    title: "כדאי לשקול תגבור שיפוט",
+    detail: function (judgeCount, dayFinishTime) {
+      return (
+        "היום צפוי להסתיים בשעה " +
+        dayFinishTime +
+        ", ורשומים בו " +
+        (judgeCount === 1 ? "שופט אחד" : judgeCount + " שופטים") +
+        ". כדאי לשקול הוספת שופט נוסף שיחליף באמצע היום."
+      );
+    },
+  },
+
+  shifts: {
+    title: "כדאי לשקול משמרת נוספת",
+    detail: function (dayFinishTime) {
+      return (
+        "היום צפוי להסתיים בשעה " +
+        dayFinishTime +
+        ". כדאי לשקול משמרת נוספת של עובדים כדי לכסות את שעות הערב."
+      );
+    },
+  },
+
+  responses: {
+    willDo: "נטפל בזה",
+    later: "הזכירי לי מאוחר יותר",
+    notNeeded: "לא נדרש",
+  },
+
+  answered: {
+    willDo: "סומן לטיפול",
+    later: "נדחה למועד מאוחר יותר",
+    notNeeded: "סומן כלא נדרש",
+  },
+
+  undo: "שינוי",
+};
+
+// The registration-open instrument. Denominated by position in the window, so the wording
+// changes with how much time is left, not only with the size of the gap.
+var REGISTRATION_WINDOW_COPY = {
+  panelTitle: "מעקב הרשמה",
+
+  progressLine: function (analysis) {
+    return (
+      "נרשמו " +
+      analysis.actualEntries +
+      " מתוך תחזית של " +
+      Math.round(analysis.predictedEntries) +
+      " · נותרו " +
+      (analysis.daysRemaining === 1
+        ? "יום אחד"
+        : analysis.daysRemaining + " ימים") +
+      " לסגירת ההרשמה"
+    );
+  },
+
+  statuses: {
+    onTrack: {
+      title: "ההרשמה מתקדמת בקצב הצפוי",
+      detail: "אין צורך בפעולה בשלב זה.",
+    },
+    // Early in the window the forecast is the less reliable side, so the wording says so.
+    earlySoft: {
+      title: "ההרשמה איטית מהצפוי, אך מוקדם להסיק",
+      detail:
+        "בתחילת תקופת ההרשמה התחזית פחות אמינה, וייתכן שהיא גבוהה מדי. כדאי להמשיך לעקוב לפני נקיטת פעולה.",
+    },
+    behind: {
+      title: "ההרשמה מפגרת אחרי התחזית",
+      detail:
+        "קצב ההרשמה נמוך מהצפוי ביחס לזמן שחלף. כדאי לשקול תזכורת לבעלי החוות כדי לעודד הרשמה.",
+    },
+    urgent: {
+      title: "ההרשמה מפגרת והזמן קצר",
+      detail:
+        "תקופת ההרשמה עומדת להסתיים וההרשמה עדיין מתחת לתחזית. זהו העיתוי האחרון שבו תזכורת עשויה להשפיע.",
+    },
+  },
+
+  notifyButton: "שליחת תזכורת לבעלי החוות",
+  notifyConfirmTitle: "שליחת תזכורת",
+  notifyConfirmBody: function (competitionName) {
+    return (
+      "תישלח התראה לכל בעלי החוות עם תזכורת להירשם לתחרות " +
+      competitionName +
+      ". לא ניתן לבטל שליחה."
+    );
+  },
+  notifyConfirm: "שלחי",
+  notifyCancel: "ביטול",
+  notifySent: "התזכורת נשלחה",
+
+  // Demo-only. The notification pipeline does not exist yet -- see the panel component.
+  demoNotice: "הדגמה בלבד — שליחת התראות אינה פעילה עדיין במערכת.",
+};
+
+export {
+  CLASSES_VIEW_TABS_COPY,
+  SCHEDULE_COPY,
+  PLANNED_VS_ACTUAL_COPY,
+  DAY_RECOMMENDATIONS_COPY,
+  REGISTRATION_WINDOW_COPY,
+};

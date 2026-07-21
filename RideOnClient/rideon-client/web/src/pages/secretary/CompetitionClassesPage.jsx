@@ -7,6 +7,8 @@ import SecretaryClassesOverviewTable from "../../components/secretary/classes/Se
 import SecretaryClassesViewTabs from "../../components/secretary/classes/SecretaryClassesViewTabs";
 import ScheduleDayNotices from "../../components/secretary/classes/ScheduleDayNotices";
 import PlannedVsActualPanel from "../../components/secretary/classes/PlannedVsActualPanel";
+import DayRecommendationsPanel from "../../components/secretary/classes/DayRecommendationsPanel";
+import RegistrationWindowPanel from "../../components/secretary/classes/RegistrationWindowPanel";
 import {
   CLASSES_VIEW_ACTUALS,
   CLASSES_VIEW_FINANCIAL,
@@ -232,6 +234,28 @@ export default function CompetitionClassesPage() {
               <PlannedVsActualPanel summary={page.plannedVsActualSummary} />
             ) : null}
 
+            {/* Only meaningful while registration is open, which is also the only time the
+                analysis returns isOpen -- the panel hides itself otherwise. */}
+            {page.activeView !== CLASSES_VIEW_FINANCIAL ? (
+              <RegistrationWindowPanel
+                analysis={page.registrationWindow}
+                competitionName={
+                  page.competitionDetails
+                    ? page.competitionDetails.competitionName ||
+                      page.competitionDetails.CompetitionName
+                    : ""
+                }
+              />
+            ) : null}
+
+            {page.activeView !== CLASSES_VIEW_FINANCIAL ? (
+              <DayRecommendationsPanel
+                recommendations={page.dayRecommendations}
+                responses={page.recommendationResponses}
+                onRespond={page.respondToRecommendation}
+              />
+            ) : null}
+
             {/* The notices belong to the schedule, so they follow it: absent from the
                 financial view, present in both time-phase views. */}
             {page.activeView !== CLASSES_VIEW_FINANCIAL ? (
@@ -423,6 +447,7 @@ export default function CompetitionClassesPage() {
               onScheduleViewModeChange={page.setScheduleViewMode}
               getScheduleForClass={page.getScheduleForClass}
               activeView={page.activeView}
+              isReiningField={page.isReiningField}
               getPlannedVsActualForClass={page.getPlannedVsActualForClass}
             />
           </>

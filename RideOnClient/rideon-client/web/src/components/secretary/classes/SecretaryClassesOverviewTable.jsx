@@ -135,10 +135,14 @@ function renderScheduleCell(cell) {
 
   var tierClass = cell.isLastOfDay ? getTierClass(cell.tier) : "";
 
+  // whitespace-nowrap keeps "HH:MM – HH:MM" on one line. Without it the predicted and live
+  // columns wrapped differently from each other purely on available width, which read as a
+  // meaningful difference between the two schedules when it was only layout.
   return (
     <span
       className={
-        "inline-block w-fit rounded px-2 py-0.5 font-semibold text-[#4A3A34] " + tierClass
+        "inline-block w-fit whitespace-nowrap rounded px-2 py-0.5 font-semibold text-[#4A3A34] " +
+        tierClass
       }
     >
       {cell.startTime}
@@ -179,7 +183,7 @@ function renderPlannedVsActualCell(comparison) {
 }
 
 var SCHEDULE_VIEW_MODES = [
-  { key: "avg", label: "רגיל" },
+  { key: "avg", label: "ממוצע" },
   { key: "min", label: "מינימום" },
   { key: "max", label: "מקסימום" },
 ];
@@ -198,6 +202,12 @@ export default function SecretaryClassesOverviewTable(props) {
 
     if (columnKey === "schedule") {
       return !!props.showScheduleColumns;
+    }
+
+    // Patterns (מסלול) are a reining concept. Every other field leaves patternNumber null,
+    // so the column was a full column of dashes for cutting, extreme and all-around.
+    if (columnKey === "pattern") {
+      return !!props.isReiningField;
     }
 
     return true;
@@ -283,7 +293,9 @@ export default function SecretaryClassesOverviewTable(props) {
             <th className="px-4 py-3">מס׳</th>
             <th className="px-4 py-3">שם מקצה</th>
             {showColumn("status") ? <th className="px-4 py-3">סטטוס</th> : null}
-            {showColumn("entries") ? <th className="px-4 py-3">כניסות</th> : null}
+            {showColumn("entries") ? (
+              <th className="px-4 py-3">כניסות בפועל</th>
+            ) : null}
             {showColumn("plannedVsActual") ? (
               <th className="px-4 py-3">{PLANNED_VS_ACTUAL_COPY.columnHeader}</th>
             ) : null}
@@ -305,7 +317,7 @@ export default function SecretaryClassesOverviewTable(props) {
                     }
                     title="הצגת התחזית כמספר בודד"
                   >
-                    מספר
+                    ממוצע
                   </button>
                   <button
                     type="button"

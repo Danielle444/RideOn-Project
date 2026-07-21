@@ -42,6 +42,8 @@ import {
   compareClassToPrediction,
   summarizePlannedVsActual,
 } from "../../utils/plannedVsActual.utils";
+import { getDayRecommendations } from "../../utils/dayRecommendations.utils";
+import { analyzeRegistrationWindow } from "../../utils/registrationWindow.utils";
 
 function normalizeDateOnly(value) {
   if (!value) {
@@ -1370,6 +1372,66 @@ export default function useSecretaryCompetitionClassesPage(options) {
     );
   }
 
+  // Staffing advice for the selected day, driven by the PREDICTED schedule -- the point is to
+  // warn before the day happens, and the live schedule only reaches a late tier once the
+  // entries are already in.
+  var dayRecommendations = useMemo(
+    function () {
+      if (!selectedDate) {
+        return [];
+      }
+
+      var dayClasses = classes.filter(function (item) {
+        return getClassDate(item) === selectedDate;
+      });
+
+      var dayResult = scheduleDayNotices ? scheduleDayNotices.predicted : null;
+
+      return getDayRecommendations(dayResult, dayClasses);
+    },
+    [selectedDate, classes, scheduleDayNotices],
+  );
+
+  // TODO: persistence. Oren chose per-competition-day persistence, which needs a table plus
+  // a proc and endpoint (see RideOnDB/migrations). Until that is deployed these answers live
+  // in component state only and reset on reload.
+  var [recommendationResponses, setRecommendationResponses] = useState({});
+
+  function respondToRecommendation(recommendationKey, response) {
+    setRecommendationResponses(function (previous) {
+      var next = { ...previous };
+
+      if (response === null) {
+        delete next[recommendationKey];
+      } else {
+        next[recommendationKey] = response;
+      }
+
+      return next;
+    });
+  }
+
+  // Registration-window instrument. Competition-wide, not per day: registration is not a
+  // per-day thing, and the forecast total it is measured against spans the whole event.
+  var registrationWindow = useMemo(
+    function () {
+      var totalPredicted = classes.reduce(function (sum, item) {
+        return sum + getPredictedEntriesForClass(item);
+      }, 0);
+
+      var totalActual = classes.reduce(function (sum, item) {
+        return sum + getActiveEntriesCountForClass(item);
+      }, 0);
+
+      return analyzeRegistrationWindow(
+        competitionDetails,
+        totalActual,
+        totalPredicted,
+      );
+    },
+    [competitionDetails, classes, entries, predictions],
+  );
+
   // Reuses the single existing class-update path (updateClassInCompetition). Fetches the
   // class's current full row first so every other field -- including judges and prizes,
   // which the update proc fully overwrites on every call -- is resent unchanged alongside
@@ -1503,6 +1565,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
     patterns,
     selectedFieldName,
     isReiningField,
+    competitionDetails,
     competitionStartDate,
     competitionEndDate,
     selectedCompetitionJudgeIds,
@@ -1527,5 +1590,10 @@ export default function useSecretaryCompetitionClassesPage(options) {
     isViewAvailable,
     plannedVsActualSummary,
     getPlannedVsActualForClass,
+
+    dayRecommendations,
+    recommendationResponses,
+    respondToRecommendation,
+    registrationWindow,
   };
 }
