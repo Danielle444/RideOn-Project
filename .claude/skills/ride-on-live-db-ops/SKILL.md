@@ -148,14 +148,16 @@ button, 38 wizard prediction display, 39 duplication-hook verification
 blocked on 36, 41 competitionday entity parked, 45 day origin ignores a real
 starttime when null-orderInDay classes sort ahead of it).
 NOTE: entries drafted Claude-Code-side on 2026-07-21 were accepted into the
-tracker under DIFFERENT numbers than drafted — the schedule-serialization and
-registration-window items were drafted as 40 and 42 but renumbered on entry,
-and the day-origin item drafted as 43 landed as 45. **Never assume a drafted
-number survives; confirm the assigned number with Oren before citing it in
-code comments, commit messages or skill notes.** Issue 40 is nonetheless
-referenced as "iss 40" throughout the Phase 7 schedule work and commit
-`a3ade7b` — that reference predates the renumbering and may point at a
-different tracker row.
+tracker under DIFFERENT numbers than drafted. Confirmed mapping (Oren,
+2026-07-21): schedule serialization drafted 40 → **#42**; competitionday
+entity drafted 41 → **#43**; registration-window push drafted 42 → **#44**;
+day origin drafted 43 → **#45**. **Never assume a drafted number survives;
+confirm the assigned number with Oren before citing it in code comments,
+commit messages or skill notes.** Two artifacts still say "iss 40" and cannot
+be corrected — commit `a3ade7b`'s message and
+`_bmad-output/party-mode/memories/installed/.memlog.md` — read both as #42.
+Tracker #43 also carries a self-referential "Related to: #43" which most
+likely means #42.
 Fields, in this order:
 
 - `id`: `"iss_<epoch ms>"` matching `createdAt`

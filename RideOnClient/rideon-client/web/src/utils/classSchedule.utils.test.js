@@ -229,7 +229,7 @@ describe("post-midnight display wraps without breaking the tiers", () => {
   });
 });
 
-// QA iss 40. Classes sharing an orderInDay run SIMULTANEOUSLY, so the day advances once per
+// QA #42. Classes sharing an orderInDay run SIMULTANEOUSLY, so the day advances once per
 // POSITION: a position costs the MAX of its classes' durations, never their sum, and the
 // between-class gap falls once per position boundary. `extremeConfig` is used throughout
 // (6 minutes per entry, no gaps of any kind) so every expected clock time is plain arithmetic.
