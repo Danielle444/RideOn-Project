@@ -639,8 +639,18 @@ export default function useSecretaryCompetitionClassesPage(options) {
     });
   }
 
+  // QA 41. The כניסות column must count Active entries only, matching the system-wide
+  // convention and the live schedule column beside it, which has always filtered. `entries`
+  // deliberately holds cancelled rows -- the cancelled show/hide/only toggle depends on it --
+  // so the filter belongs here rather than in getEntriesForClass, whose other caller
+  // (getHasDrawForClass) is left seeing the full set on purpose; narrowing that would change
+  // draw-order behaviour, which is out of scope.
   function getEntriesCountForClass(item) {
-    return getEntriesForClass(item).length;
+    return getEntriesForClass(item).filter(function (entry) {
+      var status = entry.entryStatus || entry.EntryStatus || "Active";
+
+      return status === "Active";
+    }).length;
   }
 
   function getEntriesCountForGroup(item) {

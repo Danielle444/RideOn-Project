@@ -8,11 +8,24 @@
 -- Follows the p_* param / lowercase unquoted return-column convention established by the
 -- Smart Element proc family (160-163).
 --
--- DEPLOYED LIVE 2026-07-20, verified against all six fieldids.
--- CREATE OR REPLACE matches the convention of the rest of the family. Note that
--- CREATE OR REPLACE cannot change a return type: adding a further column to RETURNS TABLE
--- requires an explicit DROP FUNCTION first.
-CREATE OR REPLACE FUNCTION public.usp_getscheduleconfigbyfieldid(p_fieldid smallint)
+-- FLATTENING IS REINING-ONLY (fieldid 1). Both gap columns are gated on that here rather
+-- than in the frontend: classSchedule.utils.js already coerces a null gap to 0, so gating
+-- in SQL means the client needs no field knowledge and no extra branch. The literal 1 is a
+-- deliberate tradeoff -- the declarative shape would be per-field columns on fieldconfig
+-- (where minutesperentrymin/max already live), which is deferred, not rejected.
+--
+-- betweenclassgapminutes  = the gap duration, applied BOTH between adjacent classes and
+--                           inside a class every flatteningrunspergap runs (one concept,
+--                           one duration -- confirmed 2026-07-21).
+-- flatteningrunspergap    = how many runs between mid-class gaps. Fixed at 6 for now;
+--                           deliberately NOT linked to the regular/minimum/maximum switcher.
+--
+-- DEPLOYED LIVE 2026-07-20 with 7 columns; this revision adds an 8th and therefore CANNOT
+-- ship via CREATE OR REPLACE -- a return-type change requires an explicit DROP FUNCTION
+-- first. The DROP below is part of the migration, not a leftover.
+DROP FUNCTION IF EXISTS public.usp_getscheduleconfigbyfieldid(smallint);
+
+CREATE FUNCTION public.usp_getscheduleconfigbyfieldid(p_fieldid smallint)
 RETURNS TABLE(
     minutesperentrymin numeric,
     minutesperentrymax numeric,
@@ -20,7 +33,8 @@ RETURNS TABLE(
     latefinishyellowhour numeric,
     latefinishorangehour numeric,
     latefinishredhour numeric,
-    defaultfirstclassstarthour numeric
+    defaultfirstclassstarthour numeric,
+    flatteningrunspergap numeric
 )
 LANGUAGE sql
 STABLE
@@ -28,11 +42,16 @@ AS $function$
     SELECT
         fc.minutesperentrymin,
         fc.minutesperentrymax,
-        (SELECT sc.configvalue FROM smartconfig sc WHERE sc.configkey = 'betweenclassgapminutes'),
+        CASE WHEN p_fieldid = 1 THEN
+            (SELECT sc.configvalue FROM smartconfig sc WHERE sc.configkey = 'betweenclassgapminutes')
+        END,
         (SELECT sc.configvalue FROM smartconfig sc WHERE sc.configkey = 'latefinishyellowhour'),
         (SELECT sc.configvalue FROM smartconfig sc WHERE sc.configkey = 'latefinishorangehour'),
         (SELECT sc.configvalue FROM smartconfig sc WHERE sc.configkey = 'latefinishredhour'),
-        (SELECT sc.configvalue FROM smartconfig sc WHERE sc.configkey = 'defaultfirstclassstarthour')
+        (SELECT sc.configvalue FROM smartconfig sc WHERE sc.configkey = 'defaultfirstclassstarthour'),
+        CASE WHEN p_fieldid = 1 THEN
+            (SELECT sc.configvalue FROM smartconfig sc WHERE sc.configkey = 'flatteningrunspergap')
+        END
     FROM (SELECT p_fieldid AS fieldid) f
     LEFT JOIN fieldconfig fc ON fc.fieldid = f.fieldid;
 $function$;

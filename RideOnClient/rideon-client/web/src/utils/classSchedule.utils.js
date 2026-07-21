@@ -178,6 +178,28 @@ var EARLIEST_SUGGESTABLE_START_MINUTES = 6 * 60;
 var SUGGESTION_ROUND_MINUTES = 30;
 var MIDNIGHT_HOUR = 24;
 
+// Flattening is reining-only. The proc returns both gap values as NULL for every other
+// field, so `gapMinutes`/`runsPerGap` arrive as 0 here and every formula below degrades to
+// a plain continuous roll-forward -- no field knowledge is needed on this side.
+//
+// A flattening gap falls every `runsPerGap` runs INSIDE a class as well as between classes.
+// The `- 1` is what stops it doubling: a class of exactly 12 runs at an interval of 6 has
+// its second boundary at run 12, which is the class boundary itself, where the between-class
+// gap already falls. So 12 runs yields 1 mid-class gap, not 2; 6 runs yields 0.
+function countMidClassGaps(entries, runsPerGap) {
+  if (!runsPerGap || runsPerGap <= 0 || entries <= 0) {
+    return 0;
+  }
+
+  return Math.floor((entries - 1) / runsPerGap);
+}
+
+function computeClassDuration(entries, minutesPerEntry, gapMinutes, runsPerGap) {
+  var runMinutes = Math.round(entries * minutesPerEntry);
+
+  return runMinutes + countMidClassGaps(entries, runsPerGap) * gapMinutes;
+}
+
 function computeDaySchedule(dayClasses, scheduleConfig, viewMode, getEntryCount) {
   var minutesPerEntry = getMinutesPerEntry(scheduleConfig, viewMode);
 
@@ -189,6 +211,12 @@ function computeDaySchedule(dayClasses, scheduleConfig, viewMode, getEntryCount)
     scheduleConfig,
     "betweenClassGapMinutes",
     "BetweenClassGapMinutes",
+  ) || 0;
+
+  var runsPerGap = readConfigValue(
+    scheduleConfig,
+    "flatteningRunsPerGap",
+    "FlatteningRunsPerGap",
   ) || 0;
 
   // When no class on the day carries a starttime, fall back to the configured assumed start
@@ -218,7 +246,12 @@ function computeDaySchedule(dayClasses, scheduleConfig, viewMode, getEntryCount)
   if (origin.startMinutes === null) {
     dayClasses.forEach(function (item) {
       var entries = Number(getEntryCount(item) || 0);
-      var duration = Math.round(entries * minutesPerEntry);
+      var duration = computeClassDuration(
+        entries,
+        minutesPerEntry,
+        gapMinutes,
+        runsPerGap,
+      );
 
       perClass[getClassInCompId(item)] = {
         hasClockTime: false,
@@ -246,7 +279,12 @@ function computeDaySchedule(dayClasses, scheduleConfig, viewMode, getEntryCount)
 
     var startMinutes = cursor;
     var entries = Number(getEntryCount(item) || 0);
-    var duration = Math.round(entries * minutesPerEntry);
+    var duration = computeClassDuration(
+      entries,
+      minutesPerEntry,
+      gapMinutes,
+      runsPerGap,
+    );
     var finishMinutes = startMinutes + duration;
 
     perClass[getClassInCompId(item)] = {
@@ -279,8 +317,13 @@ function computeDaySchedule(dayClasses, scheduleConfig, viewMode, getEntryCount)
     var overageMinutes = Math.max(0, finishHours - MIDNIGHT_HOUR) * 60;
     var roundedOverage =
       Math.ceil(overageMinutes / SUGGESTION_ROUND_MINUTES) * SUGGESTION_ROUND_MINUTES;
+    // What the overage actually demands, before the 06:00 floor is applied. When the floor
+    // bites, the offered start no longer resolves the overage -- the day still finishes late.
+    // Saying so is the whole point of finding 6; the button is still offered because an
+    // insufficient improvement is better than none.
+    var desiredOriginMinutes = origin.startMinutes - roundedOverage;
     var newOriginMinutes = Math.max(
-      origin.startMinutes - roundedOverage,
+      desiredOriginMinutes,
       EARLIEST_SUGGESTABLE_START_MINUTES,
     );
 
@@ -288,6 +331,7 @@ function computeDaySchedule(dayClasses, scheduleConfig, viewMode, getEntryCount)
       kind: "advance",
       targetClassId: origin.targetClassId,
       newStartTime: formatMinutesAsClock(newOriginMinutes),
+      isInsufficient: desiredOriginMinutes < EARLIEST_SUGGESTABLE_START_MINUTES,
     };
   }
 

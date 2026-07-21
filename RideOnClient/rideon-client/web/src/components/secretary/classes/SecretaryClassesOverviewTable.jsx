@@ -182,7 +182,7 @@ function renderScheduleCell(cell, onApplySuggestion, applyingSuggestionClassId) 
           </span>
           {renderApplyButton(
             cell.suggestion,
-            "קבע את שעת ההתחלה ל-",
+            "הכנס את שעת ההתחלה ",
             onApplySuggestion,
             applyingSuggestionClassId,
           )}
@@ -204,6 +204,11 @@ function renderScheduleCell(cell, onApplySuggestion, applyingSuggestionClassId) 
             onApplySuggestion,
             applyingSuggestionClassId,
           )}
+          {cell.suggestion && cell.suggestion.isInsufficient ? (
+            <span className="text-[10px] text-[#9A5216]">
+              הקדמת שעת ההתחלה אינה מספיקה. יש לשקול לפצל את היום או להעביר מקצים
+            </span>
+          ) : null}
         </div>
       ) : null}
     </div>
