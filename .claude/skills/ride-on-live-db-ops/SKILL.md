@@ -7,7 +7,12 @@ description: "Use this skill in ANY claude.ai conversation touching the RIDE ON 
 # RIDE ON — Claude.ai Operating Protocol
 
 Claude.ai is the **live database side and coordination hub** of the RideOn
-workflow. Claude Code (separate tool, no DB credentials) does all repo work.
+workflow. Claude Code does all repo work and, since 2026-07-20, ALSO has
+live DB access through the Supabase MCP — the "Claude Code has no DB
+credentials" split below is HISTORICAL. Reads are free on both sides;
+Claude Code shows every write as exact SQL and confirms with Oren before
+running it. Treat the division-of-labor table as a description of who
+usually does what, not as a capability boundary.
 Oren relays messages between the two. System facts (schema, procs, conventions,
 local dev setup) live in `ride-on-system-knowledge` — read that too; this skill
 is about HOW claude.ai works, not WHAT the system is.
@@ -138,9 +143,13 @@ immediately after its observation — never batch restores to the end.
 ## QA tracker entry format
 
 When drafting tracker entries, output a JSON array (wrapped in `[]`) even
-for a single entry. Latest issue number: 39 (37 update-model recompute
-button, 38 wizard prediction display, 39 duplication-hook verification,
-blocked on 36). Fields, in this order:
+for a single entry. Latest issue number: 42 (37 update-model recompute
+button, 38 wizard prediction display, 39 duplication-hook verification
+blocked on 36, 40 parallel-arena schedule serialization, 41 competitionday
+entity parked, 42 registration-window push recommendations parked).
+NOTE: 40-42 were drafted Claude-Code-side 2026-07-21 and must be pasted
+into the tracker; confirm they landed before assuming 43 is next.
+Fields, in this order:
 
 - `id`: `"iss_<epoch ms>"` matching `createdAt`
 - `num`: next sequential integer
