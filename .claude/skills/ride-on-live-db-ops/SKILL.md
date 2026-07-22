@@ -1,33 +1,41 @@
 ---
 name: ride-on-live-db-ops
-description: "Use this skill in ANY claude.ai conversation touching the RIDE ON equestrian system: live Supabase DB reads/writes, applying or verifying stored procedures, reviewing Claude Code reports, drafting prompts or replies for Claude Code, QA triage of bugs found while testing, or coordinating a deploy. Trigger even if the request seems small (\"check this proc\", \"draft a prompt for Claude Code\", \"why does the form show X\") — this skill defines claude.ai's role and safety protocol in the RideOn workflow. Load ride-on-system-knowledge alongside it for system facts."
+description: "Use this skill in ANY session doing live DB work on the RIDE ON equestrian system: reads/writes via the Supabase MCP, applying or verifying stored procedures, QA triage against DB ground truth, or coordinating a deploy. Trigger even if the request seems small (\"check this proc\", \"why does the form show X\"). Claude Code now owns these operations directly; claude.ai is an optional second reviewer. Load ride-on-system-knowledge alongside it for system facts."
 ---
 
 
-# RIDE ON — Claude.ai Operating Protocol
+# RIDE ON — Live DB Operating Protocol
 
-Claude.ai is the **live database side and coordination hub** of the RideOn
-workflow. Claude Code does all repo work and, since 2026-07-20, ALSO has
-live DB access through the Supabase MCP — the "Claude Code has no DB
-credentials" split below is HISTORICAL. Reads are free on both sides;
-Claude Code shows every write as exact SQL and confirms with Oren before
-running it. Treat the division-of-labor table as a description of who
-usually does what, not as a capability boundary.
-Oren relays messages between the two. System facts (schema, procs, conventions,
-local dev setup) live in `ride-on-system-knowledge` — read that too; this skill
-is about HOW claude.ai works, not WHAT the system is.
+**Claude Code owns live DB operations directly**, through the Supabase MCP
+(`execute_sql`, `list_tables`, `apply_migration`), as of 2026-07-20. This is
+now the default: reads are free, every write is shown to Oren as exact SQL and
+confirmed before it runs, then re-read afterwards as proof it landed. The whole
+duplication-42883 fix this file was updated from (2026-07-22) was done end to
+end by Claude Code — investigation, live proc reads, the code fix, the repo
+reconciliation, worktree renumber, merge coordination — with **no claude.ai
+involvement at all**. The old "Claude.ai is the live database side / Claude Code
+has no DB credentials" split is HISTORICAL; wherever the protocol below still
+says "claude.ai does X", read it as "whoever is at the DB does X", and that is
+normally Claude Code now.
+
+claude.ai remains available as an **optional second pair of eyes** — independent
+verification of a risky write, a cross-check of a reconstruction against live —
+and Oren can still relay between the two when she wants that. It is no longer
+required for DB work. System facts (schema, procs, conventions, local dev setup)
+live in `ride-on-system-knowledge` — read that too; this skill is about HOW live
+DB work is done safely, not WHAT the system is.
 
 Supabase project id: `sxplumrexbolpwqacpiz`.
 
 ## Division of labor
 
-| claude.ai | Claude Code |
+| Claude Code (primary) | claude.ai (optional second reviewer) |
 |---|---|
-| Live DB reads/writes via Supabase MCP | Repo exploration, edits, git, builds |
-| Verifying Claude Code's claims against live | Frontend/backend/proc SQL file changes |
-| Drafting paste-ready Claude Code prompts | Running dotnet build, npm build, greps |
-| QA triage: DB ground truth checks | Showing diffs before applying |
-| Reviewing proposed SQL before deploy | Committing, pushing |
+| Live DB reads/writes via Supabase MCP | Independent check of a proposed write |
+| Repo exploration, edits, git, builds | Cross-checking a reconstruction vs live |
+| Frontend/backend/proc SQL changes | QA triage sanity checks when asked |
+| dotnet/npm builds, greps, diffs before applying | Reviewing SQL before a high-risk deploy |
+| Showing each write as exact SQL, confirming, re-reading after; committing, pushing, merge coordination | |
 
 ## Live DB write protocol (never skip steps)
 
@@ -109,6 +117,18 @@ itself authored the type-mismatch bug (deployed as written, never drift).
 the problem is the local stack — usually the backend not running or not
 restarted after a branch switch. This resolved one real incident in minutes.
 
+**"procedure ... does not exist" (42883) is a WORDING tell, not proof of a
+missing proc.** Postgres says *procedure* for a failed `CALL` and *function*
+for a failed `SELECT * FROM fn(...)`. If the error names a "procedure" that a
+read shows plainly exists (as functions, `prokind='f'`), the bug is on the
+CALLER: the C# DAL set `CommandType.StoredProcedure`, which Npgsql 8 emits as
+`CALL` — and `CALL` only resolves `prokind='p'`. That was the entire root cause
+of duplication 42883 (2026-07-22); the date-type overload mismatch was real but
+LATENT behind it. Fix was to route through `CreateCommandWithStoredProcedure`
+(builds `SELECT * FROM fn(@p1..)`), never `CommandType.StoredProcedure`. So on a
+42883 whose proc a read confirms exists, check the caller's command type before
+touching the DB. See ride-on-system-knowledge → Competition Duplication.
+
 DB ground truth also gates UI design decisions, not just bugs: the
 slotstatus "make it a dropdown" request became a product decision once a
 read-only check showed no constraint and near-empty usage (60 NULL,
@@ -178,14 +198,20 @@ Fields, in this order:
   `createdAt`: epoch ms; `dateResolved`: null
 - `foundBy`: a PERSON (usually "Oren"), never a tool name; `assignee`: ""
 
-## Drafting for Claude Code
+## Drafting for Claude Code (only when the two-agent relay is in use)
+
+This section applies **only** when claude.ai is being used as the second agent
+and Oren is relaying prompts to a separate Claude Code — the historical split.
+In the normal case now, Claude Code does the DB work itself and there is nothing
+to draft. Kept for when Oren deliberately runs the two-agent flow.
 
 - Prompts and replies are **paste-ready**, fenced between `---` separators,
   with no meta-text inside the block.
 - Structure: investigation-first ("report findings before writing code"),
   explicit report-back points, diffs before applying, dotnet build + bypass
-  grep after backend changes, and the deployment split reminder (repo files
-  only; claude.ai applies live changes).
+  grep after backend changes, and the deployment reminder that DB changes
+  deploy independently of code and must stay backward-compatible with the
+  currently deployed backend.
 - Every prompt includes: "mark anything you inferred rather than read, and state
   it explicitly when you cannot verify something (e.g. live DB state)." Claude
   Code flagging a reconstruction as unverified has directly prevented a broken
