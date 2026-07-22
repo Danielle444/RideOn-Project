@@ -95,7 +95,7 @@ Before modifying a DAL file or `DBServices.cs`, read the corresponding stored pr
 
 ## Session Protocol (Oren's working rules)
 
-Division of labor: Claude Code works on repo files ONLY and has no DB credentials. All live DB reads, writes, migrations, and proc deployments go through claude.ai. Any SQL you write is a repo file plus a deployment request, never assume it is live.
+Division of labor: Claude Code owns repo files, and **since 2026-07-20 also reaches the live database through the Supabase MCP** (`execute_sql`, `list_tables`, `apply_migration`; project `sxplumrexbolpwqacpiz`). Reads are free — prefer verifying against live over inferring from `RideOnDB/schema.sql`, which is known stale. **Every write is shown to Oren as exact SQL and confirmed before it runs**, then re-read afterwards as proof it landed. The discipline the old repo-only rule protected still holds: a repo `.sql` file is never evidence that a proc is deployed.
 Domain knowledge lives in .claude/skills/ (RideOn skills). Read the relevant SKILL.md at session start for any RideOn task.
 Investigation first: for any nontrivial task, investigate and report findings before writing code. Mark explicitly what was read vs inferred, and state what you cannot verify. Flag path or spec corrections instead of silently fixing them.
 Show diffs before applying changes. After any backend change: dotnet build, then grep for call paths that bypass the changed validation or logic.

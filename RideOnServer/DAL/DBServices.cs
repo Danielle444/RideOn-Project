@@ -13,6 +13,7 @@ namespace RideOnServer.DAL
                 .SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                 .AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: true)
+                .AddUserSecrets<Program>(optional: true)
                 .AddEnvironmentVariables()
                 .Build();
 

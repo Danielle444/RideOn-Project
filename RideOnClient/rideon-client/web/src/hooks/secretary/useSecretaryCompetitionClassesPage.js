@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getClassesByCompetitionId,
   getPredictionsByCompetitionId,
+  getClassById,
   updateClassInCompetition,
   deleteClassInCompetition,
 } from "../../services/classInCompetitionService";
@@ -21,7 +22,28 @@ import {
   getAllPatternsWithManeuvers,
 } from "../../services/superUserService";
 import { getArenasByRanchId } from "../../services/arenaService";
-import { getErrorMessage, toInputDate } from "../../utils/competitionForm.utils";
+import { getScheduleConfigByFieldId } from "../../services/scheduleConfigService";
+import {
+  getErrorMessage,
+  toInputDate,
+  normalizeTimeForServer,
+} from "../../utils/competitionForm.utils";
+import {
+  computeScheduleColumn,
+  getScheduleCellForClass,
+  getScheduleDayResult,
+  isScheduleExempt,
+} from "../../utils/classSchedule.utils";
+import {
+  isClassesViewAvailable,
+  resolveDefaultClassesView,
+} from "../../utils/classesView.utils";
+import {
+  compareClassToPrediction,
+  summarizePlannedVsActual,
+} from "../../utils/plannedVsActual.utils";
+import { getDayRecommendations } from "../../utils/dayRecommendations.utils";
+import { analyzeRegistrationWindow } from "../../utils/registrationWindow.utils";
 
 function normalizeDateOnly(value) {
   if (!value) {
@@ -295,6 +317,41 @@ export default function useSecretaryCompetitionClassesPage(options) {
   var [patterns, setPatterns] = useState([]);
   var [fields, setFields] = useState([]);
 
+  // Schedule view (Phase 7): predicted/live schedule columns on the classes page
+  var [scheduleConfig, setScheduleConfig] = useState(null);
+  var [scheduleViewMode, setScheduleViewMode] = useState("avg");
+  var [applyingSuggestionClassId, setApplyingSuggestionClassId] = useState(null);
+
+  // Three-view tabs. `null` means "not resolved yet" -- the default is DERIVED from the
+  // competition's registration window, so it cannot be chosen until the competition loads.
+  // Once the secretary picks a tab herself the derived default stops applying.
+  var [activeView, setActiveView] = useState(null);
+  var [hasChosenView, setHasChosenView] = useState(false);
+
+  useEffect(
+    function () {
+      if (!competitionDetails || hasChosenView) {
+        return;
+      }
+
+      setActiveView(resolveDefaultClassesView(competitionDetails));
+    },
+    [competitionDetails, hasChosenView],
+  );
+
+  function changeActiveView(viewKey) {
+    if (!isClassesViewAvailable(viewKey, competitionDetails)) {
+      return;
+    }
+
+    setHasChosenView(true);
+    setActiveView(viewKey);
+  }
+
+  function isViewAvailable(viewKey) {
+    return isClassesViewAvailable(viewKey, competitionDetails);
+  }
+
   useEffect(
     function () {
       loadPageData();
@@ -330,6 +387,35 @@ export default function useSecretaryCompetitionClassesPage(options) {
       setJudges(Array.isArray(results[5].data) ? results[5].data : []);
     } catch (err) {
       console.error("loadLookups error", err);
+    }
+  }
+
+  // A competition has exactly one field, so the schedule config is fetched once per
+  // competition load, not per class.
+  useEffect(
+    function () {
+      var fieldId =
+        competitionDetails &&
+        (competitionDetails.fieldId || competitionDetails.FieldId);
+
+      if (!fieldId) {
+        return;
+      }
+
+      loadScheduleConfig(fieldId);
+    },
+    [competitionDetails],
+  );
+
+  // Best-effort only, same convention as loadPredictions: never sets `error`, never shows
+  // a toast. A failed fetch just means the schedule columns don't render.
+  async function loadScheduleConfig(fieldId) {
+    try {
+      var response = await getScheduleConfigByFieldId(fieldId);
+      setScheduleConfig(response.data || null);
+    } catch (err) {
+      console.error("loadScheduleConfig error", err);
+      setScheduleConfig(null);
     }
   }
 
@@ -594,8 +680,18 @@ export default function useSecretaryCompetitionClassesPage(options) {
     });
   }
 
+  // QA 41. The כניסות column must count Active entries only, matching the system-wide
+  // convention and the live schedule column beside it, which has always filtered. `entries`
+  // deliberately holds cancelled rows -- the cancelled show/hide/only toggle depends on it --
+  // so the filter belongs here rather than in getEntriesForClass, whose other caller
+  // (getHasDrawForClass) is left seeing the full set on purpose; narrowing that would change
+  // draw-order behaviour, which is out of scope.
   function getEntriesCountForClass(item) {
-    return getEntriesForClass(item).length;
+    return getEntriesForClass(item).filter(function (entry) {
+      var status = entry.entryStatus || entry.EntryStatus || "Active";
+
+      return status === "Active";
+    }).length;
   }
 
   function getEntriesCountForGroup(item) {
@@ -1152,6 +1248,271 @@ export default function useSecretaryCompetitionClassesPage(options) {
     }
   }
 
+  // Schedule view (Phase 7). Deliberately its own explicit Active-only filter rather than
+  // reusing getEntriesCountForClass, which counts every status -- the documented system-wide
+  // convention for "entries" is Active-only, and the live schedule column must match it.
+  function getActiveEntriesCountForClass(item) {
+    var classId = getClassInCompId(item);
+
+    return entries.filter(function (entry) {
+      if (Number(getEntryClassInCompId(entry)) !== Number(classId)) {
+        return false;
+      }
+
+      var status = entry.entryStatus || entry.EntryStatus || "Active";
+      return status === "Active";
+    }).length;
+  }
+
+  function getPredictedEntriesForClass(item) {
+    var prediction = getPredictionForClass(item);
+
+    if (!prediction) {
+      return 0;
+    }
+
+    var value = prediction.predictedEntries;
+
+    if (value === null || value === undefined) {
+      value = prediction.PredictedEntries;
+    }
+
+    return Number(value) || 0;
+  }
+
+  // Computed over the full unfiltered `classes` list (not `visibleClasses`) so a search or
+  // entries/prize/draw filter never changes the objective rolled-forward schedule -- only
+  // which rows get rendered changes.
+  var predictedScheduleColumn = useMemo(
+    function () {
+      return computeScheduleColumn(
+        classes,
+        scheduleConfig,
+        scheduleViewMode,
+        getPredictedEntriesForClass,
+      );
+    },
+    [classes, predictions, scheduleConfig, scheduleViewMode],
+  );
+
+  var liveScheduleColumn = useMemo(
+    function () {
+      return computeScheduleColumn(
+        classes,
+        scheduleConfig,
+        scheduleViewMode,
+        getActiveEntriesCountForClass,
+      );
+    },
+    [classes, entries, scheduleConfig, scheduleViewMode],
+  );
+
+  var showScheduleColumns = !!scheduleConfig && !isScheduleExempt(scheduleConfig);
+
+  function getScheduleForClass(item) {
+    return {
+      predicted: getScheduleCellForClass(predictedScheduleColumn, item),
+      live: getScheduleCellForClass(liveScheduleColumn, item),
+    };
+  }
+
+  // Day-level schedule facts for the day currently selected, so the notices panel can state
+  // them once above the table instead of squeezing them into a cell. Keyed off the full
+  // `classes` list, not `visibleClasses`: a search filter must not silence a day's warning.
+  var scheduleDayNotices = useMemo(
+    function () {
+      if (!showScheduleColumns || !selectedDate) {
+        return null;
+      }
+
+      var dayClass = classes.find(function (item) {
+        return getClassDate(item) === selectedDate;
+      });
+
+      if (!dayClass) {
+        return null;
+      }
+
+      return {
+        predicted: getScheduleDayResult(predictedScheduleColumn, dayClass),
+        live: getScheduleDayResult(liveScheduleColumn, dayClass),
+      };
+    },
+    [
+      showScheduleColumns,
+      selectedDate,
+      classes,
+      predictedScheduleColumn,
+      liveScheduleColumn,
+    ],
+  );
+
+  // Planned-vs-actual diagnosis for the selected day. Scoped to the day rather than the whole
+  // competition because that is the unit the secretary is looking at, and a three-day
+  // competition can easily have one day the forecast got right and one it did not.
+  var plannedVsActualSummary = useMemo(
+    function () {
+      var dayClasses = classes.filter(function (item) {
+        return !selectedDate || getClassDate(item) === selectedDate;
+      });
+
+      return summarizePlannedVsActual(
+        dayClasses,
+        getActiveEntriesCountForClass,
+        getPredictionForClass,
+      );
+    },
+    [classes, entries, predictions, selectedDate],
+  );
+
+  function getPlannedVsActualForClass(item) {
+    return compareClassToPrediction(
+      getActiveEntriesCountForClass(item),
+      getPredictionForClass(item),
+    );
+  }
+
+  // Staffing advice for the selected day, driven by the PREDICTED schedule -- the point is to
+  // warn before the day happens, and the live schedule only reaches a late tier once the
+  // entries are already in.
+  var dayRecommendations = useMemo(
+    function () {
+      if (!selectedDate) {
+        return [];
+      }
+
+      var dayClasses = classes.filter(function (item) {
+        return getClassDate(item) === selectedDate;
+      });
+
+      var dayResult = scheduleDayNotices ? scheduleDayNotices.predicted : null;
+
+      return getDayRecommendations(dayResult, dayClasses);
+    },
+    [selectedDate, classes, scheduleDayNotices],
+  );
+
+  // TODO: persistence. Oren chose per-competition-day persistence, which needs a table plus
+  // a proc and endpoint (see RideOnDB/migrations). Until that is deployed these answers live
+  // in component state only and reset on reload.
+  var [recommendationResponses, setRecommendationResponses] = useState({});
+
+  function respondToRecommendation(recommendationKey, response) {
+    setRecommendationResponses(function (previous) {
+      var next = { ...previous };
+
+      if (response === null) {
+        delete next[recommendationKey];
+      } else {
+        next[recommendationKey] = response;
+      }
+
+      return next;
+    });
+  }
+
+  // Forecast totals for the selected day, replacing the paid/unpaid actuals cards in the
+  // planning view. Income is GROSS -- predicted entries x cost, no prize deduction.
+  var planningForecast = useMemo(
+    function () {
+      var dayClasses = classes.filter(function (item) {
+        return !selectedDate || getClassDate(item) === selectedDate;
+      });
+
+      var predictedEntries = 0;
+      var ranchIncome = 0;
+      var federationIncome = 0;
+
+      dayClasses.forEach(function (item) {
+        var predicted = getPredictedEntriesForClass(item);
+        var organizerCost = Number(item.organizerCost || item.OrganizerCost || 0);
+        var federationCost = Number(item.federationCost || item.FederationCost || 0);
+
+        predictedEntries += predicted;
+        ranchIncome += predicted * organizerCost;
+        federationIncome += predicted * federationCost;
+      });
+
+      return {
+        predictedEntries: predictedEntries,
+        ranchIncome: ranchIncome,
+        federationIncome: federationIncome,
+        totalIncome: ranchIncome + federationIncome,
+      };
+    },
+    [classes, predictions, selectedDate],
+  );
+
+  // Registration-window instrument. Competition-wide, not per day: registration is not a
+  // per-day thing, and the forecast total it is measured against spans the whole event.
+  var registrationWindow = useMemo(
+    function () {
+      var totalPredicted = classes.reduce(function (sum, item) {
+        return sum + getPredictedEntriesForClass(item);
+      }, 0);
+
+      var totalActual = classes.reduce(function (sum, item) {
+        return sum + getActiveEntriesCountForClass(item);
+      }, 0);
+
+      return analyzeRegistrationWindow(
+        competitionDetails,
+        totalActual,
+        totalPredicted,
+      );
+    },
+    [competitionDetails, classes, entries, predictions],
+  );
+
+  // Reuses the single existing class-update path (updateClassInCompetition). Fetches the
+  // class's current full row first so every other field -- including judges and prizes,
+  // which the update proc fully overwrites on every call -- is resent unchanged alongside
+  // the new starttime.
+  async function applyStartTimeSuggestion(targetClassId, newStartTime) {
+    if (!targetClassId || !newStartTime) {
+      return;
+    }
+
+    try {
+      setApplyingSuggestionClassId(targetClassId);
+
+      var freshResponse = await getClassById(targetClassId, competitionId, ranchId);
+      var freshItem = freshResponse.data;
+
+      var hostRanchId =
+        (competitionDetails &&
+          (competitionDetails.hostRanchId || competitionDetails.HostRanchId)) ||
+        ranchId;
+
+      var payload = {
+        classInCompId: targetClassId,
+        competitionId: competitionId,
+        hostRanchId: hostRanchId,
+        classTypeId: freshItem.classTypeId,
+        arenaRanchId: hostRanchId,
+        arenaId: freshItem.arenaId,
+        classDateTime: freshItem.classDateTime,
+        startTime: normalizeTimeForServer(newStartTime),
+        orderInDay: freshItem.orderInDay,
+        organizerCost: freshItem.organizerCost,
+        federationCost: freshItem.federationCost,
+        classNotes: freshItem.classNotes,
+        judgeIds: Array.isArray(freshItem.judgeIds) ? freshItem.judgeIds : [],
+        prizes: Array.isArray(freshItem.prizes) ? freshItem.prizes : [],
+        patternNumber: freshItem.patternNumber,
+      };
+
+      await updateClassInCompetition(targetClassId, payload);
+      await loadClasses();
+      showToast("success", "שעת ההתחלה עודכנה בהצלחה");
+    } catch (err) {
+      console.error(err);
+      showToast("error", getErrorMessage(err, "שגיאה בעדכון שעת ההתחלה"));
+    } finally {
+      setApplyingSuggestionClassId(null);
+    }
+  }
+
   return {
     classes,
     entries,
@@ -1236,6 +1597,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
     patterns,
     selectedFieldName,
     isReiningField,
+    competitionDetails,
     competitionStartDate,
     competitionEndDate,
     selectedCompetitionJudgeIds,
@@ -1244,5 +1606,27 @@ export default function useSecretaryCompetitionClassesPage(options) {
     handleSubmitClass,
     handleDeleteClass,
     handleDeleteEntry,
+
+    // Schedule view (Phase 7)
+    scheduleViewMode,
+    setScheduleViewMode,
+    showScheduleColumns,
+    getScheduleForClass,
+    scheduleDayNotices,
+    applyStartTimeSuggestion,
+    applyingSuggestionClassId,
+
+    // Three-view tabs (Phase 7)
+    activeView,
+    changeActiveView,
+    isViewAvailable,
+    plannedVsActualSummary,
+    getPlannedVsActualForClass,
+
+    planningForecast,
+    dayRecommendations,
+    recommendationResponses,
+    respondToRecommendation,
+    registrationWindow,
   };
 }

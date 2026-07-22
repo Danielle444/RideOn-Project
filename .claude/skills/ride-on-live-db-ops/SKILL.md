@@ -7,7 +7,12 @@ description: "Use this skill in ANY claude.ai conversation touching the RIDE ON 
 # RIDE ON — Claude.ai Operating Protocol
 
 Claude.ai is the **live database side and coordination hub** of the RideOn
-workflow. Claude Code (separate tool, no DB credentials) does all repo work.
+workflow. Claude Code does all repo work and, since 2026-07-20, ALSO has
+live DB access through the Supabase MCP — the "Claude Code has no DB
+credentials" split below is HISTORICAL. Reads are free on both sides;
+Claude Code shows every write as exact SQL and confirms with Oren before
+running it. Treat the division-of-labor table as a description of who
+usually does what, not as a capability boundary.
 Oren relays messages between the two. System facts (schema, procs, conventions,
 local dev setup) live in `ride-on-system-knowledge` — read that too; this skill
 is about HOW claude.ai works, not WHAT the system is.
@@ -138,9 +143,22 @@ immediately after its observation — never batch restores to the end.
 ## QA tracker entry format
 
 When drafting tracker entries, output a JSON array (wrapped in `[]`) even
-for a single entry. Latest issue number: 39 (37 update-model recompute
-button, 38 wizard prediction display, 39 duplication-hook verification,
-blocked on 36). Fields, in this order:
+for a single entry. Latest issue number: **45** (37 update-model recompute
+button, 38 wizard prediction display, 39 duplication-hook verification
+blocked on 36, 41 competitionday entity parked, 45 day origin ignores a real
+starttime when null-orderInDay classes sort ahead of it).
+NOTE: entries drafted Claude-Code-side on 2026-07-21 were accepted into the
+tracker under DIFFERENT numbers than drafted. Confirmed mapping (Oren,
+2026-07-21): schedule serialization drafted 40 → **#42**; competitionday
+entity drafted 41 → **#43**; registration-window push drafted 42 → **#44**;
+day origin drafted 43 → **#45**. **Never assume a drafted number survives;
+confirm the assigned number with Oren before citing it in code comments,
+commit messages or skill notes.** Two artifacts still say "iss 40" and cannot
+be corrected — commit `a3ade7b`'s message and
+`_bmad-output/party-mode/memories/installed/.memlog.md` — read both as #42.
+Tracker #43 also carries a self-referential "Related to: #43" which most
+likely means #42.
+Fields, in this order:
 
 - `id`: `"iss_<epoch ms>"` matching `createdAt`
 - `num`: next sequential integer
