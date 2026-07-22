@@ -39,10 +39,11 @@ var FINANCIAL_PROJECTION_COPY = {
   projectionCaption:
     "כל המספרים הינם שיעור מוערך בלבד המבוסס על חיזוי הכניסות, לכן כלל המספרים מוצגים כטווח. ההכנסה ברוטו, ללא ניכוי פרסים.",
 
-  // Entry income is split into its two streams.
-  organizerIncomeLabel: "הכנסה מהמארגן",
+  // Entry income is split into its two streams. Phrased as "<party>'s income FROM classes"
+  // (הכנסת X ממקצים) -- NOT "income from <party>", which would wrongly read as the party paying.
+  organizerIncomeLabel: "הכנסת המארגן ממקצים",
   organizerIncomeHint: "כניסות צפויות × עלות המארגן",
-  federationIncomeLabel: "הכנסה מההתאחדות",
+  federationIncomeLabel: "הכנסת ההתאחדות ממקצים",
   federationIncomeHint: "כניסות צפויות × עלות ההתאחדות",
   stallIncomeLabel: "הכנסה מתאים",
   stallIncomeHint: "לפי מספר הסוסים הצפוי, במחיר תא ממוצע",
