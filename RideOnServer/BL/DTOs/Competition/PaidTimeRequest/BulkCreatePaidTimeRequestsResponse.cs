@@ -13,6 +13,15 @@ namespace RideOnServer.BL.DTOs.Competition.PaidTimeRequests
         public string? Message { get; set; }
 
         public AutoSchedulerSummary? Scheduling { get; set; }
+
+        // האם בוצע ניסיון שיבוץ אוטומטי לאחר יצירת הבקשות.
+        public bool SchedulingAttempted { get; set; }
+
+        // האם השיבוץ האוטומטי הצליח. null = לא נוסה (SchedulingAttempted = false).
+        public bool? SchedulingSucceeded { get; set; }
+
+        // הודעה בטוחה למשתמש במקרה כשל שיבוץ (ללא פרטי חריגה גולמיים).
+        public string? SchedulingMessage { get; set; }
     }
 
     public class AutoSchedulerSummary

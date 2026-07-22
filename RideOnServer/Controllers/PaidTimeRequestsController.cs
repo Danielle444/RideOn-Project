@@ -176,6 +176,17 @@ namespace RideOnServer.Controllers
                     RoleNames.HostSecretary
                 );
 
+                // כובלים את התחרות לחווה של המשתמש לפני קריאת/החלת נתוני-שיבוץ.
+                Competition? competition = Competition.GetCompetitionById(competitionId);
+                if (competition == null)
+                {
+                    return NotFound("Competition not found");
+                }
+                if (competition.HostRanchId != ranchId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לפעולה זו עבור תחרות זו");
+                }
+
                 AutoSchedulerSummary summary = PaidTimeRequest.RunAutoScheduler(competitionId);
 
                 return Ok(summary);
@@ -208,6 +219,17 @@ namespace RideOnServer.Controllers
                     request.RanchId,
                     RoleNames.RanchAdmin
                 );
+
+                // כובלים את התחרות לחווה של המשתמש לפני יצירה וקריאת/החלת נתוני-שיבוץ.
+                Competition? competition = Competition.GetCompetitionById(request.CompetitionId);
+                if (competition == null)
+                {
+                    return NotFound("Competition not found");
+                }
+                if (competition.HostRanchId != request.RanchId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לפעולה זו עבור תחרות זו");
+                }
 
                 request.OrderedBySystemUserId = personId;
 

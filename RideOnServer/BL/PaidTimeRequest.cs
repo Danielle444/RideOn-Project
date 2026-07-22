@@ -120,11 +120,21 @@ namespace RideOnServer.BL
             (List<int> createdIds, int batchId) = dal.BulkCreatePaidTimeRequests(request, createdByPersonId);
 
             AutoSchedulerSummary? schedulingSummary = null;
-            try
-            {
-                AutoScheduleResult schedResult = AutoSchedulerService.RunForCompetition(request.CompetitionId);
+            bool schedulingAttempted = false;
+            bool? schedulingSucceeded = null;
+            string? schedulingMessage = null;
 
-                HashSet<int> createdIdSet = new HashSet<int>(createdIds);
+            // ניסיון שיבוץ אוטומטי הוא תוצאה נפרדת מיצירת הבקשות. יצירת הבקשות
+            // כבר הושלמה (committed); כשל שיבוץ אינו הופך את היצירה לכושלת.
+            if (createdIds.Count > 0)
+            {
+                schedulingAttempted = true;
+                try
+                {
+                    // מועמדים = בדיוק ה-createdIds שהוחזרו מההוספה בשרת (לא מהלקוח).
+                    AutoScheduleResult schedResult = AutoSchedulerService.RunForCompetition(request.CompetitionId, createdIds);
+
+                    HashSet<int> createdIdSet = new HashSet<int>(createdIds);
 
                 Dictionary<int, AssignmentDecision> decisionByRequestId =
                     schedResult.Assignments.ToDictionary(a => a.PaidTimeRequestId);
@@ -170,10 +180,17 @@ namespace RideOnServer.BL
                     UnscheduledItems = unscheduledItems,
                     ScheduledItems = scheduledItems
                 };
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"AutoScheduler failed but bulk insert succeeded: {ex.Message}");
+
+                    schedulingSucceeded = true;
+                }
+                catch (Exception ex)
+                {
+                    // מתעדים את פרטי החריגה בצד-שרת בלבד; ללא חשיפת טקסט גולמי ללקוח.
+                    Console.WriteLine($"AutoScheduler failed but bulk insert succeeded: {ex.Message}");
+                    schedulingSucceeded = false;
+                    schedulingSummary = null;
+                    schedulingMessage = "הבקשות נוצרו בהצלחה, אך השיבוץ האוטומטי נכשל. ניתן לשבץ ידנית.";
+                }
             }
 
             return new BulkCreatePaidTimeRequestsResponse
@@ -183,13 +200,32 @@ namespace RideOnServer.BL
                 CreatedRequestIds = createdIds,
                 Warnings = overflows,
                 Message = $"נוצרו {createdIds.Count} בקשות בהצלחה",
-                Scheduling = schedulingSummary
+                Scheduling = schedulingSummary,
+                SchedulingAttempted = schedulingAttempted,
+                SchedulingSucceeded = schedulingSucceeded,
+                SchedulingMessage = schedulingMessage
             };
         }
 
         internal static AutoSchedulerSummary RunAutoScheduler(int competitionId)
         {
-            AutoScheduleResult schedResult = AutoSchedulerService.RunForCompetition(competitionId);
+            if (competitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            // טוענים snapshot אחד, וממנו גם גוזרים את המועמדים וגם משבצים
+            // (מונע טעינה כפולה של נתוני-השיבוץ).
+            AutoSchedulerDAL dal = new AutoSchedulerDAL();
+            SchedulerData data = dal.GetAutoSchedulerData(competitionId);
+
+            // מועמדים ידניים = כל הבקשות במצב Pending ולא-משובצות באותו snapshot.
+            List<int> candidateIds = data.Requests
+                .Where(r => r.Status == "Pending" && r.AssignedCompSlotId == null)
+                .Select(r => r.PaidTimeRequestId)
+                .ToList();
+
+            AutoScheduleResult schedResult = AutoSchedulerService.RunForCompetition(data, competitionId, candidateIds);
 
             List<UnscheduledRequestItem> unscheduledItems = schedResult.Audit
                 .Where(a => a.Action == "unscheduled")
