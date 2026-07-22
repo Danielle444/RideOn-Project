@@ -245,19 +245,24 @@ export default function useCompetitionDetailsStep(options) {
       if (competitionId) {
         await updateCompetition(competitionId, payload);
 
+        var updateToastMessage;
+
         if (intent === "publish") {
           setCurrentStatus("עתידית");
-          onShowToast("success", "התחרות פורסמה בהצלחה");
+          updateToastMessage = "התחרות פורסמה בהצלחה";
         } else {
           setCurrentStatus("טיוטה");
-          onShowToast("success", "התחרות נשמרה כטיוטה");
+          updateToastMessage = "התחרות נשמרה כטיוטה";
         }
+
+        onShowToast("success", updateToastMessage);
 
         await loadExistingCompetition(competitionId, currentRanchId);
 
         return {
           success: true,
           competitionId: competitionId,
+          toast: { type: "success", message: updateToastMessage },
         };
       }
 
@@ -281,6 +286,7 @@ export default function useCompetitionDetailsStep(options) {
       return {
         success: true,
         competitionId: newCompetitionId,
+        toast: { type: "success", message: "טיוטת התחרות נוצרה בהצלחה" },
       };
     } catch (error) {
       console.error(error);

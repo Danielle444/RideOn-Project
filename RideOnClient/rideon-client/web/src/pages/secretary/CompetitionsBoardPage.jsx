@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import SecretaryLayout from "../../components/secretary/SecretaryLayout";
 import secretaryGeneralMenu from "../../components/secretary/secretaryGeneralMenu";
 import CompetitionsSearchBar from "../../components/secretary/CompetitionsSearchBar";
@@ -15,6 +15,7 @@ import { WEB_SECRETARY_COMPETITION_STATUS_ORDER } from "../../config/competition
 
 export default function CompetitionsBoardPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const userContext = useUser();
   const activeRoleContext = useActiveRole();
 
@@ -72,6 +73,23 @@ export default function CompetitionsBoardPage() {
       });
     },
     [currentRanchId],
+  );
+
+  // Show a toast handed over via router state (e.g. after a competition is
+  // created, published, or duplicated on the form page, which then unmounts).
+  // Clear the state afterwards so it does not re-fire on refresh or back.
+  useEffect(
+    function () {
+      const handedToast = location.state?.toast;
+
+      if (!handedToast) {
+        return;
+      }
+
+      showToast(handedToast.type, handedToast.message);
+      navigate(location.pathname, { replace: true, state: {} });
+    },
+    [location.state],
   );
 
   async function loadCompetitions(custom) {
