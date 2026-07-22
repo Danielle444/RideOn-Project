@@ -33,11 +33,14 @@ var FINANCIAL_PROJECTION_COPY = {
   },
 
   projectionTitle: "תחזית הכנסות",
-  // Shown in a highlighted band under the enlarged title. Suggestion voice: everything is a
-  // forecast, a range, never a statement of fact. This caption is why no per-figure "בערך"
-  // prefix is needed -- it says once, up front, that every number below is an estimate.
-  projectionCaption:
-    "כל המספרים הינם שיעור מוערך בלבד המבוסס על חיזוי הכניסות, לכן כלל המספרים מוצגים כטווח. ההכנסה ברוטו, ללא ניכוי פרסים.",
+  // Shown in a highlighted band under the enlarged title, two lines: first the warning (this is
+  // an estimate, not actual income), then the methodology (range = one standard deviation, gross
+  // income). This caption is why no per-figure "בערך" prefix is needed -- it says once, up front,
+  // that every number below is an estimate.
+  projectionCaptionPrimary:
+    "המספרים המוצגים מהווים תחזית משוערת בלבד, אין להתייחס אליהם כהכנסות בפועל.",
+  projectionCaptionDetail:
+    "כל המספרים מבוססים על חיזוי הכניסות, ומוצגים כטווח על מנת לקחת בחשבון סטיית תקן אחת. ההכנסה ברוטו, ללא ניכוי פרסים.",
 
   // Entry income is split into its two streams. Phrased as "<party>'s income FROM classes"
   // (הכנסת X ממקצים) -- NOT "income from <party>", which would wrongly read as the party paying.

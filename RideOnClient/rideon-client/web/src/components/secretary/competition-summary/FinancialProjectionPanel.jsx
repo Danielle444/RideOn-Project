@@ -85,11 +85,15 @@ export default function FinancialProjectionPanel(props) {
     <div className="space-y-5">
       <div>
         {/* Enlarged title + a highlighted caption band: says once, up front, that every figure
-            below is an estimate shown as a range -- so no per-figure "בערך" is needed. */}
+            below is an estimate shown as a range -- so no per-figure "בערך" is needed. First line
+            is the warning (estimate, not actual income); second is the methodology. */}
         <h2 className="text-3xl font-black text-[#3F312B]">{copy.projectionTitle}</h2>
-        <p className="mt-3 rounded-2xl border border-[#E6D3C8] bg-[#FBEFE7] px-5 py-3 text-sm font-semibold text-[#7B5A4D]">
-          {copy.projectionCaption}
-        </p>
+        <div className="mt-3 rounded-2xl border border-[#E6D3C8] bg-[#FBEFE7] px-5 py-3 text-right">
+          <p className="text-sm font-bold text-[#7B5A4D]">
+            {copy.projectionCaptionPrimary}
+          </p>
+          <p className="mt-1 text-xs text-[#8D6E63]">{copy.projectionCaptionDetail}</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
