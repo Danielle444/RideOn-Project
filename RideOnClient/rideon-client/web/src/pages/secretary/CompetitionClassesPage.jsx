@@ -10,6 +10,7 @@ import PlannedVsActualPanel from "../../components/secretary/classes/PlannedVsAc
 import DayRecommendationsPanel from "../../components/secretary/classes/DayRecommendationsPanel";
 import RegistrationWindowPanel from "../../components/secretary/classes/RegistrationWindowPanel";
 import PlanningForecastCards from "../../components/secretary/classes/PlanningForecastCards";
+import FinancialProjectionTabs from "../../components/secretary/classes/FinancialProjectionTabs";
 import {
   CLASSES_VIEW_ACTUALS,
   CLASSES_VIEW_FINANCIAL,
@@ -226,6 +227,20 @@ export default function CompetitionClassesPage() {
               isViewAvailable={page.isViewAvailable}
               onChangeView={page.changeActiveView}
             />
+
+            {/* The financial view leads with the read-time income projection (Phase 8): three
+                sub-tabs -- projection / actual / projection-vs-actual -- above the cost-column
+                table that already lives in this view. */}
+            {page.activeView === CLASSES_VIEW_FINANCIAL ? (
+              <FinancialProjectionTabs
+                projection={page.financialProjection}
+                actual={page.financialActual}
+                registrationClosed={page.financialRegistrationClosed}
+                hasActualData={
+                  page.financialActual ? page.financialActual.hasActualData : false
+                }
+              />
+            ) : null}
 
             {/* The paid/unpaid actuals cards are meaningless before registration closes --
                 nothing has been paid yet -- so the planning view gets forecast cards
