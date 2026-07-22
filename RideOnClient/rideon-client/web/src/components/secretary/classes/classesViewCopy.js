@@ -195,7 +195,7 @@ var REGISTRATION_WINDOW_COPY = {
       analysis.actualEntries +
       " מתוך תחזית של " +
       Math.round(analysis.predictedEntries) +
-      " · נותרו " +
+      " לכלל התחרות · נותרו " +
       (analysis.daysRemaining === 1
         ? "יום אחד"
         : analysis.daysRemaining + " ימים") +
@@ -217,20 +217,20 @@ var REGISTRATION_WINDOW_COPY = {
     behind: {
       title: "ההרשמה מפגרת אחרי התחזית",
       detail:
-        "קצב ההרשמה נמוך מהצפוי ביחס לזמן שחלף. כדאי לשקול תזכורת לבעלי החוות כדי לעודד הרשמה.",
+        "קצב ההרשמה נמוך מהצפוי ביחס לזמן שחלף. כדאי לשקול תזכורת לאדמינים כדי לעודד הרשמה.",
     },
     urgent: {
-      title: "ההרשמה מפגרת והזמן קצר",
+      title: "ההרשמה נמוכה מהתחזית הצפויה והזמן קצר",
       detail:
         "תקופת ההרשמה עומדת להסתיים וההרשמה עדיין מתחת לתחזית. זהו העיתוי האחרון שבו תזכורת עשויה להשפיע.",
     },
   },
 
-  notifyButton: "שליחת תזכורת לבעלי החוות",
+  notifyButton: "שליחת תזכורת לאדמינים",
   notifyConfirmTitle: "שליחת תזכורת",
   notifyConfirmBody: function (competitionName) {
     return (
-      "תישלח התראה לכל בעלי החוות עם תזכורת להירשם לתחרות " +
+      "תישלח התראה לכל האדמינים עם תזכורת להירשם לתחרות " +
       competitionName +
       ". לא ניתן לבטל שליחה."
     );
@@ -238,9 +238,6 @@ var REGISTRATION_WINDOW_COPY = {
   notifyConfirm: "שלחי",
   notifyCancel: "ביטול",
   notifySent: "התזכורת נשלחה",
-
-  // Demo-only. The notification pipeline does not exist yet -- see the panel component.
-  demoNotice: "הדגמה בלבד — שליחת התראות אינה פעילה עדיין במערכת.",
 };
 
 // Forecast summary cards for the planning view. Suggestion/expectation voice: everything

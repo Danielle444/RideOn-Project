@@ -91,7 +91,7 @@ export default function RegistrationWindowPanel(props) {
       <ProgressBars
         analysis={analysis}
         windowLabel={props.windowLabel || "תקופת ההרשמה"}
-        entriesLabel={props.entriesLabel || "הרשמות בפועל"}
+        entriesLabel={props.entriesLabel || "הרשמות בפועל אל מול התחזית"}
       />
 
       {canNotify ? (
@@ -149,11 +149,6 @@ export default function RegistrationWindowPanel(props) {
               {REGISTRATION_WINDOW_COPY.notifyButton}
             </button>
           )}
-
-          {/* Stays visible in every state: nothing behind this button actually sends. */}
-          <p className="mt-2 text-xs opacity-75">
-            {REGISTRATION_WINDOW_COPY.demoNotice}
-          </p>
         </div>
       ) : null}
     </section>
