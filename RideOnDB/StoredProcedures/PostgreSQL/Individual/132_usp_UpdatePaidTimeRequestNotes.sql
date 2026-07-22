@@ -81,6 +81,9 @@ BEGIN
         RAISE EXCEPTION 'Cannot edit a paid request via this endpoint';
     END IF;
 
+    -- נעילת-ייעוץ ברמת התחרות (מזהה-התחרות קבוע, נקרא לעיל לפני הנעילה).
+    PERFORM pg_advisory_xact_lock(1734, v_current_competition);
+
     v_hours := EXTRACT(EPOCH FROM (v_start_ts - NOW())) / 3600.0;
 
     -- שינוי סוג פייד-טיים (מחיר) - רק >24h.
@@ -128,12 +131,17 @@ BEGIN
             RAISE EXCEPTION 'Cannot move request to a slot in a different competition';
         END IF;
 
+        -- מבטלים שיבוץ קיים כי הסלוט המבוקש השתנה - השיבוץ מחדש דרך האלגוריתם.
+        -- תיקון פגם: קובעים גם status='Pending' (קודם נותר 'Assigned' עם שיבוץ NULL)
+        -- ומאפסים allocationorigin, כדי לקיים את אילוץ מחזור-החיים.
+        -- D5 = דחייה: אין ריקָלוק לסלוט-המקור המתפנה (פער בטוח).
         UPDATE paidtimerequest
         SET requestedcompslotid = p_RequestedCompSlotId,
-            -- מבטלים שיבוץ קיים כי הסלוט המבוקש השתנה - השיבוץ מחדש דרך האלגוריתם.
             assignedcompslotid  = NULL,
             assignedstarttime   = NULL,
-            assignedorder       = NULL
+            assignedorder       = NULL,
+            status              = 'Pending',
+            allocationorigin    = NULL
         WHERE paidtimerequestid = p_PaidTimeRequestId;
     END IF;
 

@@ -11,6 +11,7 @@ declare
     v_assigned_competitionid integer;
     v_previous_slotid integer;
     v_existing_name text;
+    v_slot_start_ts timestamp with time zone;
 begin
     if p_assignedorder is null or p_assignedorder <= 0 then
         raise exception 'Invalid assigned order';
@@ -34,8 +35,16 @@ begin
         raise exception 'Paid time request not found for this ranch';
     end if;
 
-    select ptc.competitionid
-    into v_assigned_competitionid
+    -- נעילת-ייעוץ ברמת התחרות: מסדרת בין כל נתיבי-השיבוץ (אוטומטי וידני)
+    -- של אותה תחרות. מזהה-התחרות קבוע ולכן נקרא לפני הנעילה.
+    perform pg_advisory_xact_lock(1734, v_request_competitionid);
+
+    select
+        ptc.competitionid,
+        (ptc.slotdate + ptc.starttime)::timestamp with time zone
+    into
+        v_assigned_competitionid,
+        v_slot_start_ts
     from paidtimeslotincompetition ptc
     inner join competition c
         on c.competitionid = ptc.competitionid
@@ -69,12 +78,16 @@ begin
             v_existing_name;
     end if;
 
+    -- קובעים זמן-התחלה תקין (תחילת הסלוט) כבר בעדכון עצמו, כדי שהשורה
+    -- לעולם לא תהיה 'Assigned' עם assignedstarttime = NULL (תואם לאילוץ
+    -- מחזור-החיים העתידי). הריקָלוק שמיד לאחר מכן מדייק את הזמן המצטבר.
     update paidtimerequest
     set
         assignedcompslotid = p_assignedcompslotid,
         assignedorder = p_assignedorder,
-        assignedstarttime = null,
-        status = 'Assigned'
+        assignedstarttime = v_slot_start_ts,
+        status = 'Assigned',
+        allocationorigin = 'Manual'   -- שיבוץ ידני על ידי מזכירה
     where paidtimerequestid = p_paidtimerequestid;
 
     perform public.usp_recalculatepaidtimeslotassignments(

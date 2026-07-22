@@ -28,7 +28,23 @@ DECLARE
     v_slot_date       date;
     v_start_time      time;
     v_slot_start_ts   timestamptz;
+    v_competitionid   integer;
 BEGIN
+    -- מזהה-התחרות של הבקשה (קבוע) - נגזר לפני הנעילה מהסלוט המבוקש.
+    SELECT reqslot.competitionid
+    INTO v_competitionid
+    FROM public.paidtimerequest ptr
+    JOIN public.paidtimeslotincompetition reqslot
+        ON reqslot.paidtimeslotincompid = ptr.requestedcompslotid
+    WHERE ptr.paidtimerequestid = p_paidtimerequestid;
+
+    IF v_competitionid IS NULL THEN
+        RAISE EXCEPTION 'Paid time request not found';
+    END IF;
+
+    -- נעילת-ייעוץ ברמת התחרות: כל הקריאה הסמכותית והשינוי מתבצעים תחת הנעילה.
+    PERFORM pg_advisory_xact_lock(1734, v_competitionid);
+
     SELECT
         b.paidbypersonid,
         sr.paymentid,
@@ -76,11 +92,13 @@ BEGIN
         END IF;
     END IF;
 
+    -- D5 = דחייה: אין ריקָלוק לסלוט-המקור המתפנה (פער בטוח, ראה 131).
     UPDATE public.paidtimerequest
     SET status             = 'Cancelled',
         assignedcompslotid = NULL,
         assignedstarttime  = NULL,
-        assignedorder      = NULL
+        assignedorder      = NULL,
+        allocationorigin   = NULL   -- אין שיבוץ פעיל
     WHERE paidtimerequestid = p_paidtimerequestid;
 END;
 $$;

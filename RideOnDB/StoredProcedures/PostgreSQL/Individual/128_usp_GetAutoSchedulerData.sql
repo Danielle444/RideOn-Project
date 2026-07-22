@@ -50,6 +50,7 @@ BEGIN
             'assignedCompSlotId',      ptr.assignedcompslotid,
             'assignedStartTime',       ptr.assignedstarttime,
             'assignedOrder',           ptr.assignedorder,
+            'allocationOrigin',        ptr.allocationorigin,
             'status',                  ptr.status,
             'srequestdatetime',        sr.srequestdatetime,
             'batchId',                 ptr.batchid,

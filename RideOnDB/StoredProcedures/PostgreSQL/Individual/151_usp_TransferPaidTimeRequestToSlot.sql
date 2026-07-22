@@ -30,21 +30,26 @@ DECLARE
     v_requested_slot      integer;
     v_request_compid      integer;
     v_hostranchid         integer;
+    v_source_slotid       integer;
     v_target_compid       integer;
     v_target_slotdate     date;
     v_target_starttime    time;
+    v_target_ispublished  boolean;
     v_new_assignedstart   timestamptz;
+    v_new_order           integer;
 BEGIN
     SELECT
         sr.paymentid,
         ptr.status,
         ptr.requestedcompslotid,
+        ptr.assignedcompslotid,
         slot_req.competitionid,
         c.hostranchid
     INTO
         v_paymentid,
         v_status,
         v_requested_slot,
+        v_source_slotid,
         v_request_compid,
         v_hostranchid
     FROM public.paidtimerequest ptr
@@ -57,6 +62,9 @@ BEGIN
     IF v_request_compid IS NULL THEN
         RAISE EXCEPTION 'Paid time request not found';
     END IF;
+
+    -- נעילת-ייעוץ ברמת התחרות (מזהה-התחרות קבוע, נקרא לעיל לפני הנעילה).
+    PERFORM pg_advisory_xact_lock(1734, v_request_compid);
 
     IF NOT EXISTS (
         SELECT 1
@@ -78,21 +86,27 @@ BEGIN
         RAISE EXCEPTION 'Cannot transfer a paid request';
     END IF;
 
-    -- Unassign branch
+    -- ענף שחרור (target NULL): החזרה ל-Pending + איפוס שדות + origin NULL.
     IF p_newslotincompid IS NULL THEN
         UPDATE public.paidtimerequest
         SET status             = 'Pending',
             assignedcompslotid = NULL,
             assignedstarttime  = NULL,
-            assignedorder      = NULL
+            assignedorder      = NULL,
+            allocationorigin   = NULL
         WHERE paidtimerequestid = p_paidtimerequestid;
+
+        -- D2: ריקָלוק לסלוט-המקור המתפנה (מחסן מחדש את יתר המשובצים).
+        IF v_source_slotid IS NOT NULL THEN
+            PERFORM public.usp_recalculatepaidtimeslotassignments(v_hostranchid, v_source_slotid);
+        END IF;
 
         RETURN;
     END IF;
 
-    -- Target slot validation
-    SELECT pts.competitionid, pts.slotdate, pts.starttime
-    INTO v_target_compid, v_target_slotdate, v_target_starttime
+    -- אימות סלוט-יעד: קיים, אותה תחרות, ואינו מפורסם.
+    SELECT pts.competitionid, pts.slotdate, pts.starttime, COALESCE(pts.ispublished, FALSE)
+    INTO v_target_compid, v_target_slotdate, v_target_starttime, v_target_ispublished
     FROM public.paidtimeslotincompetition pts
     WHERE pts.paidtimeslotincompid = p_newslotincompid;
 
@@ -104,13 +118,37 @@ BEGIN
         RAISE EXCEPTION 'Target slot belongs to a different competition';
     END IF;
 
+    IF v_target_ispublished THEN
+        RAISE EXCEPTION 'Cannot transfer into a published slot';
+    END IF;
+
+    -- מיקום פנוי בסלוט-היעד: MAX(assignedorder)+1 (פערים אינם ממוחזרים),
+    -- למניעת התנגשות במיקום (יתחזק ע"י אינדקס-המיקום הייחודי החלקי בשלב המעבר).
+    SELECT COALESCE(MAX(o.assignedorder), 0) + 1
+    INTO v_new_order
+    FROM public.paidtimerequest o
+    WHERE o.assignedcompslotid = p_newslotincompid
+      AND o.status = 'Assigned'
+      AND o.paidtimerequestid <> p_paidtimerequestid;
+
+    -- קובעים זמן-התחלה תקין (תחילת הסלוט) כבר בעדכון, כדי שהשורה לעולם
+    -- לא תהיה 'Assigned' עם assignedstarttime = NULL. הריקָלוק שלאחר מכן מדייק.
     v_new_assignedstart := (v_target_slotdate + v_target_starttime)::timestamptz;
 
     UPDATE public.paidtimerequest
     SET status             = 'Assigned',
         assignedcompslotid = p_newslotincompid,
-        assignedstarttime  = v_new_assignedstart
-        -- assignedorder kept as-is; auto-scheduler / drag flow re-orders if needed
+        assignedstarttime  = v_new_assignedstart,
+        assignedorder      = v_new_order,
+        allocationorigin   = 'Manual'
     WHERE paidtimerequestid = p_paidtimerequestid;
+
+    -- D2: ריקָלוק לשני הסלוטים - היעד (מדייק זמנים, מאמת קיבולת) והמקור.
+    -- אם קיבולת היעד לא מספיקה, הריקָלוק זורק חריגה וכל ההעברה מתבטלת.
+    PERFORM public.usp_recalculatepaidtimeslotassignments(v_hostranchid, p_newslotincompid);
+
+    IF v_source_slotid IS NOT NULL AND v_source_slotid <> p_newslotincompid THEN
+        PERFORM public.usp_recalculatepaidtimeslotassignments(v_hostranchid, v_source_slotid);
+    END IF;
 END;
 $$;

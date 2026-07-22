@@ -15,15 +15,18 @@ declare
 
     v_requestid integer;
     v_duration integer;
+    v_competitionid integer;
 begin
     select
         ptc.slotdate,
         ptc.starttime,
-        ptc.endtime
+        ptc.endtime,
+        ptc.competitionid
     into
         v_slotdate,
         v_slotstart,
-        v_slotend
+        v_slotend,
+        v_competitionid
     from paidtimeslotincompetition ptc
     inner join competition c
         on c.competitionid = ptc.competitionid
@@ -33,6 +36,11 @@ begin
     if v_slotdate is null then
         raise exception 'Paid time slot not found for this ranch';
     end if;
+
+    -- נעילת-ייעוץ ברמת התחרות. הפרוצדורה נקראת בדרך-כלל מתוך פרוצדורה נועלת
+    -- אחרת (assign/transfer/unassign) - נעילת-טרנזקציה חוזרת על אותו מפתח
+    -- אינה חוסמת (re-entrant), ולכן בטוח לרכוש אותה גם כאן.
+    perform pg_advisory_xact_lock(1734, v_competitionid);
 
     v_slot_start_ts := (v_slotdate + v_slotstart)::timestamp with time zone;
     v_slot_end_ts := (v_slotdate + v_slotend)::timestamp with time zone;
