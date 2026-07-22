@@ -1,7 +1,7 @@
 import { FINANCIAL_PROJECTION_COPY } from "./financialProjectionCopy";
 import { formatMoneyRange, formatCountRange } from "./financialFormat";
 
-// One income band card. A band that is available renders its range; an unavailable one renders
+// One income figure card. A band that is available renders its range; an unavailable one renders
 // its prompt (absence != zero) instead of a misleading ₪0.
 function BandCard(props) {
   return (
@@ -20,10 +20,6 @@ function BandCard(props) {
           {props.prompt}
         </p>
       )}
-
-      {props.footnote ? (
-        <p className="mt-3 text-xs text-[#A98E80]">{props.footnote}</p>
-      ) : null}
     </div>
   );
 }
@@ -52,10 +48,9 @@ export default function FinancialProjectionPanel(props) {
   var stall = projection.stall;
   var shavings = projection.shavings;
 
-  // The stall prompt is ranch-wide when the host ranch has no pricing at all (the ranch-49
-  // case: no stall price AND no shavings price), otherwise the stall-specific prompt.
-  var noAnyPricing =
-    stall && !stall.available && shavings && !shavings.incomeAvailable;
+  // The stall prompt is ranch-wide when the host ranch has no pricing at all (the ranch-49 case:
+  // no stall price AND no shavings price), otherwise the stall-specific prompt.
+  var noAnyPricing = stall && !stall.available && shavings && !shavings.incomeAvailable;
   var stallPrompt = noAnyPricing ? copy.pricingPrompt : copy.stallPricePrompt;
 
   var advisories = [];
@@ -75,10 +70,7 @@ export default function FinancialProjectionPanel(props) {
   }
 
   if (stall && stall.available && (stall.tackLo > 0 || stall.tackHi > 0)) {
-    advisories.push({
-      key: "tack",
-      text: copy.tackNote(stall.tackLo, stall.tackHi),
-    });
+    advisories.push({ key: "tack", text: copy.tackNote(stall.tackLo, stall.tackHi) });
   }
 
   if (stall && stall.atCapacity) {
@@ -90,18 +82,29 @@ export default function FinancialProjectionPanel(props) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
-        <h3 className="text-lg font-bold text-[#3F312B]">{copy.projectionTitle}</h3>
-        <p className="mt-1 text-xs text-[#8D6E63]">{copy.projectionCaption}</p>
+        {/* Enlarged title + a highlighted caption band: says once, up front, that every figure
+            below is an estimate shown as a range -- so no per-figure "בערך" is needed. */}
+        <h2 className="text-3xl font-black text-[#3F312B]">{copy.projectionTitle}</h2>
+        <p className="mt-3 rounded-2xl border border-[#E6D3C8] bg-[#FBEFE7] px-5 py-3 text-sm font-semibold text-[#7B5A4D]">
+          {copy.projectionCaption}
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <BandCard
-          title={copy.entryIncomeLabel}
-          hint={copy.entryIncomeHint}
+          title={copy.organizerIncomeLabel}
+          hint={copy.organizerIncomeHint}
           available={entry.available}
-          value={formatMoneyRange(entry.lo, entry.hi)}
+          value={formatMoneyRange(entry.organizerLo, entry.organizerHi)}
+        />
+
+        <BandCard
+          title={copy.federationIncomeLabel}
+          hint={copy.federationIncomeHint}
+          available={entry.available}
+          value={formatMoneyRange(entry.federationLo, entry.federationHi)}
         />
 
         <BandCard

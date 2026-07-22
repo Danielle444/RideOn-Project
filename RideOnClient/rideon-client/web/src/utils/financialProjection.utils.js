@@ -8,16 +8,21 @@
 //   predicted entries -> per-day horses -> horse-days -> unique competition horses
 //                     -> stalls (+ tack) -> shavings bags -> income
 //
-// THREE SEPARATE, INDEPENDENTLY-LABELLED RANGES -- entry income, stall income, shavings income
-// -- each with its own assumption and its own width. A tight entry band beside a wide stall
-// band is the honesty, not a defect. They degrade independently: entry income is
-// ranch-independent (costs live on the class) and always renders; stall and shavings need the
-// ranch's config and degrade to a "set your prices" prompt when it is absent.
+// FOUR income figures, each an independently-labelled RANGE: organizer entry income, federation
+// entry income, stall income, shavings income -- plus the shavings bag-order quantity. They
+// degrade independently: the two entry figures are ranch-independent (costs live on the class)
+// and always render; stall and shavings need the ranch's config and degrade to a "set your
+// prices" prompt when it is absent.
 //
 // TWO PRICING WORLDS, never conflated:
-//   * Entry income  = classincompetition.organizercost + federationcost (per class).
+//   * Entry income  = classincompetition.organizercost (organizer) + federationcost (federation).
 //   * Stall/shavings = pricecatalog, per product, per ranch (via the financial-config proc).
 //   * Prize money is paid OUT and is never counted here.
+//
+// RANGES ARE NARROWED WITH AVERAGES (Oren, 2026-07-23): stall income prices every stall at the
+// average of the regular and VIP price (not a tier-fill spread); shavings uses the average bag
+// price and an average 2.5 bags per stall; tack is 1 per 4-5 horses. The remaining width comes
+// almost entirely from the predicted-entries band itself, which is the honest source of it.
 //
 // ABSENCE != ZERO: a missing active price arrives as null and renders the prompt, never a 0;
 // a price that is present but 0 renders as a real 0.
@@ -48,10 +53,9 @@ function getClassDate(item) {
 
 // The per-class entry band, reused verbatim from the prediction response (predicted +/- RMSE,
 // low endpoint already clamped at 0 server-side in ClassEntryPrediction). Falls back to the
-// point estimate when a class carries a prediction without a band, so a bandless prediction
-// collapses to a zero-width range rather than vanishing. Returns null only when the class has
-// NO prediction row at all -- that class is omitted from the projection and counted as
-// unpredicted, never treated as zero entries.
+// point estimate when a class carries a prediction without a band. Returns null only when the
+// class has NO prediction row at all -- that class is omitted and counted as unpredicted, never
+// treated as zero entries.
 function getEntryBandForClass(prediction) {
   var predicted = readNumber(prediction, "predictedEntries", "PredictedEntries");
 
@@ -68,19 +72,27 @@ function getEntryBandForClass(prediction) {
   };
 }
 
-// A class's entry cost = organizercost + federationcost. Both are mandatory-may-be-0 fields, so
-// a real 0 is a genuine cost, NOT missing. Returns null only when BOTH are absent -- the ~3
-// NULL-cost classes in the live data -- so the caller can advise (pricesMissingCount) instead
-// of silently understating entry income.
-function getClassCost(item) {
+// Organizer and federation cost of a class, kept separate (the two entry-income streams). Both
+// are mandatory-may-be-0 fields, so a real 0 is a genuine cost, NOT missing. `missing` is true
+// only when BOTH are absent -- the ~3 NULL-cost classes in the live data -- so the caller can
+// advise (pricesMissingCount) instead of silently understating entry income.
+function getClassCostParts(item) {
   var organizer = readNumber(item, "organizerCost", "OrganizerCost");
   var federation = readNumber(item, "federationCost", "FederationCost");
 
-  if (organizer === null && federation === null) {
-    return null;
-  }
+  return {
+    organizer: organizer || 0,
+    federation: federation || 0,
+    missing: organizer === null && federation === null,
+  };
+}
 
-  return (organizer || 0) + (federation || 0);
+// Combined entry cost (organizer + federation). Kept for callers that want the single number --
+// e.g. the actual/comparison tabs, which compare a total. Returns null when both are absent.
+function getClassCost(item) {
+  var parts = getClassCostParts(item);
+
+  return parts.missing ? null : parts.organizer + parts.federation;
 }
 
 // Unique competition horses from horse-days -- the cross-day dedup, and the ONLY place
@@ -88,8 +100,7 @@ function getClassCost(item) {
 // per-day horse counts would double-count every returning horse. Dividing horse-days by D
 // assumes every horse attends all D days (maximum reuse -> fewest horses -> low band);
 // dividing by D-1 assumes each attends D-1 days (more horses -> high band). D=1 admits no
-// cross-day reuse, so the band is the single day's horse band unchanged. Duration is consumed
-// EXACTLY here -- it must never reappear as a per-night stall price multiplier.
+// cross-day reuse, so the band is the single day's horse band unchanged.
 function deriveUniqueHorses(horseDaysLo, horseDaysHi, competitionDays) {
   var days = Number(competitionDays);
 
@@ -103,39 +114,32 @@ function deriveUniqueHorses(horseDaysLo, horseDaysHi, competitionDays) {
   };
 }
 
-// Splits a horse-stalls band across the two real stall tiers, bounded by the ranch's actual
-// supply. The LOW income endpoint fills regular first (cheapest -> lowest income); the HIGH
-// endpoint fills upgraded first (dearest -> highest income). Both are clamped to supply, so a
-// demand above total capacity flags atCapacity rather than inventing stalls that do not exist.
-function deriveStallTiers(uniqueLo, uniqueHi, regularSupply, upgradedSupply) {
-  var reg = Number(regularSupply) || 0;
-  var upg = Number(upgradedSupply) || 0;
-  var totalSupply = reg + upg;
+// The horse-stall demand band, clamped to the ranch's real total stall supply. A demand above
+// capacity flags atCapacity rather than inventing stalls that do not exist. With average pricing
+// the two tiers no longer need to be split out for income; only the total placeable count and
+// the capacity flag matter.
+function clampHorseStalls(uniqueLo, uniqueHi, totalSupply) {
+  var supply = Number(totalSupply) || 0;
 
-  var regLo = Math.min(uniqueLo, reg);
-  var upgLo = Math.min(Math.max(uniqueLo - reg, 0), upg);
-
-  var upgHi = Math.min(uniqueHi, upg);
-  var regHi = Math.min(Math.max(uniqueHi - upg, 0), reg);
+  if (supply <= 0) {
+    return { stallsLo: uniqueLo, stallsHi: uniqueHi, atCapacity: false };
+  }
 
   return {
-    regLo: regLo,
-    upgLo: upgLo,
-    regHi: regHi,
-    upgHi: upgHi,
-    atCapacity: totalSupply > 0 && uniqueHi > totalSupply,
+    stallsLo: Math.min(uniqueLo, supply),
+    stallsHi: Math.min(uniqueHi, supply),
+    atCapacity: uniqueHi > supply,
   };
 }
 
-// Tack (equipment) stalls: one per `perUnitMin`..`perUnitMax` horses (default 3..5). The FEWER
-// tack stalls (low endpoint) come from spreading the fewest horses over the widest ratio
-// (floor(uniqueLo / max)); the MOST (high endpoint) from the most horses over the tightest
-// ratio (ceil(uniqueHi / min)). Tack stalls hold no horse, bill at the regular stall price, and
-// receive no shavings -- all handled by the caller. The ratio is deliberately its own
-// low-confidence line (7/23 booking sample), sourced from smartconfig so it can be retuned
-// without a code change.
+// Tack (equipment) stalls: one per `perUnitMin`..`perUnitMax` horses (default 4..5). The FEWER
+// tack stalls (low endpoint) come from the fewest horses over the widest ratio
+// (floor(uniqueLo / max)); the MOST from the most horses over the tightest ratio
+// (ceil(uniqueHi / min)). Tack stalls hold no horse, bill at the regular stall price, and
+// receive no shavings -- all handled by the caller. The ratio is config-sourced (smartconfig)
+// so it can be retuned without a code change.
 function deriveTackStalls(uniqueLo, uniqueHi, perUnitMin, perUnitMax) {
-  var min = Number(perUnitMin) || 3;
+  var min = Number(perUnitMin) || 4;
   var max = Number(perUnitMax) || 5;
 
   return {
@@ -147,8 +151,7 @@ function deriveTackStalls(uniqueLo, uniqueHi, perUnitMin, perUnitMax) {
 // Groups the predicted classes by day and rolls each day's entry band up to a horse band, then
 // sums to horse-days across the whole competition. N = maxhorseclassesperday: a horse absorbs
 // up to N classes of this field per day, so ceil(entries / N) is the fewest horses that produce
-// that day's entries. Returns null when there is no usable horse cap (a field with no
-// fieldconfig row) -- the caller then cannot derive stalls or shavings for that field.
+// that day's entries. Returns null when there is no usable horse cap.
 function deriveHorseDays(entryBands, maxHorseClassesPerDay) {
   var n = Number(maxHorseClassesPerDay);
 
@@ -178,10 +181,14 @@ function deriveHorseDays(entryBands, maxHorseClassesPerDay) {
   return { horseDaysLo: horseDaysLo, horseDaysHi: horseDaysHi };
 }
 
+function average(a, b) {
+  return (a + b) / 2;
+}
+
 /**
- * The whole read-time projection for one competition. Every band is a labelled range; each of
- * the three income bands carries its own availability so the view can show two real numbers
- * beside one prompt without faking a total.
+ * The whole read-time projection for one competition. Every income figure is a labelled range;
+ * each carries its own availability so the view can show real numbers beside a prompt without
+ * faking a total.
  *
  * @param {Array<object>} classes full class list for the competition
  * @param {(item: object) => object|null} getPredictionForClass
@@ -190,9 +197,11 @@ function deriveHorseDays(entryBands, maxHorseClassesPerDay) {
 function deriveFinancialProjection(classes, getPredictionForClass, financialConfig) {
   var items = Array.isArray(classes) ? classes : [];
 
-  // --- Entry income (ranch-independent, always available) ---
-  var entryIncomeLo = 0;
-  var entryIncomeHi = 0;
+  // --- Entry income, split organizer vs federation (both ranch-independent, always available) ---
+  var organizerLo = 0;
+  var organizerHi = 0;
+  var federationLo = 0;
+  var federationHi = 0;
   var pricesMissingCount = 0;
   var unpredictedCount = 0;
   var predictedBands = [];
@@ -207,28 +216,30 @@ function deriveFinancialProjection(classes, getPredictionForClass, financialConf
 
     predictedBands.push({ day: getClassDate(item), lo: band.lo, hi: band.hi });
 
-    var cost = getClassCost(item);
+    var parts = getClassCostParts(item);
 
-    if (cost === null) {
+    if (parts.missing) {
       pricesMissingCount += 1;
       return;
     }
 
-    entryIncomeLo += band.lo * cost;
-    entryIncomeHi += band.hi * cost;
+    organizerLo += band.lo * parts.organizer;
+    organizerHi += band.hi * parts.organizer;
+    federationLo += band.lo * parts.federation;
+    federationHi += band.hi * parts.federation;
   });
 
   var entry = {
     available: true,
-    lo: entryIncomeLo,
-    hi: entryIncomeHi,
+    organizerLo: organizerLo,
+    organizerHi: organizerHi,
+    federationLo: federationLo,
+    federationHi: federationHi,
     pricesMissingCount: pricesMissingCount,
     unpredictedCount: unpredictedCount,
     predictedClassCount: predictedBands.length,
   };
 
-  // Stall/shavings need the ranch config AND a field horse cap. Without either, the entry band
-  // still stands on its own -- the projection tab remains useful.
   var config = financialConfig || {};
 
   var horseDays = deriveHorseDays(
@@ -253,12 +264,9 @@ function deriveFinancialProjection(classes, getPredictionForClass, financialConf
     competitionDays,
   );
 
-  var tiers = deriveStallTiers(
-    unique.uniqueLo,
-    unique.uniqueHi,
-    readNumber(config, "stallRegularSupply", "StallRegularSupply"),
-    readNumber(config, "stallUpgradedSupply", "StallUpgradedSupply"),
-  );
+  var regularSupply = readNumber(config, "stallRegularSupply", "StallRegularSupply") || 0;
+  var upgradedSupply = readNumber(config, "stallUpgradedSupply", "StallUpgradedSupply") || 0;
+  var stalls = clampHorseStalls(unique.uniqueLo, unique.uniqueHi, regularSupply + upgradedSupply);
 
   var tack = deriveTackStalls(
     unique.uniqueLo,
@@ -273,10 +281,10 @@ function deriveFinancialProjection(classes, getPredictionForClass, financialConf
     uniqueLo: unique.uniqueLo,
     uniqueHi: unique.uniqueHi,
     competitionDays: competitionDays,
-    atCapacity: tiers.atCapacity,
+    atCapacity: stalls.atCapacity,
   };
 
-  // --- Stall income (regular + upgraded + tack, all at flat per-booking prices) ---
+  // --- Stall income: every stall priced at the AVERAGE of regular and VIP; tack at regular. ---
   // Duration was already consumed in the horse-days divisor, so it is NOT re-applied here.
   var stallRegularPrice = readNumber(config, "stallRegularPrice", "StallRegularPrice");
   var stallUpgradedPrice = readNumber(config, "stallUpgradedPrice", "StallUpgradedPrice");
@@ -287,60 +295,51 @@ function deriveFinancialProjection(classes, getPredictionForClass, financialConf
     stall = {
       available: false,
       reason: "noPrice",
-      regLo: tiers.regLo,
-      upgLo: tiers.upgLo,
-      regHi: tiers.regHi,
-      upgHi: tiers.upgHi,
+      stallsLo: stalls.stallsLo,
+      stallsHi: stalls.stallsHi,
       tackLo: tack.tackLo,
       tackHi: tack.tackHi,
-      atCapacity: tiers.atCapacity,
+      atCapacity: stalls.atCapacity,
     };
   } else {
-    // Defensive: if only the upgraded price is missing, fall back to the regular price for the
-    // upgraded tier rather than dropping the whole band. Live data always has both or neither.
-    var upgradedPrice = stallUpgradedPrice === null ? stallRegularPrice : stallUpgradedPrice;
+    var avgStallPrice =
+      stallUpgradedPrice === null
+        ? stallRegularPrice
+        : average(stallRegularPrice, stallUpgradedPrice);
 
     stall = {
       available: true,
-      lo:
-        tiers.regLo * stallRegularPrice +
-        tiers.upgLo * upgradedPrice +
-        tack.tackLo * stallRegularPrice,
-      hi:
-        tiers.regHi * stallRegularPrice +
-        tiers.upgHi * upgradedPrice +
-        tack.tackHi * stallRegularPrice,
-      regLo: tiers.regLo,
-      upgLo: tiers.upgLo,
-      regHi: tiers.regHi,
-      upgHi: tiers.upgHi,
+      lo: stalls.stallsLo * avgStallPrice + tack.tackLo * stallRegularPrice,
+      hi: stalls.stallsHi * avgStallPrice + tack.tackHi * stallRegularPrice,
+      stallsLo: stalls.stallsLo,
+      stallsHi: stalls.stallsHi,
       tackLo: tack.tackLo,
       tackHi: tack.tackHi,
-      atCapacity: tiers.atCapacity,
+      atCapacity: stalls.atCapacity,
     };
   }
 
   // --- Shavings: bag-order quantity (always) + income (needs a price) ---
-  // Bags are for HORSE stalls only (regular + upgraded), never tack.
-  var bagsPerStallMin = readNumber(config, "shavingsBagsMin", "ShavingsBagsMin") || 0;
-  var bagsPerStallMax = readNumber(config, "shavingsBagsMax", "ShavingsBagsMax") || 0;
+  // Bags are for HORSE stalls only, at the AVERAGE bags-per-stall (2.5) -- never tack.
+  var avgBagsPerStall = average(
+    readNumber(config, "shavingsBagsMin", "ShavingsBagsMin") || 0,
+    readNumber(config, "shavingsBagsMax", "ShavingsBagsMax") || 0,
+  );
 
-  var bagsLo = (tiers.regLo + tiers.upgLo) * bagsPerStallMin;
-  var bagsHi = (tiers.regHi + tiers.upgHi) * bagsPerStallMax;
+  var bagsLo = stalls.stallsLo * avgBagsPerStall;
+  var bagsHi = stalls.stallsHi * avgBagsPerStall;
 
   var shavingsPriceMin = readNumber(config, "shavingsPriceMin", "ShavingsPriceMin");
   var shavingsPriceMax = readNumber(config, "shavingsPriceMax", "ShavingsPriceMax");
   var shavingsActiveCount = readNumber(config, "shavingsActiveCount", "ShavingsActiveCount") || 0;
 
   var shavings = {
-    // The bag-order quantity always shows -- ordering does not need a price. Even at a ranch
-    // with no shavings price, the secretary still needs to know how many bags to buy.
+    // The bag-order quantity always shows -- ordering does not need a price.
     bagsAvailable: true,
     bagsLo: bagsLo,
     bagsHi: bagsHi,
-    // More than one active bag product -> the price is ambiguous (the live DK bug: bags 5 @40
-    // and 10 @50 both active). The band widens to [min, max] and the view says so. Exactly one
-    // active product -> min = max and the band comes from the bag count alone.
+    // More than one active bag product is still flagged (a data issue), but the income now uses
+    // the AVERAGE of the active prices rather than widening the band.
     ambiguous: shavingsActiveCount > 1,
     activeCount: shavingsActiveCount,
   };
@@ -349,9 +348,14 @@ function deriveFinancialProjection(classes, getPredictionForClass, financialConf
     shavings.incomeAvailable = false;
     shavings.reason = "noPrice";
   } else {
+    var avgShavingsPrice =
+      shavingsPriceMax === null
+        ? shavingsPriceMin
+        : average(shavingsPriceMin, shavingsPriceMax);
+
     shavings.incomeAvailable = true;
-    shavings.lo = bagsLo * shavingsPriceMin;
-    shavings.hi = bagsHi * (shavingsPriceMax === null ? shavingsPriceMin : shavingsPriceMax);
+    shavings.lo = bagsLo * avgShavingsPrice;
+    shavings.hi = bagsHi * avgShavingsPrice;
   }
 
   return {
@@ -368,8 +372,9 @@ function deriveFinancialProjection(classes, getPredictionForClass, financialConf
 export {
   getEntryBandForClass,
   getClassCost,
+  getClassCostParts,
   deriveUniqueHorses,
-  deriveStallTiers,
+  clampHorseStalls,
   deriveTackStalls,
   deriveHorseDays,
   deriveFinancialProjection,

@@ -33,21 +33,25 @@ var FINANCIAL_PROJECTION_COPY = {
   },
 
   projectionTitle: "תחזית הכנסות",
-  // Suggestion voice: everything here is צפוי, a forecast, never a statement of fact.
+  // Shown in a highlighted band under the enlarged title. Suggestion voice: everything is a
+  // forecast, a range, never a statement of fact. This caption is why no per-figure "בערך"
+  // prefix is needed -- it says once, up front, that every number below is an estimate.
   projectionCaption:
-    "כל המספרים הם תחזית המבוססת על חיזוי הכניסות, ומוצגים כטווח. ההכנסה ברוטו, ללא ניכוי פרסים.",
+    "כל המספרים הינם שיעור מוערך בלבד המבוסס על חיזוי הכניסות, לכן כלל המספרים מוצגים כטווח. ההכנסה ברוטו, ללא ניכוי פרסים.",
 
-  entryIncomeLabel: "הכנסה ממקצים",
-  entryIncomeHint: "כניסות צפויות × עלות המקצה (מארגן + התאחדות)",
+  // Entry income is split into its two streams.
+  organizerIncomeLabel: "הכנסה מהמארגן",
+  organizerIncomeHint: "כניסות צפויות × עלות המארגן",
+  federationIncomeLabel: "הכנסה מההתאחדות",
+  federationIncomeHint: "כניסות צפויות × עלות ההתאחדות",
   stallIncomeLabel: "הכנסה מתאים",
-  stallIncomeHint: "לפי מספר הסוסים הצפוי והמלאי בחווה",
+  stallIncomeHint: "לפי מספר הסוסים הצפוי, במחיר תא ממוצע",
   shavingsIncomeLabel: "הכנסה מנסורת",
-  shavingsIncomeHint: "לפי מספר התאים הצפוי",
+  shavingsIncomeHint: "לפי מספר התאים הצפוי, במחיר נסורת ממוצע",
   bagsOrderLabel: "שקי נסורת להזמנה",
   bagsOrderHint: "כמות מוערכת להזמנה מראש",
 
-  // Range template: "בערך, בין X ל-Y". A zero-width band renders as a single value.
-  approxPrefix: "בערך, ",
+  // Range template: "בין X ל-Y". A zero-width band renders as a single value (no prefix).
   rangeBetween: "בין ",
   rangeTo: " ל-",
 
@@ -60,16 +64,17 @@ var FINANCIAL_PROJECTION_COPY = {
   shavingsPricePrompt:
     "מחיר נסורת לא הוגדר עבור החווה — עדכנו את המחירון כדי לקבל תחזית הכנסה מנסורת",
 
-  // More than one active shavings product -> the price is ambiguous (the live DK bug).
+  // More than one active shavings product -> flagged as a data issue. The income now uses the
+  // AVERAGE of the active prices rather than widening the range.
   shavingsAmbiguousNote:
-    "קיים יותר ממוצר נסורת פעיל אחד, כך שהמחיר אינו חד-משמעי. בחרו מוצר נסורת אחד לתחרות לקבלת תחזית מדויקת יותר.",
+    "קיימים כמה מוצרי נסורת פעילים; התחזית משתמשת במחיר הממוצע שלהם. כדאי לבחור מוצר נסורת אחד לתחרות.",
 
   // Tack is its own low-confidence line -- surfaced, never folded silently into the stall number.
   tackNote: function (tackLo, tackHi) {
     var count = tackLo === tackHi ? String(tackLo) : tackLo + " עד " + tackHi;
 
     return (
-      "כולל כ-" + count + " תאי ציוד (הערכה בביטחון נמוך: תא ציוד לכל 3–5 סוסים)"
+      "כולל כ-" + count + " תאי ציוד (הערכה בביטחון נמוך: תא ציוד לכל 4–5 סוסים)"
     );
   },
 

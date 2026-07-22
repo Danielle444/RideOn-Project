@@ -1,7 +1,8 @@
 // Display formatting for the financial projection. Every money figure is a projection RANGE,
-// rendered "בערך, בין X ל-Y"; a zero-width band (a single active price, exact math) collapses
-// to one approximate value. Rounding to whole shekels is deliberate -- false precision on a
-// forecast reads as certainty it does not have.
+// rendered "בין X ל-Y"; a zero-width band (a single active price, exact math) collapses to one
+// value. The page-level caption already states that every number is an estimate shown as a
+// range, so no per-figure "approximately" prefix is needed. Rounding to whole shekels is
+// deliberate -- false precision on a forecast reads as certainty it does not have.
 import { FINANCIAL_PROJECTION_COPY } from "./financialProjectionCopy";
 
 function roundWhole(value) {
@@ -16,19 +17,17 @@ function formatCount(value) {
   return roundWhole(value).toLocaleString("he-IL");
 }
 
-// "בערך, בין X ל-Y", or a single approximate value when the band has no width.
+// "בין X ל-Y", or a single value when the band has no width.
 function formatRange(lo, hi, formatValue) {
   var copy = FINANCIAL_PROJECTION_COPY;
   var low = roundWhole(lo);
   var high = roundWhole(hi);
 
   if (low === high) {
-    return copy.approxPrefix + formatValue(low);
+    return formatValue(low);
   }
 
-  return (
-    copy.approxPrefix + copy.rangeBetween + formatValue(low) + copy.rangeTo + formatValue(high)
-  );
+  return copy.rangeBetween + formatValue(low) + copy.rangeTo + formatValue(high);
 }
 
 function formatMoneyRange(lo, hi) {
