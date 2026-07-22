@@ -1,8 +1,11 @@
 -- Captured verbatim from live (project sxplumrexbolpwqacpiz) via pg_get_functiondef, 2026-07-21.
 -- This proc had never been committed; it was deployed straight through the SQL editor.
--- Live also carries a timestamptz-argument OVERLOAD of this same name (oid 25945) which is a
--- thin shim that casts ::date and delegates here. That shim is scheduled for removal once the
--- DAL fix (sending real `date` for p_newcompetitionstartdate/enddate) is deployed and verified.
+--
+-- This `date`-argument overload is the REAL implementation and the one the app calls.
+-- Live also carries a DEPRECATED timestamptz-argument overload of the same name: a thin
+-- shim that casts ::date and delegates here. It is kept (not dropped) only for backward
+-- compatibility; do not call it or extend it from new code. The C# DAL now sends real
+-- `date` for p_newcompetitionstartdate/enddate, so it binds to this overload directly.
 -- Do not redeploy this file without diffing against live first.
 
 CREATE OR REPLACE FUNCTION public.usp_duplicatecompetitionfromselection(p_sourcecompetitionid integer, p_createdbysystemuserid integer, p_newcompetitionname text, p_newcompetitionstartdate date, p_newcompetitionenddate date, p_registrationopendate date DEFAULT NULL::date, p_registrationenddate date DEFAULT NULL::date, p_paidtimeregistrationdate date DEFAULT NULL::date, p_paidtimepublicationdate date DEFAULT NULL::date, p_notes text DEFAULT NULL::text, p_classjudgeids integer[] DEFAULT NULL::integer[], p_classesjson jsonb DEFAULT '[]'::jsonb, p_paidtimeslotsjson jsonb DEFAULT '[]'::jsonb)
