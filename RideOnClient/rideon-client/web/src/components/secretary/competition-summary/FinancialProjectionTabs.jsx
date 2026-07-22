@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { FINANCIAL_PROJECTION_COPY } from "./classesViewCopy";
+import { FINANCIAL_PROJECTION_COPY } from "./financialProjectionCopy";
 import FinancialProjectionPanel from "./FinancialProjectionPanel";
 import FinancialActualPanel from "./FinancialActualPanel";
 import FinancialComparisonPanel from "./FinancialComparisonPanel";

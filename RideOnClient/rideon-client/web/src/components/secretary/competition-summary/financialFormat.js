@@ -2,7 +2,7 @@
 // rendered "בערך, בין X ל-Y"; a zero-width band (a single active price, exact math) collapses
 // to one approximate value. Rounding to whole shekels is deliberate -- false precision on a
 // forecast reads as certainty it does not have.
-import { FINANCIAL_PROJECTION_COPY } from "./classesViewCopy";
+import { FINANCIAL_PROJECTION_COPY } from "./financialProjectionCopy";
 
 function roundWhole(value) {
   return Math.round(Number(value) || 0);

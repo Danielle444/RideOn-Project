@@ -23,7 +23,6 @@ import {
 } from "../../services/superUserService";
 import { getArenasByRanchId } from "../../services/arenaService";
 import { getScheduleConfigByFieldId } from "../../services/scheduleConfigService";
-import { getFinancialConfigForCompetition } from "../../services/financialConfigService";
 import {
   getErrorMessage,
   toInputDate,
@@ -38,13 +37,7 @@ import {
 import {
   isClassesViewAvailable,
   resolveDefaultClassesView,
-  isRegistrationClosed,
 } from "../../utils/classesView.utils";
-import {
-  deriveFinancialProjection,
-  getClassCost,
-  getEntryBandForClass,
-} from "../../utils/financialProjection.utils";
 import {
   compareClassToPrediction,
   summarizePlannedVsActual,
@@ -327,7 +320,6 @@ export default function useSecretaryCompetitionClassesPage(options) {
   // Schedule view (Phase 7): predicted/live schedule columns on the classes page
   var [scheduleConfig, setScheduleConfig] = useState(null);
   var [scheduleViewMode, setScheduleViewMode] = useState("avg");
-  var [financialConfig, setFinancialConfig] = useState(null);
   var [applyingSuggestionClassId, setApplyingSuggestionClassId] = useState(null);
 
   // Three-view tabs. `null` means "not resolved yet" -- the default is DERIVED from the
@@ -424,35 +416,6 @@ export default function useSecretaryCompetitionClassesPage(options) {
     } catch (err) {
       console.error("loadScheduleConfig error", err);
       setScheduleConfig(null);
-    }
-  }
-
-  // The financial config is competition-scoped (prices/supply resolve by the host ranch), so it
-  // is fetched once the competition -- and its host ranch -- is known. Best-effort, same as the
-  // schedule config: a failed fetch just means the stall/shavings bands can't derive; the entry
-  // band still renders from class costs alone.
-  useEffect(
-    function () {
-      var hostRanchId =
-        competitionDetails &&
-        (competitionDetails.hostRanchId || competitionDetails.HostRanchId);
-
-      if (!competitionId || !hostRanchId) {
-        return;
-      }
-
-      loadFinancialConfig(competitionId, hostRanchId);
-    },
-    [competitionDetails, competitionId],
-  );
-
-  async function loadFinancialConfig(compId, hostRanchId) {
-    try {
-      var response = await getFinancialConfigForCompetition(compId, hostRanchId);
-      setFinancialConfig(response.data || null);
-    } catch (err) {
-      console.error("loadFinancialConfig error", err);
-      setFinancialConfig(null);
     }
   }
 
@@ -1480,60 +1443,6 @@ export default function useSecretaryCompetitionClassesPage(options) {
     [classes, predictions, selectedDate],
   );
 
-  // Financial projection. WHOLE-COMPETITION, never per-day: horse-days and unique horses span
-  // the entire event, so unlike planningForecast this reads the full class list and ignores the
-  // selected day. All derivation is read-time in financialProjection.utils.js.
-  var financialProjection = useMemo(
-    function () {
-      return deriveFinancialProjection(
-        classes,
-        getPredictionForClass,
-        financialConfig,
-      );
-    },
-    [classes, predictions, financialConfig],
-  );
-
-  // The actual side of the financial tabs. Entry income is real (Active entries x class cost);
-  // the projected entry-income POINT range it is compared against reuses the same read-time
-  // entry band. Whole-competition, to match the projection. hasActualData gates tabs 2/3.
-  var financialActual = useMemo(
-    function () {
-      var entryIncomeActual = 0;
-      var entryIncomePredictedLo = 0;
-      var entryIncomePredictedHi = 0;
-
-      classes.forEach(function (item) {
-        var cost = getClassCost(item);
-
-        if (cost === null) {
-          return;
-        }
-
-        entryIncomeActual += getActiveEntriesCountForClass(item) * cost;
-
-        var band = getEntryBandForClass(getPredictionForClass(item));
-
-        if (!band) {
-          return;
-        }
-
-        entryIncomePredictedLo += band.lo * cost;
-        entryIncomePredictedHi += band.hi * cost;
-      });
-
-      return {
-        hasActualData: isRegistrationClosed(competitionDetails),
-        entryIncomeActual: entryIncomeActual,
-        entryIncomePredictedLo: entryIncomePredictedLo,
-        entryIncomePredictedHi: entryIncomePredictedHi,
-      };
-    },
-    [classes, entries, predictions, competitionDetails],
-  );
-
-  var financialRegistrationClosed = isRegistrationClosed(competitionDetails);
-
   // Registration-window instrument. Competition-wide, not per day: registration is not a
   // per-day thing, and the forecast total it is measured against spans the whole event.
   var registrationWindow = useMemo(
@@ -1715,10 +1624,6 @@ export default function useSecretaryCompetitionClassesPage(options) {
     getPlannedVsActualForClass,
 
     planningForecast,
-    // Financial view (Phase 8)
-    financialProjection,
-    financialActual,
-    financialRegistrationClosed,
     dayRecommendations,
     recommendationResponses,
     respondToRecommendation,

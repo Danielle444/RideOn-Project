@@ -1,4 +1,4 @@
-import { FINANCIAL_PROJECTION_COPY } from "./classesViewCopy";
+import { FINANCIAL_PROJECTION_COPY } from "./financialProjectionCopy";
 import { formatMoneyRange, formatCountRange } from "./financialFormat";
 
 // One income band card. A band that is available renders its range; an unavailable one renders

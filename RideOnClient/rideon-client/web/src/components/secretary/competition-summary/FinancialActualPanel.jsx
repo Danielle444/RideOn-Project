@@ -1,4 +1,4 @@
-import { FINANCIAL_PROJECTION_COPY } from "./classesViewCopy";
+import { FINANCIAL_PROJECTION_COPY } from "./financialProjectionCopy";
 import { formatMoney } from "./financialFormat";
 
 // Tab 2 -- the actual running total. Entry income is real: sum of ACTIVE entries x class cost.

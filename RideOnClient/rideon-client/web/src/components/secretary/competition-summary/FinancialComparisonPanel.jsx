@@ -1,4 +1,4 @@
-import { FINANCIAL_PROJECTION_COPY } from "./classesViewCopy";
+import { FINANCIAL_PROJECTION_COPY } from "./financialProjectionCopy";
 import { formatMoney } from "./financialFormat";
 
 // Tab 3 -- reliability scorecard. Judges the FORECAST, not the competition: an actual income

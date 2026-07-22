@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import CompetitionSummarySection from "../../components/secretary/competition-summary/CompetitionSummarySection";
+import FinancialProjectionTabs from "../../components/secretary/competition-summary/FinancialProjectionTabs";
 import SummaryDetailsModal from "../../components/secretary/competition-summary/SummaryDetailsModal";
 import SummaryPaymentsBreakdownModal from "../../components/secretary/competition-summary/SummaryPaymentsBreakdownModal";
 import CashDeskModal from "../../components/secretary/competition-summary/CashDeskModal";
@@ -78,6 +79,18 @@ function SummaryPageContent(props) {
           {page.error}
         </div>
       ) : null}
+
+      {/* Phase 8 read-time income projection. Its tab format is borrowed from the classes
+          view, but it lives here on the summary page, where the money already lives. Renders
+          regardless of the summary's own loading state -- its data loads independently. */}
+      <FinancialProjectionTabs
+        projection={page.financialProjection}
+        actual={page.financialActual}
+        registrationClosed={page.financialRegistrationClosed}
+        hasActualData={
+          page.financialActual ? page.financialActual.hasActualData : false
+        }
+      />
 
       {page.loading ? (
         <div className="rounded-[28px] border border-[#E6DCD5] bg-white px-8 py-12 text-center text-[#7B5A4D] shadow-sm">
