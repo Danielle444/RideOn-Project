@@ -72,5 +72,48 @@ namespace RideOnServer.BL.AutoScheduler
 
             return result;
         }
+
+        // מסלול תצוגה-מקדימה (שלב A): מריץ את *אותו* אלגוריתם על snapshot שכבר
+        // נטען, ומחזיר את התוצאה - בלי שום כתיבה ל-DB. אין קריאה ל-ApplyAutoSchedule
+        // ואין יצירת AutoSchedulerDAL כאן. read-only מובטח מבנית.
+        internal static AutoScheduleResult PreviewForCompetition(
+            SchedulerData data,
+            int competitionId,
+            IReadOnlyList<int> candidateRequestIds)
+        {
+            if (competitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            if (candidateRequestIds == null)
+            {
+                throw new Exception("candidateRequestIds is required");
+            }
+
+            // דחיית כפילויות במזהי-המועמדים (עקבי עם מסלול ההרצה).
+            HashSet<int> candidateSet = new HashSet<int>();
+            foreach (int id in candidateRequestIds)
+            {
+                if (!candidateSet.Add(id))
+                {
+                    throw new Exception($"Duplicate candidate request id: {id}");
+                }
+            }
+
+            // בניגוד למסלול ההרצה, אין כאן short-circuit על קבוצת-מועמדים ריקה:
+            // גם ללא מועמדים, התצוגה המקדימה צריכה להציג את השיבוצים הקפואים
+            // הקיימים (FrozenItems), ולכן מריצים את האלגוריתם תמיד.
+            AutoScheduleResult result = AutoScheduler.Schedule(data, candidateRequestIds);
+
+            // אימות שוויון-קבוצות הגנתי (המנוע כבר מוודא זאת).
+            HashSet<int> decisionIds = result.Assignments.Select(a => a.PaidTimeRequestId).ToHashSet();
+            if (!decisionIds.SetEquals(candidateSet))
+            {
+                throw new Exception("Decision set does not equal candidate set");
+            }
+
+            return result;
+        }
     }
 }

@@ -109,6 +109,24 @@ namespace RideOnServer.BL.AutoScheduler
 
         [JsonPropertyName("notes")]
         public string? Notes { get; set; }
+
+        // העשרת-תצוגה (שלב B): שמות קריאים-אנושית מ-usp_GetAutoSchedulerData.
+        // אופציונליים (nullable) - עשויים להיות NULL כשנתון-התצוגה חסר. אינם
+        // משמשים את אלגוריתם השיבוץ ואינם נכללים ב-Fingerprint.
+        [JsonPropertyName("horseName")]
+        public string? HorseName { get; set; }
+
+        [JsonPropertyName("barnName")]
+        public string? BarnName { get; set; }
+
+        [JsonPropertyName("riderName")]
+        public string? RiderName { get; set; }
+
+        [JsonPropertyName("coachName")]
+        public string? CoachName { get; set; }
+
+        [JsonPropertyName("payerName")]
+        public string? PayerName { get; set; }
     }
 
     public class SchedulerBatch

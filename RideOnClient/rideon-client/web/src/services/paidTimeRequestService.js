@@ -39,10 +39,42 @@ function transferPaidTimeRequestToSlot(payload) {
   return axios.post(`${API}/PaidTimeRequests/transfer-to-slot`, payload);
 }
 
+// Read-only auto-scheduling Preview (Stage A/B/C). POST with query params and
+// NO request body - the server computes a proposal and persists nothing. The
+// JWT is attached by axiosInstance, like every other function in this file.
+function previewAutoSchedule(competitionId, ranchId) {
+  return axios.post(`${API}/PaidTimeRequests/auto-schedule/preview`, null, {
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
+  });
+}
+
+// Fingerprint-gated Apply of the auto-scheduling Preview (Stage D). The body
+// carries ONLY the server-issued fingerprint from the Preview - no assignments,
+// request/slot ids, times, orders, statuses, generatedAt, or client proposal.
+// The server recomputes a fresh proposal, verifies the fingerprint still
+// matches (else 409 STALE_PREVIEW), and applies only its own fresh decisions.
+function applyAutoSchedule(competitionId, ranchId, fingerprint) {
+  return axios.post(
+    `${API}/PaidTimeRequests/auto-schedule/apply`,
+    { fingerprint: fingerprint },
+    {
+      params: {
+        competitionId: competitionId,
+        ranchId: ranchId,
+      },
+    },
+  );
+}
+
 export {
   getPaidTimeRequestsForAssignment,
   assignPaidTimeRequest,
   unassignPaidTimeRequest,
   getPaidTimeSlotRegistrations,
   transferPaidTimeRequestToSlot,
+  previewAutoSchedule,
+  applyAutoSchedule,
 };
