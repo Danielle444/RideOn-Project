@@ -277,6 +277,116 @@ namespace RideOnServer.BL
             return MapPreviewResponse(result, data, fingerprint);
         }
 
+        // מסלול החלה (שלב D1): מקבל אך ורק את ה-Fingerprint שהלקוח קיבל מה-Preview.
+        // טוען snapshot טרי *יחיד*, גוזר ממנו מחדש את המועמדים, ההצעה וה-Fingerprint,
+        // ורק אם הם תואמים - מחיל את ההחלטות שהשרת עצמו ייצר. אין שום נתון-שיבוץ מהלקוח.
+        //
+        // גבול-הבטיחות הסופי (נעילת-ייעוץ, הגנת-שורה-מיושנת, חפיפה, וטרנזקציית הכול-או-
+        // כלום) נשאר ב-usp_applyautoschedule. אי-התאמת Fingerprint מוגנת כאן ומונעת
+        // כתיבה כלשהי; שינוי מצב שיתרחש *אחרי* ההשוואה ולפני ה-SP ייכשל בבטחה ב-SP.
+        internal static AutoSchedulerSummary ApplyAutoSchedule(int competitionId, string submittedFingerprint)
+        {
+            if (competitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            if (string.IsNullOrWhiteSpace(submittedFingerprint))
+            {
+                throw new ValidationException("Fingerprint is required");
+            }
+
+            // snapshot טרי יחיד - ממנו נגזרים המועמדים, ההצעה וה-Fingerprint.
+            AutoSchedulerDAL dal = new AutoSchedulerDAL();
+            SchedulerData data = dal.GetAutoSchedulerData(competitionId);
+
+            // מאמת את ה-Fingerprint ובונה את תוכנית-ההחלה בצד-השרת. זורק
+            // StalePreviewException (=> 409) על אי-התאמה, לפני כל כתיבה.
+            AutoScheduleApplyPlan plan =
+                BuildVerifiedApplyPlan(data, competitionId, submittedFingerprint);
+
+            // מוסר ל-DAL/פרוצדורה 129 בדיוק את ההחלטות והמזהים המורשים שהשרת ייצר.
+            dal.ApplyAutoSchedule(plan.Decisions, plan.AllowedRequestIds, competitionId);
+
+            // סיכום זהה במבנה לזה של RunAutoScheduler (חוזה AutoSchedulerSummary קיים).
+            List<UnscheduledRequestItem> unscheduledItems = plan.Result.Audit
+                .Where(a => a.Action == "unscheduled")
+                .Select(a => new UnscheduledRequestItem
+                {
+                    PaidTimeRequestId = a.PaidTimeRequestId,
+                    Reason = a.Reason ?? "לא צוינה סיבה"
+                })
+                .ToList();
+
+            return new AutoSchedulerSummary
+            {
+                ScheduledCount = plan.Result.ScheduledCount,
+                UnscheduledCount = plan.Result.UnscheduledCount,
+                FrozenCount = plan.Result.FrozenCount,
+                UnscheduledItems = unscheduledItems
+            };
+        }
+
+        // אימות-Fingerprint וחישוב-מחדש טהורים (ללא DB): גוזר את המועמדים מ-snapshot
+        // נתון, מחשב את ה-Fingerprint הקנוני *באותה פונקציה* שבה משתמש ה-Preview, ומשווה
+        // מול המוגש. אי-התאמה => StalePreviewException, לפני שנוצרת תוכנית כלשהי (ולכן
+        // לפני כל קריאת-DAL). התאמה => מריץ את *אותו* אלגוריתם ללא כתיבה (PreviewForCompetition)
+        // ומחזיר את הארגומנטים המדויקים שיימסרו ל-DAL. אין כאן נתון שמקורו בלקוח.
+        //
+        // public (ולא private) לצורך בדיקות-יחידה טהורות ללא DB, לפי מוסכמת הפרויקט
+        // (כמו ComputeAutoScheduleFingerprint / MapPreviewResponse) - במקום InternalsVisibleTo.
+        public static AutoScheduleApplyPlan BuildVerifiedApplyPlan(
+            SchedulerData data,
+            int competitionId,
+            string submittedFingerprint)
+        {
+            if (string.IsNullOrWhiteSpace(submittedFingerprint))
+            {
+                throw new ValidationException("Fingerprint is required");
+            }
+
+            List<int> candidateIds = DerivePendingCandidateIds(data);
+
+            string currentFingerprint = ComputeAutoScheduleFingerprint(data, candidateIds);
+
+            if (!FingerprintEquals(currentFingerprint, submittedFingerprint))
+            {
+                throw new StalePreviewException(
+                    "התצוגה המקדימה שאושרה כבר אינה עדכנית. יש לחשב מחדש לפני החלה.");
+            }
+
+            // אותו אלגוריתם כמו ב-Preview, ללא שום כתיבה (אין יצירת DAL ואין ApplyAutoSchedule
+            // בתוך PreviewForCompetition). כולל את בדיקת שוויון-הקבוצות ההגנתית.
+            AutoScheduleResult result =
+                AutoSchedulerService.PreviewForCompetition(data, competitionId, candidateIds);
+
+            return new AutoScheduleApplyPlan
+            {
+                CompetitionId = competitionId,
+                AllowedRequestIds = candidateIds.ToArray(),
+                Decisions = result.Assignments,
+                Result = result
+            };
+        }
+
+        // מועמדים ידניים = כל הבקשות במצב Pending ולא-משובצות (זהה למסלול ה-Preview/Run).
+        private static List<int> DerivePendingCandidateIds(SchedulerData data)
+        {
+            return data.Requests
+                .Where(r => r.Status == "Pending" && r.AssignedCompSlotId == null)
+                .Select(r => r.PaidTimeRequestId)
+                .ToList();
+        }
+
+        // השוואת Fingerprint: המחרוזת מוחזרת מהשרת כ-hex של SHA-256 (Convert.ToHexString).
+        // הלקוח מחזיר אותה מילה-במילה; משווים ordinal ללא רגישות-רישיות (עמיד לשוני-רישיות)
+        // לאחר trim. אין כאן סוד ולכן אין צורך בהשוואת זמן-קבוע.
+        private static bool FingerprintEquals(string current, string submitted)
+        {
+            return !string.IsNullOrWhiteSpace(submitted)
+                && string.Equals(current.Trim(), submitted.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
         // ממפה את תוצאת האלגוריתם לתגובת התצוגה המקדימה. שדות התצוגה (שמות)
         // נשארים ריקים/NULL בשלב A וימולאו בשלב B מ-snapshot מועשר.
         //
