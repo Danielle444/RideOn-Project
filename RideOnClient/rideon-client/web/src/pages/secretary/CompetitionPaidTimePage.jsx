@@ -8,6 +8,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import {
+  CalendarClock,
   CheckSquare,
   Eye,
   Pencil,
@@ -28,7 +29,9 @@ import PaidTimeRequestCard from "../../components/secretary/paid-time/PaidTimeRe
 import PaidTimeScheduleCell from "../../components/secretary/paid-time/PaidTimeScheduleCell";
 import PaidTimeSlotInCompetitionModal from "../../components/secretary/PaidTimeSlotInCompetitionModal";
 import PaidTimeSlotRegistrationsModal from "../../components/secretary/paid-time/PaidTimeSlotRegistrationsModal";
+import AutoSchedulePreviewModal from "../../components/secretary/paid-time/AutoSchedulePreviewModal";
 import useCompetitionPaidTimePage from "../../hooks/secretary/useCompetitionPaidTimePage";
+import useAutoSchedulePreview from "../../hooks/secretary/useAutoSchedulePreview";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import CustomDropdown from "../../components/common/CustomDropdown";
 
@@ -126,6 +129,16 @@ export default function CompetitionPaidTimePage() {
     competitionId: Number(competitionId),
     ranchId: ranchId,
     onShowToast: showToast,
+  });
+
+  // Read-only auto-scheduling Preview (Stage C2). Reuses the page's existing
+  // competitionId/ranchId and its already-loaded slots; performs no mutation.
+  const autoSchedulePreview = useAutoSchedulePreview({
+    competitionId: Number(competitionId),
+    ranchId: ranchId,
+    getSlots: function () {
+      return page.slots;
+    },
   });
 
   function handleOpenSlotDetails(timeCell) {
@@ -681,6 +694,16 @@ export default function CompetitionPaidTimePage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {!page.assignmentMode ? (
+              <TableActionButton
+                label="תצוגה מקדימה לשיבוץ אוטומטי"
+                icon={<CalendarClock size={15} />}
+                onClick={autoSchedulePreview.open}
+                disabled={autoSchedulePreview.loading}
+                loading={autoSchedulePreview.loading}
+              />
+            ) : null}
+
             {page.assignmentMode ? (
               <TableActionButton
                 label="חזרה לרשימת סלוטים"
@@ -733,6 +756,15 @@ export default function CompetitionPaidTimePage() {
         onClose={page.closePaidTimeSlotModal}
         onSubmit={page.handleSubmitPaidTimeSlot}
         onShowToast={showToast}
+      />
+
+      <AutoSchedulePreviewModal
+        isOpen={autoSchedulePreview.isOpen}
+        loading={autoSchedulePreview.loading}
+        error={autoSchedulePreview.error}
+        data={autoSchedulePreview.data}
+        onClose={autoSchedulePreview.close}
+        onRecalculate={autoSchedulePreview.recalculate}
       />
 
       <ToastMessage
