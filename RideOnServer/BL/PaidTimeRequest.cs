@@ -293,6 +293,14 @@ namespace RideOnServer.BL
                 requestById[r.PaidTimeRequestId] = r;
             }
 
+            // חיפוש מגרש לפי מזהה-סלוט: שם-המגרש המשובץ נגזר מרשימת הסלוטים
+            // הקיימת (data.Slots), שכבר נושאת arenaName. אין צורך בשדה SQL נוסף.
+            Dictionary<int, SchedulerSlot> slotById = new Dictionary<int, SchedulerSlot>();
+            foreach (SchedulerSlot s in data.Slots)
+            {
+                slotById[s.PaidTimeSlotInCompId] = s;
+            }
+
             Dictionary<int, AssignmentDecision> decisionByRequestId =
                 result.Assignments.ToDictionary(a => a.PaidTimeRequestId);
 
@@ -315,7 +323,13 @@ namespace RideOnServer.BL
                         AssignedOrder = a.AssignedOrder ?? 0,
                         EffectiveDurationMinutes = req?.DurationMinutes ?? 0,
                         RequestedCompSlotId = req?.RequestedCompSlotId ?? 0,
-                        RiderFederationMemberId = req?.RiderFederationMemberId
+                        RiderFederationMemberId = req?.RiderFederationMemberId,
+                        HorseName = req?.HorseName ?? string.Empty,
+                        BarnName = req?.BarnName,
+                        RiderName = req?.RiderName ?? string.Empty,
+                        CoachName = req?.CoachName,
+                        PayerName = req?.PayerName ?? string.Empty,
+                        AssignedArenaName = ResolveArenaName(slotById, a.AssignedCompSlotId!.Value)
                     };
                 })
                 .ToList();
@@ -333,7 +347,11 @@ namespace RideOnServer.BL
                         CoachFederationMemberId = d?.CoachFederationMemberId ?? req?.CoachFederationMemberId,
                         RequestedCompSlotId = req?.RequestedCompSlotId ?? 0,
                         Reason = x.Reason ?? "לא צוינה סיבה",
-                        ReasonCode = MapUnscheduledReasonCode(x.Reason)
+                        ReasonCode = MapUnscheduledReasonCode(x.Reason),
+                        HorseName = req?.HorseName ?? string.Empty,
+                        BarnName = req?.BarnName,
+                        RiderName = req?.RiderName ?? string.Empty,
+                        CoachName = req?.CoachName
                     };
                 })
                 .ToList();
@@ -350,7 +368,10 @@ namespace RideOnServer.BL
                         CoachFederationMemberId = req?.CoachFederationMemberId,
                         AssignedCompSlotId = req?.AssignedCompSlotId ?? x.NewSlotId ?? 0,
                         AssignedStartTime = req?.AssignedStartTime ?? x.NewStartTime,
-                        AssignedOrder = req?.AssignedOrder
+                        AssignedOrder = req?.AssignedOrder,
+                        HorseName = req?.HorseName ?? string.Empty,
+                        BarnName = req?.BarnName,
+                        AssignedArenaName = ResolveArenaName(slotById, req?.AssignedCompSlotId ?? x.NewSlotId ?? 0)
                     };
                 })
                 .ToList();
@@ -371,6 +392,13 @@ namespace RideOnServer.BL
         // ממפה את מחרוזת-הסיבה של האלגוריתם לקוד-סיבה מובנה. ההתאמה היא מול
         // המחרוזות המדויקות שב-AutoScheduler; שינוי טקסט שם יפיל לקוד "Unknown"
         // (לא לשגיאה). שלב עתידי יכול להעביר את הקודים לתוך האלגוריתם עצמו.
+        // שם-המגרש המשובץ (שלב B, תצוגה בלבד) נגזר מרשימת הסלוטים שכבר בתמונת-המצב.
+        // סלוט לא-נמצא -> מחרוזת ריקה (לא NULL, לעקביות עם חוזה ה-DTO).
+        private static string ResolveArenaName(Dictionary<int, SchedulerSlot> slotById, int slotId)
+        {
+            return slotById.TryGetValue(slotId, out SchedulerSlot? slot) ? slot.ArenaName : string.Empty;
+        }
+
         private static string MapUnscheduledReasonCode(string? reason)
         {
             switch (reason)
