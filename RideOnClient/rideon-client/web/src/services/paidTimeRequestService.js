@@ -39,10 +39,23 @@ function transferPaidTimeRequestToSlot(payload) {
   return axios.post(`${API}/PaidTimeRequests/transfer-to-slot`, payload);
 }
 
+// Read-only auto-scheduling Preview (Stage A/B/C). POST with query params and
+// NO request body - the server computes a proposal and persists nothing. The
+// JWT is attached by axiosInstance, like every other function in this file.
+function previewAutoSchedule(competitionId, ranchId) {
+  return axios.post(`${API}/PaidTimeRequests/auto-schedule/preview`, null, {
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
+  });
+}
+
 export {
   getPaidTimeRequestsForAssignment,
   assignPaidTimeRequest,
   unassignPaidTimeRequest,
   getPaidTimeSlotRegistrations,
   transferPaidTimeRequestToSlot,
+  previewAutoSchedule,
 };
