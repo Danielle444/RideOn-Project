@@ -135,12 +135,12 @@ export default function PaidTimeSlotRegistrationsModal(props) {
       onClick={props.onClose}
     >
       <div
-        className="w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl"
+        className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
         onClick={function (e) {
           e.stopPropagation();
         }}
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center justify-between p-6 pb-4">
           <div>
             <h2 className="text-xl font-black text-[#3F312B]">סלוט פייד טיים</h2>
             <p className="text-xs text-[#8D6E63]">
@@ -158,6 +158,7 @@ export default function PaidTimeSlotRegistrationsModal(props) {
           </button>
         </div>
 
+        <div className="flex-1 overflow-y-auto p-6 pt-4">
         {loading ? (
           <div className="py-8 text-center text-sm text-[#8D6E63]">טוען...</div>
         ) : null}
@@ -259,6 +260,7 @@ export default function PaidTimeSlotRegistrationsModal(props) {
             />
           </div>
         ) : null}
+        </div>
       </div>
     </div>
   );
