@@ -131,15 +131,38 @@ export default function CompetitionPaidTimePage() {
     onShowToast: showToast,
   });
 
-  // Read-only auto-scheduling Preview (Stage C2). Reuses the page's existing
-  // competitionId/ranchId and its already-loaded slots; performs no mutation.
+  // Auto-scheduling Preview (Stage C2) + fingerprint-gated Apply (Stage D2).
+  // Reuses the page's existing competitionId/ranchId and its already-loaded
+  // slots. Preview is read-only; Apply writes on the server, after which the
+  // page shows a Hebrew result, refreshes slots, and closes the modal.
   const autoSchedulePreview = useAutoSchedulePreview({
     competitionId: Number(competitionId),
     ranchId: ranchId,
     getSlots: function () {
       return page.slots;
     },
+    onApplied: handleAutoScheduleApplied,
   });
+
+  function handleAutoScheduleApplied(summary) {
+    var safe = summary || {};
+    var scheduled = Number(safe.scheduledCount ?? safe.ScheduledCount ?? 0);
+    var unscheduled = Number(safe.unscheduledCount ?? safe.UnscheduledCount ?? 0);
+
+    showToast(
+      "success",
+      "השיבוץ האוטומטי הוחל בהצלחה: " +
+        scheduled +
+        " שובצו, " +
+        unscheduled +
+        " לא שובצו",
+    );
+
+    // Refresh the slots grid (assigned counts / capacity) via the screen's
+    // established refetch, then close the Preview per the existing modal UX.
+    page.loadSlots();
+    autoSchedulePreview.close();
+  }
 
   function handleOpenSlotDetails(timeCell) {
     var slotId = timeCell && timeCell.slotId;
@@ -763,8 +786,13 @@ export default function CompetitionPaidTimePage() {
         loading={autoSchedulePreview.loading}
         error={autoSchedulePreview.error}
         data={autoSchedulePreview.data}
+        applying={autoSchedulePreview.applying}
+        applyError={autoSchedulePreview.applyError}
+        isStale={autoSchedulePreview.isStale}
+        applied={autoSchedulePreview.applied}
         onClose={autoSchedulePreview.close}
         onRecalculate={autoSchedulePreview.recalculate}
+        onApply={autoSchedulePreview.apply}
       />
 
       <ToastMessage

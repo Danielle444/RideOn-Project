@@ -1,28 +1,50 @@
-import { RefreshCw, X } from "lucide-react";
+import { CheckCircle2, RefreshCw, X } from "lucide-react";
 
-// Read-only Preview modal for the auto-scheduling proposal (Stage C2).
-// RENDER ONLY: it never calls any service. All data/loading/error come in as
-// props; refresh and close are delegated to the parent via callbacks. Closing
-// changes nothing on the server - this is a Preview.
+// Preview modal for the auto-scheduling proposal (Stage C2) with the
+// fingerprint-gated Apply action (Stage D2). RENDER ONLY: it never calls any
+// service. All data/loading/error/apply state come in as props; refresh, apply,
+// and close are delegated to the parent via callbacks. Closing changes nothing
+// on the server - the Preview itself is read-only; only Apply writes.
 //
 // Props:
 //   isOpen        : bool
-//   loading       : bool
-//   error         : string ("" when none)
+//   loading       : bool                (Preview in flight)
+//   error         : string ("" when none, Preview error)
 //   data          : normalized result from mapAutoSchedulePreview (or null)
+//   applying      : bool                (Apply in flight)
+//   applyError    : string ("" when none, Apply/stale error)
+//   isStale       : bool                (409 STALE_PREVIEW - must recalculate)
+//   applied       : bool                (Apply succeeded - cannot re-apply)
 //   onClose       : () => void
-//   onRecalculate : () => void   (calls the read-only Preview again)
+//   onRecalculate : () => void          (calls the read-only Preview again)
+//   onApply       : () => void          (calls the fingerprint-gated Apply)
 export default function AutoSchedulePreviewModal(props) {
   var isOpen = !!props.isOpen;
   var loading = !!props.loading;
   var error = props.error || "";
   var data = props.data || null;
+  var applying = !!props.applying;
+  var applyError = props.applyError || "";
+  var isStale = !!props.isStale;
+  var applied = !!props.applied;
 
   if (!isOpen) {
     return null;
   }
 
   var counts = data && data.counts ? data.counts : null;
+
+  // Apply is offered only for a valid, current, not-yet-applied Preview. A
+  // missing fingerprint, an empty proposal, a stale Preview, a Preview error,
+  // or an in-flight request all block it.
+  var hasApplicableData = !!(
+    data &&
+    !data.isEmpty &&
+    data.fingerprint
+  );
+  var applyDisabled =
+    applying || loading || isStale || applied || !!error || !hasApplicableData;
+  var showFooter = !loading && !error && !!data;
 
   return (
     <div
@@ -101,6 +123,51 @@ export default function AutoSchedulePreviewModal(props) {
             </div>
           )}
         </div>
+
+        {/* Footer: fingerprint-gated Apply (Stage D2). Shown only when a Preview
+            is available (not while loading and not on a Preview error). */}
+        {showFooter ? (
+          <div className="border-t border-[#EFE5DF] p-6 pt-4">
+            {isStale ? (
+              <div className="mb-3 rounded-2xl border border-[#E8C39A] bg-[#FDF6EC] px-4 py-3 text-sm text-[#8A5A22]">
+                <p className="font-semibold">{applyError}</p>
+                <p className="mt-1 text-xs">
+                  התצוגה אינה עדכנית - יש ללחוץ על "חשב מחדש" כדי להפיק תצוגה
+                  חדשה לפני החלה.
+                </p>
+              </div>
+            ) : applyError ? (
+              <div className="mb-3 rounded-2xl border border-[#E7BABA] bg-[#FDF4F4] px-4 py-3 text-sm text-[#A54848]">
+                {applyError}
+              </div>
+            ) : null}
+
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-[#8D6E63]">
+                {applied
+                  ? "השיבוץ הוחל בהצלחה."
+                  : "החלה תשמור את השיבוץ המוצע שחושב בשרת."}
+              </p>
+
+              <button
+                type="button"
+                onClick={props.onApply}
+                disabled={applyDisabled}
+                className="flex items-center gap-2 rounded-xl bg-[#8B6352] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#7A5547] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {applied ? (
+                  <CheckCircle2 size={16} />
+                ) : (
+                  <RefreshCw
+                    size={16}
+                    className={applying ? "animate-spin" : undefined}
+                  />
+                )}
+                {applied ? "הוחל" : applying ? "מחיל שיבוץ..." : "החל שיבוץ"}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

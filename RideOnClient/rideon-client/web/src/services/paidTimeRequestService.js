@@ -51,6 +51,24 @@ function previewAutoSchedule(competitionId, ranchId) {
   });
 }
 
+// Fingerprint-gated Apply of the auto-scheduling Preview (Stage D). The body
+// carries ONLY the server-issued fingerprint from the Preview - no assignments,
+// request/slot ids, times, orders, statuses, generatedAt, or client proposal.
+// The server recomputes a fresh proposal, verifies the fingerprint still
+// matches (else 409 STALE_PREVIEW), and applies only its own fresh decisions.
+function applyAutoSchedule(competitionId, ranchId, fingerprint) {
+  return axios.post(
+    `${API}/PaidTimeRequests/auto-schedule/apply`,
+    { fingerprint: fingerprint },
+    {
+      params: {
+        competitionId: competitionId,
+        ranchId: ranchId,
+      },
+    },
+  );
+}
+
 export {
   getPaidTimeRequestsForAssignment,
   assignPaidTimeRequest,
@@ -58,4 +76,5 @@ export {
   getPaidTimeSlotRegistrations,
   transferPaidTimeRequestToSlot,
   previewAutoSchedule,
+  applyAutoSchedule,
 };
