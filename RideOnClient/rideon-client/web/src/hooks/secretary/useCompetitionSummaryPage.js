@@ -1,4 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  getClassesByCompetitionId,
+  getPredictionsByCompetitionId,
+} from "../../services/classInCompetitionService";
+import { getSecretaryCompetitionEntries } from "../../services/entryService";
+import { getCompetitionById } from "../../services/competitionService";
+import { getFinancialConfigForCompetition } from "../../services/financialConfigService";
+import {
+  deriveFinancialProjection,
+  getClassCost,
+  getEntryBandForClass,
+} from "../../utils/financialProjection.utils";
+import { isRegistrationClosed } from "../../utils/classesView.utils";
 import {
   getCompetitionSummary,
   getCompetitionSummaryClassDetails,
@@ -97,6 +110,15 @@ export default function useCompetitionSummaryPage(options) {
   var [loading, setLoading] = useState(false);
   var [error, setError] = useState("");
 
+  // Phase 8 financial projection inputs. The three financial tabs live here on the summary page
+  // (the tab FORMAT is borrowed from the classes view, the tabs are not). All best-effort: a
+  // failed fetch just degrades a band, never blocks the summary.
+  var [finClasses, setFinClasses] = useState([]);
+  var [finPredictions, setFinPredictions] = useState([]);
+  var [finEntries, setFinEntries] = useState([]);
+  var [finCompetition, setFinCompetition] = useState(null);
+  var [finConfig, setFinConfig] = useState(null);
+
   var [federationInvoiceImporting, setFederationInvoiceImporting] =
     useState(false);
   var [federationInvoiceImportError, setFederationInvoiceImportError] =
@@ -194,6 +216,130 @@ export default function useCompetitionSummaryPage(options) {
       setLoading(false);
     }
   }
+
+  // Financial-projection data. Fetched alongside the summary once competition + ranch are known.
+  // Each fetch is independent and swallowed on failure (never sets `error`): the projection tab
+  // simply degrades. ranchId is the host secretary's ranch, which the financial-config endpoint
+  // checks against the competition's host ranch.
+  useEffect(
+    function () {
+      loadFinancialData();
+    },
+    [competitionId, ranchId],
+  );
+
+  async function loadFinancialData() {
+    if (!competitionId || !ranchId) {
+      return;
+    }
+
+    await Promise.all([
+      loadFinancialResource(function () {
+        return getClassesByCompetitionId(competitionId, ranchId);
+      }, setFinClasses, []),
+      loadFinancialResource(function () {
+        return getPredictionsByCompetitionId(competitionId, ranchId);
+      }, setFinPredictions, []),
+      loadFinancialResource(function () {
+        return getSecretaryCompetitionEntries(competitionId, ranchId);
+      }, setFinEntries, []),
+      loadFinancialResource(function () {
+        return getCompetitionById(competitionId, ranchId);
+      }, setFinCompetition, null),
+      loadFinancialResource(function () {
+        return getFinancialConfigForCompetition(competitionId, ranchId);
+      }, setFinConfig, null),
+    ]);
+  }
+
+  async function loadFinancialResource(request, setter, fallback) {
+    try {
+      var response = await request();
+      var data = response.data;
+      setter(data === undefined ? fallback : data);
+    } catch (err) {
+      console.error("loadFinancialData error", err);
+      setter(fallback);
+    }
+  }
+
+  function getFinClassInCompId(item) {
+    return item.classInCompId || item.ClassInCompId;
+  }
+
+  function getPredictionForClass(item) {
+    var classId = getFinClassInCompId(item);
+
+    return (
+      finPredictions.find(function (prediction) {
+        return Number(getFinClassInCompId(prediction)) === Number(classId);
+      }) || null
+    );
+  }
+
+  function getActiveEntriesCountForClass(item) {
+    var classId = getFinClassInCompId(item);
+
+    return finEntries.filter(function (entry) {
+      if (Number(getFinClassInCompId(entry)) !== Number(classId)) {
+        return false;
+      }
+
+      var status = entry.entryStatus || entry.EntryStatus || "Active";
+      return status === "Active";
+    }).length;
+  }
+
+  // The whole-competition income projection (entry / stall / shavings bands + bag order). Never
+  // per-day: horse-days and unique horses span the entire event. All derivation is read-time.
+  var financialProjection = useMemo(
+    function () {
+      var items = Array.isArray(finClasses) ? finClasses : [];
+      return deriveFinancialProjection(items, getPredictionForClass, finConfig);
+    },
+    [finClasses, finPredictions, finConfig],
+  );
+
+  // The actual side of the tabs. Entry income is real (Active entries x class cost); the
+  // projected entry-income range it is compared against reuses the same read-time entry band, so
+  // the comparison is like-for-like. hasActualData gates the actual + comparison tabs.
+  var financialActual = useMemo(
+    function () {
+      var items = Array.isArray(finClasses) ? finClasses : [];
+      var entryIncomeActual = 0;
+      var entryIncomePredictedLo = 0;
+      var entryIncomePredictedHi = 0;
+
+      items.forEach(function (item) {
+        var cost = getClassCost(item);
+
+        if (cost === null) {
+          return;
+        }
+
+        entryIncomeActual += getActiveEntriesCountForClass(item) * cost;
+
+        var band = getEntryBandForClass(getPredictionForClass(item));
+
+        if (!band) {
+          return;
+        }
+
+        entryIncomePredictedLo += band.lo * cost;
+        entryIncomePredictedHi += band.hi * cost;
+      });
+
+      return {
+        hasActualData: isRegistrationClosed(finCompetition),
+        entryIncomeActual: entryIncomeActual,
+        entryIncomePredictedLo: entryIncomePredictedLo,
+        entryIncomePredictedHi: entryIncomePredictedHi,
+      };
+    },
+    [finClasses, finEntries, finPredictions, finCompetition],
+  );
+
+  var financialRegistrationClosed = isRegistrationClosed(finCompetition);
 
   async function importFederationInvoices(file) {
     if (!competitionId || !ranchId) {
@@ -1080,6 +1226,11 @@ export default function useCompetitionSummaryPage(options) {
     loading: loading,
     error: error,
     loadSummary: loadSummary,
+
+    // Phase 8 financial projection tabs
+    financialProjection: financialProjection,
+    financialActual: financialActual,
+    financialRegistrationClosed: financialRegistrationClosed,
 
     detailsModal: detailsModal,
     detailsItems: detailsItems,
