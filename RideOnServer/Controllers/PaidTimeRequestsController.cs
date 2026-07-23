@@ -202,6 +202,50 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("auto-schedule/preview")]
+        public IActionResult PreviewAutoScheduler([FromQuery] int competitionId, [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (competitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                // כובלים את התחרות לחווה של המשתמש לפני קריאת נתוני-שיבוץ (read-only).
+                Competition? competition = Competition.GetCompetitionById(competitionId);
+                if (competition == null)
+                {
+                    return NotFound("Competition not found");
+                }
+                if (competition.HostRanchId != ranchId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לפעולה זו עבור תחרות זו");
+                }
+
+                AutoSchedulePreviewResponse preview = PaidTimeRequest.PreviewAutoSchedule(competitionId);
+
+                return Ok(preview);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in PreviewAutoScheduler: {ex.Message}");
+                return BadRequest("אירעה שגיאה בהפקת תצוגה מקדימה של השיבוץ האוטומטי");
+            }
+        }
+
         [HttpPost("bulk")]
         public IActionResult BulkCreatePaidTimeRequests([FromBody] BulkCreatePaidTimeRequestsRequest request)
         {

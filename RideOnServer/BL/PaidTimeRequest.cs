@@ -1,4 +1,7 @@
-﻿using RideOnServer.BL.AutoScheduler;
+﻿using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+using RideOnServer.BL.AutoScheduler;
 using RideOnServer.BL.DTOs.Competition.PaidTimeRequests;
 using RideOnServer.DAL;
 
@@ -243,6 +246,205 @@ namespace RideOnServer.BL
                 FrozenCount = schedResult.FrozenCount,
                 UnscheduledItems = unscheduledItems
             };
+        }
+
+        // תצוגה מקדימה (שלב A): קורא snapshot אחד (read-only), גוזר את המועמדים
+        // הידניים (Pending ולא-משובצים), מריץ את *אותו* אלגוריתם ללא כתיבה, מחשב
+        // Fingerprint דטרמיניסטי, וממפה לתוצאת-תצוגה. אין כאן שום מסלול כתיבה.
+        internal static AutoSchedulePreviewResponse PreviewAutoSchedule(int competitionId)
+        {
+            if (competitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            // טעינת snapshot יחיד (פרוצדורה 128 - קריאה בלבד). ממנו גוזרים גם
+            // מועמדים, גם את תוצאת האלגוריתם וגם את ה-Fingerprint.
+            AutoSchedulerDAL dal = new AutoSchedulerDAL();
+            SchedulerData data = dal.GetAutoSchedulerData(competitionId);
+
+            // מועמדים ידניים = כל הבקשות במצב Pending ולא-משובצות (זהה למסלול הידני).
+            List<int> candidateIds = data.Requests
+                .Where(r => r.Status == "Pending" && r.AssignedCompSlotId == null)
+                .Select(r => r.PaidTimeRequestId)
+                .ToList();
+
+            AutoScheduleResult result =
+                AutoSchedulerService.PreviewForCompetition(data, competitionId, candidateIds);
+
+            string fingerprint = ComputeAutoScheduleFingerprint(data, candidateIds);
+
+            return MapPreviewResponse(result, data, fingerprint);
+        }
+
+        // ממפה את תוצאת האלגוריתם לתגובת התצוגה המקדימה. שדות התצוגה (שמות)
+        // נשארים ריקים/NULL בשלב A וימולאו בשלב B מ-snapshot מועשר.
+        //
+        // public (ולא private) לצורך בדיקות-יחידה טהורות ללא DB, לפי מוסכמת הפרויקט
+        // (כמו PredictionService.ComputePrediction) - במקום InternalsVisibleTo.
+        public static AutoSchedulePreviewResponse MapPreviewResponse(
+            AutoScheduleResult result,
+            SchedulerData data,
+            string fingerprint)
+        {
+            Dictionary<int, SchedulerRequest> requestById = new Dictionary<int, SchedulerRequest>();
+            foreach (SchedulerRequest r in data.Requests)
+            {
+                requestById[r.PaidTimeRequestId] = r;
+            }
+
+            Dictionary<int, AssignmentDecision> decisionByRequestId =
+                result.Assignments.ToDictionary(a => a.PaidTimeRequestId);
+
+            List<PreviewScheduledItem> scheduledItems = result.Assignments
+                .Where(a =>
+                    a.Status == "Assigned"
+                    && a.AssignedCompSlotId.HasValue
+                    && a.AssignedStartTime.HasValue)
+                .OrderBy(a => a.AssignedStartTime)
+                .Select(a =>
+                {
+                    requestById.TryGetValue(a.PaidTimeRequestId, out SchedulerRequest? req);
+                    return new PreviewScheduledItem
+                    {
+                        PaidTimeRequestId = a.PaidTimeRequestId,
+                        HorseId = a.HorseId,
+                        CoachFederationMemberId = a.CoachFederationMemberId,
+                        AssignedCompSlotId = a.AssignedCompSlotId!.Value,
+                        AssignedStartTime = a.AssignedStartTime!.Value,
+                        AssignedOrder = a.AssignedOrder ?? 0,
+                        EffectiveDurationMinutes = req?.DurationMinutes ?? 0,
+                        RequestedCompSlotId = req?.RequestedCompSlotId ?? 0,
+                        RiderFederationMemberId = req?.RiderFederationMemberId
+                    };
+                })
+                .ToList();
+
+            List<PreviewUnscheduledItem> unscheduledItems = result.Audit
+                .Where(x => x.Action == "unscheduled")
+                .Select(x =>
+                {
+                    decisionByRequestId.TryGetValue(x.PaidTimeRequestId, out AssignmentDecision? d);
+                    requestById.TryGetValue(x.PaidTimeRequestId, out SchedulerRequest? req);
+                    return new PreviewUnscheduledItem
+                    {
+                        PaidTimeRequestId = x.PaidTimeRequestId,
+                        HorseId = d?.HorseId ?? req?.HorseId ?? 0,
+                        CoachFederationMemberId = d?.CoachFederationMemberId ?? req?.CoachFederationMemberId,
+                        RequestedCompSlotId = req?.RequestedCompSlotId ?? 0,
+                        Reason = x.Reason ?? "לא צוינה סיבה",
+                        ReasonCode = MapUnscheduledReasonCode(x.Reason)
+                    };
+                })
+                .ToList();
+
+            List<PreviewFrozenItem> frozenItems = result.Audit
+                .Where(x => x.Action == "kept-frozen")
+                .Select(x =>
+                {
+                    requestById.TryGetValue(x.PaidTimeRequestId, out SchedulerRequest? req);
+                    return new PreviewFrozenItem
+                    {
+                        PaidTimeRequestId = x.PaidTimeRequestId,
+                        HorseId = req?.HorseId ?? 0,
+                        CoachFederationMemberId = req?.CoachFederationMemberId,
+                        AssignedCompSlotId = req?.AssignedCompSlotId ?? x.NewSlotId ?? 0,
+                        AssignedStartTime = req?.AssignedStartTime ?? x.NewStartTime,
+                        AssignedOrder = req?.AssignedOrder
+                    };
+                })
+                .ToList();
+
+            return new AutoSchedulePreviewResponse
+            {
+                Fingerprint = fingerprint,
+                GeneratedAt = data.Now,
+                ScheduledCount = result.ScheduledCount,
+                UnscheduledCount = result.UnscheduledCount,
+                FrozenCount = result.FrozenCount,
+                ScheduledItems = scheduledItems,
+                UnscheduledItems = unscheduledItems,
+                FrozenItems = frozenItems
+            };
+        }
+
+        // ממפה את מחרוזת-הסיבה של האלגוריתם לקוד-סיבה מובנה. ההתאמה היא מול
+        // המחרוזות המדויקות שב-AutoScheduler; שינוי טקסט שם יפיל לקוד "Unknown"
+        // (לא לשגיאה). שלב עתידי יכול להעביר את הקודים לתוך האלגוריתם עצמו.
+        private static string MapUnscheduledReasonCode(string? reason)
+        {
+            switch (reason)
+            {
+                case "הסלוט המבוקש לא נמצא":
+                    return "RequestedSlotMissing";
+                case "הסלוט המבוקש פורסם - שיבוץ ידני נדרש":
+                    return "RequestedSlotPublished";
+                case "אין מקום פנוי בסלוט המבוקש (קיבולת/מאמן עסוק)":
+                    return "NoFreeCapacityOrCoachBusy";
+                default:
+                    return "Unknown";
+            }
+        }
+
+        // Fingerprint דטרמיניסטי ששומר על *המשמעות* של ההצעה שהמזכירה אישרה, לא רק
+        // על תקֵפות המיקום. הוא כולל:
+        //   1) קלטי-שיבוץ שיכולים לשנות את התוכנית (סלוטים, סטטוס/שיבוץ/משך/מאמן/
+        //      סלוט-מבוקש/זמן-קליטה של בקשות, וקבוצת-המועמדים);
+        //   2) זהות הישויות שהוצגו בהצעה - HorseId ו-RiderFederationMemberId. אם
+        //      בקשה תפנה מאוחר יותר לסוס/רוכב אחר, גם אם הזמן המשובץ לא היה משתנה,
+        //      ההצעה שהמזכירה אישרה כבר אינה נכונה ולכן חייבת להיחשב מיושנת.
+        // אין אילוץ-DB או מסלול-עדכון אכיף המונע שינוי של horseid/riderfederationmemberid
+        // ב-servicerequest, ולכן אסור להסתמך על "אי-שינוי בפועל" ואלה נכללים במפורש.
+        // *מוחרג במכוון:* data.Now - אינו משפיע על השיבוץ ואינו חלק ממשמעות ההצעה;
+        // הכללתו הייתה משנה כל fingerprint בכל קריאה ושוברת את התאמת Apply.
+        // מיון יציב לפי מזהה מבטיח קלט קנוני. SHA-256 -> hex.
+        //
+        // public (ולא private) לצורך בדיקות-יחידה טהורות ללא DB, לפי מוסכמת הפרויקט
+        // (כמו PredictionService.ComputePrediction) - במקום InternalsVisibleTo.
+        public static string ComputeAutoScheduleFingerprint(SchedulerData data, List<int> candidateIds)
+        {
+            StringBuilder sb = new StringBuilder();
+
+            sb.Append("comp=").Append(data.CompetitionId).Append('\n');
+
+            sb.Append("cand=");
+            foreach (int id in candidateIds.OrderBy(x => x))
+            {
+                sb.Append(id).Append(',');
+            }
+            sb.Append('\n');
+
+            sb.Append("slots=\n");
+            foreach (SchedulerSlot s in data.Slots.OrderBy(x => x.PaidTimeSlotInCompId))
+            {
+                sb.Append(s.PaidTimeSlotInCompId).Append('|')
+                  .Append(s.SlotDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).Append('|')
+                  .Append(s.StartTimeRaw).Append('|')
+                  .Append(s.EndTimeRaw).Append('|')
+                  .Append(s.TotalCapacityMinutes).Append('|')
+                  .Append(s.ArenaKey).Append('|')
+                  .Append(s.IsPublished ? "1" : "0").Append('\n');
+            }
+
+            sb.Append("reqs=\n");
+            foreach (SchedulerRequest r in data.Requests.OrderBy(x => x.PaidTimeRequestId))
+            {
+                sb.Append(r.PaidTimeRequestId).Append('|')
+                  .Append(r.Status).Append('|')
+                  .Append(r.RequestedCompSlotId).Append('|')
+                  .Append(r.AssignedCompSlotId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty).Append('|')
+                  .Append(r.AssignedStartTime?.ToString("o", CultureInfo.InvariantCulture) ?? string.Empty).Append('|')
+                  .Append(r.AssignedOrder?.ToString(CultureInfo.InvariantCulture) ?? string.Empty).Append('|')
+                  .Append(r.DurationMinutes).Append('|')
+                  .Append(r.CoachFederationMemberId).Append('|')
+                  .Append(r.HorseId).Append('|')
+                  .Append(r.RiderFederationMemberId).Append('|')
+                  .Append(r.SrequestDateTime.ToString("o", CultureInfo.InvariantCulture)).Append('\n');
+            }
+
+            using SHA256 sha = SHA256.Create();
+            byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
+            return Convert.ToHexString(hash);
         }
 
         private static void ValidateBulkCreateRequest(BulkCreatePaidTimeRequestsRequest request)
