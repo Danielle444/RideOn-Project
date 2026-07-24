@@ -161,6 +161,55 @@ Pattern: `person.nationalid = f"{n:09d}"`, `lastname = f"היסטורי {n}"`,
 `horse.horsename = f"סוס היסטורי {n}"`, `username = f"hist_{n}"`,
 `systemuser.isactive = False`
 
+### Entry chain shape + the billcharge requirement (verified 2026-07-24)
+
+Confirmed live while inserting fake entries into competition 46
+(`ריינינג 1+2 - חיזוי כניסות`, a prediction/demo competition: field 1, ranch 11,
+status NULL, dates 2026-07-28..31, `entryprediction` on all 38 classes, normally
+0 actual entries — a good live target for prediction-vs-actual demos).
+
+**The entry → servicerequest → bill chain, exactly:**
+- `entry` has **no** `srequestid` column. `entry.entryid` is itself a 1:1 FK to
+  `servicerequest.srequestid` (same id value). `entry.entryid` is NOT an identity
+  column — you set it manually, and it must equal an existing
+  `servicerequest.srequestid`.
+- `servicerequest.srequestid` and `bill.billid` are **`GENERATED ALWAYS` identity**
+  — you cannot supply them (error 428C9). Let the DB assign, capture via `RETURNING`,
+  and pair `entry.entryid` to the returned srequestid. A data-modifying CTE works:
+  insert bill `RETURNING billid` → insert N identical servicerequests `RETURNING
+  srequestid` → insert entries pairing each srequestid to a classincompid (the
+  servicerequests are fungible, so any pairing is valid).
+- `servicerequest` requires `horseid`, `riderfederationmemberid`, `billid`,
+  `orderedbysystemuserid` (all NOT NULL). One shared bill is fine — `billid` is a
+  plain FK on servicerequest, not unique. No unique constraints on entry/
+  servicerequest/bill beyond their PKs, so the same horse/rider/systemuser/bill can
+  be reused across every fabricated entry.
+
+**CRITICAL — an entry is invisible on the secretary classes/entries page until it
+has `billcharge` rows.** The display proc `usp_getsecretarycompetitionentries`
+`INNER JOIN`s a `charge_summary` CTE built entirely from **`billcharge`**
+(`sourcetype='Entry'`, `categorykey='classes'`, `competitionid=<comp>`,
+`chargestatus in ('Open','Paid')`). An entry with no matching billcharge row is
+dropped by that join — it exists in `entry` but the page shows nothing. The legacy
+`bill.amounttopay` / `servicerequest.billid` path does NOT drive this display; the
+money comes from `billcharge` (the Phase 8 financial layer). So a fabricated entry
+is not "complete" for today's schema until it has its charges. Real entries get
+**two** billcharge rows each: `chargeowner='Organizer'` (= class `organizercost`)
+and `chargeowner='Federation'` (= class `federationcost`), `chargestatus='Open'`
+(= unpaid). `ispaid`/`amounttopay` on the page are computed from these.
+
+Note: `usp_getclassesbycompetitionid` (the classes list) returns NO entry-count
+column. The classes page gets counts from the SEPARATE entries endpoint above,
+filtered client-side by `classincompid` + `entrystatus='Active'`. Two data sources,
+one screen.
+
+**Temp/demo data (distinct from the historical `היסטורי` convention):** stamp a
+sentinel so deletion is surgical — this session used
+`entry.prizerecipientname = 'TEMP_PREDICTION_TEST'` and
+`billcharge.notes = 'TEMP_PREDICTION_TEST'`. Delete in FK order:
+`billcharge` → `entry` → `servicerequest` → `bill` (capture the bill ids via the
+entries' servicerequests before deleting the entries).
+
 ---
 
 ## Authentication Architecture
@@ -632,4 +681,6 @@ WHERE cp.classincompid IS NULL AND c.competitionstatus = 'הסתיימה';
 ```python
 # entry → servicerequest → bill → person chain
 # person.lastname LIKE 'היסטורי%' identifies fabricated records
+# NOTE: also delete billcharge rows (sourcetype='Entry', sourceid=entryid) — see
+# "Entry chain shape + the billcharge requirement" above. Delete billcharge FIRST.
 ```
