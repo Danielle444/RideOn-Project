@@ -353,7 +353,14 @@ namespace RideOnServer.DAL
                     TotalAmount =
                         reader["totalamount"] == DBNull.Value
                             ? 0
-                            : Convert.ToDecimal(reader["totalamount"])
+                            : Convert.ToDecimal(reader["totalamount"]),
+
+                    // DEP-1 (Spec 2): appended LAST to #176. Read by name so it is safe even if an
+                    // older proc without the column were ever hit (name lookup, not ordinal).
+                    DeliveryPhotoUrl =
+                        reader["deliveryphotourl"] == DBNull.Value
+                            ? null
+                            : reader["deliveryphotourl"].ToString()
                 });
             }
 
