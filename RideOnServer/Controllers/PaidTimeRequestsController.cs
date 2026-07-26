@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.Competition.PaidTimeRequests;
@@ -199,6 +200,122 @@ namespace RideOnServer.Controllers
             {
                 Console.WriteLine($"Error in RunAutoScheduler: {ex.Message}");
                 return BadRequest("אירעה שגיאה בהרצת השיבוץ האוטומטי");
+            }
+        }
+
+        [HttpPost("auto-schedule/preview")]
+        public IActionResult PreviewAutoScheduler([FromQuery] int competitionId, [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (competitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                // כובלים את התחרות לחווה של המשתמש לפני קריאת נתוני-שיבוץ (read-only).
+                Competition? competition = Competition.GetCompetitionById(competitionId);
+                if (competition == null)
+                {
+                    return NotFound("Competition not found");
+                }
+                if (competition.HostRanchId != ranchId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לפעולה זו עבור תחרות זו");
+                }
+
+                AutoSchedulePreviewResponse preview = PaidTimeRequest.PreviewAutoSchedule(competitionId);
+
+                return Ok(preview);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in PreviewAutoScheduler: {ex.Message}");
+                return BadRequest("אירעה שגיאה בהפקת תצוגה מקדימה של השיבוץ האוטומטי");
+            }
+        }
+
+        // מבנה SHA-256 hex: 64 תווים הקסדצימליים בדיוק. ה-Fingerprint שהשרת מפיק הוא
+        // תמיד בצורה זו; קלט שאינו כזה מעולם לא הגיע מ-Preview => שגיאת-קלט (400), לא 409.
+        private static readonly Regex FingerprintShape =
+            new Regex("^[0-9a-fA-F]{64}$", RegexOptions.Compiled);
+
+        // החלת (Apply) התצוגה המקדימה - שלב D1. הלקוח שולח *רק* Fingerprint בגוף הבקשה.
+        // השרת מאמת אותו מול snapshot טרי, מחשב מחדש את ההצעה, ומחיל רק את ההחלטות שהוא
+        // עצמו ייצר. Fingerprint לא-תואם => 409 Conflict עם קוד יציב וקריא-מכונה.
+        [HttpPost("auto-schedule/apply")]
+        public IActionResult ApplyAutoScheduler(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId,
+            [FromBody] ApplyAutoScheduleRequest request)
+        {
+            try
+            {
+                if (competitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                if (request == null || string.IsNullOrWhiteSpace(request.Fingerprint))
+                {
+                    return BadRequest("Fingerprint is required");
+                }
+
+                if (!FingerprintShape.IsMatch(request.Fingerprint.Trim()))
+                {
+                    return BadRequest("Invalid fingerprint");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                // כובלים את התחרות לחווה של המשתמש לפני החלת נתוני-שיבוץ.
+                Competition? competition = Competition.GetCompetitionById(competitionId);
+                if (competition == null)
+                {
+                    return NotFound("Competition not found");
+                }
+                if (competition.HostRanchId != ranchId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לפעולה זו עבור תחרות זו");
+                }
+
+                AutoSchedulerSummary summary =
+                    PaidTimeRequest.ApplyAutoSchedule(competitionId, request.Fingerprint);
+
+                return Ok(summary);
+            }
+            catch (StalePreviewException ex)
+            {
+                // תצוגה מקדימה מיושנת: לא בוצעה שום כתיבה. אין חישוב-מחדש אוטומטי -
+                // ה-UI העתידי ידרוש "חשב מחדש". מוחזר קוד יציב לצד ההודעה.
+                return Conflict(new { code = StalePreviewException.Code, message = ex.Message });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in ApplyAutoScheduler: {ex.Message}");
+                return BadRequest("אירעה שגיאה בהחלת השיבוץ האוטומטי");
             }
         }
 

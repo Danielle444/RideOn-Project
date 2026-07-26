@@ -8,6 +8,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import {
+  CalendarClock,
   CheckSquare,
   Eye,
   Pencil,
@@ -28,7 +29,9 @@ import PaidTimeRequestCard from "../../components/secretary/paid-time/PaidTimeRe
 import PaidTimeScheduleCell from "../../components/secretary/paid-time/PaidTimeScheduleCell";
 import PaidTimeSlotInCompetitionModal from "../../components/secretary/PaidTimeSlotInCompetitionModal";
 import PaidTimeSlotRegistrationsModal from "../../components/secretary/paid-time/PaidTimeSlotRegistrationsModal";
+import AutoSchedulePreviewModal from "../../components/secretary/paid-time/AutoSchedulePreviewModal";
 import useCompetitionPaidTimePage from "../../hooks/secretary/useCompetitionPaidTimePage";
+import useAutoSchedulePreview from "../../hooks/secretary/useAutoSchedulePreview";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import CustomDropdown from "../../components/common/CustomDropdown";
 
@@ -127,6 +130,39 @@ export default function CompetitionPaidTimePage() {
     ranchId: ranchId,
     onShowToast: showToast,
   });
+
+  // Auto-scheduling Preview (Stage C2) + fingerprint-gated Apply (Stage D2).
+  // Reuses the page's existing competitionId/ranchId and its already-loaded
+  // slots. Preview is read-only; Apply writes on the server, after which the
+  // page shows a Hebrew result, refreshes slots, and closes the modal.
+  const autoSchedulePreview = useAutoSchedulePreview({
+    competitionId: Number(competitionId),
+    ranchId: ranchId,
+    getSlots: function () {
+      return page.slots;
+    },
+    onApplied: handleAutoScheduleApplied,
+  });
+
+  function handleAutoScheduleApplied(summary) {
+    var safe = summary || {};
+    var scheduled = Number(safe.scheduledCount ?? safe.ScheduledCount ?? 0);
+    var unscheduled = Number(safe.unscheduledCount ?? safe.UnscheduledCount ?? 0);
+
+    showToast(
+      "success",
+      "השיבוץ האוטומטי הוחל בהצלחה: " +
+        scheduled +
+        " שובצו, " +
+        unscheduled +
+        " לא שובצו",
+    );
+
+    // Refresh the slots grid (assigned counts / capacity) via the screen's
+    // established refetch, then close the Preview per the existing modal UX.
+    page.loadSlots();
+    autoSchedulePreview.close();
+  }
 
   function handleOpenSlotDetails(timeCell) {
     var slotId = timeCell && timeCell.slotId;
@@ -681,6 +717,16 @@ export default function CompetitionPaidTimePage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {!page.assignmentMode ? (
+              <TableActionButton
+                label="תצוגה מקדימה לשיבוץ אוטומטי"
+                icon={<CalendarClock size={15} />}
+                onClick={autoSchedulePreview.open}
+                disabled={autoSchedulePreview.loading}
+                loading={autoSchedulePreview.loading}
+              />
+            ) : null}
+
             {page.assignmentMode ? (
               <TableActionButton
                 label="חזרה לרשימת סלוטים"
@@ -733,6 +779,20 @@ export default function CompetitionPaidTimePage() {
         onClose={page.closePaidTimeSlotModal}
         onSubmit={page.handleSubmitPaidTimeSlot}
         onShowToast={showToast}
+      />
+
+      <AutoSchedulePreviewModal
+        isOpen={autoSchedulePreview.isOpen}
+        loading={autoSchedulePreview.loading}
+        error={autoSchedulePreview.error}
+        data={autoSchedulePreview.data}
+        applying={autoSchedulePreview.applying}
+        applyError={autoSchedulePreview.applyError}
+        isStale={autoSchedulePreview.isStale}
+        applied={autoSchedulePreview.applied}
+        onClose={autoSchedulePreview.close}
+        onRecalculate={autoSchedulePreview.recalculate}
+        onApply={autoSchedulePreview.apply}
       />
 
       <ToastMessage

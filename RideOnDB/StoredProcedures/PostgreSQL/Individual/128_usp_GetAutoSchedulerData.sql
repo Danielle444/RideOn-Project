@@ -54,7 +54,17 @@ BEGIN
             'status',                  ptr.status,
             'srequestdatetime',        sr.srequestdatetime,
             'batchId',                 ptr.batchid,
-            'notes',                   ptr.notes
+            'notes',                   ptr.notes,
+            -- העשרת-תצוגה (שלב B): שדות שם קריאים-אנושית בלבד. אינם משתתפים
+            -- בהחלטות השיבוץ ואינם נכללים ב-Fingerprint. כל ה-JOINים למטה הם
+            -- LEFT JOIN כדי להבטיח שאף בקשת-שיבוץ לא תיפול מהתמונה בגלל היעדר
+            -- נתון-תצוגה (קרדינליות זהה: הצטרפות על מפתחות ראשיים, לכל היותר שורה
+            -- אחת). מקורות מאומתים מול פרוצדורות 121/150.
+            'horseName',               h.horsename,
+            'barnName',                h.barnname,
+            'riderName',               (rider_p.firstname || ' ' || rider_p.lastname),
+            'coachName',               (coach_p.firstname || ' ' || coach_p.lastname),
+            'payerName',               (payer_p.firstname || ' ' || payer_p.lastname)
         ) AS r
         FROM paidtimerequest ptr
         INNER JOIN servicerequest sr   ON sr.srequestid     = ptr.paidtimerequestid
@@ -62,6 +72,11 @@ BEGIN
             ON reqslot.paidtimeslotincompid = ptr.requestedcompslotid
         INNER JOIN pricecatalog pc     ON pc.pricecatalogid = ptr.pricecatalogid
         INNER JOIN paidtimeproduct ptp ON ptp.productid     = pc.productid
+        LEFT JOIN horse h              ON h.horseid         = sr.horseid
+        LEFT JOIN person rider_p       ON rider_p.personid  = sr.riderfederationmemberid
+        LEFT JOIN person coach_p       ON coach_p.personid  = sr.coachfederationmemberid
+        LEFT JOIN bill b               ON b.billid          = sr.billid
+        LEFT JOIN person payer_p       ON payer_p.personid  = b.paidbypersonid
         WHERE reqslot.competitionid = p_CompetitionId
           AND ptr.status IN ('Pending', 'Assigned')
     ) sub;
