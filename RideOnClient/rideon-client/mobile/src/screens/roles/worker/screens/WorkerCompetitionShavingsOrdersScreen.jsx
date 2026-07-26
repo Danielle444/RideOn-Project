@@ -12,6 +12,7 @@ import {
   getWorkerShavingsOrdersByCompetition,
   claimShavingsOrder,
   saveDeliveryPhoto,
+  markDelivered,
 } from "../../../../services/shavingsOrderService";
 import { getMobileWorkerCompetitionsBoard } from "../../../../services/competitionService";
 import { supabase } from "../../../../lib/supabaseClient";
@@ -29,6 +30,9 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [uploadingOrderId, setUploadingOrderId] = useState(null);
   const [claimingOrderId, setClaimingOrderId] = useState(null);
+  const [markingOrderId, setMarkingOrderId] = useState(null);
+  // Orders whose photo upload just failed — reveals the no-photo fallback button (CAP-4).
+  const [photoFailedOrderId, setPhotoFailedOrderId] = useState(null);
 
   useEffect(function () {
     loadCompetitions();
@@ -134,15 +138,37 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
 
       await saveDeliveryPhoto(order.shavingsOrderId, urlData.publicUrl);
 
-      Alert.alert("בוצע", "התמונה נשמרה וההזמנה ממתינה לאישור מזכירה");
+      setPhotoFailedOrderId(null);
+      Alert.alert("בוצע", "ההזמנה סופקה");
       await loadOrders(selectedCompetition);
     } catch (err) {
       console.error("Photo upload error:", err);
-      const message =
-        err?.message || err?.error || "לא ניתן להעלות את התמונה. נסה שוב.";
-      Alert.alert("שגיאה", message);
+      setPhotoFailedOrderId(order.shavingsOrderId);
+      Alert.alert(
+        "העלאת התמונה נכשלה",
+        "ניתן לסמן את ההזמנה כסופקה גם ללא תמונה."
+      );
     } finally {
       setUploadingOrderId(null);
+    }
+  }
+
+  async function handleMarkDelivered(order) {
+    try {
+      setMarkingOrderId(order.shavingsOrderId);
+      await markDelivered(order.shavingsOrderId);
+      setPhotoFailedOrderId(null);
+      Alert.alert("בוצע", "ההזמנה סופקה");
+      await loadOrders(selectedCompetition);
+    } catch (err) {
+      if (err?.response?.status === 409) {
+        Alert.alert("לא ניתן", "ההזמנה כבר סופקה");
+        await loadOrders(selectedCompetition);
+      } else {
+        Alert.alert("שגיאה", "לא ניתן לסמן את ההזמנה כסופקה");
+      }
+    } finally {
+      setMarkingOrderId(null);
     }
   }
 
@@ -300,6 +326,8 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
                 key={order.shavingsOrderId}
                 orderTitle={`הזמנה #${order.shavingsOrderId}`}
                 deliveryStatus={order.deliveryStatus}
+                arrivalTime={order.arrivalTime}
+                workerSystemUserId={order.workerSystemUserId}
                 stallNumber={order.stallNumber}
                 bagQuantity={order.bagQuantity}
                 payerFirstName={order.payerFirstName}
@@ -311,11 +339,16 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
                 isUnclaimed={isUnclaimed}
                 uploading={uploadingOrderId === order.shavingsOrderId}
                 claiming={claimingOrderId === order.shavingsOrderId}
+                marking={markingOrderId === order.shavingsOrderId}
+                showNoPhotoFallback={photoFailedOrderId === order.shavingsOrderId}
                 onCapturePhoto={function () {
                   handleCapturePhoto(order);
                 }}
                 onClaim={function () {
                   handleClaimOrder(order);
+                }}
+                onMarkDelivered={function () {
+                  handleMarkDelivered(order);
                 }}
               />
             );

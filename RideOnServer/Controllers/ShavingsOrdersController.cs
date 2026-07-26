@@ -117,52 +117,24 @@ namespace RideOnServer.Controllers
             }
         }
 
-        [HttpGet("pending-approvals")]
-        public IActionResult GetPendingApprovals([FromQuery] int ranchId)
+        [HttpPost("mark-delivered")]
+        public IActionResult MarkDelivered([FromBody] MarkDeliveredRequest request)
         {
             try
             {
-                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+                int workerSystemUserId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                UserAccessValidator.EnsureUserHasRoleInRanch(
-                    currentPersonId,
-                    ranchId,
-                    RoleNames.HostSecretary
-                );
+                // TODO (parity with save-delivery-photo):
+                // אין כאן בדיקת שיוך ההזמנה לעובד הנוכחי. לחזק בהמשך כמו ב-save-delivery-photo.
 
-                var approvals = ShavingsOrder.GetPendingDeliveryApprovals(ranchId);
-                return Ok(new { data = approvals });
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error in GetPendingApprovals: {ex.Message}");
-                return StatusCode(500, "שגיאה בשליפת ההזמנות הממתינות");
-            }
-        }
+                bool delivered = ShavingsOrder.MarkDelivered(request);
 
-        [HttpPost("approve-delivery")]
-        public IActionResult ApproveDelivery([FromBody] ApproveDeliveryRequest request)
-        {
-            try
-            {
-                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+                if (!delivered)
+                {
+                    return Conflict("ההזמנה כבר סופקה או שאינה קיימת");
+                }
 
-                // TODO חשוב:
-                // בשביל אבטחה מלאה צריך להוסיף RanchId ל-ApproveDeliveryRequest
-                // ואז לבצע:
-                // UserAccessValidator.EnsureUserHasRoleInRanch(currentPersonId, request.RanchId, RoleNames.HostSecretary);
-                //
-                // כרגע אין RanchId ב-DTO, לכן אי אפשר לבדוק כאן הרשאת חווה בלי SP נוסף
-                // שמחזיר את ranchId לפי shavingsOrderId.
-
-                request.ApprovedByPersonId = currentPersonId;
-
-                ShavingsOrder.ApproveDelivery(request);
-                return Ok(new { message = "המשלוח אושר בהצלחה" });
+                return Ok(new { message = "ההזמנה סופקה" });
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -174,8 +146,8 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in ApproveDelivery: {ex.Message}");
-                return StatusCode(500, "שגיאה באישור המשלוח");
+                Console.WriteLine($"Error in MarkDelivered: {ex.Message}");
+                return StatusCode(500, "שגיאה בסימון ההזמנה כסופקה");
             }
         }
 

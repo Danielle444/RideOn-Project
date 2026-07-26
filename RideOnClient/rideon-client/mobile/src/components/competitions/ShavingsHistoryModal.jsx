@@ -51,14 +51,6 @@ function getStatusText(status) {
     return "לא ידוע";
   }
 
-  if (
-    value === "WaitingApproval" ||
-    value === "Waiting Approval" ||
-    value === "PendingApproval"
-  ) {
-    return "ממתין לאישור";
-  }
-
   if (value === "Pending") {
     return "ממתין";
   }
@@ -93,12 +85,7 @@ function getStatusBadgeStyle(status) {
     return styles.historyStatusInfo;
   }
 
-  if (
-    value === "WaitingApproval" ||
-    value === "Waiting Approval" ||
-    value === "PendingApproval" ||
-    value === "Pending"
-  ) {
+  if (value === "Pending") {
     return styles.historyStatusWarning;
   }
 

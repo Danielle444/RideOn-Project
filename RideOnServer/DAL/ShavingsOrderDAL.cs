@@ -86,96 +86,51 @@ namespace RideOnServer.DAL
             }
         }
 
-        public List<PendingDeliveryApprovalItem> GetPendingDeliveryApprovals(int ranchId)
+        // No-photo delivery fallback (CAP-4). Mirrors ClaimShavingsOrder: the SP returns
+        // rows-affected, so >0 means "recorded", 0 means "no open order matched".
+        public static bool MarkDelivered(int shavingsOrderId)
         {
+            ShavingsOrderDAL dal = new ShavingsOrderDAL();
+
             Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
-                { "@RanchId", ranchId }
+                { "@shavingsOrderId", shavingsOrderId }
             };
 
-            try
-            {
-                using NpgsqlConnection connection = DBServices.GetDefaultConnection();
-                connection.Open();
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
 
-                using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
-                    "usp_GetPendingDeliveryApprovals",
-                    connection,
-                    paramDic))
-                using (NpgsqlDataReader reader = command.ExecuteReader())
-                {
-                    List<PendingDeliveryApprovalItem> list = new List<PendingDeliveryApprovalItem>();
+            using NpgsqlCommand cmd = dal.CreateCommandWithStoredProcedure(
+                "usp_markdelivered",
+                conn,
+                paramDic);
 
-                    while (reader.Read())
-                    {
-                        list.Add(new PendingDeliveryApprovalItem
-                        {
-                            ShavingsOrderId = Convert.ToInt32(reader["ShavingsOrderId"]),
-                            BagQuantity = Convert.ToInt32(reader["BagQuantity"]),
-                            Notes = reader["Notes"] as string,
-                            DeliveryPhotoUrl = reader["DeliveryPhotoUrl"] as string,
-                            DeliveryPhotoDate = reader["DeliveryPhotoDate"] as DateTime?,
-                            PayerFirstName = reader["PayerFirstName"]?.ToString() ?? string.Empty,
-                            PayerLastName = reader["PayerLastName"]?.ToString() ?? string.Empty,
-                            StallNumber = reader["StallNumber"] as string,
-                            WorkerFirstName = reader["WorkerFirstName"]?.ToString() ?? string.Empty,
-                            WorkerLastName = reader["WorkerLastName"]?.ToString() ?? string.Empty,
-                        });
-                    }
-
-                    return list;
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error in GetPendingDeliveryApprovals: {ex.Message}");
-                throw;
-            }
-        }
-
-        public void ApproveDelivery(int shavingsOrderId, int approvedByPersonId, DateTime approvedAt)
-        {
-            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
-            {
-                { "@ShavingsOrderId", shavingsOrderId },
-                { "@ApprovedByPersonId", approvedByPersonId },
-                { "@ApprovedAt", approvedAt }
-            };
-
-            try
-            {
-                using NpgsqlConnection connection = DBServices.GetDefaultConnection();
-                connection.Open();
-
-                using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
-                    "usp_ApproveDelivery",
-                    connection,
-                    paramDic))
-                {
-                    command.ExecuteNonQuery();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error in ApproveDelivery: {ex.Message}");
-                throw;
-            }
+            object? result = cmd.ExecuteScalar();
+            int rowsAffected = result == null || result == DBNull.Value ? 0 : Convert.ToInt32(result);
+            return rowsAffected > 0;
         }
 
         public static List<WorkerShavingsOrderItem> GetShavingsOrdersByCompetitionForWorker(int competitionId, int ranchId)
         {
+            ShavingsOrderDAL dal = new ShavingsOrderDAL();
+
+            // Positional-dict binding: entry order (competitionId, ranchId) matches
+            // usp_getshavingsordersforworkerbycompetition(p_competitionid, p_ranchid).
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@competitionId", competitionId },
+                { "@ranchId", ranchId }
+            };
+
             List<WorkerShavingsOrderItem> orders = new List<WorkerShavingsOrderItem>();
 
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();
             conn.Open();
 
-            using NpgsqlCommand cmd = new NpgsqlCommand(
-                "SELECT * FROM usp_getshavingsordersforworkerbycompetition(@competitionId, @ranchId)",
-                conn
-            );
-
-            cmd.Parameters.AddWithValue("@competitionId", competitionId);
-            cmd.Parameters.AddWithValue("@ranchId", ranchId);
+            using NpgsqlCommand cmd = dal.CreateCommandWithStoredProcedure(
+                "usp_getshavingsordersforworkerbycompetition",
+                conn,
+                paramDic);
 
             using NpgsqlDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -204,22 +159,33 @@ namespace RideOnServer.DAL
 
         public static bool ClaimShavingsOrder(int shavingsOrderId, int workerSystemUserId)
         {
+            ShavingsOrderDAL dal = new ShavingsOrderDAL();
+
+            // Positional-dict binding: (shavingsOrderId, workerSystemUserId) matches
+            // usp_claimshavingsorder(p_shavingsorderid, p_workersystemuserid).
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@shavingsOrderId", shavingsOrderId },
+                { "@workerSystemUserId", workerSystemUserId }
+            };
+
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();
             conn.Open();
 
-            using NpgsqlCommand cmd = new NpgsqlCommand(
-                "SELECT usp_claimshavingsorder(@shavingsOrderId, @workerSystemUserId)",
-                conn
-            );
-
-            cmd.Parameters.AddWithValue("@shavingsOrderId", shavingsOrderId);
-            cmd.Parameters.AddWithValue("@workerSystemUserId", workerSystemUserId);
+            using NpgsqlCommand cmd = dal.CreateCommandWithStoredProcedure(
+                "usp_claimshavingsorder",
+                conn,
+                paramDic);
 
             object? result = cmd.ExecuteScalar();
             int rowsAffected = result == null || result == DBNull.Value ? 0 : Convert.ToInt32(result);
             return rowsAffected > 0;
         }
 
+        // DOCUMENTED EXCEPTION to the CreateCommandWithStoredProcedure convention (CAP-10):
+        // this call passes a typed jsonb (@stalls) and a typed Timestamp (@requestedDeliveryTime).
+        // @stalls is not a real column name, so AddParameterWithType cannot resolve jsonb by the
+        // column-name convention — it is left on the raw NpgsqlCommand to keep the explicit typing.
         public static int CreateShavingsOrder(CreateShavingsOrderRequest request)
         {
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();
@@ -260,18 +226,23 @@ namespace RideOnServer.DAL
 
         public static List<ShavingsAvailableStallItem> GetStallBookingsForShavings(int competitionId, int ranchId)
         {
+            ShavingsOrderDAL dal = new ShavingsOrderDAL();
+
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@competitionId", competitionId },
+                { "@ranchId", ranchId }
+            };
+
             List<ShavingsAvailableStallItem> stalls = new List<ShavingsAvailableStallItem>();
 
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();
             conn.Open();
 
-            using NpgsqlCommand cmd = new NpgsqlCommand(
-                "SELECT * FROM usp_getstallbookingsforshavings(@competitionId, @ranchId)",
-                conn
-            );
-
-            cmd.Parameters.AddWithValue("@competitionId", competitionId);
-            cmd.Parameters.AddWithValue("@ranchId", ranchId);
+            using NpgsqlCommand cmd = dal.CreateCommandWithStoredProcedure(
+                "usp_getstallbookingsforshavings",
+                conn,
+                paramDic);
 
             using NpgsqlDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -297,19 +268,24 @@ namespace RideOnServer.DAL
             int ranchId
         )
         {
+            ShavingsOrderDAL dal = new ShavingsOrderDAL();
+
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@competitionId", competitionId },
+                { "@ranchId", ranchId }
+            };
+
             List<CompetitionShavingsOrderListItem> orders =
                 new List<CompetitionShavingsOrderListItem>();
 
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();
             conn.Open();
 
-            using NpgsqlCommand cmd = new NpgsqlCommand(
-                "SELECT * FROM usp_getshavingsordersforcompetitionandranch(@competitionId, @ranchId)",
-                conn
-            );
-
-            cmd.Parameters.AddWithValue("@competitionId", competitionId);
-            cmd.Parameters.AddWithValue("@ranchId", ranchId);
+            using NpgsqlCommand cmd = dal.CreateCommandWithStoredProcedure(
+                "usp_getshavingsordersforcompetitionandranch",
+                conn,
+                paramDic);
 
             using NpgsqlDataReader reader = cmd.ExecuteReader();
 
@@ -342,15 +318,22 @@ namespace RideOnServer.DAL
                             ? null
                             : Convert.ToInt32(reader["workersystemuserid"]),
 
-                    ApprovedByPersonId =
-                        reader["approvedbypersonid"] == DBNull.Value
+                    // Lifecycle fields (approval retired) — Seen=responsetime, Delivered=arrivaltime,
+                    // PrequestDatetime=order creation clock. Ships with M4 (DROP+CREATE of the SP).
+                    Seen =
+                        reader["seen"] == DBNull.Value
                             ? null
-                            : Convert.ToInt32(reader["approvedbypersonid"]),
+                            : Convert.ToDateTime(reader["seen"]),
 
-                    ApprovedAt =
-                        reader["approvedat"] == DBNull.Value
+                    Delivered =
+                        reader["delivered"] == DBNull.Value
                             ? null
-                            : Convert.ToDateTime(reader["approvedat"]),
+                            : Convert.ToDateTime(reader["delivered"]),
+
+                    PrequestDatetime =
+                        reader["prequestdatetime"] == DBNull.Value
+                            ? null
+                            : Convert.ToDateTime(reader["prequestdatetime"]),
 
                     OrderedByName =
                         reader["orderedbyname"] == DBNull.Value
@@ -379,17 +362,22 @@ namespace RideOnServer.DAL
 
         public static List<ShavingsOrderDetailsItem> GetShavingsOrderDetails(int shavingsOrderId)
         {
+            ShavingsOrderDAL dal = new ShavingsOrderDAL();
+
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@shavingsOrderId", shavingsOrderId }
+            };
+
             List<ShavingsOrderDetailsItem> details = new List<ShavingsOrderDetailsItem>();
 
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();
             conn.Open();
 
-            using NpgsqlCommand cmd = new NpgsqlCommand(
-                "SELECT * FROM usp_getshavingsorderdetails(@shavingsOrderId)",
-                conn
-            );
-
-            cmd.Parameters.AddWithValue("@shavingsOrderId", shavingsOrderId);
+            using NpgsqlCommand cmd = dal.CreateCommandWithStoredProcedure(
+                "usp_getshavingsorderdetails",
+                conn,
+                paramDic);
 
             using NpgsqlDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -408,17 +396,22 @@ namespace RideOnServer.DAL
 
         public static List<ShavingsOrderPayerItem> GetPayersForShavingsOrder(int shavingsOrderId)
         {
+            ShavingsOrderDAL dal = new ShavingsOrderDAL();
+
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@shavingsOrderId", shavingsOrderId }
+            };
+
             List<ShavingsOrderPayerItem> payers = new List<ShavingsOrderPayerItem>();
 
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();
             conn.Open();
 
-            using NpgsqlCommand cmd = new NpgsqlCommand(
-                "SELECT * FROM usp_getpayersforshavingsorder(@shavingsOrderId)",
-                conn
-            );
-
-            cmd.Parameters.AddWithValue("@shavingsOrderId", shavingsOrderId);
+            using NpgsqlCommand cmd = dal.CreateCommandWithStoredProcedure(
+                "usp_getpayersforshavingsorder",
+                conn,
+                paramDic);
 
             using NpgsqlDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -440,18 +433,23 @@ namespace RideOnServer.DAL
 
         public static List<ShavingsOrderPayerItem> GetAllShavingsOrderPayersForCompetitionAndRanch(int competitionId, int ranchId)
         {
+            ShavingsOrderDAL dal = new ShavingsOrderDAL();
+
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@competitionId", competitionId },
+                { "@ranchId", ranchId }
+            };
+
             List<ShavingsOrderPayerItem> payers = new List<ShavingsOrderPayerItem>();
 
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();
             conn.Open();
 
-            using NpgsqlCommand cmd = new NpgsqlCommand(
-                "SELECT * FROM usp_getallshavingsorderpayersforcompetitionandranch(@competitionId, @ranchId)",
-                conn
-            );
-
-            cmd.Parameters.AddWithValue("@competitionId", competitionId);
-            cmd.Parameters.AddWithValue("@ranchId", ranchId);
+            using NpgsqlCommand cmd = dal.CreateCommandWithStoredProcedure(
+                "usp_getallshavingsorderpayersforcompetitionandranch",
+                conn,
+                paramDic);
 
             using NpgsqlDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -471,76 +469,41 @@ namespace RideOnServer.DAL
             return payers;
         }
 
-        public static List<CompetitionShavingsOrderDetailsItem>
-    GetAllShavingsOrderDetailsForCompetitionAndRanch(
-        int competitionId,
-        int ranchId
-    )
+        public static List<CompetitionShavingsOrderDetailsItem> GetAllShavingsOrderDetailsForCompetitionAndRanch(
+            int competitionId,
+            int ranchId
+        )
         {
-            List<CompetitionShavingsOrderDetailsItem>
-                details =
-                    new List<CompetitionShavingsOrderDetailsItem>();
+            ShavingsOrderDAL dal = new ShavingsOrderDAL();
 
-            using NpgsqlConnection conn =
-                DBServices.GetDefaultConnection();
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@competitionId", competitionId },
+                { "@ranchId", ranchId }
+            };
 
+            List<CompetitionShavingsOrderDetailsItem> details =
+                new List<CompetitionShavingsOrderDetailsItem>();
+
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
             conn.Open();
 
-            using NpgsqlCommand cmd =
-                new NpgsqlCommand(
-                    "SELECT * FROM usp_getallshavingsorderdetailsforcompetitionandranch(@competitionId, @ranchId)",
-                    conn
-                );
+            using NpgsqlCommand cmd = dal.CreateCommandWithStoredProcedure(
+                "usp_getallshavingsorderdetailsforcompetitionandranch",
+                conn,
+                paramDic);
 
-            cmd.Parameters.AddWithValue(
-                "@competitionId",
-                competitionId
-            );
-
-            cmd.Parameters.AddWithValue(
-                "@ranchId",
-                ranchId
-            );
-
-            using NpgsqlDataReader reader =
-                cmd.ExecuteReader();
-
+            using NpgsqlDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
             {
-                details.Add(
-                    new CompetitionShavingsOrderDetailsItem
-                    {
-                        ShavingsOrderId =
-                            Convert.ToInt32(
-                                reader["shavingsorderid"]
-                            ),
-
-                        StallBookingId =
-                            Convert.ToInt32(
-                                reader["stallbookingid"]
-                            ),
-
-                        HorseId =
-                            reader["horseid"] == DBNull.Value
-                                ? null
-                                : Convert.ToInt32(
-                                    reader["horseid"]
-                                ),
-
-                        HorseName =
-                            reader["horsename"] == DBNull.Value
-                                ? null
-                                : reader["horsename"]
-                                    .ToString(),
-
-                        BagQuantityPerStall =
-                            Convert.ToInt16(
-                                reader[
-                                    "bagquantityperstall"
-                                ]
-                            )
-                    }
-                );
+                details.Add(new CompetitionShavingsOrderDetailsItem
+                {
+                    ShavingsOrderId = Convert.ToInt32(reader["shavingsorderid"]),
+                    StallBookingId = Convert.ToInt32(reader["stallbookingid"]),
+                    HorseId = reader["horseid"] == DBNull.Value ? null : Convert.ToInt32(reader["horseid"]),
+                    HorseName = reader["horsename"] == DBNull.Value ? null : reader["horsename"].ToString(),
+                    BagQuantityPerStall = Convert.ToInt16(reader["bagquantityperstall"])
+                });
             }
 
             return details;

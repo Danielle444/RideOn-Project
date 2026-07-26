@@ -21,10 +21,6 @@ namespace RideOnServer.BL
 
         public DateTime? DeliveryPhotoDate { get; set; }
 
-        public int? ApprovedByPersonId { get; set; }
-
-        public DateTime? ApprovedAt { get; set; }
-
         public static List<WorkerShavingsOrderItem> GetWorkerShavingsOrders(int workerSystemUserId)
         {
             ShavingsOrderDAL dal = new ShavingsOrderDAL();
@@ -43,22 +39,14 @@ namespace RideOnServer.BL
             dal.SaveDeliveryPhoto(request.ShavingsOrderId, request.DeliveryPhotoUrl, DateTime.UtcNow);
         }
 
-        public static List<PendingDeliveryApprovalItem> GetPendingDeliveryApprovals(int ranchId)
-        {
-            ShavingsOrderDAL dal = new ShavingsOrderDAL();
-            return dal.GetPendingDeliveryApprovals(ranchId);
-        }
-
-        public static void ApproveDelivery(ApproveDeliveryRequest request)
+        // No-photo delivery fallback (CAP-4): records a delivery without a photo.
+        // Returns false when no open order matched (already delivered or nonexistent).
+        public static bool MarkDelivered(MarkDeliveredRequest request)
         {
             if (request.ShavingsOrderId <= 0)
                 throw new ArgumentException("מזהה הזמנה לא תקין");
 
-            if (request.ApprovedByPersonId <= 0)
-                throw new ArgumentException("מזהה מאשר לא תקין");
-
-            ShavingsOrderDAL dal = new ShavingsOrderDAL();
-            dal.ApproveDelivery(request.ShavingsOrderId, request.ApprovedByPersonId, DateTime.UtcNow);
+            return ShavingsOrderDAL.MarkDelivered(request.ShavingsOrderId);
         }
     }
 }
