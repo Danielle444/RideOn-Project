@@ -552,6 +552,21 @@ Classes support multiple prizes (add/remove rows in the form). Current live proc
 
 ---
 
+## Shavings Order Lifecycle (Spec 1 — shipped 2026-07-26, merged to main `d9c3701`)
+
+Secretary approval was **retired entirely**. The lifecycle is now `Pending → (Seen) → Delivered`, where **`Seen` is DERIVED, never a stored token**. Stored `deliverystatus` carries only `{Pending, Delivered}` (terminal is `Delivered`, not `Closed`). This supersedes the old `Pending → WaitingApproval → Closed` + approval vocabulary — that no longer exists anywhere.
+
+- **Derived state** (worker card + secretary read both compute it): `Delivered` if `arrivaltime` set, else `Seen` if `workersystemuserid` set, else `Pending`. **Never branch on the raw `deliverystatus` alone** — a claimed-but-undelivered order is stored `Pending` yet must display `Seen`. The mobile card must be fed raw `arrivalTime` + `workerSystemUserId` (not just an `isMyOrder` flag) or a claimed-by-another order derives wrong.
+- **Column semantics (repurposed by NOTE only — no rename/drop):** `responsetime` = *seen-by-worker* clock (stamped on claim); `arrivaltime` = *delivered-at* (drives delivered-ness); `deliveryphotourl`/`deliveryphotodate` = *optional proof*. `approvedbypersonid`/`approvedat` are dead — left physically in place, never read or written.
+- **"Unverified delivery"** = `arrivaltime IS NOT NULL AND deliveryphotourl IS NULL` (derived; no column) — the no-photo fallback path. A later photo promotes the same row to verified without moving `arrivaltime` (`COALESCE`).
+- **Write procs:** `usp_claimshavingsorder` sets `workersystemuserid` + `responsetime=now()` and **keeps status `Pending`** (this backward-compat keeps installed old apps working through the flow). `usp_savedeliveryphoto` and new `usp_markdelivered` set `deliverystatus='Delivered'` + `arrivaltime=COALESCE(arrivaltime,now())`. Both claim/mark return rows-affected (`>0` = recorded, `0` = no open order).
+- **Read procs (new fields):** `usp_getworkershavingsorders` (113) + `usp_getshavingsordersforworkerbycompetition` (114) each return a trailing `ResponseTime`. Secretary read `usp_getshavingsordersforcompetitionandranch` (176) dropped `ApprovedByPersonId`/`ApprovedAt` and appended `Seen`(=responsetime)/`Delivered`(=arrivaltime)/`PrequestDatetime` (order-creation clock, the SLA source).
+- **Retired procs (dropped from live):** `usp_getpendingdeliveryapprovals`, `usp_approvedelivery`. Their `pending-approvals`/`approve-delivery` endpoints, DAL/BL methods, DTOs, and the web approval action are all gone. The web secretary shavings page is a neutral placeholder — the full order-list redesign (ranch/status grouping, SLA highlighting) is **Spec 2** (`_bmad-output/specs/spec-shavings-page-redesign/`), which consumes the Seen/Delivered/PrequestDatetime fields.
+- **Repo hygiene:** all 15 shavings procs now have one committed `.sql` matching live under `Individual/` — the recovered 9 split to `169`–`177`, `SaveDeliveryPhoto`→`168`, new `178_usp_MarkDelivered`; the old `114_`/`115_` collisions and retired `115`/`116` files are gone. `ShavingsOrderDAL.cs` is reconciled onto `CreateCommandWithStoredProcedure` (positional dict, entry order = SP param order), except `CreateShavingsOrder` which stays a raw `NpgsqlCommand` for its typed `jsonb` `@stalls` (documented exception — `AddParameterWithType` can't resolve jsonb by column-name convention).
+- **Ranch attribution stays INDIRECT:** `shavingsorder` has no `ranchid` — path is `shavingsorder → shavingsorderforstallbooking → stallbooking.ranchid`.
+
+---
+
 ## Local Development Setup
 
 Backend (`RideOnServer`, port 5268): **does NOT load any .env file** — it reads only appsettings + real OS environment variables. Locally, set variables in the same PowerShell session before `dotnet run` (values mirror the Render dashboard):

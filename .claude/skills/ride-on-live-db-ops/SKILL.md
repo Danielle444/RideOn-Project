@@ -87,6 +87,29 @@ Backward compatibility rule: DB changes deploy independently of code (Render
 auto-deploys main) and must keep the currently deployed backend working
 unchanged.
 
+**Deploy-coupled changes — verify the DEPLOY, not "it's live" (learned the hard
+way, shavings Spec 1, 2026-07-26).** Some DB changes intentionally break the
+*currently deployed* backend and must land WITH the new code: a return-type
+`DROP`+`CREATE` that removes columns the deployed DAL reads by name, or dropping
+a proc the deployed backend still calls. Before applying one of these:
+- Confirm the new code is actually on the deployed source, not just running
+  locally. Render deploys from `origin/main` — check `git log origin/main`
+  contains the feature commit (`git branch -a --contains <sha>`), and that
+  Render finished redeploying. A green LOCAL `dotnet run` against live DB is NOT
+  proof of deployment; "the backend is live" can mean a locally-run feature
+  branch. In the incident, M4 (dropped `approvedbypersonid`/`approvedat` from
+  `usp_getshavingsordersforcompetitionandranch`) + M7 (dropped the approval
+  procs) were applied while `origin/main` still had the OLD code → the deployed
+  secretary read 500'd. Fixed by rolling FORWARD (merge + redeploy), not back.
+- **Capture the exact live body via `pg_get_functiondef` BEFORE any `DROP`.**
+  The dropped proc's definition is gone afterward, and the repo `.sql` may be
+  stale (the retired `usp_getpendingdeliveryapprovals` repo copy referenced
+  columns that don't exist in the live schema — it could not have restored it).
+  Without the captured body, a rollback is a reconstruction, not a restore.
+- Prefer sequencing the apply into the deploy window: merge → confirm Render
+  redeployed → then apply. If forced to choose recovery, rolling forward (get
+  the matching code deployed) is often cleaner than reconstructing dropped procs.
+
 ## QA triage pattern
 
 When Oren reports a bug seen in the UI, **check DB ground truth first** —
