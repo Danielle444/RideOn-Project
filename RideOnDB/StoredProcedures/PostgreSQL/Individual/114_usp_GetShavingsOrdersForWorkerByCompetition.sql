@@ -1,24 +1,7 @@
-CREATE OR REPLACE FUNCTION usp_GetShavingsOrdersForWorkerByCompetition(
-    p_CompetitionId INTEGER,
-    p_RanchId       INTEGER
-)
-RETURNS TABLE(
-    "ShavingsOrderId"       INTEGER,
-    "BagQuantity"           SMALLINT,
-    "Notes"                 CHARACTER VARYING,
-    "RequestedDeliveryTime" TIMESTAMP WITHOUT TIME ZONE,
-    "ArrivalTime"           TIMESTAMP WITHOUT TIME ZONE,
-    "DeliveryStatus"        CHARACTER VARYING,
-    "DeliveryPhotoUrl"      TEXT,
-    "DeliveryPhotoDate"     TIMESTAMP WITH TIME ZONE,
-    "PayerFirstName"        CHARACTER VARYING,
-    "PayerLastName"         CHARACTER VARYING,
-    "StallNumber"           CHARACTER VARYING,
-    "WorkerSystemUserId"    INTEGER,
-    "WorkerFirstName"       CHARACTER VARYING,
-    "WorkerLastName"        CHARACTER VARYING
-)
-LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION public.usp_getshavingsordersforworkerbycompetition(p_competitionid integer, p_ranchid integer)
+ RETURNS TABLE("ShavingsOrderId" integer, "BagQuantity" smallint, "Notes" character varying, "RequestedDeliveryTime" timestamp without time zone, "ArrivalTime" timestamp without time zone, "DeliveryStatus" character varying, "DeliveryPhotoUrl" text, "DeliveryPhotoDate" timestamp with time zone, "PayerFirstName" character varying, "PayerLastName" character varying, "StallNumber" character varying, "WorkerSystemUserId" integer, "WorkerFirstName" character varying, "WorkerLastName" character varying, "ResponseTime" timestamp without time zone)
+ LANGUAGE plpgsql
+AS $function$
 BEGIN
     RETURN QUERY
     SELECT DISTINCT ON (so.shavingsorderid)
@@ -35,7 +18,8 @@ BEGIN
         s.stallnumber,
         so.workersystemuserid,
         worker.firstname,
-        worker.lastname
+        worker.lastname,
+        so.responsetime
     FROM public.shavingsorder so
     INNER JOIN public.productrequest pr ON pr.prequestid = so.shavingsorderid
     INNER JOIN public.person payer ON payer.personid = pr.orderedbysystemuserid
@@ -50,4 +34,4 @@ BEGIN
       AND c.hostranchid = p_RanchId
     ORDER BY so.shavingsorderid, so.requesteddeliverytime DESC NULLS LAST;
 END;
-$$;
+$function$;

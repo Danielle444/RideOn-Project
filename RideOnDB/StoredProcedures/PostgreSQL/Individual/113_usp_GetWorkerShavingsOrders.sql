@@ -1,22 +1,7 @@
-CREATE OR REPLACE FUNCTION usp_GetWorkerShavingsOrders(
-    p_WorkerSystemUserId INTEGER
-)
-RETURNS TABLE(
-    "ShavingsOrderId"       INTEGER,
-    "BagQuantity"           SMALLINT,
-    "Notes"                 CHARACTER VARYING,
-    "RequestedDeliveryTime" TIMESTAMP WITHOUT TIME ZONE,
-    "ArrivalTime"           TIMESTAMP WITHOUT TIME ZONE,
-    "DeliveryStatus"        CHARACTER VARYING,
-    "DeliveryPhotoUrl"      TEXT,
-    "DeliveryPhotoDate"     TIMESTAMP WITH TIME ZONE,
-    "PayerFirstName"        CHARACTER VARYING,
-    "PayerLastName"         CHARACTER VARYING,
-    "StallNumber"           CHARACTER VARYING,
-    "RanchName"             CHARACTER VARYING,
-    "CompetitionName"       CHARACTER VARYING
-)
-LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION public.usp_getworkershavingsorders(p_workersystemuserid integer)
+ RETURNS TABLE("ShavingsOrderId" integer, "BagQuantity" smallint, "Notes" character varying, "RequestedDeliveryTime" timestamp without time zone, "ArrivalTime" timestamp without time zone, "DeliveryStatus" character varying, "DeliveryPhotoUrl" text, "DeliveryPhotoDate" timestamp with time zone, "PayerFirstName" character varying, "PayerLastName" character varying, "StallNumber" character varying, "RanchName" character varying, "CompetitionName" character varying, "ResponseTime" timestamp without time zone)
+ LANGUAGE plpgsql
+AS $function$
 BEGIN
     RETURN QUERY
     SELECT DISTINCT ON (so.shavingsorderid)
@@ -32,7 +17,8 @@ BEGIN
         p.lastname,
         s.stallnumber,
         r.ranchname,
-        c.competitionname
+        c.competitionname,
+        so.responsetime
     FROM public.shavingsorder so
     INNER JOIN public.productrequest pr ON pr.prequestid = so.shavingsorderid
     INNER JOIN public.person p ON p.personid = pr.orderedbysystemuserid
@@ -46,4 +32,4 @@ BEGIN
     WHERE so.workersystemuserid = p_WorkerSystemUserId
     ORDER BY so.shavingsorderid, so.requesteddeliverytime DESC NULLS LAST;
 END;
-$$;
+$function$;

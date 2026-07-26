@@ -1,26 +1,7 @@
-import axios from "./axiosInstance";
-import { getToken } from "./storageService";
-
-const API = import.meta.env.VITE_API_BASE_URL;
-
-function getAuthHeaders() {
-  const token = getToken();
-  return { headers: { Authorization: `Bearer ${token}` } };
-}
-
-function getPendingDeliveryApprovals(ranchId) {
-  return axios.get(`${API}/ShavingsOrders/pending-approvals`, {
-    ...getAuthHeaders(),
-    params: { ranchId },
-  });
-}
-
-function approveDelivery(shavingsOrderId) {
-  return axios.post(
-    `${API}/ShavingsOrders/approve-delivery`,
-    { shavingsOrderId, approvedByPersonId: 0 },
-    getAuthHeaders()
-  );
-}
-
-export { getPendingDeliveryApprovals, approveDelivery };
+// Shavings order service (web).
+//
+// The secretary delivery-approval flow was retired in Spec 1 (shavings order-table
+// redesign): the `pending-approvals` and `approve-delivery` endpoints no longer exist.
+// Spec 2 (secretary shavings page redesign) will add the order-list reads here
+// (e.g. getShavingsOrdersForCompetitionAndRanch) against the settled lifecycle fields.
+export {};

@@ -13,6 +13,7 @@ import { useActiveRole } from "../../../../context/ActiveRoleContext";
 import {
   getWorkerShavingsOrders,
   saveDeliveryPhoto,
+  markDelivered,
 } from "../../../../services/shavingsOrderService";
 import { supabase } from "../../../../lib/supabaseClient";
 
@@ -25,6 +26,9 @@ export default function WorkerShavingsOrdersScreen(props) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploadingOrderId, setUploadingOrderId] = useState(null);
+  const [markingOrderId, setMarkingOrderId] = useState(null);
+  // Orders whose photo upload just failed — reveals the no-photo fallback button (CAP-4).
+  const [photoFailedOrderId, setPhotoFailedOrderId] = useState(null);
 
   useEffect(function () {
     loadOrders();
@@ -85,12 +89,36 @@ export default function WorkerShavingsOrdersScreen(props) {
 
       await saveDeliveryPhoto(order.shavingsOrderId, publicUrl);
 
-      Alert.alert("בוצע", "התמונה נשמרה וההזמנה ממתינה לאישור מזכירה");
+      setPhotoFailedOrderId(null);
+      Alert.alert("בוצע", "ההזמנה סופקה");
       await loadOrders();
     } catch (err) {
-      Alert.alert("שגיאה", "לא ניתן להעלות את התמונה. נסה שוב.");
+      setPhotoFailedOrderId(order.shavingsOrderId);
+      Alert.alert(
+        "העלאת התמונה נכשלה",
+        "ניתן לסמן את ההזמנה כסופקה גם ללא תמונה."
+      );
     } finally {
       setUploadingOrderId(null);
+    }
+  }
+
+  async function handleMarkDelivered(order) {
+    try {
+      setMarkingOrderId(order.shavingsOrderId);
+      await markDelivered(order.shavingsOrderId);
+      setPhotoFailedOrderId(null);
+      Alert.alert("בוצע", "ההזמנה סופקה");
+      await loadOrders();
+    } catch (err) {
+      if (err?.response?.status === 409) {
+        Alert.alert("לא ניתן", "ההזמנה כבר סופקה");
+        await loadOrders();
+      } else {
+        Alert.alert("שגיאה", "לא ניתן לסמן את ההזמנה כסופקה");
+      }
+    } finally {
+      setMarkingOrderId(null);
     }
   }
 
@@ -137,15 +165,22 @@ export default function WorkerShavingsOrdersScreen(props) {
               key={order.shavingsOrderId}
               orderTitle={`הזמנה #${order.shavingsOrderId}`}
               deliveryStatus={order.deliveryStatus}
+              arrivalTime={order.arrivalTime}
               ranchName={order.ranchName}
               competitionName={order.competitionName}
               stallNumber={order.stallNumber}
               bagQuantity={order.bagQuantity}
               payerFirstName={order.payerFirstName}
               payerLastName={order.payerLastName}
+              isMyOrder={true}
               uploading={uploadingOrderId === order.shavingsOrderId}
+              marking={markingOrderId === order.shavingsOrderId}
+              showNoPhotoFallback={photoFailedOrderId === order.shavingsOrderId}
               onCapturePhoto={function () {
                 handleCapturePhoto(order);
+              }}
+              onMarkDelivered={function () {
+                handleMarkDelivered(order);
               }}
             />
           );

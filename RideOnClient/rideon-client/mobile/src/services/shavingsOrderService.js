@@ -21,6 +21,13 @@ function saveDeliveryPhoto(shavingsOrderId, deliveryPhotoUrl) {
   });
 }
 
+// No-photo delivery fallback (CAP-4): records the delivery when the photo upload fails.
+function markDelivered(shavingsOrderId) {
+  return axios.post("/ShavingsOrders/mark-delivered", {
+    shavingsOrderId: shavingsOrderId,
+  });
+}
+
 function getStallBookingsForShavings(competitionId, ranchId) {
   return axios.get("/ShavingsOrders/stall-bookings-for-order", {
     params: {
@@ -60,6 +67,7 @@ export {
   getWorkerShavingsOrdersByCompetition,
   claimShavingsOrder,
   saveDeliveryPhoto,
+  markDelivered,
   getStallBookingsForShavings,
   getShavingsOrdersForCompetitionAndRanch,
   createShavingsOrder,
