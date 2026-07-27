@@ -1,8 +1,15 @@
-import { Check, Eye, X } from "lucide-react";
+import { Check, Eye, RotateCcw, X } from "lucide-react";
 import DataTableShell from "../../common/table/DataTableShell";
-import DataTableEmptyState from "../../common/table/DataTableEmptyState";
 import DataTableLoadingState from "../../common/table/DataTableLoadingState";
 import TableActionButton from "../../common/table/TableActionButton";
+import DateRangeText from "./DateRangeText";
+import {
+  getStatusLabel,
+  getStatusClass,
+  getSourceLabel,
+  isPostStartFullChargeCancellation,
+  POST_START_FULL_CHARGE_LABEL,
+} from "../../../utils/changeTracking.utils";
 
 function getValue(item, camelKey, pascalKey, fallback) {
   if (!item) {
@@ -34,46 +41,6 @@ function formatMoney(value) {
   }
 
   return "₪" + Number(value).toLocaleString("he-IL");
-}
-
-function getSourceLabel(source) {
-  if (source === "Entry") {
-    return "מקצים";
-  }
-
-  if (source === "Product") {
-    return "מוצרים";
-  }
-
-  return source || "-";
-}
-
-function getStatusLabel(status) {
-  if (status === "Pending") {
-    return "ממתינה";
-  }
-
-  if (status === "Approved") {
-    return "אושרה";
-  }
-
-  if (status === "Rejected") {
-    return "נדחתה";
-  }
-
-  return status || "-";
-}
-
-function getStatusClass(status) {
-  if (status === "Approved") {
-    return "bg-[#EEF8F0] text-[#2F6B3B]";
-  }
-
-  if (status === "Rejected") {
-    return "bg-[#FDECEC] text-[#A33A3A]";
-  }
-
-  return "bg-[#FFF4E5] text-[#9A5B00]";
 }
 
 function getRequestKey(item) {
@@ -151,6 +118,17 @@ function buildChangedFields(beforeText, afterText) {
       return;
     }
 
+    // Money is shown once, in the dedicated "סכום" line below. Skip the
+    // money-labeled parts baked into the proc text so it is not shown twice.
+    var isMoneyField =
+      beforeLabel === "חיוב" ||
+      beforeLabel === "מחיר מחירון" ||
+      beforeLabel === "מחיר";
+
+    if (isMoneyField) {
+      return;
+    }
+
     if (beforeValue !== afterValue) {
       changes.push({
         label: beforeLabel,
@@ -180,6 +158,11 @@ function ChangeSummary(props) {
   );
 
   var changes = buildChangedFields(beforeText, afterText);
+  var isPostStartFullCharge = isPostStartFullChargeCancellation(
+    isCancelled,
+    amountBefore,
+    amountAfter,
+  );
 
   if (isCancelled) {
     return (
@@ -187,16 +170,22 @@ function ChangeSummary(props) {
         <span className="font-bold text-[#3F312B]">{requestType}</span>
 
         <span className="text-xs text-[#6D4C41]">
-          {beforeText || "ביטול הרשמה"}
+          <DateRangeText text={beforeText} fallback="ביטול הרשמה" />
         </span>
 
-        <span className="text-xs font-bold text-[#9A5B00]">
-          לאחר אישור: {formatMoney(amountAfter)}
+        <span className="text-xs font-bold text-[#7B5A4D]">
+          סכום: {formatMoney(amountBefore)} ← {formatMoney(amountAfter)}
         </span>
+
+        {isPostStartFullCharge ? (
+          <span className="text-xs font-semibold text-[#8D6E63]">
+            {POST_START_FULL_CHARGE_LABEL}
+          </span>
+        ) : null}
 
         {fineAmount !== null && fineAmount !== undefined ? (
           <span className="text-xs font-bold text-[#B26A00]">
-            כולל קנס: {formatMoney(fineAmount)}
+            החיוב הסופי כולל קנס: {formatMoney(fineAmount)}
           </span>
         ) : null}
       </div>
@@ -211,13 +200,14 @@ function ChangeSummary(props) {
         changes.slice(0, 3).map(function (change, index) {
           return (
             <span key={index} className="text-xs text-[#6D4C41]">
-              {change.label}: {change.beforeValue} ← {change.afterValue}
+              {change.label}: <DateRangeText text={change.beforeValue} />{" "}
+              ← <DateRangeText text={change.afterValue} />
             </span>
           );
         })
       ) : (
         <span className="text-xs text-[#6D4C41]">
-          {afterText || "שינוי בפרטי הבקשה"}
+          <DateRangeText text={afterText} fallback="שינוי בפרטי הבקשה" />
         </span>
       )}
 
@@ -256,7 +246,7 @@ export default function ChangeRequestsTable(props) {
             <th className="px-4 py-3">תאריך בקשה</th>
             <th className="px-4 py-3">מבקש</th>
             <th className="px-4 py-3">מקור</th>
-            <th className="px-4 py-3">ישות</th>
+            <th className="px-4 py-3">נושא הבקשה</th>
             <th className="px-4 py-3">מה שונה</th>
             <th className="px-4 py-3">סטטוס</th>
             <th className="px-4 py-3">פעולות</th>
@@ -268,8 +258,28 @@ export default function ChangeRequestsTable(props) {
             <DataTableLoadingState colSpan={7} message="טוען בקשות שינוי..." />
           ) : null}
 
-          {!props.loading && items.length === 0 ? (
-            <DataTableEmptyState colSpan={7} message="לא נמצאו בקשות שינוי" />
+          {!props.loading && items.length === 0 && props.hasRequests ? (
+            <tr>
+              <td colSpan={7} className="py-16 text-center text-[#7A655C]">
+                <div className="flex flex-col items-center gap-3">
+                  <span>אין בקשות התואמות את הסינון. נסי לנקות את הסינון.</span>
+
+                  <TableActionButton
+                    label="ניקוי סינון"
+                    icon={<RotateCcw size={15} />}
+                    onClick={props.onClearFilters}
+                  />
+                </div>
+              </td>
+            </tr>
+          ) : null}
+
+          {!props.loading && items.length === 0 && !props.hasRequests ? (
+            <tr>
+              <td colSpan={7} className="py-16 text-center text-[#7A655C]">
+                אין בקשות שינוי או ביטול בתחרות זו.
+              </td>
+            </tr>
           ) : null}
 
           {!props.loading
@@ -284,6 +294,10 @@ export default function ChangeRequestsTable(props) {
                 );
 
                 var isAnswering = props.answeringRequestKey === requestKey;
+                var isApproving =
+                  isAnswering && props.answeringAction === "Approved";
+                var isRejecting =
+                  isAnswering && props.answeringAction === "Rejected";
 
                 return (
                   <tr
@@ -339,8 +353,9 @@ export default function ChangeRequestsTable(props) {
                         {isPendingTab ? (
                           <>
                             <TableActionButton
-                              label={isAnswering ? "מאשר..." : "אשר"}
+                              label={isApproving ? "מאשר..." : "אשר"}
                               icon={<Check size={15} />}
+                              loading={isApproving}
                               disabled={isAnswering}
                               onClick={function () {
                                 props.onApprove(item);
@@ -348,9 +363,10 @@ export default function ChangeRequestsTable(props) {
                             />
 
                             <TableActionButton
-                              label={isAnswering ? "דוחה..." : "דחה"}
+                              label={isRejecting ? "דוחה..." : "דחה"}
                               icon={<X size={15} />}
                               variant="danger"
+                              loading={isRejecting}
                               disabled={isAnswering}
                               onClick={function () {
                                 props.onReject(item);

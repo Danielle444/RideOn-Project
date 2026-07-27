@@ -5,6 +5,7 @@ import {
   answerChangeRequest,
 } from "../../services/changeTrackingService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
+import { getAnswerErrorMessage } from "../../utils/changeTracking.utils";
 
 const CHANGE_REQUEST_TABS = [
   {
@@ -53,10 +54,6 @@ function getRequestSource(item) {
   return getValue(item, "requestSource", "RequestSource", "");
 }
 
-function getRequestType(item) {
-  return getValue(item, "requestType", "RequestType", "");
-}
-
 function getRequestKey(item) {
   return getRequestSource(item) + "-" + getRequestId(item);
 }
@@ -102,8 +99,37 @@ export default function useCompetitionChangeTrackingPage(options) {
   var [selectedRequest, setSelectedRequest] = useState(null);
 
   var [answeringRequestKey, setAnsweringRequestKey] = useState(null);
-  var [actionError, setActionError] = useState("");
-  var [actionSuccess, setActionSuccess] = useState("");
+  var [answeringAction, setAnsweringAction] = useState(null);
+  var [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+  });
+  var [toast, setToast] = useState({
+    isOpen: false,
+    type: "success",
+    message: "",
+  });
+
+  function closeConfirmDialog() {
+    setConfirmDialog({
+      isOpen: false,
+      title: "",
+      message: "",
+      onConfirm: null,
+    });
+  }
+
+  function showToast(type, message) {
+    setToast({ isOpen: true, type: type, message: message });
+  }
+
+  function closeToast() {
+    setToast(function (current) {
+      return { ...current, isOpen: false };
+    });
+  }
 
   useEffect(
     function () {
@@ -169,9 +195,13 @@ export default function useCompetitionChangeTrackingPage(options) {
         });
       }
 
+      // CAP-2: the type filter is a change-vs-cancel axis across BOTH sources.
+      // Match on the IsCancelled boolean, not the localized RequestType string
+      // (which is entry-only and silently hid every product request).
       if (typeFilter !== "all") {
         result = result.filter(function (item) {
-          return getRequestType(item) === typeFilter;
+          var isCancelled = getValue(item, "isCancelled", "IsCancelled", false);
+          return typeFilter === "cancel" ? Boolean(isCancelled) : !isCancelled;
         });
       }
 
@@ -232,8 +262,7 @@ export default function useCompetitionChangeTrackingPage(options) {
     setSourceFilter("all");
     setTypeFilter("all");
     setSelectedRequest(null);
-    setActionError("");
-    setActionSuccess("");
+    closeToast();
   }
 
   function clearFilters() {
@@ -256,19 +285,18 @@ export default function useCompetitionChangeTrackingPage(options) {
     var requestKey = getRequestKey(item);
 
     if (!requestId || !requestSource) {
-      setActionError("לא ניתן לזהות את בקשת השינוי");
+      showToast("error", "לא ניתן לזהות את בקשת השינוי");
       return;
     }
 
     if (answerStatus !== "Approved" && answerStatus !== "Rejected") {
-      setActionError("סטטוס טיפול לא תקין");
+      showToast("error", "סטטוס טיפול לא תקין");
       return;
     }
 
     try {
       setAnsweringRequestKey(requestKey);
-      setActionError("");
-      setActionSuccess("");
+      setAnsweringAction(answerStatus);
 
       await answerChangeRequest({
         competitionId: Number(competitionId),
@@ -280,9 +308,9 @@ export default function useCompetitionChangeTrackingPage(options) {
       });
 
       if (answerStatus === "Approved") {
-        setActionSuccess("בקשת השינוי אושרה בהצלחה");
+        showToast("success", "הבקשה אושרה והשינוי עודכן במערכת");
       } else {
-        setActionSuccess("בקשת השינוי נדחתה בהצלחה");
+        showToast("success", "הבקשה נדחתה");
       }
 
       setSelectedRequest(null);
@@ -290,19 +318,43 @@ export default function useCompetitionChangeTrackingPage(options) {
       await loadPageData();
     } catch (error) {
       console.error(error);
-      setActionError(getErrorMessage(error, "שגיאה בטיפול בבקשת השינוי"));
+      // CAP-4: never surface raw proc/exception text; map to Hebrew.
+      showToast("error", getAnswerErrorMessage(error));
     } finally {
       setAnsweringRequestKey(null);
+      setAnsweringAction(null);
     }
   }
 
+  // CAP-7: both answering actions are irreversible (approval moves money / can
+  // auto-create a fine), so each opens its own confirmation before committing.
   function approveRequest(item) {
-    answerRequest(item, "Approved");
+    setConfirmDialog({
+      isOpen: true,
+      title: "אישור בקשה",
+      message: "אישור הבקשה יעדכן את החיובים במערכת ועשוי להוסיף קנס. להמשיך?",
+      onConfirm: function () {
+        closeConfirmDialog();
+        answerRequest(item, "Approved");
+      },
+    });
   }
 
   function rejectRequest(item) {
-    answerRequest(item, "Rejected");
+    setConfirmDialog({
+      isOpen: true,
+      title: "דחיית בקשה",
+      message: "לדחות את הבקשה? לא ניתן לשחזר פעולה זו.",
+      onConfirm: function () {
+        closeConfirmDialog();
+        answerRequest(item, "Rejected");
+      },
+    });
   }
+
+  // CAP-6: distinguish "no requests exist" from "none match the active filters".
+  var hasActiveFilters =
+    sourceFilter !== "all" || typeFilter !== "all" || searchText.trim() !== "";
 
   return {
     tabs: CHANGE_REQUEST_TABS,
@@ -312,14 +364,20 @@ export default function useCompetitionChangeTrackingPage(options) {
     visibleItems: visibleItems,
     summary: summary,
     pendingCount: pendingCount,
+    hasRequests: items.length > 0,
+    hasActiveFilters: hasActiveFilters,
 
     loading: loading,
     loadingCount: loadingCount,
     error: error,
 
-    actionError: actionError,
-    actionSuccess: actionSuccess,
+    toast: toast,
+    closeToast: closeToast,
     answeringRequestKey: answeringRequestKey,
+    answeringAction: answeringAction,
+
+    confirmDialog: confirmDialog,
+    closeConfirmDialog: closeConfirmDialog,
 
     searchText: searchText,
     sourceFilter: sourceFilter,
