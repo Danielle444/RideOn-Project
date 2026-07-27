@@ -97,9 +97,9 @@ export default function ArenasAndStallsPage() {
               <StallCompoundsTable
                 items={page.compounds}
                 loading={page.loadingCompounds}
-                onCreate={function () {}}
-                onEdit={function () {}}
-                onDelete={function () {}}
+                onCreate={page.openCreateCompound}
+                onEdit={page.openEditCompound}
+                onDelete={page.handleCompoundDelete}
                 onLayoutParsed={page.handleCompoundLayoutParsed}
               />
             )}
