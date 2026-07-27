@@ -1,8 +1,9 @@
 -- Spec 1 / M4 (CAP-7): approval fields dropped, lifecycle fields added.
--- SEQUENCING: this return-type change (DROP + CREATE) is applied to live TOGETHER with the
--- backend deploy, never ahead of it — the previously deployed DAL reads approvedbypersonid/
--- approvedat by name, so dropping them while the old backend is live would crash the read.
--- Until that deploy, live still returns the pre-retirement 12-column shape.
+-- Spec 2 / DEP-1: expose DeliveryPhotoUrl so the secretary page can flag "delivered without photo".
+--   Adding an output column changes the return type => DROP + CREATE (CREATE OR REPLACE cannot change
+--   the TABLE shape). The new column is appended LAST and every consumer reads by name, so the deployed
+--   DAL keeps working unchanged. The DROP+CREATE runs atomically in one migration (no window where the
+--   function is missing), so this may be applied ahead of the web deploy (backward-compatible append).
 DROP FUNCTION IF EXISTS public.usp_getshavingsordersforcompetitionandranch(integer, integer);
 
 CREATE OR REPLACE FUNCTION public.usp_getshavingsordersforcompetitionandranch(
@@ -22,7 +23,8 @@ CREATE OR REPLACE FUNCTION public.usp_getshavingsordersforcompetitionandranch(
     "TotalAmount" numeric,
     "Seen" timestamp without time zone,             -- responsetime
     "Delivered" timestamp without time zone,        -- arrivaltime
-    "PrequestDatetime" timestamp with time zone     -- SLA source (pr.prequestdatetime)
+    "PrequestDatetime" timestamp with time zone,    -- SLA source (pr.prequestdatetime)
+    "DeliveryPhotoUrl" text                         -- DEP-1: appended LAST
  )
  LANGUAGE plpgsql
 AS $function$
@@ -41,7 +43,8 @@ BEGIN
         COALESCE(bpr_total.totalamount, 0) AS totalamount,
         so.responsetime AS "Seen",
         so.arrivaltime  AS "Delivered",
-        pr.prequestdatetime AS "PrequestDatetime"
+        pr.prequestdatetime AS "PrequestDatetime",
+        so.deliveryphotourl AS "DeliveryPhotoUrl"
     FROM shavingsorder so
     INNER JOIN productrequest pr ON pr.prequestid = so.shavingsorderid
     INNER JOIN pricecatalog pc  ON pc.pricecatalogid = pr.pricecatalogid

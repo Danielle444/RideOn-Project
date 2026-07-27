@@ -32,5 +32,9 @@ namespace RideOnServer.BL.DTOs.ShavingsOrders
         public decimal ItemPrice { get; set; }
 
         public decimal TotalAmount { get; set; }
+
+        // DEP-1 (Spec 2): delivery photo URL, appended LAST to #176. Lets the secretary page flag a
+        // "delivered without photo" (unverified) order. Null when no photo was uploaded.
+        public string? DeliveryPhotoUrl { get; set; }
     }
 }
