@@ -113,6 +113,11 @@ namespace RideOnServer.Controllers
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
+            catch (ValidationException ex)
+            {
+                // Guard message from the stored procedure (e.g. service in use → deactivate instead)
+                return BadRequest(ex.Message);
+            }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in DeleteProduct: {ex.Message}");
