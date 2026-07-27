@@ -173,8 +173,8 @@ function ChangeSummary(props) {
           <DateRangeText text={beforeText} fallback="ביטול הרשמה" />
         </span>
 
-        <span className="text-xs font-bold text-[#9A5B00]">
-          חיוב לאחר אישור: {formatMoney(amountAfter)}
+        <span className="text-xs font-bold text-[#7B5A4D]">
+          סכום: {formatMoney(amountBefore)} ← {formatMoney(amountAfter)}
         </span>
 
         {isPostStartFullCharge ? (
@@ -185,7 +185,7 @@ function ChangeSummary(props) {
 
         {fineAmount !== null && fineAmount !== undefined ? (
           <span className="text-xs font-bold text-[#B26A00]">
-            כולל קנס: {formatMoney(fineAmount)}
+            החיוב הסופי כולל קנס: {formatMoney(fineAmount)}
           </span>
         ) : null}
       </div>
