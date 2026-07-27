@@ -1,5 +1,12 @@
 import { Check, X } from "lucide-react";
 import TableActionButton from "../../common/table/TableActionButton";
+import DateRangeText from "./DateRangeText";
+import {
+  getStatusLabel,
+  getSourceLabel,
+  isPostStartFullChargeCancellation,
+  POST_START_FULL_CHARGE_LABEL,
+} from "../../../utils/changeTracking.utils";
 
 function getValue(item, camelKey, pascalKey, fallback) {
   if (!item) {
@@ -31,18 +38,6 @@ function formatMoney(value) {
   }
 
   return "₪" + Number(value).toLocaleString("he-IL");
-}
-
-function getSourceLabel(source) {
-  if (source === "Entry") {
-    return "מקצים";
-  }
-
-  if (source === "Product") {
-    return "מוצרים";
-  }
-
-  return source || "-";
 }
 
 function getRequestKey(item) {
@@ -120,6 +115,17 @@ function buildChangedFields(beforeText, afterText) {
       return;
     }
 
+    // Money is shown once, in the dedicated "סכום לפני / סכום אחרי" cards
+    // below. Skip the money-labeled parts baked into the proc text.
+    var isMoneyField =
+      beforeLabel === "חיוב" ||
+      beforeLabel === "מחיר מחירון" ||
+      beforeLabel === "מחיר";
+
+    if (isMoneyField) {
+      return;
+    }
+
     if (beforeValue !== afterValue) {
       changes.push({
         label: beforeLabel,
@@ -157,6 +163,11 @@ function ChangeSummaryBox(props) {
   );
 
   var changes = buildChangedFields(beforeText, afterText);
+  var isPostStartFullCharge = isPostStartFullChargeCancellation(
+    isCancelled,
+    amountBefore,
+    amountAfter,
+  );
 
   return (
     <div className="rounded-3xl border border-[#EFE5DF] bg-[#FAF7F5] p-5">
@@ -169,17 +180,25 @@ function ChangeSummaryBox(props) {
               <p className="text-xs font-bold text-[#8D6E63]">בקשה לביטול</p>
 
               <p className="mt-2 text-sm leading-7 text-[#3F312B]">
-                {beforeText || "ביטול הרשמה"}
+                <DateRangeText text={beforeText} fallback="ביטול הרשמה" />
               </p>
             </div>
 
             <div className="rounded-2xl bg-white p-4">
-              <p className="text-xs font-bold text-[#8D6E63]">לאחר אישור</p>
+              <p className="text-xs font-bold text-[#8D6E63]">חיוב לאחר אישור</p>
 
               <p className="mt-2 text-sm font-bold text-[#3F312B]">
-                {afterText || "ביטול הרשמה למקצה"}
+                <DateRangeText text={afterText} fallback="ביטול הרשמה למקצה" />
               </p>
             </div>
+
+            {isPostStartFullCharge ? (
+              <div className="rounded-2xl border border-[#EAD9C7] bg-[#FBF3EA] p-4">
+                <p className="text-sm font-semibold leading-7 text-[#8D6E63]">
+                  {POST_START_FULL_CHARGE_LABEL}
+                </p>
+              </div>
+            ) : null}
           </>
         ) : changes.length > 0 ? (
           changes.map(function (change, index) {
@@ -190,7 +209,8 @@ function ChangeSummaryBox(props) {
                 </p>
 
                 <p className="mt-2 text-sm font-bold text-[#3F312B]">
-                  {change.beforeValue} ← {change.afterValue}
+                  <DateRangeText text={change.beforeValue} /> ←{" "}
+                  <DateRangeText text={change.afterValue} />
                 </p>
               </div>
             );
@@ -198,7 +218,10 @@ function ChangeSummaryBox(props) {
         ) : (
           <div className="rounded-2xl bg-white p-4">
             <p className="text-sm leading-7 text-[#3F312B]">
-              {afterText || "לא נמצאו שדות שונים להצגה"}
+              <DateRangeText
+                text={afterText}
+                fallback="לא נמצאו שדות שונים להצגה"
+              />
             </p>
           </div>
         )}
@@ -241,6 +264,8 @@ export default function ChangeRequestDetailsModal(props) {
   var isPending = getValue(item, "status", "Status", "") === "Pending";
   var requestKey = getRequestKey(item);
   var isAnswering = props.answeringRequestKey === requestKey;
+  var isApproving = isAnswering && props.answeringAction === "Approved";
+  var isRejecting = isAnswering && props.answeringAction === "Rejected";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
@@ -272,7 +297,7 @@ export default function ChangeRequestDetailsModal(props) {
 
             <DetailRow
               label="סטטוס"
-              value={getValue(item, "status", "Status", "-")}
+              value={getStatusLabel(getValue(item, "status", "Status", ""))}
             />
 
             <DetailRow
@@ -293,7 +318,7 @@ export default function ChangeRequestDetailsModal(props) {
             />
 
             <DetailRow
-              label="ישות"
+              label="נושא הבקשה"
               value={getValue(item, "entityName", "EntityName", "-")}
             />
           </section>
@@ -307,8 +332,9 @@ export default function ChangeRequestDetailsModal(props) {
           {isPending ? (
             <>
               <TableActionButton
-                label={isAnswering ? "מאשר..." : "אשר"}
+                label={isApproving ? "מאשר..." : "אשר"}
                 icon={<Check size={15} />}
+                loading={isApproving}
                 disabled={isAnswering}
                 onClick={function () {
                   props.onApprove(item);
@@ -316,9 +342,10 @@ export default function ChangeRequestDetailsModal(props) {
               />
 
               <TableActionButton
-                label={isAnswering ? "דוחה..." : "דחה"}
+                label={isRejecting ? "דוחה..." : "דחה"}
                 icon={<X size={15} />}
                 variant="danger"
+                loading={isRejecting}
                 disabled={isAnswering}
                 onClick={function () {
                   props.onReject(item);

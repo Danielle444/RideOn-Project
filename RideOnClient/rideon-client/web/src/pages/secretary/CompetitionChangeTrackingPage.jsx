@@ -8,6 +8,8 @@ import ChangeRequestsSummaryCards from "../../components/secretary/change-tracki
 import ChangeRequestsFilters from "../../components/secretary/change-tracking/ChangeRequestsFilters";
 import ChangeRequestsTable from "../../components/secretary/change-tracking/ChangeRequestsTable";
 import ChangeRequestDetailsModal from "../../components/secretary/change-tracking/ChangeRequestDetailsModal";
+import ConfirmDialog from "../../components/superuser/ConfirmDialog";
+import ToastMessage from "../../components/common/ToastMessage";
 import useCompetitionChangeTrackingPage from "../../hooks/secretary/useCompetitionChangeTrackingPage";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 
@@ -54,18 +56,6 @@ export default function CompetitionChangeTrackingPage() {
           </div>
         ) : null}
 
-        {page.actionError ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {page.actionError}
-          </div>
-        ) : null}
-
-        {page.actionSuccess ? (
-          <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-bold text-green-700">
-            {page.actionSuccess}
-          </div>
-        ) : null}
-
         <ChangeRequestsTabs
           tabs={page.tabs}
           activeStatus={page.activeStatus}
@@ -89,6 +79,10 @@ export default function CompetitionChangeTrackingPage() {
           loading={page.loading}
           activeStatus={page.activeStatus}
           answeringRequestKey={page.answeringRequestKey}
+          answeringAction={page.answeringAction}
+          hasRequests={page.hasRequests}
+          hasActiveFilters={page.hasActiveFilters}
+          onClearFilters={page.clearFilters}
           onViewDetails={page.openRequestDetails}
           onApprove={page.approveRequest}
           onReject={page.rejectRequest}
@@ -97,9 +91,25 @@ export default function CompetitionChangeTrackingPage() {
         <ChangeRequestDetailsModal
           item={page.selectedRequest}
           answeringRequestKey={page.answeringRequestKey}
+          answeringAction={page.answeringAction}
           onClose={page.closeRequestDetails}
           onApprove={page.approveRequest}
           onReject={page.rejectRequest}
+        />
+
+        <ConfirmDialog
+          isOpen={page.confirmDialog?.isOpen || false}
+          title={page.confirmDialog?.title || ""}
+          message={page.confirmDialog?.message || ""}
+          onCancel={page.closeConfirmDialog}
+          onConfirm={page.confirmDialog?.onConfirm}
+        />
+
+        <ToastMessage
+          isOpen={page.toast?.isOpen || false}
+          type={page.toast?.type || "success"}
+          message={page.toast?.message || ""}
+          onClose={page.closeToast}
         />
       </div>
     </CompetitionWorkspaceLayout>

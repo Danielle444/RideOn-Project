@@ -16,9 +16,7 @@ export default function ChangeRequestsFilters(props) {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-[#3F312B]">סינון בקשות</h2>
-          <p className="text-xs text-[#8D6E63]">
-            חיפוש לפי מבקש, סוג בקשה, סוס, מוצר או פרטי שינוי
-          </p>
+          <p className="text-xs text-[#8D6E63]">חיפוש לפי שם מבקש או פרטי הבקשה</p>
         </div>
 
         <TableActionButton
@@ -102,11 +100,9 @@ export default function ChangeRequestsFilters(props) {
             <button
               type="button"
               onClick={function () {
-                props.onTypeFilterChange("שינוי מקצה");
+                props.onTypeFilterChange("change");
               }}
-              className={getFilterButtonClass(
-                props.typeFilter === "שינוי מקצה",
-              )}
+              className={getFilterButtonClass(props.typeFilter === "change")}
             >
               שינוי
             </button>
@@ -114,11 +110,9 @@ export default function ChangeRequestsFilters(props) {
             <button
               type="button"
               onClick={function () {
-                props.onTypeFilterChange("ביטול מקצה");
+                props.onTypeFilterChange("cancel");
               }}
-              className={getFilterButtonClass(
-                props.typeFilter === "ביטול מקצה",
-              )}
+              className={getFilterButtonClass(props.typeFilter === "cancel")}
             >
               ביטול
             </button>
