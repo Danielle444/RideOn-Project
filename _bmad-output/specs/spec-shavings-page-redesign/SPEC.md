@@ -5,6 +5,7 @@ companions:
   - read-model.md
   - sla-rules.md
   - add-order-form.md
+  - hebrew-labels.md
   - spec-1-dependencies.md
   - ../spec-shavings-order-backend/spec-2-handoff.md
   - ../spec-shavings-order-backend/state-machine.md
@@ -19,64 +20,66 @@ sources:
 
 ## Why
 
-**A pain to solve.** The secretary's "shavings" page (`CompetitionShavingsPage.jsx`) today is not an orders page at all — it is the delivery **approval queue**, and Spec 1 is deleting the approval stage end-to-end (the queue happened weeks late or never; orders sat in `WaitingApproval` forever). Once Spec 1 lands, that page has no reason to exist. The secretary has no single place to see the shavings orders for a running competition, no way to spot a delivery that is stalling, and no web form to add an order (only the mobile admin app can). This spec rebuilds the page as an all-orders view on Spec 1's honest `Pending → Seen → Delivered` vocabulary: every order for the competition, grouped by ranch or by status (#29), with delayed orders flagged at a glance (#30) and a secretary add-order form with a mandatory ranch (#32). It is the frontend/UX half of the redesign; the data layer, procs, worker-mobile changes, and approval removal are Spec 1, and notification push (#31/#46) is out of scope. It consumes what Spec 1 defines and designs no data layer of its own.
+**A pain to solve.** Spec 1 (`spec-shavings-order-backend`) is **merged to `main` and deployed** (merge `d9c3701`; `origin/main` at `eb369c1`). It killed delivery approval end-to-end and left the secretary's shavings page a neutral placeholder (`CompetitionShavingsPage.jsx`) with an emptied service (`shavingsOrderService.js` is `export {}`). The secretary now has no place to see the shavings orders for a running competition, no way to spot a delivery that is stalling, and no web form to add an order (only the mobile admin app can). This spec builds the page on Spec 1's shipped `Pending → Seen → Delivered` model: every order for the competition, grouped by participating ranch or by status (#29), delayed orders flagged at a glance (#30), and a secretary add-order form with a mandatory ranch (#32). It is the frontend/UX half of the redesign; the data layer, procs, worker-mobile, and approval removal are Spec 1 (done), and notification push (#31/#46) is out of scope. Branch Spec 2 off **current `origin/main`**.
 
 ## Capabilities
 
-- **CAP-1 — All-orders page replacing the approval queue**
-  - **intent:** The secretary opens one page and sees every shaving order for the competition (across all booking ranches), instead of only deliveries awaiting an approval that no longer exists.
-  - **success:** The redesigned page renders each order for the active competition with its status, bags, delivery time, and pricing; the old approve button, photo-approval cards, and `pending-approvals`/`approve-delivery` calls are gone; `npm run build` is clean and no code path references the deleted approval service.
+- **CAP-1 — All-orders page replacing the placeholder**
+  - **intent:** The secretary opens one page and sees every shaving order for the competition (across all participating ranches).
+  - **success:** The page renders each order for the active competition with its derived status, bags, delivery time, and pricing; no approve button, photo-approval card, or approval call exists; `npm run build` is clean and the emptied approval service is not reintroduced.
 
 - **CAP-2 — Ranch ⇄ Status grouping toggle in URL state (#29)**
-  - **intent:** The secretary can flip the same order list between grouping by booking **Ranch** and grouping by **Order Status** (`Pending → Seen → Delivered`), and the choice survives a reload or shared link.
-  - **success:** A toggle switches the grouping; `?group=ranch|status` (and any active ranch/status filter) is written to and restored from the URL via React Router `useSearchParams`; the same master order list re-groups without a refetch; ranch grouping is driven by the summary rollup and status grouping by client-side bucketing.
+  - **intent:** The secretary can flip the same order list between grouping by **participating ranch** and by **order status** (`Pending → Seen → Delivered`), and the choice survives a reload or shared link.
+  - **success:** A toggle switches the grouping; `?group=ranch|status` (and any active ranch/status filter) is written to and restored from the URL via React Router `useSearchParams`; the same master order list re-groups with no refetch; ranch grouping is driven by the summary rollup and status grouping by client-side bucketing on the **derived** status.
 
-- **CAP-3 — Order rows render Spec 1's lifecycle vocabulary (#29)**
-  - **intent:** Each row communicates where the order is in the honest pipeline — created, seen by a worker, delivered — and whether a delivery is photo-backed, with no trace of approval.
-  - **success:** Rows show a `Pending`/`Seen`/`Delivered` status chip plus created / seen / delivered timestamps; a delivery with `Delivered` set and no photo shows an "unverified" (ללא תמונה) marker (derived, no stored column); nowhere does the page surface `ApprovedByPersonId`/`ApprovedAt`, an approve action, or a `WaitingApproval`/`Closed` state.
+- **CAP-3 — Order rows render Spec 1's derived lifecycle (#29)**
+  - **intent:** Each row shows where the order is in the pipeline — created, seen by a worker, delivered — with no trace of approval.
+  - **success:** Rows show a `Pending`/`Seen`/`Delivered` chip computed by the derived-status rule (Delivered if `Delivered` set; else Seen if `WorkerSystemUserId` set; else Pending — never the stored token alone) plus created / seen / delivered timestamps; nowhere does the page surface approval fields, an approve action, or a `WaitingApproval`/`Closed` state.
 
 - **CAP-4 — SLA delay flagging (#30)**
-  - **intent:** The secretary spots a stalling order without reading every row — an order that was never seen soon after creation, or seen but not delivered soon after.
-  - **success:** Two rules keyed on a single named constant `SHAVINGS_SLA_THRESHOLD_HOURS = 3` flag delayed orders — (A) `Pending` and `now − PrequestDatetime > threshold`; (B) `Seen` set, `Delivered` null, `now − Seen > threshold`; a flagged order is both highlighted in-row and pinned into a dedicated "needs attention" (דורש טיפול) section; the threshold appears exactly once as the constant, never as a literal.
+  - **intent:** The secretary spots a stalling order without reading every row — one never picked up soon after creation, or picked up but not delivered soon after.
+  - **success:** Two rules keyed on a single named constant `SHAVINGS_SLA_THRESHOLD_HOURS = 3` flag delayed orders — (A) `WorkerSystemUserId` null and `now − PrequestDatetime > threshold`; (B) `WorkerSystemUserId` set, `Delivered` null, `now − Seen > threshold` (legacy `Seen`-null rows fall back to `PrequestDatetime`); a flagged order is both highlighted in-row and pinned into a dedicated "needs attention" (דורש טיפול) section; the threshold appears exactly once as the constant.
 
 - **CAP-5 — Secretary add-order form with mandatory Ranch (#32)**
   - **intent:** The secretary creates a shavings order from the web, choosing a ranch explicitly and then the stalls under it.
-  - **success:** A form mirroring the mobile admin add-order flow (price-catalog selection, delivery now/later, equal-or-per-stall bag quantity, multi-stall selection, notes) with a **required Ranch dropdown** that scopes the pickable stalls via `getStallBookingsForShavings(competitionId, ranchId)`; submitting posts to the existing `POST /api/ShavingsOrders` (which already authorizes `HostSecretary`) and the new order appears on refresh; submitting with no ranch selected is blocked with a Hebrew validation message.
+  - **success:** A form mirroring the mobile admin add-order flow (price-catalog selection, delivery now/later, equal-or-per-stall bag quantity, multi-stall selection, notes) with a **required Ranch dropdown** that scopes the pickable stalls via `getStallBookingsForShavings(competitionId, ranchId)` and the price via `getServicePricesDashboard(ranchId)`; submitting posts to the existing `POST /api/ShavingsOrders` (already authorizes `HostSecretary`) and the new order appears on refresh; submitting with no ranch is blocked with a Hebrew message.
 
 - **CAP-6 — Loading / empty / error / degenerate states**
-  - **intent:** The page behaves deliberately when data is loading, absent, failing, or reduces to a single booking ranch.
-  - **success:** Distinct loading, empty ("no orders"), and error affordances (reusing the summary page's visual treatment); when only one booking ranch exists (today's live reality), ranch grouping collapses to a single group cleanly rather than showing an empty or broken toggle.
+  - **intent:** The page behaves deliberately when data is loading, absent, failing, or reduces to a single participating ranch.
+  - **success:** Distinct loading, empty ("no orders"), and error affordances reusing the summary page's visual treatment; with one participating ranch (today's live reality) ranch grouping collapses to a single group cleanly rather than showing an empty or broken toggle; the needs-attention section is omitted when nothing is delayed.
 
 ## Constraints
 
-- **Consume Spec 1's vocabulary and reads; author no new stored procedures.** Status tokens are exactly `{Pending, Seen, Delivered}` (terminal `Delivered`); "unverified" = `arrivaltime IS NOT NULL AND deliveryphotourl IS NULL` (derived). If a field or read is missing, flag it as a Spec 1 dependency in `spec-1-dependencies.md` (`DEP-N`) — never inline SQL. Web reaches the API only through the shared `axiosInstance` → ASP.NET controller → BL → DAL → proc chain.
-- **The SLA-bearing per-order read is `usp_getshavingsordersforcompetitionandranch` (#176), and it is scoped to one booking ranch.** Ranch enumeration and group-header rollups come from `usp_getcompetitionsummaryshavingsdetails` (#172); the page loops the order read per booking ranch. The loop must be built generically for N ranches even though live data currently has exactly one booking ranch per competition (booking ranch == host ranch, Double K). See `read-model.md`.
-- **Approval is gone.** No `ApprovedByPersonId`/`ApprovedAt`, no approve button, no approval queue, no `WaitingApproval`/`Closed`. The web approval service functions are removed by Spec 1; Spec 2 must not reintroduce them.
-- **`DeliveryPhotoUrl` must reach the page for CAP-3's unverified marker.** #176's exposed fields omit it; `spec-1-dependencies.md` DEP-1 records the required Spec 1 addition. If DEP-1 is not delivered, the unverified marker cannot render.
-- **RTL Hebrew, Tailwind CSS v4, React Router v7.** Reuse the competition-summary visual language (`SummaryTable`, `SummaryAmountCards`, `CompetitionSummarySection` palette and card shapes) so the page reads as native. No default/template look — the grouping toggle and SLA flags must feel systemic.
-- **Verify in the browser preview** (web dev server, `npm run dev`, `localhost:5173`) and attach screenshots of the ranch view, the status view, and a flagged-delayed order as proof; the redesign is observable.
+- **Consume Spec 1's shipped contract; author no new stored procedures.** Status is **derived, not a stored token** — stored `deliverystatus ∈ {Pending, Delivered}` only; the display/group state is Delivered if `Delivered` set, else Seen if `WorkerSystemUserId` set, else Pending. Never group or label on the stored token alone. Web reaches the API only through the shared `axiosInstance` → controller → BL → DAL → proc chain.
+- **The SLA-bearing per-order read is `usp_getshavingsordersforcompetitionandranch` (#176), deployed, scoped to one participating ranch.** Ranch enumeration and group-header rollups come from `usp_getcompetitionsummaryshavingsdetails` (#172); the page loops the order read per participating ranch. Build generically for N ranches even though live data has one participating ranch per competition today (all Double K). See `read-model.md`.
+- **"Ranch" here means the participating ranch the horse belongs to** (`stallbooking.ranchid`, surfaced by the summary procs as BookingRanch), not the host/venue ranch. In all current data it equals the host ranch, so grouping shows one group; it is built to render N.
+- **Approval is gone.** No approval fields, approve button, approval queue, or `WaitingApproval`/`Closed`. Spec 1 emptied the web approval service; Spec 2 must not reintroduce it.
+- **RTL Hebrew, Tailwind CSS v4, React Router v7.** Reuse the competition-summary visual language (`SummaryTable`, `SummaryAmountCards`, `CompetitionSummarySection` palette and card shapes) so the page reads as native — no default/template look. The Hebrew string set is `hebrew-labels.md`, pending Oren's approval.
+- **Verify in the browser preview** (web dev server, `npm run dev`, `localhost:5173`) and attach screenshots of the ranch view, the status view, and a flagged-delayed order as proof.
 
 ## Non-goals
 
-- **The data layer, stored procedures, worker-mobile app, and approval removal** — all Spec 1 (`spec-shavings-order-backend`). Spec 2 designs UI and consumes fields.
-- **Notification push (#31/#46)** — no transport exists; entirely out of scope.
-- **Authoring any new stored procedure** — new reads/fields are Spec 1 dependencies, not Spec 2 SQL.
-- **Reworking the billing/charge split** inside `usp_createshavingsorder` — reused as-is.
-- **Deep order-detail drill-down** (per-stall horses/payers richness, `R3`) beyond a basic row expand — optional for v1.
+- **The data layer, stored procedures, worker-mobile app, and approval removal** — all Spec 1, shipped. Spec 2 designs UI and consumes fields.
+- **Notification push (#31/#46)** — no transport exists; out of scope.
+- **Authoring any new stored procedure.** The one backend gap (CAP-3's unverified marker needs `DeliveryPhotoUrl` on #176) is recorded as DEP-1 in `spec-1-dependencies.md` — a scoped decision, not open-ended SQL.
+- **Enabling shavings orders for participating ranches that have no active shavings price** — a pricing-setup dependency (only the host ranch is priced today), out of scope.
+- **Reworking the billing/charge split** inside `usp_createshavingsorder`, and **deep order-detail drill-down** beyond a basic row expand — optional/out for v1.
 
 ## Success signal
 
-Mid-competition, the secretary opens the shavings page, sees every order grouped by status, and immediately spots the two orders pinned in "needs attention" — one unclaimed for over three hours since it was created, one seen over three hours ago but still not delivered. She flips the toggle to ranch grouping, confirms the counts per ranch, then adds a new order scoped to a specific ranch's stalls — with no approval step anywhere in the loop, and the new order shows up in the list.
+Mid-competition, the secretary opens the shavings page, sees every order grouped by status, and immediately spots the two orders pinned in "needs attention" — one never picked up in over three hours since it was created, one picked up over three hours ago but still not delivered. She flips the toggle to ranch grouping, confirms the per-ranch counts, then adds a new order scoped to a ranch's stalls — with no approval step anywhere, and the new order shows up in the list.
 
 ## Assumptions
 
-- Spec 1 lands first: the CAP-7 fields (`Seen`, `Delivered`, `PrequestDatetime`) on `usp_getshavingsordersforcompetitionandranch` (#176) and the token migration are deployed before Spec 2 ships. Spec 2's row rendering and SLA logic depend on those fields being present and populated.
-- `hostRanchId` for the reads = `activeRole.ranchId`, identical to the competition-summary page (`CompetitionWorkspaceLayout` provides `competitionId`; `ActiveRoleContext` provides `ranchId`). Booking ranch equals host ranch on current data.
+- `hostRanchId` for the reads = `activeRole.ranchId` (the secretary's host ranch), identical to the competition-summary page; it scopes the competition in #172/#173 (which validate `c.hostranchid`) and is the default participating ranch for the order loop. Booking/participating ranch equals host ranch on current data.
+- Legacy rows with `WorkerSystemUserId` set but `Seen` null (pre-Spec-1 migration) are rare test rows; Rule B falls back to `PrequestDatetime` for them.
+
+## Resolved decisions (Oren, 2026-07-26)
+
+- **DEP-1 (unverified marker) — ACCEPTED.** Do the minimal backend touch: append `DeliveryPhotoUrl` to #176 + DTO + DAL. Exact SQL and file changes in `spec-1-dependencies.md`.
+- **#32 ranch dropdown scope — CONFIRMED.** Lists participating ranches that have both pickable stalls and an active shavings price (today only the host ranch); some organizer ranches lack prices and that is acceptable — enabling them is a deferred pricing-setup task.
+- **Unverified action — CONFIRMED flag-only.** Spec 2 surfaces the flag on the row; no "request proof" affordance in v1 (depends on the out-of-scope notification track).
 
 ## Open Questions
 
-- **#30 wording (confirm with Oren):** the original issue said "approved within 3h"; approval is removed, so the clock is **seen**, not approved. This spec proceeds with the seen-based clock and a "not seen / not delivered in time" label — confirm the Hebrew wording.
-- **DEP-1 ownership:** should exposing `DeliveryPhotoUrl` on #176 be folded into Spec 1, or taken as a small Spec-2 backend touch? (Required either way for CAP-3.)
-- **#32 price-catalog source for web:** mobile derives the shavings `priceCatalogId` from `getCompetitionInvitationDetails`; confirm the web read (reuse an invitation-details service if one exists, or a dedicated shavings-price read).
-- **#32 ranch dropdown option set:** ranches the secretary is authorized for (HostSecretary in that ranch, matching the create-endpoint auth) and that have pickable stalls — on live data this is only the host ranch. Confirm host-only vs any booking ranch.
-- **Unverified action:** Spec 2 surfaces the unverified flag on the row; whether the secretary gets any "request proof" affordance is TBD and depends on the out-of-scope notification track — flag only, no action, in v1.
+- **Hebrew labels:** the string catalog in `hebrew-labels.md` is approved for the needs-attention section title/subtitle; the remaining chip/badge/form wording is proposed and open to your final edit.

@@ -1,54 +1,72 @@
-# Read Model & Grouping — Ranch ⇄ Status
+# Read Model & Grouping — Participating Ranch ⇄ Status
 
 Grounds CAP-1/CAP-2/CAP-6. How the page assembles "all orders for the competition" from Spec 1's
-reads, and how the same list re-groups by ranch or by status. **No new proc; no inline SQL.**
+shipped reads, and how the same list re-groups by ranch or by **derived** status. **No new proc; no
+inline SQL.**
 
-## Live grounding (why the model is shaped this way)
+## Derived status (critical — status is not a stored token)
 
-Verified against live (`sxplumrexbolpwqacpiz`, 2026-07-24): **every** shavings order and **all 23**
-stall bookings across competitions 7/8/44 have `stallbooking.ranchid == competition.hostranchid`
-(only Double K / 11). So on current data there is exactly **one booking ranch = the host ranch**,
-and group-by-ranch is degenerate (one group). But the summary procs (#172/#173) model booking
-ranch as a first-class dimension distinct from host ranch, and #29 explicitly wants a ranch toggle
-— so the model is built generically for **N booking ranches** while collapsing cleanly to one.
+Spec 1 stores `deliverystatus ∈ {Pending, Delivered}` only. A claimed-but-undelivered order is stored
+`Pending` yet must display `Seen`. Compute the display/group state, never read the stored token for
+grouping or labels:
 
-## The reads
+```js
+// shavingsStatus.utils.js
+export function deriveShavingsStatus(order) {
+  if (getDelivered(order))          return "Delivered"; // Delivered (=arrivaltime) set
+  if (getWorkerSystemUserId(order)) return "Seen";      // claimed, not yet delivered
+  return "Pending";                                     // created, unclaimed
+}
+```
+
+`getDelivered` / `getSeen` / `getWorkerSystemUserId` / `getCreated` read the R2 fields through the
+casing-tolerant `getValue(item, camelKey, PascalKey, fallback)` helper.
+
+## Live grounding (why the ranch model is shaped this way)
+
+Verified live (`sxplumrexbolpwqacpiz`, 2026-07-26): across **all** stall bookings,
+`stallbooking.ranchid == horse.ranchid == competition.hostranchid` — every horse is a Double K horse
+at the Double K venue, so the three notions are indistinguishable in current data. Per Oren, the
+grouping ranch is the **participating ranch the horse belongs to**; the field the summary procs group
+on (`stallbooking.ranchid`, surfaced as **BookingRanch**) tracks the horse's ranch and is deliberately
+modeled as a dimension separate from `hostranchid`. So the page groups by BookingRanch = participating
+ranch — one group today, built to render N.
+
+## The reads (all deployed)
 
 | Ref | Call (web service fn) | Proc | Scope | Gives |
 |---|---|---|---|---|
-| **R1** | `getCompetitionSummaryShavingsDetails(competitionId, hostRanchId)` | #172 | host-ranch, **all booking ranches** | `{BookingRanchId, BookingRanchName, OrderCount, StallCount, BagQuantity, Expected/Paid/Unpaid}` per booking ranch → **ranch enumeration + group-header stats** |
-| **R2** | `getShavingsOrdersForCompetitionAndRanch(competitionId, bookingRanchId)` | #176 | **one booking ranch** | per-order rows: `{ShavingsOrderId, RequestedDeliveryTime, BagQuantity, DeliveryStatus, Notes, WorkerSystemUserId, OrderedByName, ItemPrice, TotalAmount, Seen, Delivered, PrequestDatetime}` (+ `DeliveryPhotoUrl` — see DEP-1) |
-| **R3** _(optional, row expand)_ | `getCompetitionSummaryShavingsEntries(competitionId, hostRanchId, bookingRanchId)` | #173 | one booking ranch | `HorseNames`, `PayerNames`, `IsPaid`, per-order amounts, `StallCount`, `BagQuantity` |
+| **R1** | `getCompetitionSummaryShavingsDetails(competitionId, hostRanchId)` | #172 | host-scoped, **all participating ranches** | per-ranch `{BookingRanchId, BookingRanchName, OrderCount, StallCount, BagQuantity, Expected/Paid/Unpaid}` → **ranch enumeration + group-header stats** |
+| **R2** | `getShavingsOrdersForCompetitionAndRanch(competitionId, participatingRanchId)` | #176 | **one participating ranch** | per-order rows: `{ShavingsOrderId, RequestedDeliveryTime, BagQuantity, DeliveryStatus, Notes, WorkerSystemUserId, OrderedByName, PriceCatalogId, ItemPrice, TotalAmount, Seen, Delivered, PrequestDatetime}` |
+| **R3** _(optional, row expand)_ | `getCompetitionSummaryShavingsEntries(competitionId, hostRanchId, bookingRanchId)` | #173 | one participating ranch | `HorseNames` (Hebrew `'תא ציוד'` tack fallback), `PayerNames`, `IsPaid`, per-order amounts, `StallCount`, `BagQuantity` |
 
-`hostRanchId = activeRole.ranchId`. R2 is **the SLA-bearing read** (it carries `Seen`/`Delivered`/
-`PrequestDatetime` per Spec 1 CAP-7); R1 does **not** carry per-order timestamps, only rollups.
+`hostRanchId = activeRole.ranchId`. **R2 is the SLA-bearing read** (carries `Seen`/`Delivered`/
+`PrequestDatetime`); R1 carries only rollups. R2 does **not** carry `DeliveryPhotoUrl` — see DEP-1.
 
 ## Assembly (the master list)
 
 ```
-rollup      = await R1(competitionId, hostRanchId)              // [{BookingRanchId, BookingRanchName, ...}]
-perRanch    = await Promise.all(rollup.map(r =>
-                 R2(competitionId, r.BookingRanchId)            // per booking ranch
-                   .then(rows => rows.map(o => ({ ...o,
-                        bookingRanchId:   r.BookingRanchId,
-                        bookingRanchName: r.BookingRanchName }))))) 
-orders      = perRanch.flat()                                   // the flat master list, ranch-tagged
+rollup   = await R1(competitionId, hostRanchId)                 // participating ranches + rollups
+perRanch = await Promise.all(rollup.map(r =>
+              R2(competitionId, r.BookingRanchId)
+                .then(rows => rows.map(o => ({ ...o,
+                     participatingRanchId:   r.BookingRanchId,
+                     participatingRanchName: r.BookingRanchName,
+                     derivedStatus:          deriveShavingsStatus(o) })))))
+orders   = perRanch.flat()                                      // flat master list, ranch-tagged + status-derived
 ```
 
-- On live data `rollup` has one entry → one R2 call. The loop is `Promise.all`, not a waterfall.
-- Each order row is tagged with its booking ranch so **both** grouping modes work off the one list
-  with no refetch.
-- Casing: read every field through the shared `getValue(item, camelKey, PascalKey, fallback)` helper
-  (the API returns PascalId columns; the app tolerates both).
+- On live data `rollup` has one entry → one R2 call. `Promise.all`, not a waterfall.
+- Each row is tagged with its participating ranch and its derived status so **both** grouping modes
+  work off the one list with no refetch.
 
 ## Grouping (`shavingsGrouping.utils.js`, pure functions)
 
-- **`group = "ranch"`** — group `orders` by `bookingRanchId`; each group's header stats come from the
-  matching **R1 rollup** row (OrderCount / StallCount / BagQuantity / amounts). Natural grouping.
-- **`group = "status"`** — bucket `orders` by `DeliveryStatus` into a fixed ordered set
-  `["Pending", "Seen", "Delivered"]` (pipeline order); each group's header shows a count and bag sum
-  derived client-side. Unknown/legacy tokens (should not occur post-migration) fall into a trailing
-  "אחר" bucket rather than being dropped.
+- **`group = "ranch"`** — group `orders` by `participatingRanchId`; each group's header stats come from
+  the matching **R1 rollup** row. Natural grouping.
+- **`group = "status"`** — bucket `orders` by `derivedStatus` into fixed pipeline order
+  `["Pending", "Seen", "Delivered"]`; header count + bag sum derived client-side. (No `WaitingApproval`/
+  `Closed`; any unexpected value falls into a trailing "אחר" bucket rather than being dropped.)
 
 Grouping is a pure transform of the same `orders` array — switching modes never refetches.
 
@@ -56,18 +74,17 @@ Grouping is a pure transform of the same `orders` array — switching modes neve
 
 React Router v7 `useSearchParams`:
 
-- `?group=ranch|status` — default `ranch`. `setGroup` replaces the param (no history spam:
-  `setSearchParams(next, { replace: true })`).
-- `?ranch=<bookingRanchId>` — optional filter to one ranch group.
-- `?status=Pending|Seen|Delivered` — optional filter to one status bucket.
+- `?group=ranch|status` — default `ranch`; `setSearchParams(next, { replace: true })` (no history spam).
+- `?ranch=<participatingRanchId>` and `?status=Pending|Seen|Delivered` — optional filters that narrow the
+  derived groups client-side; they do not change the fetch.
 
-Filters narrow the derived groups client-side; they do not change the fetch. `useSearchParams` is
-only thinly used in the web app today (3 auth/superuser pages) — this establishes the pattern for
-secretary workspace pages.
+`useSearchParams` is thinly used in the web app today (3 auth/superuser pages) — this establishes the
+pattern for secretary workspace pages.
 
 ## Not this
 
-- **Not** a per-ranch waterfall or an N+1 that blocks render — `Promise.all`, and N=1 in practice.
-- **Not** proc #173 as the backbone — it lacks the SLA timestamps #30 needs. #176 is the backbone;
-  #173 is optional row-expand richness only.
+- **Not** grouping/labelling on the stored `DeliveryStatus` token — always the derived status.
+- **Not** proc #173 as the backbone — it lacks the SLA timestamps. #176 is the backbone; #173 is
+  optional row-expand richness only.
+- **Not** a per-ranch waterfall or N+1 — `Promise.all`, N=1 in practice.
 - **Not** a new competition-wide order-list proc — flagged as the deferred DEP-2, not built here.

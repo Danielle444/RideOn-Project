@@ -29,14 +29,20 @@ web/src/
   services/
     shavingsOrderService.js            ← REWRITTEN: approval fns removed (Spec 1), reads/writes added
   utils/
+    shavingsStatus.utils.js            ← NEW: deriveShavingsStatus(order) — Delivered/Seen/Pending (see read-model.md)
     shavingsSla.utils.js               ← NEW: SLA_THRESHOLD constant + rule predicates (see sla-rules.md)
     shavingsGrouping.utils.js          ← NEW: group-by-ranch / group-by-status pure fns
 ```
 
 Reuse (do not duplicate): `competitionSummaryService.getCompetitionSummaryShavingsDetails` /
 `getCompetitionSummaryShavingsEntries` for the ranch rollup and optional row-expand richness;
+`servicePricesService.getServicePricesDashboard(ranchId)` for the #32 price source (נסורת section);
 the summary palette and `SummaryTable`/`SummaryAmountCards`/`CompetitionSummarySection` visual
 patterns; the shared `getValue(item, camelKey, pascalKey, fallback)` casing-tolerant reader.
+
+**Status is derived, never read from the stored token** — `ShavingsStatusChip` and the status grouping
+both call `deriveShavingsStatus(order)` (Delivered if `Delivered` set; else Seen if `WorkerSystemUserId`
+set; else Pending). See `read-model.md`.
 
 ## Component tree
 
