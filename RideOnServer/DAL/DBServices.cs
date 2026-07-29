@@ -19,13 +19,6 @@ namespace RideOnServer.DAL
 
             string cStr = configuration.GetConnectionString(conStr)!;
 
-            var builder = new NpgsqlConnectionStringBuilder(cStr);
-
-            Console.WriteLine("=== DB HOST === " + builder.Host);
-            Console.WriteLine("=== DB PORT === " + builder.Port);
-            Console.WriteLine("=== DB USER === " + builder.Username);
-            Console.WriteLine("=== DB DATABASE === " + builder.Database);
-
             return new NpgsqlConnection(cStr);
         }
 

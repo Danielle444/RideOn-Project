@@ -131,10 +131,6 @@ namespace RideOnServer.Controllers
                 if (request == null)
                     return BadRequest("Invalid request");
 
-                // TEMP DEBUG (Issue C): remove once the drop point is confirmed.
-                Console.WriteLine($"[ISSUE-C] CreateClassInCompetition request.Prizes count={request.Prizes?.Count ?? -1} " +
-                    $"types=[{string.Join(",", (request.Prizes ?? new List<ClassPrizeItem>()).Select(p => p.PrizeTypeId))}]");
-
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
                 UserAccessValidator.EnsureUserHasRoleInRanch(
@@ -188,10 +184,6 @@ namespace RideOnServer.Controllers
 
                 if (classInCompId != request.ClassInCompId)
                     return BadRequest("ClassInCompId mismatch");
-
-                // TEMP DEBUG (Issue C): remove once the drop point is confirmed.
-                Console.WriteLine($"[ISSUE-C] UpdateClassInCompetition request.Prizes count={request.Prizes?.Count ?? -1} " +
-                    $"types=[{string.Join(",", (request.Prizes ?? new List<ClassPrizeItem>()).Select(p => p.PrizeTypeId))}]");
 
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
