@@ -6,6 +6,7 @@ import {
   getSourceLabel,
   isPostStartFullChargeCancellation,
   POST_START_FULL_CHARGE_LABEL,
+  buildChangedFields,
 } from "../../../utils/changeTracking.utils";
 
 function getValue(item, camelKey, pascalKey, fallback) {
@@ -46,96 +47,6 @@ function getRequestKey(item) {
     "-" +
     getValue(item, "requestId", "RequestId", "")
   );
-}
-
-function splitDetailsText(text) {
-  if (!text) {
-    return [];
-  }
-
-  return String(text)
-    .split("|")
-    .map(function (part) {
-      return part.trim();
-    })
-    .filter(function (part) {
-      return part.length > 0;
-    });
-}
-
-function getDetailLabel(part) {
-  var index = part.indexOf(":");
-
-  if (index === -1) {
-    return part.trim();
-  }
-
-  return part.substring(0, index).trim();
-}
-
-function getDetailValue(part) {
-  var index = part.indexOf(":");
-
-  if (index === -1) {
-    return "";
-  }
-
-  return part.substring(index + 1).trim();
-}
-
-function buildChangedFields(beforeText, afterText) {
-  var beforeParts = splitDetailsText(beforeText);
-  var afterParts = splitDetailsText(afterText);
-  var changes = [];
-
-  beforeParts.forEach(function (beforePart) {
-    var beforeLabel = getDetailLabel(beforePart);
-    var beforeValue = getDetailValue(beforePart);
-
-    var matchingAfterPart = afterParts.find(function (afterPart) {
-      return getDetailLabel(afterPart) === beforeLabel;
-    });
-
-    if (!matchingAfterPart) {
-      return;
-    }
-
-    var afterValue = getDetailValue(matchingAfterPart);
-
-    var isMissingAfterValue =
-      afterValue === "" ||
-      afterValue === "-" ||
-      afterValue === "₪" ||
-      afterValue === "₪0" ||
-      afterValue === "₪0.00";
-
-    var isPayerField = beforeLabel === "משלם" || beforeLabel === "משלמים";
-
-    if (isPayerField && isMissingAfterValue) {
-      return;
-    }
-
-    // Money is shown once, in the dedicated "סכום לפני / סכום אחרי" cards
-    // below. Skip the money-labeled parts baked into the proc text.
-    var isMoneyField =
-      beforeLabel === "חיוב" ||
-      beforeLabel === "מחיר מחירון" ||
-      beforeLabel === "מחיר";
-
-    if (isMoneyField) {
-      return;
-    }
-
-    if (beforeValue !== afterValue) {
-      changes.push({
-        label: beforeLabel,
-        beforeValue: beforeValue || "-",
-        afterValue: afterValue || "-",
-      });
-    }
-  });
-
-  return changes;
 }
 
 function DetailRow(props) {
