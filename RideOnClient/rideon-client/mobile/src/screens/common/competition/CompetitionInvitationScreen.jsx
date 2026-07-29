@@ -13,6 +13,12 @@ import CompetitionServicesSection from "../../../components/competitions/Competi
 import CompetitionRegisterButton from "../../../components/competitions/CompetitionRegisterButton";
 
 import competitionInvitationStyles from "../../../styles/competitionInvitationStyles";
+import getCompetitionStatusBadgeStyle from "../../../styles/competitionStatusBadgeStyle";
+
+import {
+  getCompetitionStatusLabel,
+  getCompetitionStatusVariant,
+} from "../../../../../shared/auth/utils/competitions/competitionStatus";
 
 import { useUser } from "../../../context/UserContext";
 import { useActiveRole } from "../../../context/ActiveRoleContext";
@@ -50,24 +56,6 @@ function formatWeekdayWithDate(value) {
     });
 
     return weekday + " " + shortDate;
-  } catch (error) {
-    return String(value);
-  }
-}
-
-function formatDate(value) {
-  if (!value) {
-    return "—";
-  }
-
-  try {
-    var date = new Date(value);
-
-    return date.toLocaleDateString("he-IL", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
   } catch (error) {
     return String(value);
   }
@@ -297,6 +285,12 @@ export default function CompetitionInvitationScreen(props) {
     (user?.lastName || "")
   ).trim();
 
+  var competitionStatus = details?.competition?.competitionStatus;
+
+  var statusBadgeStyle = getCompetitionStatusBadgeStyle(
+    getCompetitionStatusVariant(competitionStatus)
+  );
+
   return (
     <MobileScreenLayout
       title="פרטי תחרות"
@@ -363,23 +357,20 @@ export default function CompetitionInvitationScreen(props) {
               "פרטי תחרות"}
           </Text>
 
-          <Text style={competitionInvitationStyles.heroSubTitle}>
-            חווה מארחת: {details?.competition?.hostRanchName || "—"}
-          </Text>
-
-          <Text style={competitionInvitationStyles.heroSubTitle}>
-            ענף: {details?.competition?.fieldName || "—"}
-          </Text>
-
-          <Text style={competitionInvitationStyles.heroSubTitle}>
-            תאריכים: {formatDate(details?.competition?.competitionStartDate)} -{" "}
-            {formatDate(details?.competition?.competitionEndDate)}
-          </Text>
-
-          {details?.competition?.competitionStatus ? (
-            <View style={competitionInvitationStyles.heroStatusBadge}>
-              <Text style={competitionInvitationStyles.heroStatusText}>
-                {details.competition.competitionStatus}
+          {competitionStatus ? (
+            <View
+              style={[
+                competitionInvitationStyles.heroStatusBadge,
+                { backgroundColor: statusBadgeStyle.backgroundColor },
+              ]}
+            >
+              <Text
+                style={[
+                  competitionInvitationStyles.heroStatusText,
+                  { color: statusBadgeStyle.color },
+                ]}
+              >
+                {getCompetitionStatusLabel(competitionStatus)}
               </Text>
             </View>
           ) : null}
@@ -420,6 +411,7 @@ export default function CompetitionInvitationScreen(props) {
 
             <CompetitionRegisterButton
               visible={isAdmin}
+              status={competitionStatus}
               onPress={handleRegisterPress}
             />
           </>
