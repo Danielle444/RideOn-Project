@@ -118,7 +118,9 @@ export default function AutoSchedulePreviewModal(props) {
               <SummaryBar counts={counts} />
 
               <ScheduledSection items={data.scheduled} />
+              <MovedSection items={data.moved} />
               <FrozenSection items={data.frozen} />
+              <UnchangedSection items={data.unchanged} />
               <UnscheduledSection items={data.unscheduled} />
             </div>
           )}
@@ -183,9 +185,16 @@ function SummaryBar(props) {
         value={counts.scheduled || 0}
         className="border-[#BFD5C3] bg-[#F3FAF4] text-[#2F6B3B]"
       />
+      {/* V2-2: movement gets the amber family already used for fallback
+          placements and staleness - it is a change the secretary must notice. */}
+      <SummaryChip
+        label="שיבוצים קיימים שיוזזו"
+        value={counts.moved || 0}
+        className="border-[#E8C39A] bg-[#FDF6EC] text-[#8A5A22]"
+      />
       <SummaryChip
         label="יישארו בשיבוץ הקיים"
-        value={counts.frozen || 0}
+        value={(counts.frozen || 0) + (counts.unchanged || 0)}
         className="border-[#E2D5CE] bg-[#FAF5F1] text-[#7B5A4D]"
       />
       <SummaryChip
@@ -306,6 +315,61 @@ function ScheduledSection(props) {
   );
 }
 
+// V2-2. Existing assignments the Apply will MOVE. Shows old -> new for every
+// field that changes, so the Preview can never hide movement from the secretary.
+function MovedSection(props) {
+  var items = Array.isArray(props.items) ? props.items : [];
+
+  return (
+    <Section
+      title="שיבוצים קיימים שיוזזו"
+      count={items.length}
+      emptyMessage="לא יוזזו שיבוצים קיימים"
+    >
+      {items.map(function (item) {
+        return (
+          <RowCard key={item.paidTimeRequestId}>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-[#FDF6EC] px-2 py-0.5 text-[10px] font-bold text-[#8A5A22]">
+                שיבוץ קיים יוזז
+              </span>
+              <span className="text-sm font-bold text-[#3F312B]">
+                {item.horse}
+                <span className="text-xs font-normal text-[#8D6E63]">
+                  {" · "}
+                  {item.rider}
+                  {" · מאמן: "}
+                  {item.coach}
+                </span>
+              </span>
+            </div>
+
+            <div className="mt-1 grid grid-cols-1 gap-x-4 gap-y-1 text-xs text-[#6B574F] sm:grid-cols-2">
+              <div>
+                <span className="text-[#8D6E63]">סלוט: </span>
+                {item.slotChangeLabel}
+              </div>
+              <div>
+                <span className="text-[#8D6E63]">שעה: </span>
+                {item.startTimeChangeLabel}
+              </div>
+              <div>
+                <span className="text-[#8D6E63]">סדר: </span>
+                {item.orderChangeLabel}
+              </div>
+              <div>
+                <span className="text-[#8D6E63]">מגרש: </span>
+                {item.arena}
+              </div>
+            </div>
+          </RowCard>
+        );
+      })}
+    </Section>
+  );
+}
+
+// Existing assignments that CANNOT be moved, each with its structured reason.
 function FrozenSection(props) {
   var items = Array.isArray(props.items) ? props.items : [];
 
@@ -314,6 +378,66 @@ function FrozenSection(props) {
       title="שיבוצים קיימים שיישמרו"
       count={items.length}
       emptyMessage="אין שיבוצים קיימים לשמירה"
+    >
+      {items.map(function (item) {
+        return (
+          <RowCard key={item.paidTimeRequestId}>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-[#EEF2FF] px-2 py-0.5 text-[10px] font-bold text-[#4B5563]">
+                ללא שינוי
+              </span>
+              <span className="text-sm font-bold text-[#3F312B]">
+                {item.horse}
+              </span>
+            </div>
+
+            <div className="mt-1 grid grid-cols-1 gap-x-4 gap-y-1 text-xs text-[#6B574F] sm:grid-cols-2">
+              <div>
+                <span className="text-[#8D6E63]">סלוט: </span>
+                {item.assignedSlotLabel}
+              </div>
+              <div>
+                <span className="text-[#8D6E63]">מגרש: </span>
+                {item.arena}
+              </div>
+              <div>
+                <span className="text-[#8D6E63]">שעה: </span>
+                {item.startTime}
+              </div>
+              <div>
+                <span className="text-[#8D6E63]">סדר: </span>
+                {item.assignedOrder !== null && item.assignedOrder !== undefined
+                  ? item.assignedOrder
+                  : "—"}
+              </div>
+              {/* Absent on an older server response - simply not rendered. */}
+              {item.frozenReasonLabel ? (
+                <div className="sm:col-span-2 text-[#8D6E63]">
+                  {item.frozenReasonLabel}
+                </div>
+              ) : null}
+            </div>
+          </RowCard>
+        );
+      })}
+    </Section>
+  );
+}
+
+// V2-2. Movable, but deliberately left where they are. Shown so the secretary
+// can see they were considered rather than overlooked. Never written by Apply.
+function UnchangedSection(props) {
+  var items = Array.isArray(props.items) ? props.items : [];
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <Section
+      title="שיבוצים קיימים שנשארים במקומם"
+      count={items.length}
+      emptyMessage=""
     >
       {items.map(function (item) {
         return (
@@ -388,6 +512,14 @@ function UnscheduledSection(props) {
               {item.adjacentSlotsTriedLabel ? (
                 <div className="text-[#8D6E63]">
                   {item.adjacentSlotsTriedLabel}
+                </div>
+              ) : null}
+              {/* V2-2: additive only. The reason above stays the primary fact;
+                  this says the bounded search stopped at its limit rather than
+                  proving no legal plan exists. */}
+              {item.movementSearchExhaustedLabel ? (
+                <div className="sm:col-span-2 text-[#8D6E63]">
+                  {item.movementSearchExhaustedLabel}
                 </div>
               ) : null}
             </div>

@@ -98,6 +98,13 @@ namespace RideOnServer.BL.AutoScheduler
         [JsonPropertyName("assignedOrder")]
         public int? AssignedOrder { get; set; }
 
+        // V2-2: מקור-השיבוץ ('Auto' / 'Manual' / NULL). כבר נפלט מ-usp_getautoschedulerdata
+        // ורק לא נקלט ב-DTO עד כה. משמש *אך ורק* לשימור-ערך בעת הזזה - אינו משפיע על
+        // סיווג הניידות ואינו קלט לאלגוריתם. NULL הוא ערך תקין ונפוץ (69 שורות Assigned
+        // בנתונים החיים), ולכן "שימור" פירושו גם NULL -> NULL.
+        [JsonPropertyName("allocationOrigin")]
+        public string? AllocationOrigin { get; set; }
+
         [JsonPropertyName("status")]
         public string Status { get; set; } = "Pending";
 
@@ -157,9 +164,45 @@ namespace RideOnServer.BL.AutoScheduler
         public DateTime ExecutedAt { get; set; }
         public int ScheduledCount { get; set; }
         public int UnscheduledCount { get; set; }
+
+        // FrozenCount סופר שיבוצים קיימים שאינם ניתנים להזזה כלל.
+        // כאשר allowMovement=false (מסלול ה-bulk, פרוצדורה 129) *כל* שורה Assigned
+        // נספרת כאן - התנהגות V2-1 נשמרת ללא שינוי.
         public int FrozenCount { get; set; }
+
+        // V2-2: שיבוצים קיימים שהוזזו בפועל (חלק מקבוצת-הכתיבה).
+        public int MovedCount { get; set; }
+
+        // V2-2: שיבוצים קיימים הניתנים להזזה שנותרו במקומם במכוון (אינם נכתבים).
+        public int UnchangedCount { get; set; }
+
         public List<AssignmentDecision> Assignments { get; set; } = new();
         public List<AuditLogEntry> Audit { get; set; } = new();
+    }
+
+    // V2-2: סוג-השינוי של החלטה. נקבע *אך ורק* במנוע ומועבר כמות-שהוא ל-DTO
+    // ולמטען ה-Apply - אין גזירה מחדש בשכבת המיפוי או ב-JavaScript.
+    public static class ChangeKinds
+    {
+        public const string NewAssignment = "NewAssignment";
+        public const string Moved = "Moved";
+        public const string Unscheduled = "Unscheduled";
+    }
+
+    // V2-2: הסיבה שבגללה שיבוץ קיים אינו ניתן להזזה. מוצג למזכירה בתצוגה המקדימה.
+    public static class FrozenReasons
+    {
+        public const string PublishedSlot = "PublishedSlot";
+        public const string OutOfScopePlacement = "OutOfScopePlacement";
+
+        // לשורה עצמה אין assignedstarttime.
+        public const string NoStartTime = "NoStartTime";
+
+        // השורה תקינה, אבל הסלוט שבו היא יושבת מכיל שורת-מדור-קודם ללא
+        // assignedstarttime. מצב-התפוסה של הסלוט אינו ניתן לאימות, ולכן הסלוט
+        // כולו מחוץ לתחום האוטומטי: אין נכנסים אליו, אין יוצאים ממנו ואין זזים
+        // בתוכו.
+        public const string UnsafeLegacySlot = "UnsafeLegacySlot";
     }
 
     // סוגי-מיקום אפשריים של שיבוץ אוטומטי (V2-1). נקבעים *אך ורק* במנוע
@@ -191,15 +234,44 @@ namespace RideOnServer.BL.AutoScheduler
 
         // נכון כשבוצע ניסיון-מיקום בפועל על סלוט סמוך כלשהו (רלוונטי ל-Pending).
         public bool AdjacentSlotsTried { get; set; }
+
+        // ===== V2-2, תוספתי בלבד =====
+        //
+        // סוג-השינוי (NewAssignment / Moved / Unscheduled). קובע את חברות השורה
+        // בקבוצת-הכתיבה: רק NewAssignment ו-Moved נשלחים ל-usp_ApplyAutoScheduleV2.
+        public string ChangeKind { get; set; } = ChangeKinds.Unscheduled;
+
+        // מצב-הישן הצפוי של שיבוץ קיים שהוזז. NULL בשיבוץ חדש. נמסר ל-SP כשומר
+        // מפני תוכנית מיושנת ברמת-השורה (מחליף את הבדיקה 'Pending ולא-משובץ').
+        public int? PreviousAssignedCompSlotId { get; set; }
+        public DateTime? PreviousAssignedStartTime { get; set; }
+        public int? PreviousAssignedOrder { get; set; }
+        public string? PreviousAllocationOrigin { get; set; }
+
+        // מקור-השיבוץ הסופי: 'Auto' לשיבוץ חדש, והערך הקודם *כמות-שהוא* (כולל NULL)
+        // לשיבוץ קיים שהוזז. אין מחיקת עדות לכך שהשיבוץ נעשה ידנית.
+        public string? AllocationOrigin { get; set; }
+
+        // נכון כשהופעל חיפוש-הזזה עבור הבקשה (רלוונטי ל-Pending).
+        public bool MovementAttempted { get; set; }
+
+        // נכון כשחיפוש-ההזזה נעצר במגבלת עומק/תקציב ולא מפני שלא קיים פתרון.
+        // *תוספתי בלבד* - אינו מחליף את Reason/ReasonCode של הסלוט המבוקש.
+        public bool MovementSearchExhausted { get; set; }
     }
 
     public class AuditLogEntry
     {
         public int PaidTimeRequestId { get; set; }
-        public string Action { get; set; } = string.Empty;   // scheduled | unscheduled | kept-frozen | moved
+        // scheduled | unscheduled | kept-frozen | kept-unchanged | moved
+        public string Action { get; set; } = string.Empty;
         public string? Reason { get; set; }
         public int? PreviousSlotId { get; set; }
         public int? NewSlotId { get; set; }
         public DateTime? NewStartTime { get; set; }
+
+        // V2-2: קוד-סיבה מובנה לשורה קפואה (FrozenReasons). NULL בכל פעולה אחרת,
+        // וגם בשורות קפואות במסלול ה-bulk שבו אין סיווג ניידות.
+        public string? FrozenReason { get; set; }
     }
 }

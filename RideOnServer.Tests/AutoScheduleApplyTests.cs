@@ -217,18 +217,24 @@ namespace RideOnServer.Tests
             AutoScheduleApplyPlan plan =
                 PaidTimeRequest.BuildVerifiedApplyPlan(data, data.CompetitionId, fingerprint);
 
-            plan.AllowedRequestIds.Should().BeEmpty();
+            plan.WritePlan.Items.Should().BeEmpty();
+            plan.WritePlan.ExpectedWriteSetCount.Should().Be(0);
             plan.Decisions.Should().BeEmpty();
             plan.Result.ScheduledCount.Should().Be(0);
-            plan.Result.FrozenCount.Should().Be(1); // the existing assignment still surfaces as frozen
-            // NOTE: the outer ApplyAutoSchedule hands these empty args to the DAL, which
-            // short-circuits (returns 0) without invoking usp_applyautoschedule.
+            // V2-2: the existing assignment sits in its own requested, unpublished slot,
+            // so it is MOVABLE — and, with nothing to make room for, deliberately unchanged.
+            // Unchanged rows are never written, which is why the write plan stays empty.
+            plan.Result.FrozenCount.Should().Be(0);
+            plan.Result.UnchangedCount.Should().Be(1);
+            plan.Result.MovedCount.Should().Be(0);
+            // NOTE: the outer ApplyAutoSchedule hands this empty plan to the DAL, which
+            // short-circuits without invoking usp_applyautoschedulev2.
         }
 
-        // --- 7: frozen assignments are never in the mutable candidate set ---------------------
+        // --- 7: existing assignments are never in the mutable candidate set -------------------
 
         [Fact]
-        public void BuildVerifiedApplyPlan_FrozenAssignment_IsExcludedFromAllowedRequestIds()
+        public void BuildVerifiedApplyPlan_UnchangedExistingAssignment_IsExcludedFromTheWriteSet()
         {
             SchedulerData data = new SchedulerData
             {
@@ -246,9 +252,10 @@ namespace RideOnServer.Tests
             AutoScheduleApplyPlan plan =
                 PaidTimeRequest.BuildVerifiedApplyPlan(data, data.CompetitionId, fingerprint);
 
-            plan.AllowedRequestIds.Should().Contain(100);
-            plan.AllowedRequestIds.Should().NotContain(200);
-            plan.Result.FrozenCount.Should().Be(1);
+            plan.WritePlan.Items.Select(i => i.PaidTimeRequestId).Should().Contain(100);
+            plan.WritePlan.Items.Select(i => i.PaidTimeRequestId).Should().NotContain(200);
+            plan.Result.UnchangedCount.Should().Be(1);
+            plan.Result.MovedCount.Should().Be(0);
             plan.Decisions.Select(d => d.PaidTimeRequestId).Should().NotContain(200);
         }
 
@@ -270,8 +277,9 @@ namespace RideOnServer.Tests
             AutoScheduleApplyPlan plan =
                 PaidTimeRequest.BuildVerifiedApplyPlan(data, data.CompetitionId, fingerprint);
 
-            // Still in the allowed set (a decision is required for it), but Pending & unallocated.
-            plan.AllowedRequestIds.Should().Contain(100);
+            // A decision is still required for it, but Pending decisions are NOT write-set
+            // members: nothing about the row changes, so the SP is never asked to touch it.
+            plan.WritePlan.Items.Should().BeEmpty();
             AssignmentDecision decision = plan.Decisions.Single(d => d.PaidTimeRequestId == 100);
             decision.Status.Should().Be("Pending");
             decision.AssignedCompSlotId.Should().BeNull();
@@ -303,11 +311,19 @@ namespace RideOnServer.Tests
                 PaidTimeRequest.BuildVerifiedApplyPlan(data, data.CompetitionId, fingerprint);
 
             plan.CompetitionId.Should().Be(77);
-            plan.AllowedRequestIds.Should().BeEquivalentTo(candidateIds);
 
-            // Completeness: exactly one decision per allowed request (matches SP's contract).
+            // Completeness: exactly one decision per candidate (100 scheduled, 101 pending).
             plan.Decisions.Select(d => d.PaidTimeRequestId)
                 .Should().BeEquivalentTo(candidateIds);
+
+            // The write set is the strict subset that actually changes: only the scheduled
+            // candidate. 101 stays Pending and 200 is an unchanged existing assignment.
+            plan.WritePlan.Items.Select(i => i.PaidTimeRequestId).Should().BeEquivalentTo(new[] { 100 });
+            plan.WritePlan.ExpectedWriteSetCount.Should().Be(plan.WritePlan.Items.Count);
+            plan.WritePlan.Items.Single().ChangeKind.Should().Be(ChangeKinds.NewAssignment);
+            plan.WritePlan.Items.Single().NewAllocationOrigin.Should().Be("Auto");
+            plan.WritePlan.Items.Single().ExpectedStatus.Should().Be("Pending");
+            plan.WritePlan.Items.Single().ExpectedAssignedCompSlotId.Should().BeNull();
         }
 
         // --- 10: Apply reuses Preview's exact fingerprint function (Preview unchanged) --------

@@ -4,9 +4,12 @@ import {
   mapUnscheduledReason,
   normalizePlacementKind,
   placementKindLabel,
+  formatOldToNew,
   REASON_CODE_LABELS,
   PLACEMENT_KIND_LABELS,
   ADJACENT_SLOTS_TRIED_LABEL,
+  MOVEMENT_SEARCH_EXHAUSTED_LABEL,
+  FROZEN_REASON_LABELS,
 } from "./autoSchedulePreview.utils.js";
 
 // Loaded slots as the paid-time page actually holds them (camelCase from the
@@ -524,5 +527,211 @@ describe("mapAutoSchedulePreview - V2-1 fields", function () {
     expect(
       mapAutoSchedulePreview(response, SLOTS).unscheduled[0].adjacentSlotsTried,
     ).toBe(false);
+  });
+});
+
+// =====================================================================
+// V2-2: moved / unchanged buckets, frozen reasons, movement diagnostics
+// =====================================================================
+describe("mapAutoSchedulePreview - V2-2 movement", function () {
+  function movedResponse() {
+    var response = baseResponse();
+    response.movedCount = 1;
+    response.unchangedCount = 1;
+    response.movedItems = [
+      {
+        paidTimeRequestId: 400,
+        horseName: "Rocket",
+        barnName: "West Barn",
+        riderName: "Dana Rider",
+        coachName: "Eli Coach",
+        payerName: "Fay Payer",
+        requestedCompSlotId: 1,
+        effectiveDurationMinutes: 11,
+        previousAssignedCompSlotId: 1,
+        previousAssignedStartTime: "2026-08-01T08:00:00",
+        previousAssignedOrder: 3,
+        previousArenaName: "Arena 1",
+        assignedCompSlotId: 2,
+        assignedStartTime: "2026-08-02T09:30:00",
+        assignedOrder: 1,
+        assignedArenaName: "",
+        placementKind: "NextSameDay",
+        allocationOrigin: "Manual",
+      },
+    ];
+    response.unchangedItems = [
+      {
+        paidTimeRequestId: 500,
+        horseName: "Willow",
+        assignedCompSlotId: 1,
+        assignedArenaName: "Arena 1",
+        assignedStartTime: "2026-08-01T10:00:00",
+        assignedOrder: 9,
+        allocationOrigin: null,
+      },
+    ];
+    return response;
+  }
+
+  it("maps a moved item with old -> new labels for slot, time and order", function () {
+    var item = mapAutoSchedulePreview(movedResponse(), SLOTS).moved[0];
+
+    expect(item.paidTimeRequestId).toBe(400);
+    expect(item.previousSlotId).toBe(1);
+    expect(item.assignedSlotId).toBe(2);
+    expect(item.previousStartTime).toBe("08:00");
+    expect(item.startTime).toBe("09:30");
+    expect(item.previousOrder).toBe(3);
+    expect(item.assignedOrder).toBe(1);
+
+    // The approved "מ־{old} אל {new}" shape, pre-formatted so the modal never
+    // builds it itself.
+    expect(item.startTimeChangeLabel).toBe("מ־08:00 אל 09:30");
+    expect(item.orderChangeLabel).toBe("מ־3 אל 1");
+    expect(item.slotChangeLabel).toBe(
+      "מ־2026-08-01 · 08:00–12:00 · Arena 1 אל 2026-08-02 · 09:00–11:00",
+    );
+  });
+
+  it("preserves the moved row's allocation origin verbatim", function () {
+    expect(mapAutoSchedulePreview(movedResponse(), SLOTS).moved[0].allocationOrigin).toBe(
+      "Manual",
+    );
+  });
+
+  it("keeps a null allocation origin null rather than inventing one", function () {
+    var response = movedResponse();
+    response.movedItems[0].allocationOrigin = null;
+
+    expect(mapAutoSchedulePreview(response, SLOTS).moved[0].allocationOrigin).toBeNull();
+  });
+
+  it("counts moved and unchanged separately from frozen", function () {
+    var counts = mapAutoSchedulePreview(movedResponse(), SLOTS).counts;
+
+    expect(counts.moved).toBe(1);
+    expect(counts.unchanged).toBe(1);
+    expect(counts.frozen).toBe(1);
+    expect(counts.serverMoved).toBe(1);
+    expect(counts.serverUnchanged).toBe(1);
+  });
+
+  it("maps an unchanged item without any old/new pairing", function () {
+    var item = mapAutoSchedulePreview(movedResponse(), SLOTS).unchanged[0];
+
+    expect(item.paidTimeRequestId).toBe(500);
+    expect(item.assignedOrder).toBe(9);
+    expect(item.startTime).toBe("10:00");
+    expect(item.slotChangeLabel).toBeUndefined();
+  });
+
+  it("labels each frozen reason and flags the published-slot case", function () {
+    var response = movedResponse();
+    response.frozenItems[0].frozenReason = "PublishedSlot";
+    response.frozenItems[0].isPublishedSlot = true;
+
+    var item = mapAutoSchedulePreview(response, SLOTS).frozen[0];
+
+    expect(item.frozenReason).toBe("PublishedSlot");
+    expect(item.frozenReasonLabel).toBe(FROZEN_REASON_LABELS.PublishedSlot);
+    expect(item.isPublishedSlot).toBe(true);
+  });
+
+  it("maps every remaining frozen reason", function () {
+    var response = movedResponse();
+
+    response.frozenItems[0].frozenReason = "OutOfScopePlacement";
+    expect(mapAutoSchedulePreview(response, SLOTS).frozen[0].frozenReasonLabel).toBe(
+      FROZEN_REASON_LABELS.OutOfScopePlacement,
+    );
+
+    response.frozenItems[0].frozenReason = "NoStartTime";
+    expect(mapAutoSchedulePreview(response, SLOTS).frozen[0].frozenReasonLabel).toBe(
+      FROZEN_REASON_LABELS.NoStartTime,
+    );
+
+    // The row is healthy; its SLOT holds a legacy start-time-less assignment.
+    response.frozenItems[0].frozenReason = "UnsafeLegacySlot";
+    var item = mapAutoSchedulePreview(response, SLOTS).frozen[0];
+    expect(item.frozenReasonLabel).toBe(FROZEN_REASON_LABELS.UnsafeLegacySlot);
+    // Distinct from the published case - it must not read as a publication freeze.
+    expect(item.isPublishedSlot).toBe(false);
+  });
+
+  it("degrades an unrecognised frozen reason to no label instead of throwing", function () {
+    var response = movedResponse();
+    response.frozenItems[0].frozenReason = "SomethingNew";
+
+    var item = mapAutoSchedulePreview(response, SLOTS).frozen[0];
+
+    expect(item.frozenReason).toBe("SomethingNew");
+    expect(item.frozenReasonLabel).toBeNull();
+  });
+
+  it("surfaces search exhaustion ADDITIVELY, never replacing the reason", function () {
+    var response = movedResponse();
+    response.unscheduledItems[0].movementAttempted = true;
+    response.unscheduledItems[0].movementSearchExhausted = true;
+
+    var item = mapAutoSchedulePreview(response, SLOTS).unscheduled[0];
+
+    expect(item.movementAttempted).toBe(true);
+    expect(item.movementSearchExhausted).toBe(true);
+    expect(item.movementSearchExhaustedLabel).toBe(
+      MOVEMENT_SEARCH_EXHAUSTED_LABEL,
+    );
+    // The original requested-slot reason is untouched.
+    expect(item.reasonText).toBe("הסלוט המבוקש פורסם - שיבוץ ידני נדרש");
+    expect(item.reasonCode).toBe("RequestedSlotPublished");
+  });
+
+  it("shows no exhaustion line when a movement search simply found nothing", function () {
+    var response = movedResponse();
+    response.unscheduledItems[0].movementAttempted = true;
+    response.unscheduledItems[0].movementSearchExhausted = false;
+
+    var item = mapAutoSchedulePreview(response, SLOTS).unscheduled[0];
+
+    expect(item.movementAttempted).toBe(true);
+    expect(item.movementSearchExhaustedLabel).toBeNull();
+  });
+
+  // The backward-compatibility guarantee: a server that predates V2-2 sends
+  // neither movedItems nor unchangedItems and none of the new item fields.
+  it("handles an older server response with no V2-2 fields at all", function () {
+    var response = baseResponse();
+    expect(response.movedItems).toBeUndefined();
+    expect(response.unchangedItems).toBeUndefined();
+
+    var result = mapAutoSchedulePreview(response, SLOTS);
+
+    expect(result.moved).toEqual([]);
+    expect(result.unchanged).toEqual([]);
+    expect(result.counts.moved).toBe(0);
+    expect(result.counts.unchanged).toBe(0);
+    expect(result.frozen[0].frozenReasonLabel).toBeNull();
+    expect(result.frozen[0].isPublishedSlot).toBe(false);
+    expect(result.unscheduled[0].movementSearchExhausted).toBe(false);
+    expect(result.unscheduled[0].movementSearchExhaustedLabel).toBeNull();
+    // Still not "empty" - the pre-V2-2 buckets are populated.
+    expect(result.isEmpty).toBe(false);
+  });
+
+  it("treats a response with only moved rows as non-empty", function () {
+    var response = {
+      fingerprint: "FP-X",
+      movedItems: movedResponse().movedItems,
+    };
+
+    var result = mapAutoSchedulePreview(response, SLOTS);
+
+    expect(result.isEmpty).toBe(false);
+    expect(result.moved).toHaveLength(1);
+  });
+
+  it("formatOldToNew renders the approved shape", function () {
+    expect(formatOldToNew("א", "ב")).toBe("מ־א אל ב");
+    expect(formatOldToNew(3, 1)).toBe("מ־3 אל 1");
   });
 });

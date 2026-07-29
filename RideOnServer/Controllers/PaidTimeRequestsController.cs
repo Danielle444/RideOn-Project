@@ -297,8 +297,10 @@ namespace RideOnServer.Controllers
                     return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לפעולה זו עבור תחרות זו");
                 }
 
+                // personId (טענת "PersonId") נמסר כמבצע-ההחלה עבור שורות-הביקורת
+                // של שיבוצים שהוזזו. אינו קלט לאלגוריתם ואינו חלק מה-Fingerprint.
                 AutoSchedulerSummary summary =
-                    PaidTimeRequest.ApplyAutoSchedule(competitionId, request.Fingerprint);
+                    PaidTimeRequest.ApplyAutoSchedule(competitionId, request.Fingerprint, personId);
 
                 return Ok(summary);
             }
