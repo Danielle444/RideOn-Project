@@ -61,6 +61,35 @@ is to apply the DB proc live, verify E2E, and ship — not to rewrite anything.
   returned by the hook, `StallCompoundsTable` invokes the props, the modal prefills via
   `initialItem={page.editingCompound}`). No browser check happened.
 
+### ⚠️ Before testing CAP-1 Delete: it is DESTRUCTIVE on every current compound
+
+`usp_deletecompound` (read live 2026-07-30) guards on **`stallbooking`, NOT on stalls**. When
+no booking exists it runs `DELETE FROM stall WHERE ranchid AND compoundid` and only then
+deletes the compound. So a compound with stalls but no bookings is deleted **along with all
+its stall rows, silently, with no guard and no undo.**
+
+All four ranch-11 compounds currently have **zero bookings**:
+
+| compound | stalls | outcome if Delete is clicked |
+|---|---|---|
+| `מתחם תאי תחרות` (1) | 98 | deletes compound **+ 98 stall rows** |
+| `מתחם חנית קרונות` (2) | 30 | deletes compound **+ 30 stall rows** |
+| `מתחם B2W` (3) | 21 | deletes compound **+ 21 stall rows** |
+| `מתחם DK` (4) | 40 | deletes compound **+ 40 stall rows** |
+
+This corrects an earlier claim in this session that Delete "will likely hit the booking
+guard" — it will not; the guard is bookings, and there are none.
+
+**Do NOT test CAP-1 Delete on a real compound.** Create a throwaway compound with no stalls,
+delete that, and confirm it disappears. That satisfies the CAP-1 success criterion
+("Delete confirms then removes") without risking 189 stall rows.
+
+Note this is NOT the scoped-out controller follow-up. It is a property of the delete proc
+itself and a hazard in the acceptance test. Related: the proc's `RAISE` carries no `ERRCODE`,
+so it surfaces as `P0001` and the controller still swallows it into a generic Hebrew string —
+that swallowing IS the accepted non-goal, so even when the booking guard does fire, the
+specific message will not reach the secretary.
+
 **Local dev caveat learned the hard way:** `rideon-local.ps1` and the backend env vars
 (`ConnectionStrings__DefaultConnection`, `Jwt__Key`, …) exist on **Oren's** machine only.
 On Danielle's box (`C:\Users\betka`) the script does not exist at any path, no env var is
