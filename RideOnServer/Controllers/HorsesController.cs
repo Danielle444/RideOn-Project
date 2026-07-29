@@ -56,6 +56,44 @@ namespace RideOnServer.Controllers
             }
         }
 
+        // Bounded, real-horse-only lookup for on-demand pickers. Same
+        // authorization and response shape as GetHorses, but backed by
+        // usp_getrealhorsesbyranch (federation-numbered horses only, max 200
+        // rows). Deliberately a separate route so GetHorses / the full ranch
+        // horse list stay untouched.
+        [HttpGet("real")]
+        public IActionResult GetRealHorses([FromQuery] int ranchId, [FromQuery] string? search)
+        {
+            try
+            {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                var filters = new GetHorsesFiltersRequest
+                {
+                    RanchId = ranchId,
+                    SearchText = search
+                };
+
+                var horses = Horse.GetRealHorsesByRanch(filters);
+                return Ok(horses);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetRealHorses: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת סוסים");
+            }
+        }
+
         [HttpGet("competition")]
         public IActionResult GetCompetitionHorses(
             [FromQuery] int ranchId,

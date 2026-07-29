@@ -1,7 +1,16 @@
-import React, { useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import styles from "../../styles/adminCompetitionRegistrationsStyles";
+
+var SEARCH_DEBOUNCE_MS = 300;
 
 function getSafeText(value) {
   if (value === null || value === undefined) {
@@ -57,9 +66,51 @@ export default function CompetitionRegistrationDropdown(props) {
   var disabled = !!props.disabled;
   var isLocked = !!props.isLocked;
 
+  // Opt-in server-side search mode. Pickers that preload a small list leave
+  // onSearch undefined and keep the original local-filter behaviour; the horse
+  // picker passes it so the list is fetched on open and on every debounced
+  // keystroke instead of preloading the whole ranch horse table.
+  var onSearch = props.onSearch;
+  var isAsyncSearch = typeof onSearch === "function";
+  var isLoading = !!props.isLoading;
+
+  useEffect(
+    function () {
+      if (!isAsyncSearch || !isOpen) {
+        return;
+      }
+
+      var trimmedSearch = getSafeText(searchText);
+
+      if (!trimmedSearch) {
+        // Opening the picker (or clearing the box) fetches the bounded default
+        // list straight away — the list must never look empty on open.
+        onSearch("");
+        return;
+      }
+
+      var timeoutId = setTimeout(function () {
+        onSearch(trimmedSearch);
+      }, SEARCH_DEBOUNCE_MS);
+
+      return function () {
+        clearTimeout(timeoutId);
+      };
+    },
+    // onSearch is deliberately out of the dependency list: call sites may pass
+    // an inline lambda, and re-firing on every parent render would defeat the
+    // debounce.
+    [isAsyncSearch, isOpen, searchText],
+  );
+
   var filteredItems = useMemo(
     function () {
-      var normalizedSearch = getSafeText(searchText).toLowerCase();
+      // In server-search mode the results are already filtered by the search
+      // argument, so filtering again locally would drop legitimate matches
+      // (e.g. a hit on federation number, which is not part of the label).
+      var normalizedSearch = isAsyncSearch
+        ? ""
+        : getSafeText(searchText).toLowerCase();
 
       return items
         .map(function (item, index) {
@@ -85,7 +136,15 @@ export default function CompetitionRegistrationDropdown(props) {
           return entry.label.toLowerCase().includes(normalizedSearch);
         });
     },
-    [items, props, searchText],
+    [
+      items,
+      searchText,
+      isAsyncSearch,
+      props.getItemLabel,
+      props.getItemId,
+      props.getItemKey,
+      props.label,
+    ],
   );
 
   function handleToggleOpen() {
@@ -193,7 +252,11 @@ export default function CompetitionRegistrationDropdown(props) {
             nestedScrollEnabled={true}
             keyboardShouldPersistTaps="handled"
           >
-            {filteredItems.length === 0 ? (
+            {isLoading && filteredItems.length === 0 ? (
+              <View style={styles.dropdownEmptyWrap}>
+                <ActivityIndicator size="small" color="#7B5A4D" />
+              </View>
+            ) : filteredItems.length === 0 ? (
               <View style={styles.dropdownEmptyWrap}>
                 <Text style={styles.dropdownEmptyText}>לא נמצאו תוצאות</Text>
               </View>

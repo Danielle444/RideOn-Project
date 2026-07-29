@@ -54,6 +54,8 @@ export default function CompetitionRegistrationFormCard(props) {
         }}
         getItemLabel={props.formatHorseLabel}
         onSelect={props.setSelectedHorse}
+        onSearch={props.onSearchHorses}
+        isLoading={props.horsesLoading}
         isLocked={props.locks.horse}
         onToggleLock={function () {
           props.onToggleLock("horse");

@@ -199,6 +199,8 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             screenError={registration.screenError}
             classes={registration.classes}
             horses={registration.horses}
+            horsesLoading={registration.horsesLoading}
+            onSearchHorses={registration.loadHorsesForPicker}
             riders={registration.riders}
             trainers={registration.trainers}
             payers={registration.payers}
