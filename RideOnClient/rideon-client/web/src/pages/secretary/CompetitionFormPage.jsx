@@ -186,13 +186,9 @@ export default function CompetitionFormPage(props) {
               onSaveDraft={function () {
                 page.handleSaveDetails("draft");
               }}
-              onPublish={
-                page.shouldShowPaidTimeStep
-                  ? null
-                  : function () {
-                      page.handleSaveDetails("publish");
-                    }
-              }
+              onPublish={function () {
+                page.handleSaveDetails("publish");
+              }}
               canPublishCompetition={page.canPublishCompetition}
             />
 

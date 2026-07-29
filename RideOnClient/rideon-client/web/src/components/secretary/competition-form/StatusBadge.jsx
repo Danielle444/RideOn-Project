@@ -1,3 +1,5 @@
+import { getCompetitionStatusLabel } from "../../../../../shared/auth/utils/competitions/competitionStatus";
+
 export default function StatusBadge(props) {
   var status = props.status || "-";
   var className = "bg-[#F3ECE8] text-[#6D4C41]";
@@ -22,7 +24,7 @@ export default function StatusBadge(props) {
         "inline-flex rounded-full px-4 py-2 text-sm font-semibold " + className
       }
     >
-      {status}
+      {getCompetitionStatusLabel(status)}
     </span>
   );
 }

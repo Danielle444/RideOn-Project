@@ -15,6 +15,7 @@ import {
   markDelivered,
 } from "../../../../services/shavingsOrderService";
 import { getMobileWorkerCompetitionsBoard } from "../../../../services/competitionService";
+import { getCompetitionStatusLabel } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
 import { supabase } from "../../../../lib/supabaseClient";
 
 const DELIVERY_BUCKET = "delivery-photos";
@@ -274,7 +275,7 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
                     textAlign: "right",
                   }}
                 >
-                  {comp.competitionStatus}
+                  {getCompetitionStatusLabel(comp.competitionStatus)}
                 </Text>
               </Pressable>
             );

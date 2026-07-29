@@ -239,7 +239,23 @@ export default function useCompetitionDetailsStep(options) {
     try {
       setSavingDetails(true);
 
-      var statusToSend = intent === "publish" ? null : "טיוטה";
+      // "publish" clears the manual marker (null) so the server's effective-status
+      // calculation takes over. "draft" writes the draft marker explicitly.
+      // "continue" (save & continue to classes) must PRESERVE the current status:
+      // it echoes the status the form already holds, which the server's
+      // NormalizeManualStatus collapses back to the stored value — טיוטה stays
+      // draft, בוטלה stays cancelled, and any computed published value
+      // (עתידית/פעילה/כעת/הסתיימה) collapses to null, i.e. stays published.
+      var statusToSend;
+
+      if (intent === "publish") {
+        statusToSend = null;
+      } else if (intent === "draft") {
+        statusToSend = "טיוטה";
+      } else {
+        statusToSend = currentStatus;
+      }
+
       var payload = buildCompetitionPayload(statusToSend);
 
       if (competitionId) {
@@ -250,9 +266,13 @@ export default function useCompetitionDetailsStep(options) {
         if (intent === "publish") {
           setCurrentStatus("עתידית");
           updateToastMessage = "התחרות פורסמה בהצלחה";
-        } else {
+        } else if (intent === "draft") {
           setCurrentStatus("טיוטה");
           updateToastMessage = "התחרות נשמרה כטיוטה";
+        } else {
+          // "continue" preserves the status — leave currentStatus alone and let
+          // the reload below refresh it from the server's effective status.
+          updateToastMessage = "פרטי התחרות נשמרו בהצלחה";
         }
 
         onShowToast("success", updateToastMessage);
