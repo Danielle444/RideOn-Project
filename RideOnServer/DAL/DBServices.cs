@@ -89,6 +89,8 @@ namespace RideOnServer.DAL
                 key == "paidtimeregistrationdate" ||
                 key == "paidtimepublicationdate" ||
                 key == "slotdate" ||
+                key == "datefrom" ||
+                key == "dateto" ||
                 key == "startDate" ||
                 key == "endDate" ||
                 key == "startdate" ||
