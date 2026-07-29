@@ -18,6 +18,24 @@ export default function CompetitionDetailsSection(props) {
   var [openDropdownKey, setOpenDropdownKey] = useState("");
   var [localJudges, setLocalJudges] = useState(judges);
 
+  // Registration-closing date must sit inside [registrationOpen, competitionStart].
+  // Each bound only applies when its reference date is filled in — both may be blank.
+  // The picker enforces this via min/max; validateDetailsForm keeps the save-time backstop.
+  var registrationOpenDate = props.detailsForm.registrationOpenDate;
+  var registrationEndDate = props.detailsForm.registrationEndDate;
+  var competitionStartDate = props.detailsForm.competitionStartDate;
+
+  var registrationEndError = "";
+
+  if (registrationEndDate) {
+    if (registrationOpenDate && registrationEndDate < registrationOpenDate) {
+      registrationEndError =
+        "תאריך סגירת הרשמה לא יכול להיות לפני תאריך פתיחת הרשמה";
+    } else if (competitionStartDate && registrationEndDate > competitionStartDate) {
+      registrationEndError = "תאריך סגירת ההרשמה חייב להיות עד תחילת התחרות";
+    }
+  }
+
   useEffect(
     function () {
       setLocalJudges(judges);
@@ -67,6 +85,7 @@ export default function CompetitionDetailsSection(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 שם תחרות
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
               <input
                 type="text"
@@ -81,6 +100,7 @@ export default function CompetitionDetailsSection(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 ענף
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
 
               <CustomDropdown
@@ -106,6 +126,7 @@ export default function CompetitionDetailsSection(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 תאריך התחלה
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
               <input
                 type="date"
@@ -120,6 +141,7 @@ export default function CompetitionDetailsSection(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 תאריך סיום
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
               <input
                 type="date"
@@ -152,11 +174,19 @@ export default function CompetitionDetailsSection(props) {
               <input
                 type="date"
                 value={props.detailsForm.registrationEndDate}
+                min={registrationOpenDate || undefined}
+                max={competitionStartDate || undefined}
                 onChange={function (e) {
                   props.onChange("registrationEndDate", e.target.value);
                 }}
                 className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right"
               />
+
+              {registrationEndError ? (
+                <div className="mt-1.5 text-right text-xs text-red-600">
+                  {registrationEndError}
+                </div>
+              ) : null}
             </div>
 
             <div>
@@ -286,6 +316,7 @@ export default function CompetitionDetailsSection(props) {
         initialJudge={null}
         fields={judgeCreation.judgeFields}
         error={judgeCreation.judgeModalError}
+        onShowToast={props.onShowToast}
       />
     </SectionCard>
   );

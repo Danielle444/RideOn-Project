@@ -221,6 +221,7 @@ export default function ChangePasswordPage() {
             <div>
               <label className="block text-sm font-semibold text-[#4E342E] mb-1.5">
                 סיסמה נוכחית
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
 
               <div className="relative">
@@ -255,6 +256,7 @@ export default function ChangePasswordPage() {
 
             <Field
               label="סיסמה חדשה"
+              required
               info={<Info size={14} />}
               showInfoPopup={showPasswordInfo}
               onInfoClick={function () {
@@ -314,6 +316,7 @@ export default function ChangePasswordPage() {
             <div>
               <label className="block text-sm font-semibold text-[#4E342E] mb-1.5">
                 אימות סיסמה חדשה
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
 
               <div className="relative">

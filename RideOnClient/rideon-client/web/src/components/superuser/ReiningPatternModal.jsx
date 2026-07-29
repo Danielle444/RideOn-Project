@@ -239,6 +239,7 @@ export default function ReiningPatternModal(props) {
               <div>
                 <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
                   מספר מסלול
+                  <span className="text-red-500 mr-0.5">*</span>
                 </label>
                 <input
                   type="number"

@@ -151,6 +151,7 @@ export default function CompetitionFormPage(props) {
               onToggleCompetitionJudge={page.toggleCompetitionJudge}
               onJudgesReloaded={page.setJudgesManually}
               onChange={page.handleDetailsChange}
+              onShowToast={page.showToast}
               savingDetails={page.savingDetails}
               onSaveDraft={function () {
                 page.handleSaveDetails("draft");

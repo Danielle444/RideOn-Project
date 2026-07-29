@@ -35,6 +35,11 @@ export default function FieldModal(props) {
         </div>
 
         <form onSubmit={handleSubmit}>
+          <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
+            שם ענף
+            <span className="text-red-500 mr-0.5">*</span>
+          </label>
+
           <input
             type="text"
             value={name}

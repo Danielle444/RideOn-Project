@@ -50,6 +50,7 @@ export default function PrizeTypeModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
                 שם פרס
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
               <input
                 type="text"

@@ -45,6 +45,7 @@ export default function CreateSuperUserModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
                 אימייל
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
               <input
                 type="email"
@@ -61,6 +62,7 @@ export default function CreateSuperUserModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
                 סיסמה זמנית
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
               <input
                 type="password"
