@@ -13,15 +13,17 @@ import {
   buildChangedFields,
 } from "../../../utils/changeTracking.utils";
 
-// #52: these endpoints serialize camelCase (MVC default naming policy), so
-// this reads the one live key. The PascalCase fallback it replaced was dead.
-function getValue(item, camelKey, fallback) {
+function getValue(item, camelKey, pascalKey, fallback) {
   if (!item) {
     return fallback;
   }
 
   if (item[camelKey] !== null && item[camelKey] !== undefined) {
     return item[camelKey];
+  }
+
+  if (item[pascalKey] !== null && item[pascalKey] !== undefined) {
+    return item[pascalKey];
   }
 
   return fallback;
@@ -45,24 +47,25 @@ function formatMoney(value) {
 
 function getRequestKey(item) {
   return (
-    getValue(item, "requestSource", "") +
+    getValue(item, "requestSource", "RequestSource", "") +
     "-" +
-    getValue(item, "requestId", "")
+    getValue(item, "requestId", "RequestId", "")
   );
 }
 
 function ChangeSummary(props) {
   var item = props.item;
 
-  var requestType = getValue(item, "requestType", "");
-  var isCancelled = getValue(item, "isCancelled", false);
-  var beforeText = getValue(item, "beforeText", "");
-  var afterText = getValue(item, "afterText", "");
-  var amountBefore = getValue(item, "amountBefore", null);
-  var amountAfter = getValue(item, "amountAfter", null);
+  var requestType = getValue(item, "requestType", "RequestType", "");
+  var isCancelled = getValue(item, "isCancelled", "IsCancelled", false);
+  var beforeText = getValue(item, "beforeText", "BeforeText", "");
+  var afterText = getValue(item, "afterText", "AfterText", "");
+  var amountBefore = getValue(item, "amountBefore", "AmountBefore", null);
+  var amountAfter = getValue(item, "amountAfter", "AmountAfter", null);
   var fineAmount = getValue(
     item,
     "fineAmountSnapshot",
+    "FineAmountSnapshot",
     null,
   );
 
@@ -193,10 +196,11 @@ export default function ChangeRequestsTable(props) {
           {!props.loading
             ? items.map(function (item) {
                 var requestKey = getRequestKey(item);
-                var status = getValue(item, "status", "");
+                var status = getValue(item, "status", "Status", "");
                 var source = getValue(
                   item,
                   "requestSource",
+                  "RequestSource",
                   "",
                 );
 
@@ -213,7 +217,7 @@ export default function ChangeRequestsTable(props) {
                   >
                     <td className="px-4 py-3">
                       {formatDate(
-                        getValue(item, "requestDate", null),
+                        getValue(item, "requestDate", "RequestDate", null),
                       )}
                     </td>
 
@@ -221,6 +225,7 @@ export default function ChangeRequestsTable(props) {
                       {getValue(
                         item,
                         "requestedByName",
+                        "RequestedByName",
                         "-",
                       )}
                     </td>
@@ -230,11 +235,11 @@ export default function ChangeRequestsTable(props) {
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
                         <span className="font-bold">
-                          {getValue(item, "entityName", "-")}
+                          {getValue(item, "entityName", "EntityName", "-")}
                         </span>
 
                         <span className="text-xs text-[#8D6E63]">
-                          {getValue(item, "entityType", "-")}
+                          {getValue(item, "entityType", "EntityType", "-")}
                         </span>
                       </div>
                     </td>

@@ -30,9 +30,7 @@ function normalizeText(value) {
   return String(value).toLowerCase();
 }
 
-// #52: these endpoints serialize camelCase (MVC default naming policy), so
-// this reads the one live key. The PascalCase fallback it replaced was dead.
-function getValue(item, camelKey, fallback) {
+function getValue(item, camelKey, pascalKey, fallback) {
   if (!item) {
     return fallback;
   }
@@ -41,15 +39,19 @@ function getValue(item, camelKey, fallback) {
     return item[camelKey];
   }
 
+  if (item[pascalKey] !== null && item[pascalKey] !== undefined) {
+    return item[pascalKey];
+  }
+
   return fallback;
 }
 
 function getRequestId(item) {
-  return getValue(item, "requestId", 0);
+  return getValue(item, "requestId", "RequestId", 0);
 }
 
 function getRequestSource(item) {
-  return getValue(item, "requestSource", "");
+  return getValue(item, "requestSource", "RequestSource", "");
 }
 
 function getRequestKey(item) {
@@ -59,12 +61,19 @@ function getRequestKey(item) {
 function getRequestSearchText(item) {
   return [
     item.requestType,
+    item.RequestType,
     item.requestSource,
+    item.RequestSource,
     item.requestedByName,
+    item.RequestedByName,
     item.entityType,
+    item.EntityType,
     item.entityName,
+    item.EntityName,
     item.beforeText,
+    item.BeforeText,
     item.afterText,
+    item.AfterText,
   ]
     .filter(Boolean)
     .join(" ")
@@ -164,9 +173,8 @@ export default function useCompetitionChangeTrackingPage(options) {
       setLoadingCount(true);
 
       var response = await getPendingChangeRequestsCount(ranchId);
-      // The controller returns Ok(new { PendingCount }); MVC's default camelCase
-      // naming policy puts it on the wire as pendingCount.
-      var count = response.data?.pendingCount || 0;
+      var count =
+        response.data?.pendingCount || response.data?.PendingCount || 0;
 
       setPendingCount(Number(count));
     } catch (error) {
@@ -192,7 +200,7 @@ export default function useCompetitionChangeTrackingPage(options) {
       // (which is entry-only and silently hid every product request).
       if (typeFilter !== "all") {
         result = result.filter(function (item) {
-          var isCancelled = getValue(item, "isCancelled", false);
+          var isCancelled = getValue(item, "isCancelled", "IsCancelled", false);
           return typeFilter === "cancel" ? Boolean(isCancelled) : !isCancelled;
         });
       }
@@ -220,7 +228,7 @@ export default function useCompetitionChangeTrackingPage(options) {
 
       items.forEach(function (item) {
         var source = getRequestSource(item);
-        var isCancelled = getValue(item, "isCancelled", false);
+        var isCancelled = getValue(item, "isCancelled", "IsCancelled", false);
 
         if (source === "Entry") {
           entryCount += 1;
