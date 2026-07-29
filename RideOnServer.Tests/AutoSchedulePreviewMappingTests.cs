@@ -412,5 +412,134 @@ namespace RideOnServer.Tests
                 }
             };
         }
+
+        // --- V2-1: PlacementKind / AdjacentSlotsTried reach the Preview DTO -------------------
+        //
+        // Note the Slot() helper above deliberately gives every slot its own ArenaId, which
+        // makes adjacent fallback impossible under the same-arena rule. These two cases build
+        // their own same-arena, same-day slots so the fallback path is actually exercised.
+
+        private static SchedulerSlot SameArenaSlot(
+            int id, string start, string end, int capacityMinutes = 240)
+        {
+            return new SchedulerSlot
+            {
+                PaidTimeSlotInCompId = id,
+                SlotDate = new DateTime(2026, 8, 1),
+                StartTimeRaw = start,
+                EndTimeRaw = end,
+                TotalCapacityMinutes = capacityMinutes,
+                ArenaRanchId = 11,
+                ArenaId = 2,
+                ArenaName = "Arena 2",
+                IsPublished = false
+            };
+        }
+
+        [Fact]
+        public void MapPreviewResponse_CarriesPlacementKind_ForAFallbackAssignment()
+        {
+            SchedulerData data = new SchedulerData
+            {
+                CompetitionId = 41,
+                Now = new DateTime(2026, 7, 29, 9, 0, 0),
+                Slots = new List<SchedulerSlot>
+                {
+                    SameArenaSlot(1, "08:00:00", "10:00:00"),
+                    SameArenaSlot(2, "10:00:00", "12:00:00", capacityMinutes: 0)
+                },
+                Requests = new List<SchedulerRequest>
+                {
+                    Pending(100, requestedSlotId: 2, horseId: 501, riderId: 901, coachId: 8)
+                }
+            };
+
+            List<int> candidateIds = Candidates(data);
+            AutoScheduleResult result = AutoScheduler.Schedule(data, candidateIds);
+            AutoSchedulePreviewResponse preview = PaidTimeRequest.MapPreviewResponse(
+                result, data, PaidTimeRequest.ComputeAutoScheduleFingerprint(data, candidateIds));
+
+            PreviewScheduledItem item = preview.ScheduledItems.Single();
+            item.PlacementKind.Should().Be(PlacementKinds.PreviousSameDay);
+            // The user's original preference is reported unchanged alongside the fallback.
+            item.RequestedCompSlotId.Should().Be(2);
+            item.AssignedCompSlotId.Should().Be(1);
+            item.AssignedArenaName.Should().Be("Arena 2");
+        }
+
+        [Fact]
+        public void MapPreviewResponse_DefaultsPlacementKindToRequested_ForANormalAssignment()
+        {
+            SchedulerData data = BaselineData(new DateTime(2026, 7, 29, 9, 0, 0));
+            List<int> candidateIds = Candidates(data);
+
+            AutoScheduleResult result = AutoScheduler.Schedule(data, candidateIds);
+            AutoSchedulePreviewResponse preview = PaidTimeRequest.MapPreviewResponse(
+                result, data, PaidTimeRequest.ComputeAutoScheduleFingerprint(data, candidateIds));
+
+            preview.ScheduledItems.Single().PlacementKind.Should().Be(PlacementKinds.Requested);
+        }
+
+        [Fact]
+        public void MapPreviewResponse_CarriesAdjacentSlotsTried_AndKeepsTheV20ReasonCode()
+        {
+            // Requested slot full, neighbour full -> the neighbour WAS tried, and the reason
+            // stays the approved V2-0 capacity/coach string and code.
+            SchedulerData data = new SchedulerData
+            {
+                CompetitionId = 41,
+                Now = new DateTime(2026, 7, 29, 9, 0, 0),
+                Slots = new List<SchedulerSlot>
+                {
+                    SameArenaSlot(1, "08:00:00", "10:00:00", capacityMinutes: 0),
+                    SameArenaSlot(2, "10:00:00", "12:00:00", capacityMinutes: 0)
+                },
+                Requests = new List<SchedulerRequest>
+                {
+                    Pending(100, requestedSlotId: 2, horseId: 501, riderId: 901, coachId: 8)
+                }
+            };
+
+            List<int> candidateIds = Candidates(data);
+            AutoScheduleResult result = AutoScheduler.Schedule(data, candidateIds);
+            AutoSchedulePreviewResponse preview = PaidTimeRequest.MapPreviewResponse(
+                result, data, PaidTimeRequest.ComputeAutoScheduleFingerprint(data, candidateIds));
+
+            PreviewUnscheduledItem item = preview.UnscheduledItems.Single();
+            item.AdjacentSlotsTried.Should().BeTrue();
+            item.ReasonCode.Should().Be("NoFreeCapacityOrCoachBusy");
+            item.Reason.Should().Be("אין מקום פנוי בסלוט המבוקש (קיבולת/מאמן עסוק)");
+            item.RequestedCompSlotId.Should().Be(2);
+        }
+
+        [Fact]
+        public void MapPreviewResponse_AdjacentSlotsTriedIsFalse_WhenNoNeighbourWasEligible()
+        {
+            // The only same-day neighbour is published -> skipped without an attempt.
+            SchedulerSlot published = SameArenaSlot(1, "08:00:00", "10:00:00");
+            published.IsPublished = true;
+
+            SchedulerData data = new SchedulerData
+            {
+                CompetitionId = 41,
+                Now = new DateTime(2026, 7, 29, 9, 0, 0),
+                Slots = new List<SchedulerSlot>
+                {
+                    published,
+                    SameArenaSlot(2, "10:00:00", "12:00:00", capacityMinutes: 0)
+                },
+                Requests = new List<SchedulerRequest>
+                {
+                    Pending(100, requestedSlotId: 2, horseId: 501, riderId: 901, coachId: 8)
+                }
+            };
+
+            List<int> candidateIds = Candidates(data);
+            AutoScheduleResult result = AutoScheduler.Schedule(data, candidateIds);
+            AutoSchedulePreviewResponse preview = PaidTimeRequest.MapPreviewResponse(
+                result, data, PaidTimeRequest.ComputeAutoScheduleFingerprint(data, candidateIds));
+
+            preview.UnscheduledItems.Single().AdjacentSlotsTried.Should().BeFalse();
+        }
     }
 }

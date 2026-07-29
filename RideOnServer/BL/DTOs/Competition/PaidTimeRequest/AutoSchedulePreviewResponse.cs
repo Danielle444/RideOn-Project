@@ -1,3 +1,5 @@
+using RideOnServer.BL.AutoScheduler;
+
 namespace RideOnServer.BL.DTOs.Competition.PaidTimeRequests
 {
     // תצוגה מקדימה (read-only) של אלגוריתם השיבוץ האוטומטי - שלב A.
@@ -39,6 +41,10 @@ namespace RideOnServer.BL.DTOs.Competition.PaidTimeRequests
         public int RequestedCompSlotId { get; set; }
         public int? RiderFederationMemberId { get; set; }
 
+        // V2-1, תוספתי: היכן שובצה הבקשה ביחס לסלוט המבוקש -
+        // "Requested" / "PreviousSameDay" / "NextSameDay". נקבע במנוע בלבד.
+        public string PlacementKind { get; set; } = PlacementKinds.Requested;
+
         // העשרת-תצוגה (שלב B) - ריק/NULL עד אז.
         public string HorseName { get; set; } = string.Empty;
         public string? BarnName { get; set; }
@@ -59,6 +65,10 @@ namespace RideOnServer.BL.DTOs.Competition.PaidTimeRequests
 
         public string Reason { get; set; } = string.Empty;
         public string ReasonCode { get; set; } = "Unknown";
+
+        // V2-1, תוספתי: האם נבדקו בפועל סלוטים סמוכים באותו יום לפני הוויתור.
+        // אינו משנה את Reason/ReasonCode - אלה נותרים מעוגנים בסלוט המבוקש.
+        public bool AdjacentSlotsTried { get; set; }
 
         // העשרת-תצוגה (שלב B) - ריק/NULL עד אז.
         public string HorseName { get; set; } = string.Empty;

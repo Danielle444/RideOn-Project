@@ -2,7 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   mapAutoSchedulePreview,
   mapUnscheduledReason,
+  normalizePlacementKind,
+  placementKindLabel,
   REASON_CODE_LABELS,
+  PLACEMENT_KIND_LABELS,
+  ADJACENT_SLOTS_TRIED_LABEL,
 } from "./autoSchedulePreview.utils.js";
 
 // Loaded slots as the paid-time page actually holds them (camelCase from the
@@ -396,5 +400,129 @@ describe("mapUnscheduledReason", function () {
     expect(mapUnscheduledReason(undefined, undefined)).toBe(
       REASON_CODE_LABELS.Unknown,
     );
+  });
+});
+
+/* =======================
+   V2-1: placement kind + adjacent-slots-tried
+======================= */
+
+describe("normalizePlacementKind / placementKindLabel", function () {
+  it("passes through the three known kinds", function () {
+    expect(normalizePlacementKind("Requested")).toBe("Requested");
+    expect(normalizePlacementKind("PreviousSameDay")).toBe("PreviousSameDay");
+    expect(normalizePlacementKind("NextSameDay")).toBe("NextSameDay");
+  });
+
+  it("falls back to Requested for missing, empty or unknown values", function () {
+    expect(normalizePlacementKind(undefined)).toBe("Requested");
+    expect(normalizePlacementKind(null)).toBe("Requested");
+    expect(normalizePlacementKind("")).toBe("Requested");
+    expect(normalizePlacementKind("   ")).toBe("Requested");
+    expect(normalizePlacementKind("SomethingNewFromAFutureServer")).toBe(
+      "Requested",
+    );
+    // Must not be fooled by inherited Object.prototype keys.
+    expect(normalizePlacementKind("constructor")).toBe("Requested");
+  });
+
+  it("maps each kind to its approved Hebrew label", function () {
+    expect(placementKindLabel("Requested")).toBe(
+      PLACEMENT_KIND_LABELS.Requested,
+    );
+    expect(placementKindLabel("PreviousSameDay")).toBe(
+      PLACEMENT_KIND_LABELS.PreviousSameDay,
+    );
+    expect(placementKindLabel("NextSameDay")).toBe(
+      PLACEMENT_KIND_LABELS.NextSameDay,
+    );
+    expect(placementKindLabel(undefined)).toBe(PLACEMENT_KIND_LABELS.Requested);
+  });
+});
+
+describe("mapAutoSchedulePreview - V2-1 fields", function () {
+  it("surfaces a previous-same-day fallback with its label and flag", function () {
+    var response = baseResponse();
+    response.scheduledItems[0].placementKind = "PreviousSameDay";
+
+    var s = mapAutoSchedulePreview(response, SLOTS).scheduled[0];
+
+    expect(s.placementKind).toBe("PreviousSameDay");
+    expect(s.placementKindLabel).toBe(PLACEMENT_KIND_LABELS.PreviousSameDay);
+    expect(s.isFallbackPlacement).toBe(true);
+    // Requested and assigned slots stay distinct and both remain readable.
+    expect(s.requestedSlotId).toBe(2);
+    expect(s.assignedSlotId).toBe(1);
+  });
+
+  it("surfaces a next-same-day fallback", function () {
+    var response = baseResponse();
+    response.scheduledItems[0].placementKind = "NextSameDay";
+
+    var s = mapAutoSchedulePreview(response, SLOTS).scheduled[0];
+
+    expect(s.placementKind).toBe("NextSameDay");
+    expect(s.placementKindLabel).toBe(PLACEMENT_KIND_LABELS.NextSameDay);
+    expect(s.isFallbackPlacement).toBe(true);
+  });
+
+  it("reads a PascalCase placementKind too", function () {
+    var response = baseResponse();
+    delete response.scheduledItems[0].placementKind;
+    response.scheduledItems[0].PlacementKind = "PreviousSameDay";
+
+    expect(mapAutoSchedulePreview(response, SLOTS).scheduled[0].placementKind).toBe(
+      "PreviousSameDay",
+    );
+  });
+
+  it("exposes the adjacent-slots-tried label only when the flag is true", function () {
+    var tried = baseResponse();
+    tried.unscheduledItems[0].adjacentSlotsTried = true;
+    var triedItem = mapAutoSchedulePreview(tried, SLOTS).unscheduled[0];
+    expect(triedItem.adjacentSlotsTried).toBe(true);
+    expect(triedItem.adjacentSlotsTriedLabel).toBe(ADJACENT_SLOTS_TRIED_LABEL);
+
+    var notTried = baseResponse();
+    notTried.unscheduledItems[0].adjacentSlotsTried = false;
+    var notTriedItem = mapAutoSchedulePreview(notTried, SLOTS).unscheduled[0];
+    expect(notTriedItem.adjacentSlotsTried).toBe(false);
+    expect(notTriedItem.adjacentSlotsTriedLabel).toBeNull();
+  });
+
+  it("does not change the reason when adjacent slots were tried", function () {
+    var response = baseResponse();
+    response.unscheduledItems[0].adjacentSlotsTried = true;
+
+    var item = mapAutoSchedulePreview(response, SLOTS).unscheduled[0];
+
+    expect(item.reasonText).toBe("הסלוט המבוקש פורסם - שיבוץ ידני נדרש");
+    expect(item.reasonCode).toBe("RequestedSlotPublished");
+  });
+
+  // 23: an older server that knows nothing about V2-1 must still render.
+  it("uses safe defaults for an older server response with neither field", function () {
+    var response = baseResponse();
+    expect(response.scheduledItems[0].placementKind).toBeUndefined();
+    expect(response.unscheduledItems[0].adjacentSlotsTried).toBeUndefined();
+
+    var result = mapAutoSchedulePreview(response, SLOTS);
+
+    expect(result.scheduled[0].placementKind).toBe("Requested");
+    expect(result.scheduled[0].placementKindLabel).toBe(
+      PLACEMENT_KIND_LABELS.Requested,
+    );
+    expect(result.scheduled[0].isFallbackPlacement).toBe(false);
+    expect(result.unscheduled[0].adjacentSlotsTried).toBe(false);
+    expect(result.unscheduled[0].adjacentSlotsTriedLabel).toBeNull();
+  });
+
+  it("treats a non-boolean adjacentSlotsTried as false", function () {
+    var response = baseResponse();
+    response.unscheduledItems[0].adjacentSlotsTried = "true";
+
+    expect(
+      mapAutoSchedulePreview(response, SLOTS).unscheduled[0].adjacentSlotsTried,
+    ).toBe(false);
   });
 });

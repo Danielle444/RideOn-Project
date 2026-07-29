@@ -14,8 +14,19 @@ namespace RideOnServer.BL.AutoScheduler
     //    - קיבולת הסלוט (סך דקות).
     // 4) סלוטים פורסמו (isPublished=true) - לא נוגעים בשיבוצים שלהם.
     //
+    // V2-1 - נפילה-לסלוט-סמוך באותו יום:
+    // 5) העיבוד מתבצע בשני שלבים. שלב 1 מנסה לכל המועמדים (FIFO) את הסלוט
+    //    המבוקש בלבד; שלב 2 מנסה למי שנותר, באותו סדר FIFO, את השכן הקודם
+    //    ואז את השכן הבא באותו יום. השלביות מבטיחה שבקשה שנופלת לסלוט סמוך
+    //    לא תתפוס קיבולת בסלוט לפני שבקשה שביקשה אותו *ישירות* קיבלה את
+    //    הזדמנות שלב-1 שלה.
+    // 6) "קודם"/"הבא" הם השכנים הפיזיים המיידיים ברשימת סלוטי אותו יום,
+    //    לפי סדר דטרמיניסטי מלא. שכן שאינו כשיר (פורסם / מגרש אחר) מדולג
+    //    ואינו מוחלף בסלוט המרוחק שתי עמדות או יותר.
+    // 7) לעולם אין חציית תאריך: המועמדים נבנים מסלוטי אותו SlotDate בלבד.
+    //
     // יורחב ב-v2 ל: re-shuffle pass, scoring להעדפות רכות,
-    // אילוצי מטא-דאטה (adjacency, min-spacing, training order, hard time).
+    // אילוצי מטא-דאטה (min-spacing, training order, hard time).
     public static class AutoScheduler
     {
         private const int TRANSITION_MINUTES = 7;
@@ -134,18 +145,34 @@ namespace RideOnServer.BL.AutoScheduler
                 .ThenBy(r => r.PaidTimeRequestId)
                 .ToList();
 
+            // סלוטי התחרות מקובצים לפי תאריך ומסודרים בסדר דטרמיניסטי מלא (V2-1).
+            // מכאן נגזרים השכנים הפיזיים המיידיים של הסלוט המבוקש.
+            Dictionary<DateTime, List<SchedulerSlot>> slotsByDate = BuildOrderedSlotsByDate(data.Slots);
+
+            // ===== שלב 1: כל המועמדים (FIFO), הסלוט המבוקש בלבד =====
+            // התוצאה של כל מועמד נרשמת ונפלטת רק בסוף, כדי לשמור על סדר-הפליטה
+            // ההיסטורי (FIFO) של ההחלטות והביקורת גם כשמתרחשת נפילה-לסלוט-סמוך.
+            List<CandidateOutcome> outcomes = new List<CandidateOutcome>();
+
             foreach (SchedulerRequest req in candidates)
             {
+                CandidateOutcome outcome = new CandidateOutcome { Request = req };
+                outcomes.Add(outcome);
+
                 if (!slotById.TryGetValue(req.RequestedCompSlotId, out SchedulerSlot? requestedSlot))
                 {
-                    AddPendingDecision(result, req, "הסלוט המבוקש לא נמצא");
+                    outcome.PendingReason = "הסלוט המבוקש לא נמצא";
                     continue;
                 }
 
+                outcome.RequestedSlot = requestedSlot;
+
                 // אם הסלוט המבוקש פורסם - לא משתבץ אוטומטית (שייך למזכירה).
+                // התנהגות V2-0 נשמרת: אין ניסיון נפילה לסלוט סמוך במקרה הזה.
                 if (requestedSlot.IsPublished)
                 {
-                    AddPendingDecision(result, req, "הסלוט המבוקש פורסם - שיבוץ ידני נדרש", requestedSlot.PaidTimeSlotInCompId);
+                    outcome.PendingReason = "הסלוט המבוקש פורסם - שיבוץ ידני נדרש";
+                    outcome.PendingSlotId = requestedSlot.PaidTimeSlotInCompId;
                     continue;
                 }
 
@@ -153,46 +180,92 @@ namespace RideOnServer.BL.AutoScheduler
                     req, requestedSlot, coachTimelines, slotTimelines,
                     riderTimelines, horseTimelines, out UnscheduledCause cause);
 
+                // הסיבה של שלב 1 היא הסיבה הסופית שתדווח אם גם כל הסמוכים ייכשלו.
+                outcome.RequestedSlotCause = cause;
+
                 if (placement.HasValue)
                 {
-                    coachTimelines.Add(req.CoachFederationMemberId, requestedSlot, placement.Value);
-                    slotTimelines.Add(requestedSlot.PaidTimeSlotInCompId, placement.Value);
-                    riderTimelines.Add(req.RiderFederationMemberId, placement.Value);
-                    horseTimelines.Add(req.HorseId, placement.Value);
+                    OccupyTimelines(
+                        req, requestedSlot, placement.Value,
+                        coachTimelines, slotTimelines, riderTimelines, horseTimelines,
+                        maxOrderBySlot, outcome, PlacementKinds.Requested, "FIFO greedy");
+                }
+                else
+                {
+                    // מועמד לשלב 2 בלבד אם הסלוט המבוקש נמצא ואינו מפורסם.
+                    outcome.EligibleForFallback = true;
+                }
+            }
 
-                    // assignedOrder: max הקיים בסלוט + 1 (דטרמיניסטי, לפי סדר העיבוד היציב).
-                    // אין הסתמכות על ספירת המשובצים (פערים עלולים לגרום להתנגשות).
-                    int slotId = requestedSlot.PaidTimeSlotInCompId;
-                    int baseMax = maxOrderBySlot.TryGetValue(slotId, out int m) ? m : 0;
-                    int order = baseMax + 1;
-                    maxOrderBySlot[slotId] = order;
+            // ===== שלב 2: מי שנותר, באותו סדר FIFO, שכן קודם ואז שכן הבא =====
+            foreach (CandidateOutcome outcome in outcomes)
+            {
+                if (outcome.Placed || !outcome.EligibleForFallback || outcome.RequestedSlot == null)
+                {
+                    continue;
+                }
 
+                List<(SchedulerSlot slot, string kind)> adjacent =
+                    ResolveAdjacentCandidates(slotsByDate, outcome.RequestedSlot);
+
+                foreach ((SchedulerSlot slot, string kind) candidate in adjacent)
+                {
+                    // סמוך "נבדק" רק כשבוצע עליו ניסיון-מיקום בפועל.
+                    outcome.AdjacentSlotsTried = true;
+
+                    Interval? adjacentPlacement = TryFindPlacement(
+                        outcome.Request, candidate.slot, coachTimelines, slotTimelines,
+                        riderTimelines, horseTimelines, out UnscheduledCause _);
+
+                    if (adjacentPlacement.HasValue)
+                    {
+                        OccupyTimelines(
+                            outcome.Request, candidate.slot, adjacentPlacement.Value,
+                            coachTimelines, slotTimelines, riderTimelines, horseTimelines,
+                            maxOrderBySlot, outcome, candidate.kind, "FIFO greedy - סלוט סמוך באותו יום");
+                        break;
+                    }
+                }
+            }
+
+            // ===== פליטת ההחלטות בסדר FIFO המקורי =====
+            foreach (CandidateOutcome outcome in outcomes)
+            {
+                if (outcome.Placed && outcome.Slot != null)
+                {
                     result.Assignments.Add(new AssignmentDecision
                     {
-                        PaidTimeRequestId = req.PaidTimeRequestId,
-                        HorseId = req.HorseId,
-                        CoachFederationMemberId = req.CoachFederationMemberId,
-                        AssignedCompSlotId = slotId,
-                        AssignedStartTime = placement.Value.Start,
-                        AssignedOrder = order,
-                        Status = "Assigned"
+                        PaidTimeRequestId = outcome.Request.PaidTimeRequestId,
+                        HorseId = outcome.Request.HorseId,
+                        CoachFederationMemberId = outcome.Request.CoachFederationMemberId,
+                        AssignedCompSlotId = outcome.Slot.PaidTimeSlotInCompId,
+                        AssignedStartTime = outcome.Placement.Start,
+                        AssignedOrder = outcome.AssignedOrder,
+                        Status = "Assigned",
+                        PlacementKind = outcome.PlacementKind
                     });
 
                     result.Audit.Add(new AuditLogEntry
                     {
-                        PaidTimeRequestId = req.PaidTimeRequestId,
+                        PaidTimeRequestId = outcome.Request.PaidTimeRequestId,
                         Action = "scheduled",
-                        Reason = "FIFO greedy",
-                        PreviousSlotId = req.AssignedCompSlotId,
-                        NewSlotId = slotId,
-                        NewStartTime = placement.Value.Start
+                        Reason = outcome.AuditReason,
+                        PreviousSlotId = outcome.Request.AssignedCompSlotId,
+                        NewSlotId = outcome.Slot.PaidTimeSlotInCompId,
+                        NewStartTime = outcome.Placement.Start
                     });
 
                     result.ScheduledCount++;
                 }
                 else
                 {
-                    AddPendingDecision(result, req, ReasonForCause(cause));
+                    // סיבה סופית: הסיבה של הסלוט המבוקש (שלב 1). כשלונות של
+                    // מועמדים סמוכים לעולם אינם מחליפים אותה.
+                    string reason = outcome.PendingReason ?? ReasonForCause(outcome.RequestedSlotCause);
+
+                    AddPendingDecision(
+                        result, outcome.Request, reason,
+                        outcome.PendingSlotId, outcome.AdjacentSlotsTried);
                 }
             }
 
@@ -213,19 +286,183 @@ namespace RideOnServer.BL.AutoScheduler
             return result;
         }
 
+        // תוצאת-ביניים של מועמד יחיד בין שלב 1 לשלב 2 ועד לפליטה. אינה נחשפת
+        // מחוץ למנוע; ההחלטות עצמן נפלטות בסוף, בסדר FIFO המקורי.
+        private sealed class CandidateOutcome
+        {
+            public SchedulerRequest Request = null!;
+
+            // הסלוט המבוקש כפי שנפתר מתמונת-המצב (null אם לא נמצא).
+            public SchedulerSlot? RequestedSlot;
+
+            // סיבת-הכשל של הסלוט המבוקש בשלב 1 - הסיבה הסופית שתדווח.
+            public UnscheduledCause RequestedSlotCause = UnscheduledCause.CapacityOrCoach;
+
+            // נכון רק כשהסלוט המבוקש נמצא, אינו מפורסם, ולא נמצא בו מקום.
+            public bool EligibleForFallback;
+
+            // נכון כשבוצע ניסיון-מיקום בפועל על סלוט סמוך כלשהו בשלב 2.
+            public bool AdjacentSlotsTried;
+
+            public bool Placed;
+            public SchedulerSlot? Slot;
+            public Interval Placement;
+            public int AssignedOrder;
+            public string PlacementKind = PlacementKinds.Requested;
+            public string AuditReason = string.Empty;
+
+            // סיבת-Pending סופית שנקבעה כבר בשלב 1 (סלוט חסר / מפורסם).
+            public string? PendingReason;
+            public int? PendingSlotId;
+        }
+
+        // תופס את המרווח בכל צירי-הזמן ומחשב את assignedOrder עבור סלוט-היעד.
+        // נקרא מיד עם מציאת מיקום (בשלב 1 ובשלב 2 כאחד), כדי שבקשה מאוחרת יותר
+        // באותו שלב תיבדק מול התפוסה שכבר נוצרה.
+        private static void OccupyTimelines(
+            SchedulerRequest req,
+            SchedulerSlot slot,
+            Interval placement,
+            CoachTimeline coachTimelines,
+            SlotTimeline slotTimelines,
+            EntityTimeline riderTimelines,
+            EntityTimeline horseTimelines,
+            Dictionary<int, int> maxOrderBySlot,
+            CandidateOutcome outcome,
+            string placementKind,
+            string auditReason)
+        {
+            coachTimelines.Add(req.CoachFederationMemberId, slot, placement);
+            slotTimelines.Add(slot.PaidTimeSlotInCompId, placement);
+            riderTimelines.Add(req.RiderFederationMemberId, placement);
+            horseTimelines.Add(req.HorseId, placement);
+
+            // assignedOrder: max הקיים בסלוט + 1 (דטרמיניסטי, לפי סדר העיבוד היציב).
+            // אין הסתמכות על ספירת המשובצים (פערים עלולים לגרום להתנגשות).
+            int slotId = slot.PaidTimeSlotInCompId;
+            int baseMax = maxOrderBySlot.TryGetValue(slotId, out int m) ? m : 0;
+            int order = baseMax + 1;
+            maxOrderBySlot[slotId] = order;
+
+            outcome.Placed = true;
+            outcome.Slot = slot;
+            outcome.Placement = placement;
+            outcome.AssignedOrder = order;
+            outcome.PlacementKind = placementKind;
+            outcome.AuditReason = auditReason;
+        }
+
+        // מקבץ את סלוטי התחרות לפי תאריך, וממיין כל יום בסדר דטרמיניסטי מלא:
+        // StartTime, EndTime, ArenaRanchId, ArenaId, PaidTimeSlotInCompId.
+        // המפתח האחרון הוא מפתח ראשי, ולכן הסדר הוא סדר-מלא ללא תיקו - אינו תלוי
+        // בסדר ה-JSON, בסדר שורות ה-DB או בסדר מעבר על מילון.
+        private static Dictionary<DateTime, List<SchedulerSlot>> BuildOrderedSlotsByDate(
+            List<SchedulerSlot> slots)
+        {
+            Dictionary<DateTime, List<SchedulerSlot>> byDate = new Dictionary<DateTime, List<SchedulerSlot>>();
+
+            foreach (SchedulerSlot s in slots)
+            {
+                DateTime key = s.SlotDate.Date;
+                if (!byDate.TryGetValue(key, out List<SchedulerSlot>? list))
+                {
+                    list = new List<SchedulerSlot>();
+                    byDate[key] = list;
+                }
+                list.Add(s);
+            }
+
+            foreach (KeyValuePair<DateTime, List<SchedulerSlot>> entry in byDate)
+            {
+                entry.Value.Sort(CompareSlotsForAdjacency);
+            }
+
+            return byDate;
+        }
+
+        private static int CompareSlotsForAdjacency(SchedulerSlot a, SchedulerSlot b)
+        {
+            int c = a.StartTime.CompareTo(b.StartTime);
+            if (c != 0) return c;
+
+            c = a.EndTime.CompareTo(b.EndTime);
+            if (c != 0) return c;
+
+            c = a.ArenaRanchId.CompareTo(b.ArenaRanchId);
+            if (c != 0) return c;
+
+            c = a.ArenaId.CompareTo(b.ArenaId);
+            if (c != 0) return c;
+
+            return a.PaidTimeSlotInCompId.CompareTo(b.PaidTimeSlotInCompId);
+        }
+
+        // השכנים הפיזיים המיידיים של הסלוט המבוקש באותו יום (עמדה i-1 ואז i+1).
+        // שכן שאינו כשיר מדולג ואינו מוחלף בסלוט המרוחק שתי עמדות או יותר.
+        // חציית תאריך בלתי-אפשרית מבנית: הרשימה היא של אותו SlotDate בלבד.
+        private static List<(SchedulerSlot slot, string kind)> ResolveAdjacentCandidates(
+            Dictionary<DateTime, List<SchedulerSlot>> slotsByDate,
+            SchedulerSlot requestedSlot)
+        {
+            List<(SchedulerSlot slot, string kind)> candidates = new List<(SchedulerSlot, string)>();
+
+            if (!slotsByDate.TryGetValue(requestedSlot.SlotDate.Date, out List<SchedulerSlot>? sameDay))
+            {
+                return candidates;
+            }
+
+            int index = sameDay.FindIndex(s => s.PaidTimeSlotInCompId == requestedSlot.PaidTimeSlotInCompId);
+            if (index < 0)
+            {
+                return candidates;
+            }
+
+            if (index - 1 >= 0 && IsEligibleAdjacent(sameDay[index - 1], requestedSlot))
+            {
+                candidates.Add((sameDay[index - 1], PlacementKinds.PreviousSameDay));
+            }
+
+            if (index + 1 < sameDay.Count && IsEligibleAdjacent(sameDay[index + 1], requestedSlot))
+            {
+                candidates.Add((sameDay[index + 1], PlacementKinds.NextSameDay));
+            }
+
+            return candidates;
+        }
+
+        // כשירות שכן: אינו מפורסם, ובאותו מגרש כמו הסלוט המבוקש (V2-1:
+        // נפילה חוצת-מגרשים נדחתה במפורש). שיוך-התחרות ושוויון-התאריך מובטחים
+        // מבנית - תמונת-המצב היא של תחרות אחת, והרשימה היא של יום אחד.
+        private static bool IsEligibleAdjacent(SchedulerSlot candidate, SchedulerSlot requestedSlot)
+        {
+            if (candidate.IsPublished)
+            {
+                return false;
+            }
+
+            if (candidate.ArenaKey != requestedSlot.ArenaKey)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
         // מוסיף החלטת Pending יחידה (ללא שדות-שיבוץ), רישום ביקורת ומונה.
         private static void AddPendingDecision(
             AutoScheduleResult result,
             SchedulerRequest req,
             string reason,
-            int? requestedSlotId = null)
+            int? requestedSlotId = null,
+            bool adjacentSlotsTried = false)
         {
             result.Assignments.Add(new AssignmentDecision
             {
                 PaidTimeRequestId = req.PaidTimeRequestId,
                 HorseId = req.HorseId,
                 CoachFederationMemberId = req.CoachFederationMemberId,
-                Status = "Pending"
+                Status = "Pending",
+                AdjacentSlotsTried = adjacentSlotsTried
             });
 
             result.Audit.Add(new AuditLogEntry
