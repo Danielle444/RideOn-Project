@@ -9,17 +9,15 @@ import {
   buildChangedFields,
 } from "../../../utils/changeTracking.utils";
 
-function getValue(item, camelKey, pascalKey, fallback) {
+// #52: these endpoints serialize camelCase (MVC default naming policy), so
+// this reads the one live key. The PascalCase fallback it replaced was dead.
+function getValue(item, camelKey, fallback) {
   if (!item) {
     return fallback;
   }
 
   if (item[camelKey] !== null && item[camelKey] !== undefined) {
     return item[camelKey];
-  }
-
-  if (item[pascalKey] !== null && item[pascalKey] !== undefined) {
-    return item[pascalKey];
   }
 
   return fallback;
@@ -43,9 +41,9 @@ function formatMoney(value) {
 
 function getRequestKey(item) {
   return (
-    getValue(item, "requestSource", "RequestSource", "") +
+    getValue(item, "requestSource", "") +
     "-" +
-    getValue(item, "requestId", "RequestId", "")
+    getValue(item, "requestId", "")
   );
 }
 
@@ -61,15 +59,14 @@ function DetailRow(props) {
 function ChangeSummaryBox(props) {
   var item = props.item;
 
-  var beforeText = getValue(item, "beforeText", "BeforeText", "");
-  var afterText = getValue(item, "afterText", "AfterText", "");
-  var isCancelled = getValue(item, "isCancelled", "IsCancelled", false);
-  var amountBefore = getValue(item, "amountBefore", "AmountBefore", null);
-  var amountAfter = getValue(item, "amountAfter", "AmountAfter", null);
+  var beforeText = getValue(item, "beforeText", "");
+  var afterText = getValue(item, "afterText", "");
+  var isCancelled = getValue(item, "isCancelled", false);
+  var amountBefore = getValue(item, "amountBefore", null);
+  var amountAfter = getValue(item, "amountAfter", null);
   var fineAmount = getValue(
     item,
     "fineAmountSnapshot",
-    "FineAmountSnapshot",
     null,
   );
 
@@ -171,8 +168,8 @@ export default function ChangeRequestDetailsModal(props) {
     return null;
   }
 
-  var source = getValue(item, "requestSource", "RequestSource", "");
-  var isPending = getValue(item, "status", "Status", "") === "Pending";
+  var source = getValue(item, "requestSource", "");
+  var isPending = getValue(item, "status", "") === "Pending";
   var requestKey = getRequestKey(item);
   var isAnswering = props.answeringRequestKey === requestKey;
   var isApproving = isAnswering && props.answeringAction === "Approved";
@@ -188,7 +185,7 @@ export default function ChangeRequestDetailsModal(props) {
             </h2>
 
             <p className="mt-1 text-sm text-[#8D6E63]">
-              {getValue(item, "requestType", "RequestType", "-")}
+              {getValue(item, "requestType", "-")}
             </p>
           </div>
 
@@ -208,29 +205,29 @@ export default function ChangeRequestDetailsModal(props) {
 
             <DetailRow
               label="סטטוס"
-              value={getStatusLabel(getValue(item, "status", "Status", ""))}
+              value={getStatusLabel(getValue(item, "status", ""))}
             />
 
             <DetailRow
               label="תאריך בקשה"
               value={formatDateTime(
-                getValue(item, "requestDate", "RequestDate", null),
+                getValue(item, "requestDate", null),
               )}
             />
 
             <DetailRow
               label="מבקש"
-              value={getValue(item, "requestedByName", "RequestedByName", "-")}
+              value={getValue(item, "requestedByName", "-")}
             />
 
             <DetailRow
               label="תחרות"
-              value={getValue(item, "competitionName", "CompetitionName", "-")}
+              value={getValue(item, "competitionName", "-")}
             />
 
             <DetailRow
               label="נושא הבקשה"
-              value={getValue(item, "entityName", "EntityName", "-")}
+              value={getValue(item, "entityName", "-")}
             />
           </section>
 
