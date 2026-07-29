@@ -1,5 +1,6 @@
 import { View, Text, Pressable } from "react-native";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
+import { getCompetitionStatusLabel } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
 
 export default function AdminHomeCard(props) {
   function getStatusStyle(status) {
@@ -13,7 +14,9 @@ export default function AdminHomeCard(props) {
     <View style={roleSharedStyles.card}>
       <View style={roleSharedStyles.cardTopRow}>
         <View style={[roleSharedStyles.statusBadge, getStatusStyle(props.status)]}>
-          <Text style={roleSharedStyles.statusText}>{props.status}</Text>
+          <Text style={roleSharedStyles.statusText}>
+            {getCompetitionStatusLabel(props.status)}
+          </Text>
         </View>
 
         <View style={roleSharedStyles.cardTextWrap}>

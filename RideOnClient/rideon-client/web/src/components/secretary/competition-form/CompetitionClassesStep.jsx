@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import SectionCard from "./SectionCard";
 import ClassesInCompetitionSection from "../ClassesInCompetitionSection";
 
@@ -189,16 +189,6 @@ export default function CompetitionClassesStep(props) {
                 >
                   <Plus size={18} />
                   הוספת מקצה
-                </button>
-
-                <button
-                  type="button"
-                  disabled={true}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[#D7CCC8] px-5 py-3 font-semibold text-[#7B655C] opacity-60"
-                  title="שכפול מקצים יתחבר בהמשך"
-                >
-                  <Copy size={18} />
-                  שכפל מקצים
                 </button>
               </div>
             </div>

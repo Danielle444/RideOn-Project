@@ -9,6 +9,7 @@ import {
 import DataTableShell from "../common/table/DataTableShell";
 import DataTableEmptyState from "../common/table/DataTableEmptyState";
 import DataTableLoadingState from "../common/table/DataTableLoadingState";
+import { getCompetitionStatusLabel } from "../../../../shared/auth/utils/competitions/competitionStatus";
 
 function formatDate(dateValue) {
   if (!dateValue) {
@@ -33,7 +34,7 @@ function getStatusLabel(status) {
     return "-";
   }
 
-  return status;
+  return getCompetitionStatusLabel(status);
 }
 
 function getStatusClass(status) {
@@ -243,7 +244,14 @@ export default function CompetitionsTable(props) {
                 filterTitle="סינון לפי סטטוס"
                 filterValue={props.statusFilter}
                 onFilterChange={props.onStatusFilterChange}
-                filterOptions={props.statusOptions}
+                filterOptions={(props.statusOptions || []).map(function (
+                  statusValue,
+                ) {
+                  return {
+                    value: statusValue,
+                    label: getCompetitionStatusLabel(statusValue),
+                  };
+                })}
               />
             </th>
 
