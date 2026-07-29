@@ -1,25 +1,25 @@
--- usp_GetCompetitionsByHostRanch
--- Secretary competition board: list a host ranch's competitions with optional
--- free-text / status / field / date-range filters.
+-- Migration: datefilter_overlap_usp_getcompetitionsbyhostranch
+-- Applied to live (project sxplumrexbolpwqacpiz) 2026-07-30.
+-- Retires QA #16 (no-results half) == QA #68.
 --
--- This file is the DEPLOYED definition, captured verbatim via pg_get_functiondef
--- after migration `datefilter_overlap_usp_getcompetitionsbyhostranch` (2026-07-30).
+-- WHAT CHANGED: the competition-board date filter moved from "contained-within"
+-- to OVERLAP semantics. Previously a competition had to fall entirely inside the
+-- requested window to appear, so any competition straddling a window edge
+-- silently vanished from the board. Proven live: a Nov 5 -> Nov 30 search on
+-- ranch 11 dropped competition 14 (runs 2025-11-04 .. 2025-11-08) because it
+-- started one day before the window.
 --
--- Two pre-existing drifts from live were cleared in that same commit; do not
--- reintroduce them:
---   1. Parameter names are `*_param` on live, NOT `p_*`.
---   2. The string return columns are `character varying` on live, NOT `TEXT`.
--- Applying the old `p_*` / TEXT version against live fails with 42P13
--- (cannot change return type of existing function).
+-- Only the two date WHERE lines differ from the previous live body:
+--     BEFORE: c.competitionstartdate >= datefrom_param
+--             c.competitionenddate   <= dateto_param
+--     AFTER:  c.competitionenddate   >= datefrom_param
+--             c.competitionstartdate <= dateto_param
 --
--- DATE FILTER IS OVERLAP, NOT CONTAINED-WITHIN (QA #16 no-results half == #68):
--- a competition appears when it overlaps the requested window at all
--- (end >= from AND start <= to). The earlier contained-within form silently
--- dropped any competition straddling a window edge -- e.g. competition 14
--- (2025-11-04 .. 2025-11-08) vanished from a Nov 5 -> Nov 30 search.
---
--- NOTE: PG_02_Competition.sql also contains a copy of this proc. That aggregate
--- file is DEPRECATED and is not a source of truth -- this file is.
+-- Signature, the 15 return columns and the ORDER BY are unchanged, so this is a
+-- plain CREATE OR REPLACE (no DROP, no 42P13) and the currently deployed backend
+-- is unaffected: CompetitionDAL.GetCompetitionsByHostRanch passes the same 6
+-- positional params and reads the same columns by name. NULL bounds are
+-- unaffected by the change.
 
 CREATE OR REPLACE FUNCTION public.usp_getcompetitionsbyhostranch(
     ranchid_param integer,

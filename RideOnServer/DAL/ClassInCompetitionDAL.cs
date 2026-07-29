@@ -320,18 +320,12 @@ namespace RideOnServer.DAL
             NpgsqlConnection connection,
             NpgsqlTransaction transaction)
         {
-            // TEMP DEBUG (Issue C): remove once the drop point is confirmed.
-            Console.WriteLine($"[ISSUE-C] SaveClassPrizes classInCompId={classInCompId} incomingCount={prizes.Count} " +
-                $"types=[{string.Join(",", prizes.Select(p => p.PrizeTypeId))}]");
-
             DeleteClassPrizeByClassId(classInCompId, connection, transaction);
-            Console.WriteLine($"[ISSUE-C] after delete-all, classprize count={CountClassPrizes(classInCompId, connection, transaction)}");
 
             foreach (ClassPrizeItem prize in prizes)
             {
                 if (!prize.PrizeTypeId.HasValue || !prize.PrizeAmount.HasValue)
                 {
-                    Console.WriteLine($"[ISSUE-C] skipping incomplete prize row: prizeTypeId={prize.PrizeTypeId}, prizeAmount={prize.PrizeAmount}");
                     continue;
                 }
 
@@ -347,19 +341,6 @@ namespace RideOnServer.DAL
                     command.Transaction = transaction;
                     command.ExecuteNonQuery();
                 }
-
-                Console.WriteLine($"[ISSUE-C] after upsert prizeTypeId={prize.PrizeTypeId.Value}, classprize count={CountClassPrizes(classInCompId, connection, transaction)}");
-            }
-        }
-
-        // TEMP DEBUG (Issue C): remove once the drop point is confirmed.
-        private int CountClassPrizes(int classInCompId, NpgsqlConnection connection, NpgsqlTransaction transaction)
-        {
-            using (NpgsqlCommand command = new NpgsqlCommand(
-                "SELECT COUNT(*) FROM classprize WHERE classincompid = @classInCompId", connection, transaction))
-            {
-                command.Parameters.AddWithValue("@classInCompId", classInCompId);
-                return Convert.ToInt32(command.ExecuteScalar());
             }
         }
 
