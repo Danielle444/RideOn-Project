@@ -1,4 +1,6 @@
 import { Check, Pencil, Trash2, X } from "lucide-react";
+import DataTableLoadingState from "../../common/table/DataTableLoadingState";
+import DataTableEmptyState from "../../common/table/DataTableEmptyState";
 
 export default function WorkersTable(props) {
   function renderStatusPill(roleStatus) {
@@ -67,25 +69,11 @@ export default function WorkersTable(props) {
 
         <tbody>
           {props.loading ? (
-            <tr>
-              <td
-                colSpan={7}
-                className="px-5 py-12 text-center text-[#8A7268]"
-              >
-                טוענת עובדים...
-              </td>
-            </tr>
+            <DataTableLoadingState colSpan={7} message="טוענת עובדים..." />
           ) : null}
 
           {!props.loading && props.workers.length === 0 ? (
-            <tr>
-              <td
-                colSpan={7}
-                className="px-5 py-12 text-center text-[#8A7268]"
-              >
-                לא נמצאו עובדים להצגה
-              </td>
-            </tr>
+            <DataTableEmptyState colSpan={7} message="לא נמצאו עובדים להצגה" />
           ) : null}
 
           {!props.loading &&

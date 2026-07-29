@@ -3,6 +3,7 @@ import DataTableShell from "../../common/table/DataTableShell";
 import DataTableLoadingState from "../../common/table/DataTableLoadingState";
 import TableActionButton from "../../common/table/TableActionButton";
 import DateRangeText from "./DateRangeText";
+import DataTableEmptyState from "../../common/table/DataTableEmptyState";
 import {
   getStatusLabel,
   getStatusClass,
@@ -275,11 +276,10 @@ export default function ChangeRequestsTable(props) {
           ) : null}
 
           {!props.loading && items.length === 0 && !props.hasRequests ? (
-            <tr>
-              <td colSpan={7} className="py-16 text-center text-[#7A655C]">
-                אין בקשות שינוי או ביטול בתחרות זו.
-              </td>
-            </tr>
+            <DataTableEmptyState
+              colSpan={7}
+              message="אין בקשות שינוי או ביטול בתחרות זו."
+            />
           ) : null}
 
           {!props.loading
