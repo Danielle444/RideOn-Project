@@ -398,6 +398,7 @@ export default function AddShavingsOrderModal(props) {
           <div>
             <label className="mb-1 block text-sm font-bold text-[#5D4037]">
               חווה
+              <span className="text-red-500 mr-0.5">*</span>
             </label>
             <select
               value={ranchId}
@@ -421,6 +422,7 @@ export default function AddShavingsOrderModal(props) {
           <div>
             <label className="mb-1 block text-sm font-bold text-[#5D4037]">
               מחיר נסורת
+              <span className="text-red-500 mr-0.5">*</span>
             </label>
             {loadingPrices ? (
               <p className="text-sm text-[#8A7268]">טוען מחירים...</p>
@@ -504,6 +506,7 @@ export default function AddShavingsOrderModal(props) {
           <div>
             <label className="mb-1 block text-sm font-bold text-[#5D4037]">
               כמות שקים
+              <span className="text-red-500 mr-0.5">*</span>
             </label>
             <div className="mb-3 inline-flex rounded-full border border-[#E3D7D0] bg-[#F7F1EC] p-1">
               {[
@@ -548,6 +551,7 @@ export default function AddShavingsOrderModal(props) {
           <div>
             <label className="mb-1 block text-sm font-bold text-[#5D4037]">
               תאים
+              <span className="text-red-500 mr-0.5">*</span>
             </label>
             {loadingStalls ? (
               <p className="text-sm text-[#8A7268]">טוען תאים...</p>

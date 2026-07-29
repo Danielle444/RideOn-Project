@@ -277,6 +277,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
             <div className="md:col-span-2">
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 תזמון הסלוט
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
 
               <div className="grid grid-cols-2 gap-3">
@@ -313,6 +314,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 יום בשבוע
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
 
               <CustomDropdown
@@ -351,6 +353,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 מועד ביום
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
 
               <CustomDropdown
@@ -384,6 +387,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 מגרש
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
 
               <CustomDropdown
@@ -430,6 +434,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 שעת התחלה
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
 
               <div className="flex gap-2">
@@ -485,6 +490,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 שעת סיום
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
 
               <div className="flex gap-2">

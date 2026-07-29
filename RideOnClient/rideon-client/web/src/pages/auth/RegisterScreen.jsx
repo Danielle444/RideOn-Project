@@ -899,6 +899,7 @@ export default function RegisterScreen() {
                         <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <Field
                             label={`חווה ${ranchRolePairs.length > 1 ? idx + 1 : ""}`}
+                            required={idx === 0}
                           >
                             <div>
                               <CustomDropdown
@@ -943,6 +944,7 @@ export default function RegisterScreen() {
 
                           <Field
                             label={`תפקיד ${ranchRolePairs.length > 1 ? idx + 1 : ""}`}
+                            required={idx === 0}
                           >
                             <CustomDropdown
                               value={pair.roleId}

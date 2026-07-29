@@ -244,6 +244,7 @@ export default function JudgesManagementPage() {
         initialJudge={editItem}
         fields={fields}
         error={error}
+        onShowToast={showToast}
       />
 
       <ConfirmDialog

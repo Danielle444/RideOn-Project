@@ -56,6 +56,7 @@ export default function ClassTypeModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
                 ענף
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
               <select
                 value={fieldId}
@@ -77,6 +78,7 @@ export default function ClassTypeModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
                 שם סוג מקצה
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
               <input
                 type="text"

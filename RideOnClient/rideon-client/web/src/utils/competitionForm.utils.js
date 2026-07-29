@@ -128,6 +128,15 @@ function getErrorMessage(error, fallbackMessage) {
     if (
       error.response.data &&
       typeof error.response.data === "object" &&
+      typeof error.response.data.message === "string" &&
+      error.response.data.message.trim()
+    ) {
+      return error.response.data.message;
+    }
+
+    if (
+      error.response.data &&
+      typeof error.response.data === "object" &&
       typeof error.response.data.title === "string"
     ) {
       return error.response.data.title;
@@ -168,6 +177,14 @@ function validateDetailsForm(detailsForm) {
     detailsForm.registrationEndDate < detailsForm.registrationOpenDate
   ) {
     return "תאריך סגירת הרשמה לא יכול להיות לפני תאריך פתיחת הרשמה";
+  }
+
+  if (
+    detailsForm.registrationEndDate &&
+    detailsForm.competitionStartDate &&
+    detailsForm.registrationEndDate > detailsForm.competitionStartDate
+  ) {
+    return "תאריך סגירת ההרשמה חייב להיות עד תחילת התחרות";
   }
 
   if (

@@ -50,6 +50,18 @@ var FIELD_VALIDATION_RULES = [
     },
   },
   {
+    // Reining-only: mandatory whenever the pattern field is rendered at all.
+    key: "patternNumber",
+    message: "בענף ריינינג חובה לבחור מסלול",
+    isValid: function (value, context) {
+      if (!context?.shouldShowPatternField) {
+        return true;
+      }
+
+      return !!value;
+    },
+  },
+  {
     key: "classDate",
     message: "תאריך המקצה חייב להיות בטווח תאריכי התחרות",
     isValid: function (value, context) {
@@ -142,7 +154,6 @@ export default function ClassInCompetitionModal(props) {
   var patterns = Array.isArray(props.patterns) ? props.patterns : [];
 
   var [openDropdownKey, setOpenDropdownKey] = useState("");
-  var [localError, setLocalError] = useState("");
   var [fieldErrors, setFieldErrors] = useState({});
   var [prizeRowErrors, setPrizeRowErrors] = useState({});
   var [prizeDuplicateError, setPrizeDuplicateError] = useState("");
@@ -203,7 +214,6 @@ export default function ClassInCompetitionModal(props) {
         return;
       }
 
-      setLocalError("");
       setFieldErrors({});
       setPrizeRowErrors({});
       setPrizeDuplicateError("");
@@ -319,7 +329,6 @@ export default function ClassInCompetitionModal(props) {
   }
 
   function handleChange(fieldName, value) {
-    setLocalError("");
     setFieldErrors(function (prev) {
       if (!prev[fieldName]) {
         return prev;
@@ -339,8 +348,6 @@ export default function ClassInCompetitionModal(props) {
   }
 
   function toggleJudgeSelection(judgeId) {
-    setLocalError("");
-
     setFormData(function (prev) {
       var currentJudgeIds = Array.isArray(prev.judgeIds) ? prev.judgeIds : [];
       var exists = currentJudgeIds.some(function (id) {
@@ -435,6 +442,7 @@ export default function ClassInCompetitionModal(props) {
     var validationContext = {
       competitionStartDate: props.competitionStartDate || "",
       competitionEndDate: props.competitionEndDate || "",
+      shouldShowPatternField: shouldShowPatternField,
     };
 
     var nextFieldErrors = getFieldErrors(formData, validationContext);
@@ -449,16 +457,6 @@ export default function ClassInCompetitionModal(props) {
       Object.keys(prizeValidation.rowErrors).length > 0 ||
       prizeValidation.duplicateError
     ) {
-      if (props.onShowToast) {
-        props.onShowToast("error", "המקצה לא נשמר. יש למלא את השדות המסומנים.");
-      }
-
-      return;
-    }
-
-    if (shouldShowPatternField && !formData.patternNumber) {
-      setLocalError("בענף ריינינג חובה לבחור מסלול");
-
       if (props.onShowToast) {
         props.onShowToast("error", "המקצה לא נשמר. יש למלא את השדות המסומנים.");
       }
@@ -524,6 +522,7 @@ export default function ClassInCompetitionModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 סוג מקצה
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
 
               <CustomDropdown
@@ -555,6 +554,7 @@ export default function ClassInCompetitionModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 מגרש
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
 
               <CustomDropdown
@@ -637,6 +637,7 @@ export default function ClassInCompetitionModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 עלות מארגן
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
               <input
                 type="number"
@@ -659,6 +660,7 @@ export default function ClassInCompetitionModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 עלות התאחדות
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
               <input
                 type="number"
@@ -682,6 +684,7 @@ export default function ClassInCompetitionModal(props) {
               <div>
                 <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                   מסלול
+                  <span className="text-red-500 mr-0.5">*</span>
                 </label>
 
                 <CustomDropdown
@@ -702,6 +705,12 @@ export default function ClassInCompetitionModal(props) {
                     handleChange("patternNumber", e.target.value);
                   }}
                 />
+
+                {fieldErrors.patternNumber ? (
+                  <div className="mt-1.5 text-right text-xs text-red-600">
+                    {fieldErrors.patternNumber}
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -730,6 +739,28 @@ export default function ClassInCompetitionModal(props) {
                   {formData.prizeRows.map(function (row) {
                     var rowErrors = prizeRowErrors[row.rowId] || {};
 
+                    // Offer only prize types no sibling row already uses, so a
+                    // duplicate cannot be entered. The row's own selection stays
+                    // in its list. validatePrizeRows remains the save-time backstop.
+                    var takenByOtherRows = formData.prizeRows
+                      .filter(function (otherRow) {
+                        return otherRow.rowId !== row.rowId;
+                      })
+                      .map(function (otherRow) {
+                        return String(otherRow.prizeTypeId);
+                      })
+                      .filter(Boolean);
+
+                    var availablePrizeTypes = prizeTypes.filter(
+                      function (prizeType) {
+                        return (
+                          takenByOtherRows.indexOf(
+                            String(prizeType.prizeTypeId),
+                          ) === -1
+                        );
+                      },
+                    );
+
                     return (
                       <div
                         key={row.rowId}
@@ -741,7 +772,7 @@ export default function ClassInCompetitionModal(props) {
                               dropdownKey={"prize-type-" + row.rowId}
                               openDropdownKey={openDropdownKey}
                               setOpenDropdownKey={setOpenDropdownKey}
-                              options={prizeTypes}
+                              options={availablePrizeTypes}
                               value={row.prizeTypeId}
                               placeholder="בחרי סוג פרס"
                               searchable={true}
@@ -882,13 +913,7 @@ export default function ClassInCompetitionModal(props) {
             </div>
           </div>
 
-          {localError ? (
-            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
-              {localError}
-            </div>
-          ) : null}
-
-          {!localError && props.error ? (
+          {props.error ? (
             <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
               {props.error}
             </div>

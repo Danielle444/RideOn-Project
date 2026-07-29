@@ -1,6 +1,52 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
+// Required-field rules for the judge form. Mirrors the declarative array used by
+// ClassInCompetitionModal / PaidTimeSlotInCompetitionModal so a new mandatory
+// field is a one-line addition here. English names and country stay optional —
+// they are nullable on `judge` and BL/Judge.cs ValidateJudge does not require them.
+var FIELD_VALIDATION_RULES = [
+  {
+    key: "firstNameHebrew",
+    message: "יש להזין שם פרטי בעברית",
+    isValid: function (value) {
+      return !!String(value || "").trim();
+    },
+  },
+  {
+    key: "lastNameHebrew",
+    message: "יש להזין שם משפחה בעברית",
+    isValid: function (value) {
+      return !!String(value || "").trim();
+    },
+  },
+  {
+    key: "fieldIds",
+    message: "יש לבחור לפחות ענף אחד",
+    isValid: function (value) {
+      return Array.isArray(value) && value.length > 0;
+    },
+  },
+];
+
+function getFieldErrors(form, selectedFieldIds) {
+  var errors = {};
+
+  var values = {
+    firstNameHebrew: form.firstNameHebrew,
+    lastNameHebrew: form.lastNameHebrew,
+    fieldIds: selectedFieldIds,
+  };
+
+  FIELD_VALIDATION_RULES.forEach(function (rule) {
+    if (!rule.isValid(values[rule.key])) {
+      errors[rule.key] = rule.message;
+    }
+  });
+
+  return errors;
+}
+
 export default function JudgeModal(props) {
   const [form, setForm] = useState({
     firstNameHebrew: "",
@@ -11,11 +57,14 @@ export default function JudgeModal(props) {
   });
 
   const [selectedFieldIds, setSelectedFieldIds] = useState([]);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   useEffect(() => {
     if (!props.isOpen) {
       return;
     }
+
+    setFieldErrors({});
 
     if (props.initialJudge) {
       setForm({
@@ -54,7 +103,21 @@ export default function JudgeModal(props) {
     }
   }, [props.isOpen, props.initialJudge, props.fields]);
 
+  function clearFieldError(name) {
+    setFieldErrors(function (prev) {
+      if (!prev[name]) {
+        return prev;
+      }
+
+      var next = { ...prev };
+      delete next[name];
+      return next;
+    });
+  }
+
   function updateField(name, value) {
+    clearFieldError(name);
+
     setForm(function (prev) {
       return {
         ...prev,
@@ -64,6 +127,8 @@ export default function JudgeModal(props) {
   }
 
   function toggleField(fieldId) {
+    clearFieldError("fieldIds");
+
     setSelectedFieldIds(function (prev) {
       if (prev.includes(fieldId)) {
         return prev.filter(function (id) {
@@ -81,6 +146,21 @@ export default function JudgeModal(props) {
 
   function handleSubmit(e) {
     e.preventDefault();
+
+    var nextFieldErrors = getFieldErrors(form, selectedFieldIds);
+
+    setFieldErrors(nextFieldErrors);
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      if (props.onShowToast) {
+        props.onShowToast(
+          "error",
+          "השופט לא נשמר. יש למלא את השדות המסומנים.",
+        );
+      }
+
+      return;
+    }
 
     props.onSubmit({
       judgeId: props.initialJudge?.judgeId || 0,
@@ -118,27 +198,39 @@ export default function JudgeModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
                 שם פרטי בעברית
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
               <input
                 type="text"
                 value={form.firstNameHebrew}
                 onChange={(e) => updateField("firstNameHebrew", e.target.value)}
                 className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-                required
               />
+
+              {fieldErrors.firstNameHebrew ? (
+                <div className="mt-1.5 text-right text-xs text-red-600">
+                  {fieldErrors.firstNameHebrew}
+                </div>
+              ) : null}
             </div>
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
                 שם משפחה בעברית
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
               <input
                 type="text"
                 value={form.lastNameHebrew}
                 onChange={(e) => updateField("lastNameHebrew", e.target.value)}
                 className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-                required
               />
+
+              {fieldErrors.lastNameHebrew ? (
+                <div className="mt-1.5 text-right text-xs text-red-600">
+                  {fieldErrors.lastNameHebrew}
+                </div>
+              ) : null}
             </div>
 
             <div>
@@ -182,6 +274,7 @@ export default function JudgeModal(props) {
             <div className="md:col-span-2">
               <label className="mb-3 block text-sm font-semibold text-[#5D4037]">
                 ענפים
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
 
               <div className="rounded-2xl border border-[#E6DCD5] bg-[#FBF8F6] p-4">
@@ -206,6 +299,12 @@ export default function JudgeModal(props) {
                   })}
                 </div>
               </div>
+
+              {fieldErrors.fieldIds ? (
+                <div className="mt-1.5 text-right text-xs text-red-600">
+                  {fieldErrors.fieldIds}
+                </div>
+              ) : null}
             </div>
           </div>
 

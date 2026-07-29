@@ -14,6 +14,7 @@ import {
   searchFederationExternalCredits,
   validateFederationCoverageBeforeOrganizerPayment,
 } from "../../services/competitionPaymentsService";
+import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 function getValue(item, camelKey, pascalKey, fallback) {
   if (!item) {
@@ -29,20 +30,6 @@ function getValue(item, camelKey, pascalKey, fallback) {
   }
 
   return fallback;
-}
-
-function getErrorMessage(error, fallbackMessage) {
-  if (error?.response?.data) {
-    if (typeof error.response.data === "string") {
-      return error.response.data;
-    }
-
-    if (error.response.data.message) {
-      return error.response.data.message;
-    }
-  }
-
-  return fallbackMessage;
 }
 
 function getChargeId(charge) {

@@ -202,6 +202,7 @@ export default function FineModal(props) {
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
                 סכום קנס
+                <span className="text-red-500 mr-0.5">*</span>
               </label>
 
               <input
