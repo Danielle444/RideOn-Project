@@ -24,6 +24,8 @@ import useAdminCompetitionEntriesList from "../../../../hooks/useAdminCompetitio
 
 import styles from "../../../../styles/adminCompetitionClassesStyles";
 
+import Button from "../../../../components/ui/Button";
+
 import CompetitionEntryCreateModal from "../../../../components/competitions/CompetitionEntryCreateModal";
 
 import CompetitionEntryCard from "../../../../components/competitions/CompetitionEntryCard";
@@ -378,59 +380,29 @@ export default function AdminCompetitionClassesScreen(props) {
           {showFilters ? renderFilters() : null}
         </View>
 
-        <Pressable
-          style={styles.addButton}
+        <Button
+          variant="solid"
+          label="+ הוסף הרשמה למקצה"
           onPress={function () {
             setShowCreateModal(true);
           }}
-        >
-          <Text style={styles.addButtonText}>+ הוסף הרשמה למקצה</Text>
-        </Pressable>
+        />
 
-        <Pressable
+        <Button
+          variant="outline"
+          label="שכפל הרשמות מתחרות קודמת"
           onPress={function () {
             setDuplicateModalOpen(true);
           }}
-          style={{
-            flexDirection: "row-reverse",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "#FFFFFF",
-            borderWidth: 1,
-            borderColor: "#7B5A4D",
-            paddingVertical: 10,
-            paddingHorizontal: 14,
-            borderRadius: 10,
-            gap: 8,
-            marginTop: 10,
-            marginBottom: 12,
-          }}
-        >
-          <Text style={{ color: "#7B5A4D", fontWeight: "700", fontSize: 14 }}>
-            שכפל הרשמות מתחרות קודמת
-          </Text>
-        </Pressable>
+          style={{ marginTop: 10, marginBottom: 12 }}
+        />
 
-        <Pressable
+        <Button
+          variant="outline"
+          label="צפה בסדר כניסות בכל התחרות"
           onPress={handleViewAllEntries}
-          style={{
-            flexDirection: "row-reverse",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "#FFFFFF",
-            borderWidth: 1,
-            borderColor: "#7B5A4D",
-            paddingVertical: 10,
-            paddingHorizontal: 14,
-            borderRadius: 10,
-            gap: 8,
-            marginBottom: 12,
-          }}
-        >
-          <Text style={{ color: "#7B5A4D", fontWeight: "700", fontSize: 14 }}>
-            צפה בסדר כניסות בכל התחרות
-          </Text>
-        </Pressable>
+          style={{ marginBottom: 12 }}
+        />
 
         <CompetitionEntryCreateModal
           visible={showCreateModal}

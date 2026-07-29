@@ -1,5 +1,7 @@
 import { StyleSheet } from "react-native";
 
+import { rtlLabelStyle } from "./rtlLabelStyle";
+
 var styles = StyleSheet.create({
   screenContent: {
     padding: 16,
@@ -211,10 +213,14 @@ var styles = StyleSheet.create({
     backgroundColor: "#7B5A4D",
   },
 
+  // רצועת הטאבים נשארת סגמנטד-קונטרול בספוק (flex 1, רדיוס 14) ולא הופכת
+  // ל-Button, אבל היא שואלת את אותו כלל RTL בדיוק - ראה styles/rtlLabelStyle.js.
+  // ה-numberOfLines המשלים יושב על ה-Text ב-RegistrationsTabs.
   tabButtonText: {
     fontSize: 14,
     fontWeight: "700",
     color: "#6D564A",
+    ...rtlLabelStyle,
   },
 
   tabButtonTextActive: {
