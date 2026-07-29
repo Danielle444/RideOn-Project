@@ -80,9 +80,21 @@ All four ranch-11 compounds currently have **zero bookings**:
 This corrects an earlier claim in this session that Delete "will likely hit the booking
 guard" — it will not; the guard is bookings, and there are none.
 
-**Do NOT test CAP-1 Delete on a real compound.** Create a throwaway compound with no stalls,
-delete that, and confirm it disappears. That satisfies the CAP-1 success criterion
-("Delete confirms then removes") without risking 189 stall rows.
+**Do NOT test CAP-1 Delete on a real compound.** Use this self-contained sequence instead —
+it exercises all three CAP-1 actions on data the test itself creates, so nothing pre-existing
+is ever at risk:
+
+1. **Add** — "הוספת מתחם", give it an obviously-disposable unique name (e.g. `בדיקה QA56`).
+   `usp_CreateCompoundWithStallsByPattern` creates the compound **and its stalls** from the
+   numbering pattern, so the new compound owns fresh throwaway stalls. It has a
+   duplicate-name guard, so the name must be unique in the ranch.
+2. **Edit** — reopen it and confirm the name field is **prefilled** with that name. Rename it
+   and save. (Guarded by `usp_UpdateCompoundName`: blank name and duplicate name both raise.)
+3. **Delete** — delete that same compound. It has zero bookings, so it removes cleanly along
+   with only the stalls step 1 created.
+
+That covers "Add opens the modal / Edit opens prefilled / Delete confirms and removes" in full
+without touching the 189 real stall rows.
 
 Note this is NOT the scoped-out controller follow-up. It is a property of the delete proc
 itself and a hazard in the acceptance test. Related: the proc's `RAISE` carries no `ERRCODE`,
