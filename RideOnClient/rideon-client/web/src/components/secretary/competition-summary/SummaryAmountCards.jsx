@@ -14,13 +14,18 @@ function AmountCard(props) {
       onClick={props.onClick}
       disabled={!props.onClick}
       className={
-        "rounded-2xl border border-[#E3D7D0] bg-white px-6 py-5 text-right shadow-sm disabled:cursor-default " +
+        "min-w-0 rounded-2xl border border-[#E3D7D0] bg-white px-6 py-5 text-right shadow-sm disabled:cursor-default " +
         clickableClass
       }
     >
       <p className="text-sm font-bold text-[#6D4C41]">{props.title}</p>
 
-      <p className={"mt-3 text-3xl font-black " + colorClass}>
+      <p
+        className={
+          "mt-3 break-words text-2xl font-black tabular-nums lg:text-3xl " +
+          colorClass
+        }
+      >
         {props.isMoney === false
           ? Number(props.amount || 0).toLocaleString("he-IL")
           : formatMoney(props.amount)}
