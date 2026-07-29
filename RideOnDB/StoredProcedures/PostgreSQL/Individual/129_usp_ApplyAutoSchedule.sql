@@ -41,6 +41,14 @@ DECLARE
     v_slot_pub        BOOLEAN;
     v_req_comp        INTEGER;
     v_decisions_count INTEGER;
+
+    -- זהות הבקשה המוחלת (מאמן/רוכב/סוס) ומגרש-היעד, עבור בדיקות-חוקיות
+    -- חוצות-סלוטים של מאמן/רוכב/סוס (V2-0). רוכב/סוס אינם NULL; מאמן nullable.
+    v_cur_coach       INTEGER;
+    v_cur_rider       INTEGER;
+    v_cur_horse       INTEGER;
+    v_slot_arena_rid  INTEGER;
+    v_slot_arena_id   INTEGER;
 BEGIN
     -- ===== בדיקת ארגומנטים =====
     IF p_CompetitionId IS NULL
@@ -122,12 +130,15 @@ BEGIN
                 RAISE EXCEPTION 'duration unknown for request %', v_request_id;
             END IF;
 
-            -- גבולות סלוט-היעד + שיוך-תחרות + מצב-פרסום.
+            -- גבולות סלוט-היעד + שיוך-תחרות + מצב-פרסום + מגרש (לכלל-המעבר של המאמן).
             SELECT (s.slotdate + s.starttime)::timestamptz,
                    (s.slotdate + s.endtime)::timestamptz,
                    s.competitionid,
-                   COALESCE(s.ispublished, FALSE)
-            INTO v_slot_start_ts, v_slot_end_ts, v_slot_comp, v_slot_pub
+                   COALESCE(s.ispublished, FALSE),
+                   s.arenaranchid,
+                   s.arenaid
+            INTO v_slot_start_ts, v_slot_end_ts, v_slot_comp, v_slot_pub,
+                 v_slot_arena_rid, v_slot_arena_id
             FROM paidtimeslotincompetition s
             WHERE s.paidtimeslotincompid = v_slot_id;
 
@@ -172,6 +183,85 @@ BEGIN
                   AND v_start_time < o.assignedstarttime + ((optp.durationminutes + 1) || ' minutes')::interval
             ) THEN
                 RAISE EXCEPTION 'overlap with existing occupant in slot %', v_slot_id;
+            END IF;
+
+            -- זהות הבקשה המוחלת (מאמן/רוכב/סוס), לבדיקות-החוקיות חוצות-הסלוטים.
+            SELECT csr.coachfederationmemberid, csr.riderfederationmemberid, csr.horseid
+            INTO v_cur_coach, v_cur_rider, v_cur_horse
+            FROM servicerequest csr
+            WHERE csr.srequestid = v_request_id;
+
+            -- חפיפת מאמן: אותו מאמן לא יכול להיות בשני מקומות באותו זמן, על פני כל
+            -- הסלוטים בתחרות. מרווח מעבר 7 דק' בין מגרשים שונים בלבד; 0 באותו מגרש
+            -- (זהה ל-CoachTimeline ב-C#, TRANSITION_MINUTES=7). NULL coach => ללא זהות
+            -- מאמן ולכן ללא אילוץ מאמן (לא משחזרים את התנגשות "coach 0" של ה-DTO).
+            IF v_cur_coach IS NOT NULL AND EXISTS (
+                SELECT 1
+                FROM paidtimerequest o
+                JOIN paidtimeslotincompetition oslot
+                     ON oslot.paidtimeslotincompid = o.assignedcompslotid
+                    AND oslot.competitionid = p_CompetitionId
+                JOIN servicerequest osr   ON osr.srequestid    = o.paidtimerequestid
+                JOIN pricecatalog opc     ON opc.pricecatalogid = o.pricecatalogid
+                JOIN paidtimeproduct optp ON optp.productid     = opc.productid
+                WHERE o.status = 'Assigned'
+                  AND o.paidtimerequestid <> v_request_id
+                  AND o.assignedstarttime IS NOT NULL
+                  AND osr.coachfederationmemberid = v_cur_coach
+                  AND (o.assignedstarttime
+                        - (CASE WHEN oslot.arenaranchid = v_slot_arena_rid
+                                 AND oslot.arenaid      = v_slot_arena_id
+                                THEN 0 ELSE 7 END || ' minutes')::interval) < v_cand_end
+                  AND v_start_time <
+                       (o.assignedstarttime
+                        + ((optp.durationminutes + 1
+                            + CASE WHEN oslot.arenaranchid = v_slot_arena_rid
+                                    AND oslot.arenaid      = v_slot_arena_id
+                                   THEN 0 ELSE 7 END) || ' minutes')::interval)
+            ) THEN
+                RAISE EXCEPTION 'coach overlap for request %', v_request_id;
+            END IF;
+
+            -- חפיפת רוכב: אותו רוכב לא יכול להיות בשני שיבוצים חופפים, על פני כל
+            -- הסלוטים בתחרות (ללא מרווח מעבר). זהות דרך servicerequest.
+            IF EXISTS (
+                SELECT 1
+                FROM paidtimerequest o
+                JOIN paidtimeslotincompetition oslot
+                     ON oslot.paidtimeslotincompid = o.assignedcompslotid
+                    AND oslot.competitionid = p_CompetitionId
+                JOIN servicerequest osr   ON osr.srequestid    = o.paidtimerequestid
+                JOIN pricecatalog opc     ON opc.pricecatalogid = o.pricecatalogid
+                JOIN paidtimeproduct optp ON optp.productid     = opc.productid
+                WHERE o.status = 'Assigned'
+                  AND o.paidtimerequestid <> v_request_id
+                  AND o.assignedstarttime IS NOT NULL
+                  AND osr.riderfederationmemberid = v_cur_rider
+                  AND o.assignedstarttime < v_cand_end
+                  AND v_start_time < o.assignedstarttime + ((optp.durationminutes + 1) || ' minutes')::interval
+            ) THEN
+                RAISE EXCEPTION 'rider overlap for request %', v_request_id;
+            END IF;
+
+            -- חפיפת סוס: אותו סוס לא יכול להיות בשני שיבוצים חופפים, על פני כל
+            -- הסלוטים בתחרות (ללא מרווח מעבר). זהות דרך servicerequest.
+            IF EXISTS (
+                SELECT 1
+                FROM paidtimerequest o
+                JOIN paidtimeslotincompetition oslot
+                     ON oslot.paidtimeslotincompid = o.assignedcompslotid
+                    AND oslot.competitionid = p_CompetitionId
+                JOIN servicerequest osr   ON osr.srequestid    = o.paidtimerequestid
+                JOIN pricecatalog opc     ON opc.pricecatalogid = o.pricecatalogid
+                JOIN paidtimeproduct optp ON optp.productid     = opc.productid
+                WHERE o.status = 'Assigned'
+                  AND o.paidtimerequestid <> v_request_id
+                  AND o.assignedstarttime IS NOT NULL
+                  AND osr.horseid = v_cur_horse
+                  AND o.assignedstarttime < v_cand_end
+                  AND v_start_time < o.assignedstarttime + ((optp.durationminutes + 1) || ' minutes')::interval
+            ) THEN
+                RAISE EXCEPTION 'horse overlap for request %', v_request_id;
             END IF;
 
             -- החלה מוגנת: רק שורה Pending ולא-משובצת זזה (הגנה מפני תוכנית מיושנת).
