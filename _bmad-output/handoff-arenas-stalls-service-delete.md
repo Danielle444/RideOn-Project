@@ -15,7 +15,7 @@
 ### QA #53 — Service delete (Service Prices page) never worked
 - Root cause A (crash): the live-only proc `usp_deleteserviceproduct` guarded usage with `productrequest.productid`, **a column that does not exist** → SQLSTATE 42703 on every delete past the stall guard. Live-verified 2026-07-27.
 - Root cause B (latent FK): `DELETE FROM pricecatalog` had **no guard against `paidtimerequest`** (FK onto pricecatalog) → 23503 for any used paid-time product even after A is fixed. Live data: paid-time products 1,2 referenced by `paidtimerequest`; products 3,4,5 by `productrequest`.
-- Fixes (code committed; **proc NOT yet applied to live — see below**):
+- Fixes (code committed; **proc APPLIED LIVE 2026-07-30 — see the status block below**):
   - Proc rewrite → `RideOnDB/StoredProcedures/PostgreSQL/Individual/183_usp_DeleteServiceProduct.sql`. Detects usage correctly via `pricecatalog` for BOTH request types; blocks with Hebrew "deactivate instead" tagged `SQLSTATE 'RN001'`; hard-deletes only truly-unused products (never destroys financial history). Matches Oren's ruling: block-and-redirect, not cascade.
   - `ServicePriceDAL.DeleteServiceProduct` — catch `PostgresException` with `SqlState == "RN001"` → rethrow `BL.ValidationException(ex.MessageText)`.
   - `ServicePricesController.DeleteProduct` — catch `ValidationException` → `BadRequest(ex.Message)` (surfaces the Hebrew guard message instead of the generic string). Honesty bet, **service page only** (Oren's scope).
@@ -24,28 +24,67 @@ C# compiles clean (`dotnet build` — only MSB file-lock errors from a running s
 
 ---
 
-## ⚠️ FIRST action next session — apply the proc live (needs Oren's explicit go-ahead)
+## ✅ DONE 2026-07-30 — the proc IS applied live. Do not re-apply.
 
-Per the live-DB protocol: show SQL, get explicit go, apply via `apply_migration`, re-read + smoke test.
+Applied with Oren's explicit go-ahead as migration `qa53_fix_deleteserviceproduct_guards_rn001`.
+`CREATE OR REPLACE`, oid 21844, signature unchanged. The deployed body is byte-identical to
+`183_usp_DeleteServiceProduct.sql` (`prosrc` md5 `1b36cbffb32c9ee44cad876f682386da`, 1240 chars).
 
-**Migration to apply** = the body in `183_usp_DeleteServiceProduct.sql` (CREATE OR REPLACE).
+Pre-apply smoke test ran inside a rolled-back transaction (terminating `RAISE`), and the
+rollback was re-read and confirmed — counts restored, product 11 and its child rows intact,
+throwaway function absent. Post-apply, exercised against the DEPLOYED proc: products 2, 3
+and 5 all raise `RN001` with the Hebrew guard text. **The 42703 crash is gone.**
 
-**Rollback body (exact currently-deployed definition, captured 2026-07-27 before any change):**
+Still outstanding: **the C# is not merged**, so the guard message still reaches the
+secretary as the generic Hebrew fallback (the runbook's "new proc + old C#" row — correct
+blocking, no worse than before). E2E was never run in a browser; CAP-1 is verified only by
+static tracing. Branch: `fix/qa-53-56-db-and-verify`, commits `4876ec8` + `a85a0a6`.
+
+The section below is retained as the historical record of what was to be applied, and for
+the rollback body.
+
+**Migration that was applied** = the body in `183_usp_DeleteServiceProduct.sql` (CREATE OR REPLACE).
+
+**Rollback body — the TRUE prior definition, captured from `pg_get_functiondef` 2026-07-30
+immediately before the apply.**
+
+> Correction: the version previously recorded here was described as the "exact
+> currently-deployed definition" but was **not** byte-exact — it had the `EXISTS` predicates
+> flattened onto single lines. The logic was identical, so nothing was decided wrongly on
+> it, but it would not have restored the proc character for character. The block below is
+> the real one. (Restore only if the new proc must be reverted — it still contains the
+> `productrequest.productid` 42703 bug and is never a target state.)
+
 ```sql
 CREATE OR REPLACE FUNCTION public.usp_deleteserviceproduct(productid_param smallint)
  RETURNS void
  LANGUAGE plpgsql
 AS $function$
 BEGIN
-    IF EXISTS (SELECT 1 FROM stall s WHERE s.stalltype = productid_param) THEN
+    IF EXISTS (
+        SELECT 1
+        FROM stall s
+        WHERE s.stalltype = productid_param
+    ) THEN
         RAISE EXCEPTION 'Cannot delete product because it is used by stalls';
     END IF;
-    IF EXISTS (SELECT 1 FROM productrequest pr WHERE pr.productid = productid_param) THEN
+
+    IF EXISTS (
+        SELECT 1
+        FROM productrequest pr
+        WHERE pr.productid = productid_param
+    ) THEN
         RAISE EXCEPTION 'Cannot delete product because it is used by requests';
     END IF;
-    DELETE FROM paidtimeproduct WHERE productid = productid_param;
-    DELETE FROM pricecatalog WHERE productid = productid_param;
-    DELETE FROM product WHERE productid = productid_param;
+
+    DELETE FROM paidtimeproduct
+    WHERE productid = productid_param;
+
+    DELETE FROM pricecatalog
+    WHERE productid = productid_param;
+
+    DELETE FROM product
+    WHERE productid = productid_param;
 END;
 $function$
 ```

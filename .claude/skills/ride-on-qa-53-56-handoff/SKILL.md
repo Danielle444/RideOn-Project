@@ -25,7 +25,7 @@ is to apply the DB proc live, verify E2E, and ship — not to rewrite anything.
 
 - **QA #56** (frontend): `ArenasAndStallsPage.jsx` compound Add/Edit/Delete were wired to
   no-op functions; now wired to the real `useArenasAndStallsPage` handlers. Live-ready.
-- **QA #53** (backend, committed, proc NOT yet applied live):
+- **QA #53** (backend, committed; **proc APPLIED LIVE 2026-07-30** — do NOT re-apply):
   - `RideOnDB/StoredProcedures/PostgreSQL/Individual/183_usp_DeleteServiceProduct.sql` —
     detects usage through `pricecatalog` for BOTH `productrequest.pricecatalogid` and
     `paidtimerequest.pricecatalogid`; raises Hebrew SQLSTATE `RN001` guards; hard-deletes
@@ -36,13 +36,42 @@ is to apply the DB proc live, verify E2E, and ship — not to rewrite anything.
   - `ServicePricesController.DeleteProduct` catches `ValidationException` →
     `BadRequest(ex.Message)`, so the Hebrew guard text reaches the user.
 
+## Current state (updated 2026-07-30 — read this before the goals below)
+
+**Step 1 is DONE. Steps 2 and 3 are not.** Work continued on branch
+`fix/qa-53-56-db-and-verify` (cut from `fix/qa-53-56-arenas-stalls-service-delete`).
+
+- **Proc applied live 2026-07-30**, migration `qa53_fix_deleteserviceproduct_guards_rn001`,
+  with Oren's explicit go-ahead. `CREATE OR REPLACE`, oid 21844, signature unchanged.
+  Deployed body is byte-identical to the repo file (`prosrc` md5
+  `1b36cbffb32c9ee44cad876f682386da`, 1240 chars). **Do not re-apply.**
+  Pre-apply smoke test ran in a rolled-back transaction and the rollback was re-read and
+  confirmed. Post-apply, against the deployed proc: products 2, 3 and 5 all raise `RN001`
+  with the Hebrew guard — the 42703 crash is gone.
+- **The proc file was renumbered 181 → 183.** `181_usp_GetRealHorsesByRanch.sql` was
+  already on main and `182_usp_ApplyAutoScheduleV2.sql` was claimed by a concurrent
+  branch. Same collision class as the old 164 clash. Cite **183**, never 181.
+- **NOT merged, NOT deployed.** The branch is 6 commits behind main and main is 6 behind
+  it, with **zero file overlap** (so a conflict-free merge is expected). Main's only touch
+  inside the #53 path is `ServicePriceManager.cs`, and that change is purely additive
+  (`GetActiveServicePricesForRanch`) — `DeleteProduct` is untouched.
+- Because the C# is unmerged, the deployed app is in the runbook's **"new proc + old C#"**
+  row: correct blocking, message still the generic Hebrew fallback. No worse than before.
+- **E2E was never run.** CAP-1 was verified only by static tracing (handlers exist and are
+  returned by the hook, `StallCompoundsTable` invokes the props, the modal prefills via
+  `initialItem={page.editingCompound}`). No browser check happened.
+
+**Local dev caveat learned the hard way:** `rideon-local.ps1` and the backend env vars
+(`ConnectionStrings__DefaultConnection`, `Jwt__Key`, …) exist on **Oren's** machine only.
+On Danielle's box (`C:\Users\betka`) the script does not exist at any path, no env var is
+set at session/User/Machine scope, and `appsettings.json` carries no `ConnectionStrings`
+or `Jwt` section at all — so a local backend cannot be started there without pulling both
+secrets from the Render dashboard first. `appsettings.Development.json` is also **tracked**
+in git, contrary to CLAUDE.md's claim that it is gitignored.
+
 ## Execution goals (in order)
 
-1. **Apply the #53 proc live — requires Oren's explicit go-ahead.** Follow
-   `ride-on-live-db-ops`: show the exact SQL (the 181 file body), get an explicit "go",
-   apply via `apply_migration`, re-read the deployed definition as proof. Run the
-   side-effect-free smoke test from `migration-and-deploy.md` first and confirm rollback.
-   The rollback body (the *broken* prior definition) is in that companion.
+1. ~~**Apply the #53 proc live**~~ — **DONE 2026-07-30, see Current state above.**
 2. **Verify E2E** (Oren provides host-secretary login): backend `dotnet run` (stop any
    running instance so the binary unlocks), frontend `npm run dev` → http://localhost:5173.
    - CAP-1: Arenas & Stalls → "הוספת מתחם" opens modal; Edit prefilled; Delete removes.
