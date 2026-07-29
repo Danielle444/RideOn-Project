@@ -19,19 +19,11 @@ namespace RideOnServer.BL
             List<ClassInCompetition> classes = ClassInCompetition.GetClassesByCompetitionId(competitionId);
             List<PaidTimeSlotInCompetition> paidTimeSlots = PaidTimeSlotInCompetition.GetPaidTimeSlotsByCompetitionId(competitionId);
 
-            ServicePriceDAL servicePriceDal = new ServicePriceDAL();
-            List<ServicePriceRow> priceRows = servicePriceDal.GetServicePricingDashboard(competition.HostRanchId);
-
-            List<ServicePriceCategorySection> priceSections = priceRows
-                .GroupBy(x => new { x.CategoryId, x.CategoryName })
-                .Select(group => new ServicePriceCategorySection
-                {
-                    CategoryId = group.Key.CategoryId,
-                    CategoryName = group.Key.CategoryName,
-                    Items = group.OrderBy(x => x.ProductId).ToList()
-                })
-                .OrderBy(x => x.CategoryId)
-                .ToList();
+            // Consumer-facing surface: only active, priced products. This one call
+            // also covers every registration selection list (shavings, stall
+            // bookings, paid times), which all read servicePriceSections from here.
+            List<ServicePriceCategorySection> priceSections =
+                ServicePriceManager.GetActiveServicePricesForRanch(competition.HostRanchId);
 
             CompetitionDAL competitionDal = new CompetitionDAL();
             List<string> judges = competitionDal.GetJudgeNamesByCompetitionId(competitionId);

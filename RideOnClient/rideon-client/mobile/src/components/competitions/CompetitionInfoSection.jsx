@@ -49,13 +49,6 @@ export default function CompetitionInfoSection(props) {
         </View>
 
         <View style={competitionInvitationStyles.infoRow}>
-          <Text style={competitionInvitationStyles.infoLabel}>סטטוס</Text>
-          <Text style={competitionInvitationStyles.infoValue}>
-            {competition?.competitionStatus || "—"}
-          </Text>
-        </View>
-
-        <View style={competitionInvitationStyles.infoRow}>
           <Text style={competitionInvitationStyles.infoLabel}>תחילת תחרות</Text>
           <Text style={competitionInvitationStyles.infoValue}>
             {formatDate(competition?.competitionStartDate)}

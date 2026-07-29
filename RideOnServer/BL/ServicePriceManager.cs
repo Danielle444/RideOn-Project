@@ -25,6 +25,32 @@ namespace RideOnServer.BL
                 .ToList();
         }
 
+        // Consumer-facing view of the same dashboard rows: only products that are
+        // actually offerable (active, with a real price). Categories left with no
+        // offerable product produce no section at all.
+        // GetDashboard above stays unfiltered on purpose - it is the secretary
+        // editing surface and must keep showing inactive/unpriced products.
+        internal static List<ServicePriceCategorySection> GetActiveServicePricesForRanch(int ranchId)
+        {
+            if (ranchId <= 0)
+                throw new Exception("RanchId is required");
+
+            ServicePriceDAL dal = new ServicePriceDAL();
+            List<ServicePriceRow> rows = dal.GetServicePricingDashboard(ranchId);
+
+            return rows
+                .Where(x => x.IsActive && x.ItemPrice != null)
+                .GroupBy(x => new { x.CategoryId, x.CategoryName })
+                .Select(group => new ServicePriceCategorySection
+                {
+                    CategoryId = group.Key.CategoryId,
+                    CategoryName = group.Key.CategoryName,
+                    Items = group.OrderBy(x => x.ProductId).ToList()
+                })
+                .OrderBy(x => x.CategoryId)
+                .ToList();
+        }
+
         internal static int CreateProduct(CreateServiceProductRequest request)
         {
             if (request == null)

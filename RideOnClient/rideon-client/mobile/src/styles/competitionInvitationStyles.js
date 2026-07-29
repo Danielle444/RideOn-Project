@@ -334,6 +334,14 @@ const competitionInvitationStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800",
   },
+
+  ctaButtonDisabled: {
+    backgroundColor: "#D9D9D9",
+  },
+
+  ctaButtonTextDisabled: {
+    color: "#9B9B9B",
+  },
 });
 
 export default competitionInvitationStyles;

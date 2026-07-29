@@ -1,7 +1,10 @@
 import { Alert, Text, TouchableOpacity, View } from "react-native";
 import homeScreenStyles from "../../styles/homeScreenStyles";
 import { formatCompetitionDateRange } from "../../../../shared/auth/utils/competitions/competitionFormatters";
-import { getCompetitionStatusVariant } from "../../../../shared/auth/utils/competitions/competitionStatus";
+import {
+  getCompetitionStatusLabel,
+  getCompetitionStatusVariant,
+} from "../../../../shared/auth/utils/competitions/competitionStatus";
 
 function getStatusStyle(variant) {
   if (variant === "now") {
@@ -97,7 +100,7 @@ export default function HomeCompetitionCard(props) {
               { color: statusStyle.color },
             ]}
           >
-            {item.competitionStatus || ""}
+            {getCompetitionStatusLabel(item.competitionStatus) || ""}
           </Text>
         </View>
 

@@ -47,8 +47,20 @@ function canWorkerEnterCompetition(status) {
   return status === "פעילה" || status === "כעת";
 }
 
+// Display-only mapping. "פעילה" stays the stored/compared logic key everywhere
+// (getCompetitionStatusVariant and the canAdmin/Payer/Worker gates above);
+// this only changes what the user reads on a badge.
+function getCompetitionStatusLabel(status) {
+  if (status === "פעילה") {
+    return "פתוח להרשמה";
+  }
+
+  return status;
+}
+
 export {
   getCompetitionStatusVariant,
+  getCompetitionStatusLabel,
   canAdminSeeCompetitionDetails,
   canAdminRegisterCompetition,
   canAdminEnterCompetition,

@@ -1,6 +1,9 @@
 import { Text, TouchableOpacity, View } from "react-native";
 import competitionBoardStyles from "../../styles/competitionBoardStyles";
-import { getCompetitionStatusVariant } from "../../../../shared/auth/utils/competitions/competitionStatus";
+import {
+  getCompetitionStatusLabel,
+  getCompetitionStatusVariant,
+} from "../../../../shared/auth/utils/competitions/competitionStatus";
 
 function getStatusStyle(variant) {
   if (variant === "now") {
@@ -76,7 +79,7 @@ function ActionButton(props) {
 
 export default function CompetitionBoardCard(props) {
   var statusVariant = getCompetitionStatusVariant(props.status);
-  var statusDisplay = props.status || "";
+  var statusDisplay = getCompetitionStatusLabel(props.status) || "";
   var statusStyle = getStatusStyle(statusVariant);
 
   return (
