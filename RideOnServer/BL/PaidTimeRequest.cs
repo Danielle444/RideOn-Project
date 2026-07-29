@@ -519,6 +519,10 @@ namespace RideOnServer.BL
                     return "RequestedSlotPublished";
                 case "אין מקום פנוי בסלוט המבוקש (קיבולת/מאמן עסוק)":
                     return "NoFreeCapacityOrCoachBusy";
+                case "אין מקום פנוי בסלוט המבוקש (הרוכב תפוס בזמן חופף)":
+                    return "RiderConflict";
+                case "אין מקום פנוי בסלוט המבוקש (הסוס תפוס בזמן חופף)":
+                    return "HorseConflict";
                 default:
                     return "Unknown";
             }

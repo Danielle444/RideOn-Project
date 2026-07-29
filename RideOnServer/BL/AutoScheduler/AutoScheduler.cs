@@ -77,6 +77,10 @@ namespace RideOnServer.BL.AutoScheduler
             //    של assignedOrder הקיים בכל סלוט (בסיס ל-max+1).
             CoachTimeline coachTimelines = new CoachTimeline();
             SlotTimeline slotTimelines = new SlotTimeline();
+            // תפוסת רוכב/סוס (V2-0): חפיפה טהורה לפי Interval, ללא מרווח-מעבר,
+            // על פני כל הסלוטים/המגרשים/התאריכים בתחרות.
+            EntityTimeline riderTimelines = new EntityTimeline();
+            EntityTimeline horseTimelines = new EntityTimeline();
             Dictionary<int, int> maxOrderBySlot = new Dictionary<int, int>();
 
             foreach (SchedulerRequest req in data.Requests)
@@ -97,6 +101,9 @@ namespace RideOnServer.BL.AutoScheduler
 
                     coachTimelines.Add(req.CoachFederationMemberId, assignedSlot, interval);
                     slotTimelines.Add(assignedSlot.PaidTimeSlotInCompId, interval);
+                    // שיבוץ קפוא זורע גם תפוסת רוכב/סוס - בקשה חדשה לא תחפוף עליו.
+                    riderTimelines.Add(req.RiderFederationMemberId, interval);
+                    horseTimelines.Add(req.HorseId, interval);
                 }
 
                 if (req.AssignedCompSlotId.HasValue && req.AssignedOrder.HasValue)
@@ -142,12 +149,16 @@ namespace RideOnServer.BL.AutoScheduler
                     continue;
                 }
 
-                Interval? placement = TryFindPlacement(req, requestedSlot, coachTimelines, slotTimelines);
+                Interval? placement = TryFindPlacement(
+                    req, requestedSlot, coachTimelines, slotTimelines,
+                    riderTimelines, horseTimelines, out UnscheduledCause cause);
 
                 if (placement.HasValue)
                 {
                     coachTimelines.Add(req.CoachFederationMemberId, requestedSlot, placement.Value);
                     slotTimelines.Add(requestedSlot.PaidTimeSlotInCompId, placement.Value);
+                    riderTimelines.Add(req.RiderFederationMemberId, placement.Value);
+                    horseTimelines.Add(req.HorseId, placement.Value);
 
                     // assignedOrder: max הקיים בסלוט + 1 (דטרמיניסטי, לפי סדר העיבוד היציב).
                     // אין הסתמכות על ספירת המשובצים (פערים עלולים לגרום להתנגשות).
@@ -181,7 +192,7 @@ namespace RideOnServer.BL.AutoScheduler
                 }
                 else
                 {
-                    AddPendingDecision(result, req, "אין מקום פנוי בסלוט המבוקש (קיבולת/מאמן עסוק)");
+                    AddPendingDecision(result, req, ReasonForCause(cause));
                 }
             }
 
@@ -228,18 +239,42 @@ namespace RideOnServer.BL.AutoScheduler
             result.UnscheduledCount++;
         }
 
-        // מנסה למצוא את הזמן המוקדם ביותר בסלוט שמתאים לבקשה
-        // ולא מפר אילוצי מאמן/קיבולת.
+        // ממפה סיבת אי-שיבוץ ממוקדת למחרוזת ההצגה (Hebrew). קיבולת/מאמן נשמרת
+        // כמחרוזת הקיימת ללא שינוי; רוכב/סוס מקבלים מחרוזת ייעודית.
+        private static string ReasonForCause(UnscheduledCause cause)
+        {
+            switch (cause)
+            {
+                case UnscheduledCause.Rider:
+                    return "אין מקום פנוי בסלוט המבוקש (הרוכב תפוס בזמן חופף)";
+                case UnscheduledCause.Horse:
+                    return "אין מקום פנוי בסלוט המבוקש (הסוס תפוס בזמן חופף)";
+                default:
+                    return "אין מקום פנוי בסלוט המבוקש (קיבולת/מאמן עסוק)";
+            }
+        }
+
+        // מנסה למצוא את הזמן המוקדם ביותר בסלוט שמתאים לבקשה ולא מפר אילוצי
+        // קיבולת/מאמן/רוכב/סוס. מדווח דרך cause את "הסיבה הכובלת" - השלב העמוק
+        // ביותר שאליו הגיע מועמד-זמן כלשהו לפני שנחסם, כדי שכשל-קיבולת לעולם
+        // לא יסומן כרוכב/סוס ולהפך.
         private static Interval? TryFindPlacement(
             SchedulerRequest req,
             SchedulerSlot slot,
             CoachTimeline coachTimelines,
-            SlotTimeline slotTimelines)
+            SlotTimeline slotTimelines,
+            EntityTimeline riderTimelines,
+            EntityTimeline horseTimelines,
+            out UnscheduledCause cause)
         {
+            // ברירת מחדל: קיבולת/מאמן (כולל קיבולת, גבולות, חפיפת-סלוט, מאמן).
+            cause = UnscheduledCause.CapacityOrCoach;
+
             DateTime slotStart = slot.SlotDate.Date.Add(slot.StartTime);
             DateTime slotEnd = slot.SlotDate.Date.Add(slot.EndTime);
 
             // קיבולת: סך דקות שכבר תפוסות בסלוט + הבקשה הנוכחית <= קיבולת.
+            // כשל קיבולת חוזר מוקדם ולעולם אינו מסומן כרוכב/סוס.
             int usedMinutes = slotTimelines.GetUsedMinutes(slot.PaidTimeSlotInCompId);
             if (usedMinutes + req.DurationMinutes > slot.TotalCapacityMinutes)
             {
@@ -266,14 +301,42 @@ namespace RideOnServer.BL.AutoScheduler
                 // לא יחפוף עם תפוסה קיימת בסלוט.
                 if (slotTimelines.OverlapsAny(slot.PaidTimeSlotInCompId, candidate)) continue;
 
-                // המאמן לא תפוס (כולל מעבר 7 דק' אם בא ממגרש אחר).
+                // המאמן לא תפוס (כולל מעבר 7 דק' אם בא ממגרש אחר). התנהגות מאמן לא שונתה.
                 if (!coachTimelines.IsCoachAvailable(req.CoachFederationMemberId, slot, candidate, TRANSITION_MINUTES)) continue;
+
+                // מכאן והלאה - עבר קיבולת/גבולות/סלוט/מאמן; חוסמי רוכב/סוס בלבד.
+                // הרוכב לא תפוס (חפיפה טהורה, ללא מרווח-מעבר).
+                if (riderTimelines.IsBusy(req.RiderFederationMemberId, candidate))
+                {
+                    // מקדם ל-Rider רק אם טרם נמצא חוסם עמוק יותר (Horse).
+                    if (cause == UnscheduledCause.CapacityOrCoach)
+                    {
+                        cause = UnscheduledCause.Rider;
+                    }
+                    continue;
+                }
+
+                // הסוס לא תפוס (חפיפה טהורה, ללא מרווח-מעבר).
+                if (horseTimelines.IsBusy(req.HorseId, candidate))
+                {
+                    // Horse הוא השלב העמוק ביותר - תמיד גובר.
+                    cause = UnscheduledCause.Horse;
+                    continue;
+                }
 
                 return candidate;
             }
 
             return null;
         }
+    }
+
+    // סיבת אי-שיבוץ ממוקדת, נגזרת דטרמיניסטית מ-TryFindPlacement (V2-0).
+    public enum UnscheduledCause
+    {
+        CapacityOrCoach,
+        Rider,
+        Horse
     }
 
     // טווח זמנים סגור-פתוח: [Start, End).
@@ -379,6 +442,39 @@ namespace RideOnServer.BL.AutoScheduler
         public int GetCount(int slotId)
         {
             return _bySlot.TryGetValue(slotId, out List<Interval>? list) ? list.Count : 0;
+        }
+    }
+
+    // ניהול תפוסת ישות בודדת (רוכב או סוס): רשימת קטעים תפוסים לכל מזהה-ישות.
+    // חפיפה טהורה לפי Interval, ללא מרווח-מעבר (שונה מ-CoachTimeline, שמוסיף 7 דק'
+    // בין מגרשים). משמש לאכיפת אי-חפיפה של אותו רוכב/סוס על פני כל הסלוטים בתחרות.
+    public class EntityTimeline
+    {
+        private readonly Dictionary<int, List<Interval>> _byEntity = new();
+
+        public void Add(int entityId, Interval interval)
+        {
+            if (!_byEntity.ContainsKey(entityId))
+            {
+                _byEntity[entityId] = new List<Interval>();
+            }
+            _byEntity[entityId].Add(interval);
+        }
+
+        public bool IsBusy(int entityId, Interval candidate)
+        {
+            if (!_byEntity.TryGetValue(entityId, out List<Interval>? list))
+            {
+                return false;
+            }
+            foreach (Interval i in list)
+            {
+                if (i.Overlaps(candidate))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }
