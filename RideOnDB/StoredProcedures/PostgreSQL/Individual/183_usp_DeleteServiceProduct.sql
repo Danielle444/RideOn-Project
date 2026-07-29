@@ -1,4 +1,4 @@
--- 181_usp_DeleteServiceProduct.sql
+-- 183_usp_DeleteServiceProduct.sql
 --
 -- QA #53 fix — secretary "delete service" (Service Prices page) never worked.
 --

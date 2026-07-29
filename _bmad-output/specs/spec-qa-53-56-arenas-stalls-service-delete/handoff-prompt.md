@@ -14,7 +14,7 @@ deploy-coupling table). Read both before acting.
 
 1. **Apply the #53 proc to the live database — requires Oren's explicit go-ahead.**
    Follow the live-DB protocol: show the exact SQL (the body of
-   `RideOnDB/StoredProcedures/PostgreSQL/Individual/181_usp_DeleteServiceProduct.sql`),
+   `RideOnDB/StoredProcedures/PostgreSQL/Individual/183_usp_DeleteServiceProduct.sql`),
    get an explicit "go", apply via `apply_migration`, then re-read the deployed definition
    as proof. Run the side-effect-free smoke test from the companion first and confirm the
    rollback. Do NOT apply anything without the go-ahead.

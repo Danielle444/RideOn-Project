@@ -16,7 +16,7 @@
 - Root cause A (crash): the live-only proc `usp_deleteserviceproduct` guarded usage with `productrequest.productid`, **a column that does not exist** → SQLSTATE 42703 on every delete past the stall guard. Live-verified 2026-07-27.
 - Root cause B (latent FK): `DELETE FROM pricecatalog` had **no guard against `paidtimerequest`** (FK onto pricecatalog) → 23503 for any used paid-time product even after A is fixed. Live data: paid-time products 1,2 referenced by `paidtimerequest`; products 3,4,5 by `productrequest`.
 - Fixes (code committed; **proc NOT yet applied to live — see below**):
-  - Proc rewrite → `RideOnDB/StoredProcedures/PostgreSQL/Individual/181_usp_DeleteServiceProduct.sql`. Detects usage correctly via `pricecatalog` for BOTH request types; blocks with Hebrew "deactivate instead" tagged `SQLSTATE 'RN001'`; hard-deletes only truly-unused products (never destroys financial history). Matches Oren's ruling: block-and-redirect, not cascade.
+  - Proc rewrite → `RideOnDB/StoredProcedures/PostgreSQL/Individual/183_usp_DeleteServiceProduct.sql`. Detects usage correctly via `pricecatalog` for BOTH request types; blocks with Hebrew "deactivate instead" tagged `SQLSTATE 'RN001'`; hard-deletes only truly-unused products (never destroys financial history). Matches Oren's ruling: block-and-redirect, not cascade.
   - `ServicePriceDAL.DeleteServiceProduct` — catch `PostgresException` with `SqlState == "RN001"` → rethrow `BL.ValidationException(ex.MessageText)`.
   - `ServicePricesController.DeleteProduct` — catch `ValidationException` → `BadRequest(ex.Message)` (surfaces the Hebrew guard message instead of the generic string). Honesty bet, **service page only** (Oren's scope).
 
@@ -28,7 +28,7 @@ C# compiles clean (`dotnet build` — only MSB file-lock errors from a running s
 
 Per the live-DB protocol: show SQL, get explicit go, apply via `apply_migration`, re-read + smoke test.
 
-**Migration to apply** = the body in `181_usp_DeleteServiceProduct.sql` (CREATE OR REPLACE).
+**Migration to apply** = the body in `183_usp_DeleteServiceProduct.sql` (CREATE OR REPLACE).
 
 **Rollback body (exact currently-deployed definition, captured 2026-07-27 before any change):**
 ```sql

@@ -4,7 +4,7 @@ Load-bearing operational companion to `SPEC.md`. The executor needs this to sati
 
 ## The migration to apply
 
-**New proc body:** `RideOnDB/StoredProcedures/PostgreSQL/Individual/181_usp_DeleteServiceProduct.sql` (a `CREATE OR REPLACE FUNCTION`). Apply that file's body verbatim.
+**New proc body:** `RideOnDB/StoredProcedures/PostgreSQL/Individual/183_usp_DeleteServiceProduct.sql` (a `CREATE OR REPLACE FUNCTION`). Apply that file's body verbatim.
 
 Behavior: raises SQLSTATE `RN001` with a Hebrew message when the product is (a) a stall type assigned to physical stalls, or (b) referenced by any `pricecatalog` row that a `productrequest` **or** `paidtimerequest` points at. Otherwise it hard-deletes `paidtimeproduct` → `pricecatalog` → `product`, and raises `RN001` "not found" if no product row matched.
 

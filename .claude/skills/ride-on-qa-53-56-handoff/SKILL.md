@@ -26,7 +26,7 @@ is to apply the DB proc live, verify E2E, and ship — not to rewrite anything.
 - **QA #56** (frontend): `ArenasAndStallsPage.jsx` compound Add/Edit/Delete were wired to
   no-op functions; now wired to the real `useArenasAndStallsPage` handlers. Live-ready.
 - **QA #53** (backend, committed, proc NOT yet applied live):
-  - `RideOnDB/StoredProcedures/PostgreSQL/Individual/181_usp_DeleteServiceProduct.sql` —
+  - `RideOnDB/StoredProcedures/PostgreSQL/Individual/183_usp_DeleteServiceProduct.sql` —
     detects usage through `pricecatalog` for BOTH `productrequest.pricecatalogid` and
     `paidtimerequest.pricecatalogid`; raises Hebrew SQLSTATE `RN001` guards; hard-deletes
     only zero-stall / zero-order products. Fixes the old `productrequest.productid`
