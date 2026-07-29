@@ -13,7 +13,6 @@ import {
   Eye,
   EyeOff,
   MapPinned,
-  Plus,
 } from "lucide-react";
 
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
@@ -194,16 +193,6 @@ export default function CompetitionStallsPage() {
                 פרסם מפת תאים
               </button>
             )}
-
-            <button
-              type="button"
-              disabled
-              className="inline-flex cursor-not-allowed items-center gap-2 rounded-2xl border border-[#E5D9D2] bg-[#F7F1ED] px-4 py-2 text-sm font-semibold text-[#BCAAA4]"
-              title="יפותח בהמשך"
-            >
-              <Plus size={16} />
-              הוסף תא
-            </button>
           </div>
         </div>
 

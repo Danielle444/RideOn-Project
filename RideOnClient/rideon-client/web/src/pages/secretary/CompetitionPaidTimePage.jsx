@@ -619,15 +619,18 @@ export default function CompetitionPaidTimePage() {
                 </p>
               ) : null}
 
-              {filteredPendingRequests.map(function (request) {
-                return (
-                  <PaidTimeRequestCard
-                    key={request.paidTimeRequestId || request.PaidTimeRequestId}
-                    request={request}
-                    disabled={page.savingAssignment}
-                  />
-                );
-              })}
+              {!page.loadingRequests &&
+                filteredPendingRequests.map(function (request) {
+                  return (
+                    <PaidTimeRequestCard
+                      key={
+                        request.paidTimeRequestId || request.PaidTimeRequestId
+                      }
+                      request={request}
+                      disabled={page.savingAssignment}
+                    />
+                  );
+                })}
             </div>
           </aside>
 
