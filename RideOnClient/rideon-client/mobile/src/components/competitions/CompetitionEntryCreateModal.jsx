@@ -58,9 +58,20 @@ export default function CompetitionEntryCreateModal(props) {
         return item.classInCompId === editItem.classInCompId;
       });
 
-      var selectedHorse = registrations.horses.find(function (item) {
-        return item.horseId === editItem.horseId;
-      });
+      // The horse list is no longer preloaded (the picker fetches a bounded
+      // list when it opens), so the edit-mode horse is built from the entry
+      // itself. It carries every field the label and the submit payload use.
+      // Deliberately NOT resolved against registrations.horses: that list now
+      // changes on every picker open/keystroke, and depending on it here would
+      // re-run this effect and wipe the user's in-progress selections.
+      var selectedHorse = editItem.horseId
+        ? {
+            horseId: editItem.horseId,
+            horseName: editItem.horseName || "",
+            barnName: editItem.barnName || "",
+            federationNumber: editItem.federationNumber || "",
+          }
+        : null;
 
       var selectedRider = registrations.riders.find(function (item) {
         return item.federationMemberId === editItem.riderFederationMemberId;
@@ -90,7 +101,6 @@ export default function CompetitionEntryCreateModal(props) {
       props.visible,
       editItem,
       registrations.classes,
-      registrations.horses,
       registrations.riders,
       registrations.trainers,
       registrations.payers,
@@ -193,6 +203,8 @@ export default function CompetitionEntryCreateModal(props) {
             screenError={registrations.screenError}
             classes={registrations.classes}
             horses={registrations.horses}
+            horsesLoading={registrations.horsesLoading}
+            onSearchHorses={registrations.loadHorsesForPicker}
             riders={registrations.riders}
             trainers={registrations.trainers}
             payers={registrations.payers}

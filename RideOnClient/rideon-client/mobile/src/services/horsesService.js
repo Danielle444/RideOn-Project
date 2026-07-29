@@ -9,6 +9,17 @@ function getHorsesByRanch(ranchId, searchText) {
   });
 }
 
+// Bounded, real-horse-only lookup (federation-numbered horses, max 200 rows).
+// Use this for on-demand pickers; getHorsesByRanch returns the full ranch table.
+function getRealHorsesByRanch(ranchId, searchText) {
+  return axios.get("/Horses/real", {
+    params: {
+      ranchId: ranchId,
+      search: searchText || null,
+    },
+  });
+}
+
 function getCompetitionHorses(ranchId, competitionId, searchText) {
   return axios.get("/Horses/competition", {
     params: {
@@ -81,6 +92,7 @@ function approveHealthCertificate(horseId, competitionId, ranchId) {
 
 export {
   getHorsesByRanch,
+  getRealHorsesByRanch,
   getCompetitionHorses,
   updateHorseBarnName,
   getHealthCertificates,

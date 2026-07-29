@@ -27,6 +27,8 @@ export default function CompetitionRegistrationsClassesTab(props) {
       <CompetitionRegistrationFormCard
         classes={props.classes}
         horses={props.horses}
+        horsesLoading={props.horsesLoading}
+        onSearchHorses={props.onSearchHorses}
         riders={props.riders}
         trainers={props.trainers}
         payers={props.payers}

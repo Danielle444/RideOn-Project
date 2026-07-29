@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import {
@@ -6,7 +6,7 @@ import {
   getTrainersByRanch,
 } from "../services/federationMembersService";
 import { getCompetitionInvitationDetails } from "../services/competitionService";
-import { getHorsesByRanch } from "../services/horsesService";
+import { getRealHorsesByRanch } from "../services/horsesService";
 import { getManagedPayers } from "../services/payerService";
 import { createEntry } from "../services/entriesService";
 
@@ -180,8 +180,13 @@ export default function useAdminCompetitionRegistrations(params) {
   });
 
   var [loading, setLoading] = useState(false);
+  var [horsesLoading, setHorsesLoading] = useState(false);
   var [isSaving, setIsSaving] = useState(false);
   var [screenError, setScreenError] = useState("");
+
+  // Monotonic id so an out-of-order horse-search response cannot overwrite the
+  // results of a later keystroke.
+  var horsesRequestIdRef = useRef(0);
 
   var [lastCreatedEntry, setLastCreatedEntry] = useState(null);
 
@@ -233,30 +238,28 @@ export default function useAdminCompetitionRegistrations(params) {
       setLoading(true);
       setScreenError("");
 
+      // Horses are deliberately NOT loaded here — the ranch horse table is
+      // unbounded (ranch 11 holds 8,871 rows, ~69 of them real) and stalled
+      // this screen. The horse picker fetches its own bounded list when it
+      // opens, via loadHorsesForPicker below.
       var results = await Promise.all([
         getCompetitionInvitationDetails(
           competitionId,
           activeRole.roleId,
           activeRole.ranchId,
         ),
-        getHorsesByRanch(activeRole.ranchId, null),
         getManagedPayers(activeRole.ranchId, null, null),
         getRidersByRanch(activeRole.ranchId, null),
         getTrainersByRanch(activeRole.ranchId, null),
       ]);
 
       var invitationResponse = results[0];
-      var horsesResponse = results[1];
-      var payersResponse = results[2];
-      var ridersResponse = results[3];
-      var trainersResponse = results[4];
+      var payersResponse = results[1];
+      var ridersResponse = results[2];
+      var trainersResponse = results[3];
 
       var incomingClasses = Array.isArray(invitationResponse?.data?.classes)
         ? invitationResponse.data.classes
-        : [];
-
-      var incomingHorses = Array.isArray(horsesResponse?.data)
-        ? horsesResponse.data
         : [];
 
       var incomingPayers = Array.isArray(payersResponse?.data)
@@ -275,14 +278,6 @@ export default function useAdminCompetitionRegistrations(params) {
         incomingClasses
           .map(function (item) {
             return normalizeClassItem(item);
-          })
-          .filter(Boolean),
-      );
-
-      setHorses(
-        incomingHorses
-          .map(function (item) {
-            return normalizeHorseItem(item);
           })
           .filter(Boolean),
       );
@@ -318,6 +313,55 @@ export default function useAdminCompetitionRegistrations(params) {
       setLoading(false);
     }
   }
+
+  // Fetches the bounded, real-horse-only list for the horse picker. Called when
+  // the picker opens and on every debounced keystroke, with the typed text
+  // passed to the server as the search argument.
+  var loadHorsesForPicker = useCallback(
+    async function (searchText) {
+      if (!activeRole || !activeRole.ranchId) {
+        return;
+      }
+
+      var requestId = horsesRequestIdRef.current + 1;
+      horsesRequestIdRef.current = requestId;
+
+      try {
+        setHorsesLoading(true);
+
+        var response = await getRealHorsesByRanch(
+          activeRole.ranchId,
+          searchText || null,
+        );
+
+        // Ignore a slow response that a newer keystroke has already superseded.
+        if (horsesRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        var incomingHorses = Array.isArray(response?.data) ? response.data : [];
+
+        setHorses(
+          incomingHorses
+            .map(function (item) {
+              return normalizeHorseItem(item);
+            })
+            .filter(Boolean),
+        );
+      } catch (error) {
+        if (horsesRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        setHorses([]);
+      } finally {
+        if (horsesRequestIdRef.current === requestId) {
+          setHorsesLoading(false);
+        }
+      }
+    },
+    [activeRole],
+  );
 
   function handleToggleLock(fieldKey) {
     setLocks(function (prevLocks) {
@@ -475,6 +519,8 @@ export default function useAdminCompetitionRegistrations(params) {
     handleToggleLock,
 
     loading,
+    horsesLoading,
+    loadHorsesForPicker,
     isSaving,
     screenError,
     canSubmit,

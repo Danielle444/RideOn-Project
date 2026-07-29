@@ -53,6 +53,58 @@ namespace RideOnServer.DAL
             }
         }
 
+        // Bounded, real-horse-only sibling of GetHorsesByRanch. Calls
+        // usp_getrealhorsesbyranch, which filters out horses with no federation
+        // number and caps every result set at 200 rows. Same result shape as
+        // usp_gethorsesbyranch, so the HorseListItem mapping is identical.
+        public List<HorseListItem> GetRealHorsesByRanch(GetHorsesFiltersRequest filters)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@p_ranchid", filters.RanchId },
+                { "@p_search_text", (object?)filters.SearchText ?? DBNull.Value }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_getrealhorsesbyranch",
+                        connection,
+                        paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<HorseListItem> horses = new List<HorseListItem>();
+
+                        while (reader.Read())
+                        {
+                            horses.Add(new HorseListItem
+                            {
+                                HorseId = Convert.ToInt32(reader["HorseId"]),
+                                RanchId = Convert.ToInt32(reader["RanchId"]),
+                                RanchName = reader["RanchName"].ToString() ?? string.Empty,
+                                HorseName = reader["HorseName"].ToString() ?? string.Empty,
+                                BarnName = reader["BarnName"] == DBNull.Value ? null : reader["BarnName"].ToString(),
+                                FederationNumber = reader["FederationNumber"] == DBNull.Value ? null : reader["FederationNumber"].ToString(),
+                                ChipNumber = reader["ChipNumber"] == DBNull.Value ? null : reader["ChipNumber"].ToString(),
+                                BirthYear = reader["BirthYear"] == DBNull.Value ? null : Convert.ToInt16(reader["BirthYear"]),
+                                Gender = reader["Gender"] == DBNull.Value ? null : reader["Gender"].ToString()
+                            });
+                        }
+
+                        return horses;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
         public List<CompetitionHorseListItem> GetHorsesForCompetition(GetCompetitionHorsesFiltersRequest filters)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>

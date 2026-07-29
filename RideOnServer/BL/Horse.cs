@@ -38,6 +38,22 @@ namespace RideOnServer.BL
             return dal.GetHorsesByRanch(filters);
         }
 
+        internal static List<HorseListItem> GetRealHorsesByRanch(GetHorsesFiltersRequest filters)
+        {
+            if (filters == null)
+            {
+                throw new Exception("Filters are required");
+            }
+
+            if (filters.RanchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            HorseDAL dal = new HorseDAL();
+            return dal.GetRealHorsesByRanch(filters);
+        }
+
         internal static void UpdateHorseBarnName(UpdateHorseBarnNameRequest request)
         {
             if (request == null)
