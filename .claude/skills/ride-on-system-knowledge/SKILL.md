@@ -161,6 +161,17 @@ Pattern: `person.nationalid = f"{n:09d}"`, `lastname = f"היסטורי {n}"`,
 `horse.horsename = f"סוס היסטורי {n}"`, `username = f"hist_{n}"`,
 `systemuser.isactive = False`
 
+**Consequence — the `horse` table is heavily polluted with these fabricated
+horses, and they carry NO `federationnumber` (verified 2026-07-28: ranch 11 /
+Double K has 8,871 horse rows but only 69 with a real federation number — 8,802 are
+fabricated, federationnumber IS NULL).** Any live horse-listing / horse-picker
+feature MUST filter to real horses, e.g. `btrim(coalesce(federationnumber,'')) <>
+''`, or it will surface thousands of ghosts and load pathologically slowly. The live
+`usp_gethorsesbyranch` proc has **no such filter and no LIMIT** — a null search
+returns the entire ranch. Treat "real horse" ≈ "has a federation number" for
+picking/registration; the ghost rows themselves are a separate data-cleanup concern,
+not something to display.
+
 ### Entry chain shape + the billcharge requirement (verified 2026-07-24)
 
 Confirmed live while inserting fake entries into competition 46
