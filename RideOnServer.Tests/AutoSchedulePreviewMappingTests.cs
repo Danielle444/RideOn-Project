@@ -12,6 +12,183 @@ namespace RideOnServer.Tests
     // no controller, no writes.
     public class AutoSchedulePreviewMappingTests
     {
+        // ===== V2-2: moved / unchanged / frozen-reason mapping =====
+        //
+        // Built on the same "step aside" fixture the engine tests use: 200 sits in
+        // S1 having requested the PUBLISHED S2, so it can legally move to S3; 300
+        // sits inside the published S2 and is frozen; 100 can only be scheduled by
+        // moving 200 out of the way.
+        private static SchedulerData MovementScenario()
+        {
+            return new SchedulerData
+            {
+                CompetitionId = 41,
+                Now = new DateTime(2026, 7, 29, 9, 0, 0),
+                Slots = new List<SchedulerSlot>
+                {
+                    MoveSlot(1, "08:00:00", "08:11:00"),
+                    MoveSlot(2, "09:00:00", "09:11:00", isPublished: true),
+                    MoveSlot(3, "10:00:00", "10:11:00")
+                },
+                Requests = new List<SchedulerRequest>
+                {
+                    MoveAssigned(200, requestedSlotId: 2, assignedSlotId: 1,
+                        start: "08:00:00", order: 4, origin: "Manual", horseName: "Rocket"),
+                    MoveAssigned(300, requestedSlotId: 2, assignedSlotId: 2,
+                        start: "09:00:00", order: 1, origin: null, horseName: "Thunder"),
+                    new SchedulerRequest
+                    {
+                        PaidTimeRequestId = 100,
+                        HorseId = 6100,
+                        RiderFederationMemberId = 5100,
+                        CoachFederationMemberId = 7100,
+                        DurationMinutes = 11,
+                        RequestedCompSlotId = 1,
+                        Status = "Pending",
+                        SrequestDateTime = new DateTime(2026, 7, 20, 10, 0, 0),
+                        HorseName = "Comet"
+                    }
+                }
+            };
+        }
+
+        private static SchedulerSlot MoveSlot(int id, string start, string end, bool isPublished = false)
+        {
+            return new SchedulerSlot
+            {
+                PaidTimeSlotInCompId = id,
+                SlotDate = new DateTime(2026, 8, 1),
+                StartTimeRaw = start,
+                EndTimeRaw = end,
+                TotalCapacityMinutes = 11,
+                ArenaRanchId = 11,
+                ArenaId = 2,
+                ArenaName = "Arena " + id,
+                IsPublished = isPublished
+            };
+        }
+
+        private static SchedulerRequest MoveAssigned(int id, int requestedSlotId, int assignedSlotId,
+            string start, int order, string? origin, string horseName)
+        {
+            return new SchedulerRequest
+            {
+                PaidTimeRequestId = id,
+                HorseId = 6000 + id,
+                RiderFederationMemberId = 5000 + id,
+                CoachFederationMemberId = 7000 + id,
+                DurationMinutes = 11,
+                RequestedCompSlotId = requestedSlotId,
+                AssignedCompSlotId = assignedSlotId,
+                AssignedStartTime = new DateTime(2026, 8, 1).Add(TimeSpan.Parse(start)),
+                AssignedOrder = order,
+                AllocationOrigin = origin,
+                Status = "Assigned",
+                SrequestDateTime = new DateTime(2026, 7, 18, 10, 0, 0),
+                HorseName = horseName
+            };
+        }
+
+        private static AutoSchedulePreviewResponse MapMovementScenario()
+        {
+            SchedulerData data = MovementScenario();
+            List<int> candidates = data.Requests
+                .Where(r => r.Status == "Pending" && r.AssignedCompSlotId == null)
+                .Select(r => r.PaidTimeRequestId)
+                .ToList();
+
+            AutoScheduleResult result = AutoScheduler.Schedule(data, candidates, allowMovement: true);
+            return PaidTimeRequest.MapPreviewResponse(result, data, "FP");
+        }
+
+        [Fact]
+        public void MapPreviewResponse_MovedRow_CarriesBothOldAndNewState()
+        {
+            AutoSchedulePreviewResponse response = MapMovementScenario();
+
+            response.MovedCount.Should().Be(1);
+            PreviewMovedItem moved = response.MovedItems.Single();
+
+            moved.PaidTimeRequestId.Should().Be(200);
+            moved.PreviousAssignedCompSlotId.Should().Be(1);
+            moved.PreviousAssignedStartTime.Should().Be(new DateTime(2026, 8, 1, 8, 0, 0));
+            moved.PreviousAssignedOrder.Should().Be(4);
+            moved.PreviousArenaName.Should().Be("Arena 1");
+
+            moved.AssignedCompSlotId.Should().Be(3);
+            moved.AssignedStartTime.Should().Be(new DateTime(2026, 8, 1, 10, 0, 0));
+            moved.AssignedArenaName.Should().Be("Arena 3");
+            moved.HorseName.Should().Be("Rocket");
+
+            // Preserved verbatim, never rewritten to "Auto".
+            moved.AllocationOrigin.Should().Be("Manual");
+        }
+
+        [Fact]
+        public void MapPreviewResponse_ScheduledAndMoved_AreExactlyTheWriteSet()
+        {
+            AutoSchedulePreviewResponse response = MapMovementScenario();
+
+            // The documented invariant: ScheduledItems united with MovedItems is
+            // precisely what Apply will write. Frozen rows are in neither.
+            response.ScheduledItems.Select(i => i.PaidTimeRequestId)
+                .Concat(response.MovedItems.Select(i => i.PaidTimeRequestId))
+                .Should().BeEquivalentTo(new[] { 100, 200 });
+
+            response.ScheduledItems.Single().AllocationOrigin.Should().Be("Auto");
+        }
+
+        [Fact]
+        public void MapPreviewResponse_FrozenRow_CarriesItsStructuredReason()
+        {
+            AutoSchedulePreviewResponse response = MapMovementScenario();
+
+            PreviewFrozenItem frozen = response.FrozenItems.Single();
+            frozen.PaidTimeRequestId.Should().Be(300);
+            frozen.FrozenReason.Should().Be(FrozenReasons.PublishedSlot);
+            frozen.IsPublishedSlot.Should().BeTrue();
+            frozen.HorseName.Should().Be("Thunder");
+        }
+
+        [Fact]
+        public void MapPreviewResponse_UnchangedRow_IsSeparateFromFrozen_AndNotAWriteSetMember()
+        {
+            // Two-seat slot, nothing to make room for: 200 is movable but left alone.
+            SchedulerData data = new SchedulerData
+            {
+                CompetitionId = 41,
+                Now = new DateTime(2026, 7, 29, 9, 0, 0),
+                Slots = new List<SchedulerSlot>
+                {
+                    new SchedulerSlot
+                    {
+                        PaidTimeSlotInCompId = 1,
+                        SlotDate = new DateTime(2026, 8, 1),
+                        StartTimeRaw = "08:00:00",
+                        EndTimeRaw = "08:22:00",
+                        TotalCapacityMinutes = 22,
+                        ArenaRanchId = 11,
+                        ArenaId = 2,
+                        ArenaName = "Arena 1"
+                    }
+                },
+                Requests = new List<SchedulerRequest>
+                {
+                    MoveAssigned(200, requestedSlotId: 1, assignedSlotId: 1,
+                        start: "08:00:00", order: 1, origin: null, horseName: "Willow")
+                }
+            };
+
+            AutoScheduleResult result = AutoScheduler.Schedule(data, new List<int>(), allowMovement: true);
+            AutoSchedulePreviewResponse response = PaidTimeRequest.MapPreviewResponse(result, data, "FP");
+
+            response.UnchangedCount.Should().Be(1);
+            response.UnchangedItems.Single().PaidTimeRequestId.Should().Be(200);
+            response.FrozenItems.Should().BeEmpty();
+            response.MovedItems.Should().BeEmpty();
+            response.ScheduledItems.Should().BeEmpty();
+        }
+
         private static SchedulerSlot Slot(
             int id,
             bool isPublished = false,

@@ -284,11 +284,19 @@ namespace RideOnServer.BL
         // גבול-הבטיחות הסופי (נעילת-ייעוץ, הגנת-שורה-מיושנת, חפיפה, וטרנזקציית הכול-או-
         // כלום) נשאר ב-usp_applyautoschedule. אי-התאמת Fingerprint מוגנת כאן ומונעת
         // כתיבה כלשהי; שינוי מצב שיתרחש *אחרי* ההשוואה ולפני ה-SP ייכשל בבטחה ב-SP.
-        internal static AutoSchedulerSummary ApplyAutoSchedule(int competitionId, string submittedFingerprint)
+        internal static AutoSchedulerSummary ApplyAutoSchedule(
+            int competitionId,
+            string submittedFingerprint,
+            int appliedByPersonId)
         {
             if (competitionId <= 0)
             {
                 throw new Exception("Invalid CompetitionId");
+            }
+
+            if (appliedByPersonId <= 0)
+            {
+                throw new Exception("Invalid AppliedByPersonId");
             }
 
             if (string.IsNullOrWhiteSpace(submittedFingerprint))
@@ -305,8 +313,9 @@ namespace RideOnServer.BL
             AutoScheduleApplyPlan plan =
                 BuildVerifiedApplyPlan(data, competitionId, submittedFingerprint);
 
-            // מוסר ל-DAL/פרוצדורה 129 בדיוק את ההחלטות והמזהים המורשים שהשרת ייצר.
-            dal.ApplyAutoSchedule(plan.Decisions, plan.AllowedRequestIds, competitionId);
+            // מוסר לפרוצדורה 182 את קבוצת-הכתיבה שהשרת עצמו ייצר, ואת זהות
+            // המאשר לצורך שורת-הביקורת. פרוצדורה 129 נשארת למסלול ה-bulk.
+            dal.ApplyAutoScheduleV2(plan.WritePlan, competitionId, appliedByPersonId);
 
             // סיכום זהה במבנה לזה של RunAutoScheduler (חוזה AutoSchedulerSummary קיים).
             List<UnscheduledRequestItem> unscheduledItems = plan.Result.Audit
@@ -363,9 +372,74 @@ namespace RideOnServer.BL
             return new AutoScheduleApplyPlan
             {
                 CompetitionId = competitionId,
-                AllowedRequestIds = candidateIds.ToArray(),
+                WritePlan = BuildWritePlan(result),
                 Decisions = result.Assignments,
                 Result = result
+            };
+        }
+
+        // בונה את קבוצת-הכתיבה מתוך החלטות המנוע: *אך ורק* שיבוצים חדשים
+        // ושיבוצים קיימים שהוזזו. החלטת Pending אינה שורת-כתיבה, ושורה שלא זזה
+        // או שקפואה אינה החלטה מלכתחילה ולכן אינה יכולה להגיע לכאן.
+        //
+        // public (ולא private) לצורך בדיקות-יחידה טהורות ללא DB, לפי מוסכמת הפרויקט.
+        public static AutoScheduleWritePlan BuildWritePlan(AutoScheduleResult result)
+        {
+            List<AutoScheduleWritePlanItem> items = new List<AutoScheduleWritePlanItem>();
+
+            foreach (AssignmentDecision d in result.Assignments)
+            {
+                if (d.Status != "Assigned")
+                {
+                    continue;
+                }
+
+                if (d.ChangeKind != ChangeKinds.NewAssignment && d.ChangeKind != ChangeKinds.Moved)
+                {
+                    throw new Exception(
+                        $"Assigned decision for request {d.PaidTimeRequestId} has unexpected ChangeKind '{d.ChangeKind}'");
+                }
+
+                if (!d.AssignedCompSlotId.HasValue || !d.AssignedStartTime.HasValue || !d.AssignedOrder.HasValue)
+                {
+                    throw new Exception($"Incomplete Assigned decision for request {d.PaidTimeRequestId}");
+                }
+
+                bool isMove = d.ChangeKind == ChangeKinds.Moved;
+
+                if (isMove
+                    && (!d.PreviousAssignedCompSlotId.HasValue
+                        || !d.PreviousAssignedStartTime.HasValue
+                        || !d.PreviousAssignedOrder.HasValue))
+                {
+                    throw new Exception($"Moved decision for request {d.PaidTimeRequestId} is missing its old state");
+                }
+
+                items.Add(new AutoScheduleWritePlanItem
+                {
+                    PaidTimeRequestId = d.PaidTimeRequestId,
+                    ChangeKind = d.ChangeKind,
+
+                    // שיבוץ חדש נבדק כ-Pending ולא-משובץ (בדיוק כמו בפרוצדורה 129);
+                    // הזזה נבדקת מול המיקום הישן המדויק שהתצוגה המקדימה הראתה.
+                    ExpectedStatus = isMove ? "Assigned" : "Pending",
+                    ExpectedAssignedCompSlotId = isMove ? d.PreviousAssignedCompSlotId : null,
+                    ExpectedAssignedStartTime = isMove ? d.PreviousAssignedStartTime : null,
+                    ExpectedAssignedOrder = isMove ? d.PreviousAssignedOrder : null,
+                    ExpectedAllocationOrigin = isMove ? d.PreviousAllocationOrigin : null,
+
+                    NewAssignedCompSlotId = d.AssignedCompSlotId.Value,
+                    NewAssignedStartTime = d.AssignedStartTime.Value,
+                    NewAssignedOrder = d.AssignedOrder.Value,
+                    NewStatus = "Assigned",
+                    NewAllocationOrigin = d.AllocationOrigin
+                });
+            }
+
+            return new AutoScheduleWritePlan
+            {
+                ExpectedWriteSetCount = items.Count,
+                Items = items
             };
         }
 
@@ -417,6 +491,7 @@ namespace RideOnServer.BL
             List<PreviewScheduledItem> scheduledItems = result.Assignments
                 .Where(a =>
                     a.Status == "Assigned"
+                    && a.ChangeKind == ChangeKinds.NewAssignment
                     && a.AssignedCompSlotId.HasValue
                     && a.AssignedStartTime.HasValue)
                 .OrderBy(a => a.AssignedStartTime)
@@ -445,7 +520,55 @@ namespace RideOnServer.BL
                         RiderName = req?.RiderName ?? string.Empty,
                         CoachName = req?.CoachName,
                         PayerName = req?.PayerName ?? string.Empty,
-                        AssignedArenaName = ResolveArenaName(slotById, a.AssignedCompSlotId!.Value)
+                        AssignedArenaName = ResolveArenaName(slotById, a.AssignedCompSlotId!.Value),
+                        AllocationOrigin = a.AllocationOrigin
+                    };
+                })
+                .ToList();
+
+            // V2-2: שיבוצים קיימים שיוזזו. יחד עם scheduledItems אלה *בדיוק*
+            // השורות ש-Apply יכתוב - התצוגה אינה יכולה להסתיר תנועה.
+            List<PreviewMovedItem> movedItems = result.Assignments
+                .Where(a =>
+                    a.Status == "Assigned"
+                    && a.ChangeKind == ChangeKinds.Moved
+                    && a.AssignedCompSlotId.HasValue
+                    && a.AssignedStartTime.HasValue)
+                .OrderBy(a => a.AssignedStartTime)
+                .ThenBy(a => a.PaidTimeRequestId)
+                .Select(a =>
+                {
+                    requestById.TryGetValue(a.PaidTimeRequestId, out SchedulerRequest? req);
+                    return new PreviewMovedItem
+                    {
+                        PaidTimeRequestId = a.PaidTimeRequestId,
+                        HorseId = a.HorseId,
+                        CoachFederationMemberId = a.CoachFederationMemberId,
+                        RiderFederationMemberId = req?.RiderFederationMemberId,
+                        RequestedCompSlotId = req?.RequestedCompSlotId ?? 0,
+                        EffectiveDurationMinutes = req?.DurationMinutes ?? 0,
+
+                        PreviousAssignedCompSlotId = a.PreviousAssignedCompSlotId ?? 0,
+                        PreviousAssignedStartTime = a.PreviousAssignedStartTime ?? default,
+                        PreviousAssignedOrder = a.PreviousAssignedOrder ?? 0,
+                        PreviousArenaName = ResolveArenaName(slotById, a.PreviousAssignedCompSlotId ?? 0),
+
+                        AssignedCompSlotId = a.AssignedCompSlotId!.Value,
+                        AssignedStartTime = a.AssignedStartTime!.Value,
+                        AssignedOrder = a.AssignedOrder ?? 0,
+                        AssignedArenaName = ResolveArenaName(slotById, a.AssignedCompSlotId!.Value),
+
+                        PlacementKind = string.IsNullOrWhiteSpace(a.PlacementKind)
+                            ? PlacementKinds.Requested
+                            : a.PlacementKind,
+                        // נשמר במדויק, כולל NULL.
+                        AllocationOrigin = a.AllocationOrigin,
+
+                        HorseName = req?.HorseName ?? string.Empty,
+                        BarnName = req?.BarnName,
+                        RiderName = req?.RiderName ?? string.Empty,
+                        CoachName = req?.CoachName,
+                        PayerName = req?.PayerName ?? string.Empty
                     };
                 })
                 .ToList();
@@ -466,6 +589,9 @@ namespace RideOnServer.BL
                         ReasonCode = MapUnscheduledReasonCode(x.Reason),
                         // V2-1: אות מובנה נפרד. Reason/ReasonCode אינם מושפעים.
                         AdjacentSlotsTried = d?.AdjacentSlotsTried ?? false,
+                        // V2-2: אותות מובנים נוספים, באותה צורה בדיוק.
+                        MovementAttempted = d?.MovementAttempted ?? false,
+                        MovementSearchExhausted = d?.MovementSearchExhausted ?? false,
                         HorseName = req?.HorseName ?? string.Empty,
                         BarnName = req?.BarnName,
                         RiderName = req?.RiderName ?? string.Empty,
@@ -487,6 +613,31 @@ namespace RideOnServer.BL
                         AssignedCompSlotId = req?.AssignedCompSlotId ?? x.NewSlotId ?? 0,
                         AssignedStartTime = req?.AssignedStartTime ?? x.NewStartTime,
                         AssignedOrder = req?.AssignedOrder,
+                        FrozenReason = x.FrozenReason,
+                        IsPublishedSlot = x.FrozenReason == FrozenReasons.PublishedSlot,
+                        AllocationOrigin = req?.AllocationOrigin,
+                        HorseName = req?.HorseName ?? string.Empty,
+                        BarnName = req?.BarnName,
+                        AssignedArenaName = ResolveArenaName(slotById, req?.AssignedCompSlotId ?? x.NewSlotId ?? 0)
+                    };
+                })
+                .ToList();
+
+            // V2-2: ניתן היה להזיז, ונשאר במקומו. אינו נכתב ואינו נרשם בביקורת.
+            List<PreviewUnchangedItem> unchangedItems = result.Audit
+                .Where(x => x.Action == "kept-unchanged")
+                .Select(x =>
+                {
+                    requestById.TryGetValue(x.PaidTimeRequestId, out SchedulerRequest? req);
+                    return new PreviewUnchangedItem
+                    {
+                        PaidTimeRequestId = x.PaidTimeRequestId,
+                        HorseId = req?.HorseId ?? 0,
+                        CoachFederationMemberId = req?.CoachFederationMemberId,
+                        AssignedCompSlotId = req?.AssignedCompSlotId ?? x.NewSlotId ?? 0,
+                        AssignedStartTime = req?.AssignedStartTime ?? x.NewStartTime,
+                        AssignedOrder = req?.AssignedOrder,
+                        AllocationOrigin = req?.AllocationOrigin,
                         HorseName = req?.HorseName ?? string.Empty,
                         BarnName = req?.BarnName,
                         AssignedArenaName = ResolveArenaName(slotById, req?.AssignedCompSlotId ?? x.NewSlotId ?? 0)
@@ -501,9 +652,13 @@ namespace RideOnServer.BL
                 ScheduledCount = result.ScheduledCount,
                 UnscheduledCount = result.UnscheduledCount,
                 FrozenCount = result.FrozenCount,
+                MovedCount = result.MovedCount,
+                UnchangedCount = result.UnchangedCount,
                 ScheduledItems = scheduledItems,
                 UnscheduledItems = unscheduledItems,
-                FrozenItems = frozenItems
+                FrozenItems = frozenItems,
+                MovedItems = movedItems,
+                UnchangedItems = unchangedItems
             };
         }
 
@@ -589,7 +744,13 @@ namespace RideOnServer.BL
                   .Append(r.CoachFederationMemberId).Append('|')
                   .Append(r.HorseId).Append('|')
                   .Append(r.RiderFederationMemberId).Append('|')
-                  .Append(r.SrequestDateTime.ToString("o", CultureInfo.InvariantCulture)).Append('\n');
+                  .Append(r.SrequestDateTime.ToString("o", CultureInfo.InvariantCulture)).Append('|')
+                  // V2-2: מקור-השיבוץ נכלל כי הוא חלק ממשמעות ההצעה - שורה שהוזזה
+                  // חייבת לשמר אותו, והמזכירה מאשרת גם אותו. שינוי ידני שמשנה רק
+                  // את המקור (למשל שיבוץ-מחדש לאותו מיקום) מייַשן את התצוגה כראוי.
+                  // *מוחרג במכוון:* paymentid - תשלום אינו מקפיא שיבוץ (החלטה
+                  // עסקית מאושרת), ולכן אינו קלט-שיבוץ ואינו חלק מהמשמעות.
+                  .Append(r.AllocationOrigin ?? string.Empty).Append('\n');
             }
 
             using SHA256 sha = SHA256.Create();

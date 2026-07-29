@@ -35,6 +35,32 @@ var DEFAULT_PLACEMENT_KIND = "Requested";
 // one same-day adjacent slot before giving up. It never replaces the reason.
 var ADJACENT_SLOTS_TRIED_LABEL = "נבדקו גם סלוטים סמוכים באותו יום";
 
+// V2-2. Shown when the bounded movement search stopped at its depth/node limit
+// rather than proving no legal plan exists. Additive: it is rendered ALONGSIDE
+// the requested-slot reason and never replaces it, exactly like the label above.
+var MOVEMENT_SEARCH_EXHAUSTED_LABEL =
+  "נבדקו אפשרויות להזזת שיבוצים קיימים, אך החיפוש הגיע למגבלת העומק";
+
+// V2-2. Why an existing assignment cannot be moved at all (as opposed to simply
+// not needing to move, which is the "unchanged" bucket). Decided by the server.
+var FROZEN_REASON_LABELS = {
+  PublishedSlot: "השיבוץ נמצא בסלוט שפורסם ולכן לא ניתן להזיז אותו",
+  OutOfScopePlacement: "השיבוץ הקיים נמצא מחוץ לטווח הסלוטים הסמוכים",
+  NoStartTime: "לשיבוץ הקיים חסרה שעת התחלה ולכן הוא לא יוזז",
+  // The row itself is healthy; the SLOT holds a legacy assignment with no start
+  // time, so the whole slot is out of automatic scope.
+  UnsafeLegacySlot:
+    "הסלוט מכיל שיבוץ קיים ללא שעת התחלה ולכן אינו זמין לשיבוץ אוטומטי",
+};
+
+// V2-2 moved-row copy.
+var MOVED_BADGE_LABEL = "שיבוץ קיים יוזז";
+
+// Old -> new, used for every changed field on a moved row.
+function formatOldToNew(oldValue, newValue) {
+  return "מ־" + String(oldValue) + " אל " + String(newValue);
+}
+
 var HORSE_FALLBACK = "סוס";
 var DASH = "—";
 
@@ -313,6 +339,7 @@ function mapFrozenItem(item, slotIndex) {
   var startTimeRaw = pick(item, "assignedStartTime", "AssignedStartTime");
   var assignedOrder = pick(item, "assignedOrder", "AssignedOrder");
   var startTimeLabel = formatTime(startTimeRaw);
+  var frozenReason = pick(item, "frozenReason", "FrozenReason");
 
   return {
     paidTimeRequestId: pick(item, "paidTimeRequestId", "PaidTimeRequestId"),
@@ -327,6 +354,131 @@ function mapFrozenItem(item, slotIndex) {
       assignedOrder === null || assignedOrder === undefined
         ? null
         : Number(assignedOrder),
+    // V2-2. Absent on an older server response -> no reason line, nothing breaks.
+    frozenReason: isNonEmptyString(frozenReason) ? frozenReason : null,
+    frozenReasonLabel: isNonEmptyString(frozenReason)
+      ? FROZEN_REASON_LABELS[frozenReason] || null
+      : null,
+    isPublishedSlot: pick(item, "isPublishedSlot", "IsPublishedSlot") === true,
+    allocationOrigin: pick(item, "allocationOrigin", "AllocationOrigin") || null,
+  };
+}
+
+// V2-2. An existing assignment that WILL be moved. Carries both states so the
+// secretary sees exactly what changes; together with the scheduled items this is
+// precisely the set of rows Apply will write.
+function mapMovedItem(item, slotIndex) {
+  var previousSlotId = pick(
+    item,
+    "previousAssignedCompSlotId",
+    "PreviousAssignedCompSlotId",
+  );
+  var assignedSlotId = pick(item, "assignedCompSlotId", "AssignedCompSlotId");
+  var previousStart = formatTime(
+    pick(item, "previousAssignedStartTime", "PreviousAssignedStartTime"),
+  );
+  var newStart = formatTime(
+    pick(item, "assignedStartTime", "AssignedStartTime"),
+  );
+  var previousOrder = pick(
+    item,
+    "previousAssignedOrder",
+    "PreviousAssignedOrder",
+  );
+  var assignedOrder = pick(item, "assignedOrder", "AssignedOrder");
+  var duration = pick(
+    item,
+    "effectiveDurationMinutes",
+    "EffectiveDurationMinutes",
+  );
+  var placementKind = normalizePlacementKind(
+    pick(item, "placementKind", "PlacementKind"),
+  );
+
+  var previousSlotLabel = buildSlotLabel(slotIndex, previousSlotId);
+  var assignedSlotLabel = buildSlotLabel(slotIndex, assignedSlotId);
+
+  return {
+    paidTimeRequestId: pick(item, "paidTimeRequestId", "PaidTimeRequestId"),
+    horse: displayHorse(item),
+    barnName: rawBarnName(item),
+    rider: displayRider(item),
+    coach: displayCoach(item),
+    payer: displayPayer(item),
+
+    placementKind: placementKind,
+    placementKindLabel: placementKindLabel(placementKind),
+
+    previousSlotId: previousSlotId,
+    previousSlotLabel: previousSlotLabel,
+    previousStartTime: isNonEmptyString(previousStart) ? previousStart : DASH,
+    previousOrder:
+      previousOrder === null || previousOrder === undefined
+        ? null
+        : Number(previousOrder),
+    previousArena:
+      pick(item, "previousArenaName", "PreviousArenaName") || DASH,
+
+    assignedSlotId: assignedSlotId,
+    assignedSlotLabel: assignedSlotLabel,
+    startTime: isNonEmptyString(newStart) ? newStart : DASH,
+    assignedOrder:
+      assignedOrder === null || assignedOrder === undefined
+        ? null
+        : Number(assignedOrder),
+    arena: resolveArenaDisplay(
+      pick(item, "assignedArenaName", "AssignedArenaName"),
+      slotIndex,
+      assignedSlotId,
+    ),
+
+    // Ready-made "מ־X אל Y" strings so the modal never formats them itself.
+    slotChangeLabel: formatOldToNew(previousSlotLabel, assignedSlotLabel),
+    startTimeChangeLabel: formatOldToNew(
+      isNonEmptyString(previousStart) ? previousStart : DASH,
+      isNonEmptyString(newStart) ? newStart : DASH,
+    ),
+    orderChangeLabel: formatOldToNew(
+      previousOrder === null || previousOrder === undefined
+        ? DASH
+        : previousOrder,
+      assignedOrder === null || assignedOrder === undefined
+        ? DASH
+        : assignedOrder,
+    ),
+
+    // Preserved verbatim from the previous value, including null.
+    allocationOrigin: pick(item, "allocationOrigin", "AllocationOrigin") || null,
+    durationMinutes:
+      duration === null || duration === undefined ? null : Number(duration),
+  };
+}
+
+// V2-2. Movable, but deliberately left alone. Never written, never audited.
+function mapUnchangedItem(item, slotIndex) {
+  var assignedSlotId = pick(item, "assignedCompSlotId", "AssignedCompSlotId");
+  var startTimeLabel = formatTime(
+    pick(item, "assignedStartTime", "AssignedStartTime"),
+  );
+  var assignedOrder = pick(item, "assignedOrder", "AssignedOrder");
+
+  return {
+    paidTimeRequestId: pick(item, "paidTimeRequestId", "PaidTimeRequestId"),
+    horse: displayHorse(item),
+    barnName: rawBarnName(item),
+    assignedSlotId: assignedSlotId,
+    assignedSlotLabel: buildSlotLabel(slotIndex, assignedSlotId),
+    arena: resolveArenaDisplay(
+      pick(item, "assignedArenaName", "AssignedArenaName"),
+      slotIndex,
+      assignedSlotId,
+    ),
+    startTime: isNonEmptyString(startTimeLabel) ? startTimeLabel : DASH,
+    assignedOrder:
+      assignedOrder === null || assignedOrder === undefined
+        ? null
+        : Number(assignedOrder),
+    allocationOrigin: pick(item, "allocationOrigin", "AllocationOrigin") || null,
   };
 }
 
@@ -337,6 +489,11 @@ function mapUnscheduledItem(item, slotIndex) {
   // Missing on an older server response - defaults to false (nothing shown).
   var adjacentSlotsTried =
     pick(item, "adjacentSlotsTried", "AdjacentSlotsTried") === true;
+  // V2-2, same shape: additive signals that never alter the reason below.
+  var movementAttempted =
+    pick(item, "movementAttempted", "MovementAttempted") === true;
+  var movementSearchExhausted =
+    pick(item, "movementSearchExhausted", "MovementSearchExhausted") === true;
 
   return {
     paidTimeRequestId: pick(item, "paidTimeRequestId", "PaidTimeRequestId"),
@@ -349,6 +506,13 @@ function mapUnscheduledItem(item, slotIndex) {
     adjacentSlotsTried: adjacentSlotsTried,
     adjacentSlotsTriedLabel: adjacentSlotsTried
       ? ADJACENT_SLOTS_TRIED_LABEL
+      : null,
+    movementAttempted: movementAttempted,
+    // Only the exhausted case earns its own visible line; a movement search that
+    // simply found nothing adds no information beyond the reason itself.
+    movementSearchExhausted: movementSearchExhausted,
+    movementSearchExhaustedLabel: movementSearchExhausted
+      ? MOVEMENT_SEARCH_EXHAUSTED_LABEL
       : null,
     reasonText: mapUnscheduledReason(reason, reasonCode),
     // Raw code preserved for future badge/detail use (may be undefined).
@@ -372,6 +536,12 @@ function mapAutoSchedulePreview(response, slots) {
   var rawUnscheduled = asArray(
     pick(safeResponse, "unscheduledItems", "UnscheduledItems"),
   );
+  // V2-2 buckets. An older server response simply has neither key, and asArray
+  // turns that into an empty list - no branch, no crash, no missing section.
+  var rawMoved = asArray(pick(safeResponse, "movedItems", "MovedItems"));
+  var rawUnchanged = asArray(
+    pick(safeResponse, "unchangedItems", "UnchangedItems"),
+  );
 
   var scheduled = rawScheduled.map(function (item) {
     return mapScheduledItem(item, slotIndex);
@@ -385,8 +555,20 @@ function mapAutoSchedulePreview(response, slots) {
     return mapUnscheduledItem(item, slotIndex);
   });
 
+  var moved = rawMoved.map(function (item) {
+    return mapMovedItem(item, slotIndex);
+  });
+
+  var unchanged = rawUnchanged.map(function (item) {
+    return mapUnchangedItem(item, slotIndex);
+  });
+
   var isEmpty =
-    scheduled.length === 0 && frozen.length === 0 && unscheduled.length === 0;
+    scheduled.length === 0 &&
+    frozen.length === 0 &&
+    unscheduled.length === 0 &&
+    moved.length === 0 &&
+    unchanged.length === 0;
 
   return {
     // Preserved for future Stage D (Apply) staleness checks - NOT displayed or
@@ -401,15 +583,21 @@ function mapAutoSchedulePreview(response, slots) {
       scheduled: scheduled.length,
       frozen: frozen.length,
       unscheduled: unscheduled.length,
+      moved: moved.length,
+      unchanged: unchanged.length,
       // Server-reported counts preserved for reference (may be undefined).
       serverScheduled: pick(safeResponse, "scheduledCount", "ScheduledCount"),
       serverFrozen: pick(safeResponse, "frozenCount", "FrozenCount"),
       serverUnscheduled: pick(safeResponse, "unscheduledCount", "UnscheduledCount"),
+      serverMoved: pick(safeResponse, "movedCount", "MovedCount"),
+      serverUnchanged: pick(safeResponse, "unchangedCount", "UnchangedCount"),
     },
 
     scheduled: scheduled,
     frozen: frozen,
     unscheduled: unscheduled,
+    moved: moved,
+    unchanged: unchanged,
   };
 }
 
@@ -418,7 +606,11 @@ export {
   mapUnscheduledReason,
   normalizePlacementKind,
   placementKindLabel,
+  formatOldToNew,
   REASON_CODE_LABELS,
   PLACEMENT_KIND_LABELS,
   ADJACENT_SLOTS_TRIED_LABEL,
+  MOVEMENT_SEARCH_EXHAUSTED_LABEL,
+  FROZEN_REASON_LABELS,
+  MOVED_BADGE_LABEL,
 };

@@ -58,7 +58,9 @@ namespace RideOnServer.BL.AutoScheduler
                 };
             }
 
-            AutoScheduleResult result = AutoScheduler.Schedule(data, candidateRequestIds);
+            // מסלול ה-bulk נשאר V2-1 בדיוק: allowMovement=false. פרוצדורה 129
+            // מקבלת אך ורק שיבוצים חדשים, ולכן אסור שהמנוע ייצר כאן החלטות-הזזה.
+            AutoScheduleResult result = AutoScheduler.Schedule(data, candidateRequestIds, false);
 
             // אימות שוויון-קבוצות הגנתי (המנוע כבר מוודא זאת).
             HashSet<int> decisionIds = result.Assignments.Select(a => a.PaidTimeRequestId).ToHashSet();
@@ -104,13 +106,32 @@ namespace RideOnServer.BL.AutoScheduler
             // בניגוד למסלול ההרצה, אין כאן short-circuit על קבוצת-מועמדים ריקה:
             // גם ללא מועמדים, התצוגה המקדימה צריכה להציג את השיבוצים הקפואים
             // הקיימים (FrozenItems), ולכן מריצים את האלגוריתם תמיד.
-            AutoScheduleResult result = AutoScheduler.Schedule(data, candidateRequestIds);
+            //
+            // V2-2: זהו המסלול היחיד שבו הזזת שיבוצים קיימים מותרת. הוא משותף
+            // ל-Preview ול-Apply (BuildVerifiedApplyPlan קורא לאותה מתודה בדיוק
+            // על אותה תמונת-מצב), ולכן זהות התוצאה בין השניים מובטחת מבנית.
+            AutoScheduleResult result = AutoScheduler.Schedule(data, candidateRequestIds, true);
 
-            // אימות שוויון-קבוצות הגנתי (המנוע כבר מוודא זאת).
+            // אימות שוויון-קבוצות הגנתי: ההחלטות הן המועמדים *ועוד* שיבוצים
+            // קיימים שהוזזו. שורות שלא זזו וקפואות אינן החלטות.
             HashSet<int> decisionIds = result.Assignments.Select(a => a.PaidTimeRequestId).ToHashSet();
-            if (!decisionIds.SetEquals(candidateSet))
+            HashSet<int> movedIds = result.Assignments
+                .Where(a => a.ChangeKind == ChangeKinds.Moved)
+                .Select(a => a.PaidTimeRequestId)
+                .ToHashSet();
+
+            HashSet<int> expectedIds = new HashSet<int>(candidateSet);
+            expectedIds.UnionWith(movedIds);
+
+            if (!decisionIds.SetEquals(expectedIds))
             {
                 throw new Exception("Decision set does not equal candidate set");
+            }
+
+            // כל מזהה שאינו מועמד חייב להיות החלטת-הזזה - לעולם לא שיבוץ חדש.
+            if (movedIds.Overlaps(candidateSet))
+            {
+                throw new Exception("A candidate request was emitted as a moved decision");
             }
 
             return result;
