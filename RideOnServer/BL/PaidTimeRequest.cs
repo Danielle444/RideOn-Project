@@ -434,6 +434,12 @@ namespace RideOnServer.BL
                         EffectiveDurationMinutes = req?.DurationMinutes ?? 0,
                         RequestedCompSlotId = req?.RequestedCompSlotId ?? 0,
                         RiderFederationMemberId = req?.RiderFederationMemberId,
+                        // V2-1: מועבר כמות-שהוא מהחלטת המנוע. אין גזירה מחדש כאן
+                        // (השוואת סלוטים/זמנים בשכבת המיפוי הייתה משכפלת את כלל
+                        // הסמיכות ומסכנת את זהות Preview/Apply).
+                        PlacementKind = string.IsNullOrWhiteSpace(a.PlacementKind)
+                            ? PlacementKinds.Requested
+                            : a.PlacementKind,
                         HorseName = req?.HorseName ?? string.Empty,
                         BarnName = req?.BarnName,
                         RiderName = req?.RiderName ?? string.Empty,
@@ -458,6 +464,8 @@ namespace RideOnServer.BL
                         RequestedCompSlotId = req?.RequestedCompSlotId ?? 0,
                         Reason = x.Reason ?? "לא צוינה סיבה",
                         ReasonCode = MapUnscheduledReasonCode(x.Reason),
+                        // V2-1: אות מובנה נפרד. Reason/ReasonCode אינם מושפעים.
+                        AdjacentSlotsTried = d?.AdjacentSlotsTried ?? false,
                         HorseName = req?.HorseName ?? string.Empty,
                         BarnName = req?.BarnName,
                         RiderName = req?.RiderName ?? string.Empty,

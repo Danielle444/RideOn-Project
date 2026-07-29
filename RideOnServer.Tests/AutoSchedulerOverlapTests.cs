@@ -9,6 +9,17 @@ namespace RideOnServer.Tests
     // (AutoScheduler.Schedule). These build an in-memory SchedulerData and call the
     // engine directly — no database, no writes. Coach behavior is asserted to be
     // unchanged (same-arena overlap + 7-min cross-arena transition preserved).
+    //
+    // V2-1 fixture note: several cases below pair Slot(1) and Slot(2) on the SAME
+    // date, in the SAME arena, over the SAME hours, purely to force a rider/horse/
+    // coach conflict across two slots. Under V2-1 those two slots are same-day
+    // positional neighbours, so a request blocked in slot 2 would legitimately fall
+    // back into slot 1 at a later, non-conflicting start — which would stop the test
+    // from pinning what it was written to pin. Those fixtures therefore cap the
+    // neighbour with capacityMinutes: 11 (room for exactly one ride), so the
+    // adjacent-slot attempt fails on capacity and the V2-0 property under test is
+    // still the thing being asserted. The reported reason stays the requested-slot
+    // cause, since V2-1 anchors the reason to Phase 1.
     public class AutoSchedulerOverlapTests
     {
         private const string RiderReason = "אין מקום פנוי בסלוט המבוקש (הרוכב תפוס בזמן חופף)";
@@ -89,7 +100,7 @@ namespace RideOnServer.Tests
             {
                 CompetitionId = 41,
                 Now = new DateTime(2026, 7, 23, 9, 0, 0),
-                Slots = new List<SchedulerSlot> { Slot(1), Slot(2) },
+                Slots = new List<SchedulerSlot> { Slot(1, capacityMinutes: 11), Slot(2) },
                 Requests = new List<SchedulerRequest>
                 {
                     Pending(100, requestedSlotId: 1, rider: 5000, horse: 1, coach: 10),
@@ -115,7 +126,7 @@ namespace RideOnServer.Tests
             {
                 CompetitionId = 41,
                 Now = new DateTime(2026, 7, 23, 9, 0, 0),
-                Slots = new List<SchedulerSlot> { Slot(1), Slot(2) },
+                Slots = new List<SchedulerSlot> { Slot(1, capacityMinutes: 11), Slot(2) },
                 Requests = new List<SchedulerRequest>
                 {
                     Pending(100, requestedSlotId: 1, rider: 1, horse: 7000, coach: 10),
@@ -256,7 +267,7 @@ namespace RideOnServer.Tests
             {
                 CompetitionId = 41,
                 Now = new DateTime(2026, 7, 23, 9, 0, 0),
-                Slots = new List<SchedulerSlot> { Slot(1), Slot(2) },
+                Slots = new List<SchedulerSlot> { Slot(1, capacityMinutes: 11), Slot(2) },
                 Requests = new List<SchedulerRequest>
                 {
                     Assigned(200, slotId: 1, rider: 5000, horse: 900, coach: 10),
@@ -281,7 +292,7 @@ namespace RideOnServer.Tests
             {
                 CompetitionId = 41,
                 Now = new DateTime(2026, 7, 23, 9, 0, 0),
-                Slots = new List<SchedulerSlot> { Slot(1), Slot(2) },
+                Slots = new List<SchedulerSlot> { Slot(1, capacityMinutes: 11), Slot(2) },
                 Requests = new List<SchedulerRequest>
                 {
                     Assigned(200, slotId: 1, rider: 950, horse: 7000, coach: 10),
@@ -306,7 +317,7 @@ namespace RideOnServer.Tests
             {
                 CompetitionId = 41,
                 Now = new DateTime(2026, 7, 23, 9, 0, 0),
-                Slots = new List<SchedulerSlot> { Slot(1, arenaId: 1), Slot(2, arenaId: 1) },
+                Slots = new List<SchedulerSlot> { Slot(1, arenaId: 1, capacityMinutes: 11), Slot(2, arenaId: 1) },
                 Requests = new List<SchedulerRequest>
                 {
                     Pending(100, requestedSlotId: 1, rider: 1, horse: 1, coach: 9000),
@@ -448,7 +459,7 @@ namespace RideOnServer.Tests
             {
                 CompetitionId = 41,
                 Now = new DateTime(2026, 7, 23, 9, 0, 0),
-                Slots = new List<SchedulerSlot> { Slot(1), Slot(2) },
+                Slots = new List<SchedulerSlot> { Slot(1, capacityMinutes: 11), Slot(2) },
                 Requests = new List<SchedulerRequest>
                 {
                     Pending(100, requestedSlotId: 1, rider: 5000, horse: 1, coach: 10),
@@ -466,7 +477,7 @@ namespace RideOnServer.Tests
             {
                 CompetitionId = 41,
                 Now = new DateTime(2026, 7, 23, 9, 0, 0),
-                Slots = new List<SchedulerSlot> { Slot(1), Slot(2) },
+                Slots = new List<SchedulerSlot> { Slot(1, capacityMinutes: 11), Slot(2) },
                 Requests = new List<SchedulerRequest>
                 {
                     Pending(100, requestedSlotId: 1, rider: 1, horse: 7000, coach: 10),

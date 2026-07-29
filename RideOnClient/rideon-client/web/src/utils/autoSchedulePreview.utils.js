@@ -18,6 +18,23 @@ var REASON_CODE_LABELS = {
   Unknown: "לא ניתן לשבץ - סיבה לא ידועה",
 };
 
+// Hebrew labels for where a proposal was placed relative to the requested slot
+// (V2-1 same-day adjacent fallback). The placement kind is decided by the
+// server-side scheduler and passed through verbatim - it is NEVER re-derived
+// here by comparing slot times, which would duplicate the adjacency rule.
+// An older server that does not send the field is treated as "Requested".
+var PLACEMENT_KIND_LABELS = {
+  Requested: "בסלוט המבוקש",
+  PreviousSameDay: "בסלוט הקודם באותו יום",
+  NextSameDay: "בסלוט הבא באותו יום",
+};
+
+var DEFAULT_PLACEMENT_KIND = "Requested";
+
+// Shown on an unscheduled request when the scheduler actually tried at least
+// one same-day adjacent slot before giving up. It never replaces the reason.
+var ADJACENT_SLOTS_TRIED_LABEL = "נבדקו גם סלוטים סמוכים באותו יום";
+
 var HORSE_FALLBACK = "סוס";
 var DASH = "—";
 
@@ -211,6 +228,27 @@ function rawBarnName(item) {
 }
 
 /* =======================
+   placement kind handling
+======================= */
+
+// Normalize the server-sent placement kind. Missing, empty, or unrecognized
+// values fall back to "Requested" so an older server response still renders.
+function normalizePlacementKind(placementKind) {
+  if (
+    isNonEmptyString(placementKind) &&
+    Object.prototype.hasOwnProperty.call(PLACEMENT_KIND_LABELS, placementKind)
+  ) {
+    return placementKind;
+  }
+
+  return DEFAULT_PLACEMENT_KIND;
+}
+
+function placementKindLabel(placementKind) {
+  return PLACEMENT_KIND_LABELS[normalizePlacementKind(placementKind)];
+}
+
+/* =======================
    reason handling
 ======================= */
 
@@ -240,6 +278,9 @@ function mapScheduledItem(item, slotIndex) {
   var duration = pick(item, "effectiveDurationMinutes", "EffectiveDurationMinutes");
   var assignedOrder = pick(item, "assignedOrder", "AssignedOrder");
   var startTimeLabel = formatTime(startTimeRaw);
+  var placementKind = normalizePlacementKind(
+    pick(item, "placementKind", "PlacementKind"),
+  );
 
   return {
     paidTimeRequestId: pick(item, "paidTimeRequestId", "PaidTimeRequestId"),
@@ -248,6 +289,9 @@ function mapScheduledItem(item, slotIndex) {
     rider: displayRider(item),
     coach: displayCoach(item),
     payer: displayPayer(item),
+    placementKind: placementKind,
+    placementKindLabel: placementKindLabel(placementKind),
+    isFallbackPlacement: placementKind !== DEFAULT_PLACEMENT_KIND,
     requestedSlotId: requestedSlotId,
     requestedSlotLabel: buildSlotLabel(slotIndex, requestedSlotId),
     assignedSlotId: assignedSlotId,
@@ -290,6 +334,9 @@ function mapUnscheduledItem(item, slotIndex) {
   var requestedSlotId = pick(item, "requestedCompSlotId", "RequestedCompSlotId");
   var reason = pick(item, "reason", "Reason");
   var reasonCode = pick(item, "reasonCode", "ReasonCode");
+  // Missing on an older server response - defaults to false (nothing shown).
+  var adjacentSlotsTried =
+    pick(item, "adjacentSlotsTried", "AdjacentSlotsTried") === true;
 
   return {
     paidTimeRequestId: pick(item, "paidTimeRequestId", "PaidTimeRequestId"),
@@ -299,6 +346,10 @@ function mapUnscheduledItem(item, slotIndex) {
     coach: displayCoach(item),
     requestedSlotId: requestedSlotId,
     requestedSlotLabel: buildSlotLabel(slotIndex, requestedSlotId),
+    adjacentSlotsTried: adjacentSlotsTried,
+    adjacentSlotsTriedLabel: adjacentSlotsTried
+      ? ADJACENT_SLOTS_TRIED_LABEL
+      : null,
     reasonText: mapUnscheduledReason(reason, reasonCode),
     // Raw code preserved for future badge/detail use (may be undefined).
     reasonCode: isNonEmptyString(reasonCode) ? reasonCode : null,
@@ -365,5 +416,9 @@ function mapAutoSchedulePreview(response, slots) {
 export {
   mapAutoSchedulePreview,
   mapUnscheduledReason,
+  normalizePlacementKind,
+  placementKindLabel,
   REASON_CODE_LABELS,
+  PLACEMENT_KIND_LABELS,
+  ADJACENT_SLOTS_TRIED_LABEL,
 };

@@ -162,6 +162,16 @@ namespace RideOnServer.BL.AutoScheduler
         public List<AuditLogEntry> Audit { get; set; } = new();
     }
 
+    // סוגי-מיקום אפשריים של שיבוץ אוטומטי (V2-1). נקבעים *אך ורק* במנוע
+    // (AutoScheduler) ומועברים כמות-שהם ל-DTO של התצוגה המקדימה - אין גזירה
+    // מחדש שלהם בשכבת המיפוי או ב-JavaScript.
+    public static class PlacementKinds
+    {
+        public const string Requested = "Requested";
+        public const string PreviousSameDay = "PreviousSameDay";
+        public const string NextSameDay = "NextSameDay";
+    }
+
     public class AssignmentDecision
     {
         public int PaidTimeRequestId { get; set; }
@@ -171,6 +181,16 @@ namespace RideOnServer.BL.AutoScheduler
         public DateTime? AssignedStartTime { get; set; }
         public int? AssignedOrder { get; set; }
         public string Status { get; set; } = "Pending";
+
+        // V2-1, תוספתי בלבד. שני השדות אינם נשלחים ל-usp_applyautoschedule:
+        // AutoSchedulerDAL.ApplyAutoSchedule מסרייל הטלה מפורשת של חמישה שדות
+        // בלבד, ולכן מטען הפרוצדורה אינו משתנה.
+        //
+        // סוג-המיקום של החלטת Assigned (Requested / PreviousSameDay / NextSameDay).
+        public string PlacementKind { get; set; } = PlacementKinds.Requested;
+
+        // נכון כשבוצע ניסיון-מיקום בפועל על סלוט סמוך כלשהו (רלוונטי ל-Pending).
+        public bool AdjacentSlotsTried { get; set; }
     }
 
     public class AuditLogEntry

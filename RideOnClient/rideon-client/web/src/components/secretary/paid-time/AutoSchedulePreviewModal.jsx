@@ -250,15 +250,27 @@ function ScheduledSection(props) {
       {items.map(function (item) {
         return (
           <RowCard key={item.paidTimeRequestId}>
-            <div className="text-sm font-bold text-[#3F312B]">
-              {item.horse}
-              <span className="text-xs font-normal text-[#8D6E63]">
-                {" · "}
-                {item.rider}
-                {" · מאמן: "}
-                {item.coach}
-                {" · משלם: "}
-                {item.payer}
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={
+                  "rounded-full px-2 py-0.5 text-[10px] font-bold " +
+                  (item.isFallbackPlacement
+                    ? "bg-[#FDF6EC] text-[#8A5A22]"
+                    : "bg-[#EEF2FF] text-[#4B5563]")
+                }
+              >
+                {item.placementKindLabel}
+              </span>
+              <span className="text-sm font-bold text-[#3F312B]">
+                {item.horse}
+                <span className="text-xs font-normal text-[#8D6E63]">
+                  {" · "}
+                  {item.rider}
+                  {" · מאמן: "}
+                  {item.coach}
+                  {" · משלם: "}
+                  {item.payer}
+                </span>
               </span>
             </div>
 
@@ -373,6 +385,11 @@ function UnscheduledSection(props) {
                 <span className="text-[#8D6E63]">סיבה: </span>
                 {item.reasonText}
               </div>
+              {item.adjacentSlotsTriedLabel ? (
+                <div className="text-[#8D6E63]">
+                  {item.adjacentSlotsTriedLabel}
+                </div>
+              ) : null}
             </div>
           </RowCard>
         );
