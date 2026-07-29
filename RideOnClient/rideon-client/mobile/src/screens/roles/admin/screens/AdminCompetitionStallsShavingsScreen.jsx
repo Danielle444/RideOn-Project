@@ -3,12 +3,13 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   RefreshControl,
   ScrollView,
   Text,
   View,
 } from "react-native";
+
+import Button from "../../../../components/ui/Button";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 
@@ -304,43 +305,27 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
         }
       >
         <View style={styles.topActionsRow}>
-          <Pressable
-            style={styles.addStallTopButton}
+          <Button
+            variant="solid"
+            label="+ הוסף תא"
             onPress={handleOpenCreateStallModal}
-          >
-            <Text style={styles.addStallTopButtonText}>+ הוסף תא</Text>
-          </Pressable>
+            style={{ flex: 1 }}
+          />
 
-          <Pressable
-            style={styles.addShavingsTopButton}
+          <Button
+            variant="outline"
+            label="+ הוסף הזמנת נסורת"
             onPress={handleOpenGeneralShavingsModal}
-          >
-            <Text style={styles.addShavingsTopButtonText}>
-              + הוסף הזמנת נסורת
-            </Text>
-          </Pressable>
+            style={{ flex: 1 }}
+          />
         </View>
 
-        <Pressable
+        <Button
+          variant="outline"
+          label="צפה במפת תאים"
           onPress={handleOpenStallMap}
-          style={{
-            flexDirection: "row-reverse",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "#FFFFFF",
-            borderWidth: 1,
-            borderColor: "#7B5A4D",
-            paddingVertical: 10,
-            paddingHorizontal: 14,
-            borderRadius: 10,
-            gap: 8,
-            marginBottom: 12,
-          }}
-        >
-          <Text style={{ color: "#7B5A4D", fontWeight: "700", fontSize: 14 }}>
-            צפה במפת תאים
-          </Text>
-        </Pressable>
+          style={{ marginBottom: 12 }}
+        />
 
         {renderContent()}
 

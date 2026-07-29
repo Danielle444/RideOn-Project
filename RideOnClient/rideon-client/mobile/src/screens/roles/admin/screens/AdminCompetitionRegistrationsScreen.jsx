@@ -8,6 +8,7 @@ import CompetitionPaidTimeTab from "../../../../components/competitions/Competit
 import CompetitionStallBookingsTab from "../../../../components/competitionRegistrations/CompetitionStallBookingsTab";
 
 import styles from "../../../../styles/adminCompetitionRegistrationsStyles";
+import { RTL_LABEL_NUMBER_OF_LINES } from "../../../../styles/rtlLabelStyle";
 
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import { getAdminCompetitionMenuItems } from "../../../../navigation/competitionMenuConfigs";
@@ -39,6 +40,7 @@ function RegistrationsTabs(props) {
         }}
       >
         <Text
+          numberOfLines={RTL_LABEL_NUMBER_OF_LINES}
           style={[
             styles.tabButtonText,
             props.activeTab === "classes" ? styles.tabButtonTextActive : null,
@@ -58,6 +60,7 @@ function RegistrationsTabs(props) {
         }}
       >
         <Text
+          numberOfLines={RTL_LABEL_NUMBER_OF_LINES}
           style={[
             styles.tabButtonText,
             props.activeTab === "paidTimes" ? styles.tabButtonTextActive : null,
@@ -77,6 +80,7 @@ function RegistrationsTabs(props) {
         }}
       >
         <Text
+          numberOfLines={RTL_LABEL_NUMBER_OF_LINES}
           style={[
             styles.tabButtonText,
             props.activeTab === "stalls" ? styles.tabButtonTextActive : null,
@@ -96,6 +100,7 @@ function RegistrationsTabs(props) {
         }}
       >
         <Text
+          numberOfLines={RTL_LABEL_NUMBER_OF_LINES}
           style={[
             styles.tabButtonText,
             props.activeTab === "shavings" ? styles.tabButtonTextActive : null,

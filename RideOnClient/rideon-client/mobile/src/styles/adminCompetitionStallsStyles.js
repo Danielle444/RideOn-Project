@@ -781,44 +781,21 @@ export default StyleSheet.create({
     marginBottom: 12,
   },
 
-  addStallTopButton: {
-    flex: 1,
-    minHeight: 42,
-    backgroundColor: "#7B5A4D",
-    borderRadius: 13,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  addStallTopButtonText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-
-  addShavingsTopButton: {
-    flex: 1,
-    minHeight: 42,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#D8C7BC",
-    borderRadius: 13,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 0,
-  },
-
-  addShavingsTopButtonText: {
-    color: "#6A5248",
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "900",
-    textAlign: "center",
-  },
+  // addStallTopButton / addShavingsTopButton (+ הטקסטים שלהם) הוסרו - שני
+  // כפתורי הפעולה העליונים וכפתור מפת התאים עברו לכפתור המשותף
+  // components/ui/Button.jsx. הם היו סטייה מהעיצוב: רדיוס 13 במקום 10,
+  // ולכפתור הנסורת מתאר אפור #D8C7BC וטקסט #6A5248 במקום החום #7B5A4D.
+  //
+  // מה נשאר בכוונה מחוץ לכפתור המשותף (ראה CAP-6):
+  //   cancelStallButton  - פעולה הרסנית (אדום); ל-Button אין וריאנט סכנה
+  //                        וצביעתו בחום הייתה מוחקת את האזהרה.
+  //   editStallButton    - חצי מזוג פעולות קומפקטי בתוך כרטיס, לצד כפתור
+  //                        הביטול ההרסני שלא יכול לעבור; העברת אחד מהם
+  //                        בלבד הייתה שוברת את הזוג.
+  //   historyButton      - קישור זעיר בתוך פאנל ברוחב 150; ריפוד 14
+  //                        ותווית 14 של הטוקנים לא נכנסים שם.
+  //   shavingsPlusButton - כפתור עגול 30x30 של אייקון בלבד, ללא תווית;
+  //                        סוג פקד אחר לגמרי.
+  //   editSubmitButton   - כפתור שליחה של מודאל, שייך למשפחת המודאלים ולא
+  //                        למשטח המסך שסומן.
 });

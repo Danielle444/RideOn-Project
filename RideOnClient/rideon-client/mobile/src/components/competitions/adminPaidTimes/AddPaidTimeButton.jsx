@@ -1,10 +1,15 @@
-import { Alert, Pressable, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Alert, View } from "react-native";
+
+import Button from "../../ui/Button";
 
 // כפתור "הוסף פייד טיים" במסך הפייד טיימים של אדמין.
 // בלחיצה - Alert עם 2 אופציות: הזמנה רגילה / הזמנה חכמה.
 // שניהם מובילים למסך AdminCompetitionRegistrations בטאב פייד טיים.
 // "חכמה" מועברת עם param openSmartBooking=true - המסך עצמו פותח את הצ'אטבוט אוטומטית.
+//
+// הצביעה בלבד עברה לכפתור המשותף (החום היה #5A4036 - החום השגוי - והוא
+// עכשיו #7B5A4D דרך ה-Button). הלוגיקה של ההזמנה החכמה, ה-Alert והניווט
+// לא נגעו בהם.
 export default function AddPaidTimeButton(props) {
   var navigation = props.navigation;
   var competitionId = props.competitionId;
@@ -43,24 +48,12 @@ export default function AddPaidTimeButton(props) {
 
   return (
     <View style={{ marginBottom: 12 }}>
-      <Pressable
+      <Button
+        variant="solid"
+        icon="add-circle"
+        label="הוסף פייד טיים"
         onPress={handlePress}
-        style={{
-          flexDirection: "row-reverse",
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: "#5A4036",
-          paddingVertical: 12,
-          paddingHorizontal: 16,
-          borderRadius: 10,
-          gap: 8,
-        }}
-      >
-        <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-        <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 15 }}>
-          הוסף פייד טיים
-        </Text>
-      </Pressable>
+      />
     </View>
   );
 }

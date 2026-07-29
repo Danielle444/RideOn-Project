@@ -340,19 +340,8 @@ var styles = StyleSheet.create({
     lineHeight: 22,
   },
 
-  addButton: {
-    backgroundColor: "#7B5A4D",
-    borderRadius: 16,
-    paddingVertical: 15,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  addButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "800",
-  },
+  // addButton / addButtonText הוסרו - שלושת כפתורי התחתית של המסך עברו
+  // לכפתור המשותף components/ui/Button.jsx.
 
   modalContainer: {
     flex: 1,
