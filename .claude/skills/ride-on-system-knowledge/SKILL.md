@@ -584,6 +584,26 @@ Secretary-web feature where the host secretary approves/rejects payer-submitted 
 
 ---
 
+## Arenas & Stalls + Service Prices (secretary ranch setup) (July 2026)
+
+Two related secretary pages for host-ranch setup, both fixed under QA #53/#56 on branch `fix/qa-53-56-arenas-stalls-service-delete` (2026-07-27):
+
+- **Arenas & Stalls** — `web/src/pages/secretary/ArenasAndStallsPage.jsx` + `hooks/secretary/useArenasAndStallsPage.js` + `components/secretary/arenas-stalls/*`. Two collapsible sections: Arenas (`arena` table, `usp_deletearena`) and Stall Compounds (`stallcompound`/`stall`, `usp_deletecompound`, layout upload via `saveLayout`). **A stall compound requires a stall TYPE, which comes from the Service Prices page — product category 2** (`loadStallTypes` filters `getServicePricesDashboard` sections to `categoryId === 2`). This cross-page dependency is invisible in the UI today (deferred onboarding UX = QA #69).
+- **Service Prices** — `web/src/pages/secretary/ServicePricesPage.jsx` + `hooks/secretary/useServicePricesPage.js` + `services/servicePricesService.js`. Per-ranch product catalog with create/update, activate/deactivate (soft, per-ranch), price history, and hard delete. Paid-time products also live here (category surfaces into the Paid Time domain).
+
+**The three "delete" procs (`usp_deleteserviceproduct`, `usp_deletecompound`, `usp_deletearena`) are LIVE-ONLY — they were never in the repo.** Corrected `usp_deleteserviceproduct` now has repo source at `RideOnDB/StoredProcedures/PostgreSQL/Individual/183_usp_DeleteServiceProduct.sql`.
+
+### QA #53 — service delete never worked (root cause, live-verified 2026-07-27)
+The deployed `usp_deleteserviceproduct` guarded usage with `productrequest.productid` — **a column that does not exist** (productrequest columns: prequestid, competitionid, prequestdatetime, orderedbysystemuserid, pricecatalogid, notes, approvaldate). Every delete past the stall guard threw SQLSTATE **42703**. Latent second bug: `DELETE FROM pricecatalog` had no guard against **`paidtimerequest.pricecatalogid`** (FK onto pricecatalog) → 23503 for used paid-time products even after fixing 42703. The controller swallowed all of it into a generic Hebrew string, so the secretary never saw why. Usage must be detected through `pricecatalog` for BOTH `productrequest` and `paidtimerequest`. Ruling (Oren): block-and-redirect to Deactivate, never cascade-delete financial history.
+
+### The RN001 convention (new this session)
+Business-rule guards inside a proc `RAISE ... USING ERRCODE = 'RN001'`. `ServicePriceDAL` catches `PostgresException` where `SqlState == "RN001"` and rethrows `BL.ValidationException(ex.MessageText)`; the controller catches `ValidationException` → `BadRequest(ex.Message)`, surfacing the Hebrew guard text. Applied to the **service delete path only** this session (Oren's scope). **Systemic gap still open:** arena + compound delete controllers (and any other delete that RAISEs a Hebrew guard) still swallow the message into a generic string — the DB writes a nice reason no user ever sees. Candidate for the same RN001 pattern later.
+
+### QA #56 — Add/Edit/Delete dead on Arenas & Stalls
+`ArenasAndStallsPage.jsx` wired `StallCompoundsTable` to empty no-op functions while the hook already exported working `openCreateCompound`/`openEditCompound`/`handleCompoundDelete`. Arenas were wired correctly; only compounds were stubbed. Fix = pass the real handlers. Lesson: a "button does nothing" bug on this codebase is often a hook handler that exists but was never passed as a prop — grep the hook's return object before assuming a deeper cause.
+
+---
+
 ## Local Development Setup
 
 Backend (`RideOnServer`, port 5268): **does NOT load any .env file** — it reads only appsettings + real OS environment variables. Locally, set variables in the same PowerShell session before `dotnet run` (values mirror the Render dashboard):

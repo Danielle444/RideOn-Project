@@ -136,6 +136,12 @@ namespace RideOnServer.DAL
                     }
                 }
             }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule guard raised inside the stored procedure
+                // (service still in use). Surface its Hebrew message to the user.
+                throw new BL.ValidationException(ex.MessageText);
+            }
             catch (NpgsqlException ex)
             {
                 throw new Exception(ex.Message);
