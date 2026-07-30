@@ -134,13 +134,16 @@ export function isTokenValid(token) {
   return !isTokenExpired(token);
 }
 
-// ---------- CLEAR ALL ----------
+// ---------- CLEAR ACTIVE SESSION ----------
+// מנקה אך ורק את נתוני הסשן המאומת. העדפת "זכור אותי" אינה נתון סשן, ולכן
+// היא נשמרת כאן — כך שתיבת הסימון במסך ההתחברות תוכל לשקף את הבחירה
+// הקודמת אחרי התנתקות, 401 או טוקן שפג. מחיקה שלה נעשית רק במפורש דרך
+// removeRememberMe.
 export async function clearAuthStorage() {
   await AsyncStorage.multiRemove([
     STORAGE_KEYS.TOKEN,
     STORAGE_KEYS.USER,
     STORAGE_KEYS.ACTIVE_ROLE,
     ACTIVE_COMPETITION_KEY,
-    REMEMBER_ME_KEY,
   ]);
 }
