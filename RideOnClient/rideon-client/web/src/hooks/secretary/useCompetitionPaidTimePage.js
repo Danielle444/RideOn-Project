@@ -555,17 +555,29 @@ export default function useCompetitionPaidTimePage(options) {
   }
 
   async function handleAssignRequest(requestId, slotId, order) {
-    await assignPaidTimeRequest({
-      ranchId,
-      paidTimeRequestId: requestId,
-      assignedCompSlotId: slotId,
-      assignedOrder: order,
-    });
+    try {
+      await assignPaidTimeRequest({
+        ranchId,
+        paidTimeRequestId: requestId,
+        assignedCompSlotId: slotId,
+        assignedOrder: order,
+      });
 
-    await loadRequests();
-    await loadSlots();
+      await loadRequests();
+      await loadSlots();
 
-    onShowToast?.("success", "שובץ בהצלחה");
+      onShowToast?.("success", "שובץ בהצלחה");
+    } catch (err) {
+      // The server returns the controlled Hebrew validation message raised by
+      // the assign SP or by the slot re-sequencing SP it calls. Without this
+      // catch the drop was rejected silently: dnd-kit does not await onDragEnd,
+      // so the rejection surfaced only as an unhandled promise and the
+      // secretary saw no toast at all.
+      onShowToast?.(
+        "error",
+        getErrorMessage(err, "אירעה שגיאה בשיבוץ בקשת פייד־טיים"),
+      );
+    }
   }
 
   async function handleUnassignRequest(requestId) {
