@@ -7,13 +7,31 @@ import {
   approveHealthCertificate,
 } from "../../services/healthCertificateService";
 import ConfirmDialog from "../../components/superuser/ConfirmDialog";
+import ToastMessage from "../../components/common/ToastMessage";
+
+// Both failures are reported with a fixed Hebrew sentence. Nothing from the
+// response body reaches the screen: the endpoint can surface database text,
+// Supabase URLs and English SP messages, none of which belong in front of a
+// secretary.
+const LOAD_ERROR_MESSAGE = "אירעה שגיאה בטעינת תעודות הבריאות. יש לנסות שוב.";
+const APPROVE_ERROR_MESSAGE = "אירעה שגיאה באישור תעודת הבריאות";
 
 export default function CompetitionHealthCertificatesPage() {
+  // Same shape as the sibling secretary pages (CompetitionShavingsPage): the
+  // role comes from the context here, at page level, and is handed down as a
+  // plain ranchId prop. The import was already present but never called, which
+  // is what made the page throw on load.
+  const activeRoleContext = useActiveRole();
+  const activeRole = activeRoleContext.activeRole;
+
   return (
     <CompetitionWorkspaceLayout activeItemKey="health-certificates">
       {function (layout) {
         return (
-          <HealthCertificatesContent competitionId={layout.competitionId} />
+          <HealthCertificatesContent
+            competitionId={layout.competitionId}
+            ranchId={activeRole ? activeRole.ranchId : null}
+          />
         );
       }}
     </CompetitionWorkspaceLayout>
@@ -37,10 +55,16 @@ function getStatusLabel(status) {
   };
 }
 
-function HealthCertificatesContent({ competitionId }) {
+function HealthCertificatesContent({ competitionId, ranchId }) {
   const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [actionLoadingKey, setActionLoadingKey] = useState(null);
+  const [toast, setToast] = useState({
+    isOpen: false,
+    type: "success",
+    message: "",
+  });
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
     title: "",
@@ -51,21 +75,34 @@ function HealthCertificatesContent({ competitionId }) {
   useEffect(
     function () {
       if (!competitionId) return;
+      if (!ranchId) return;
       loadCertificates();
     },
-    [competitionId],
+    [competitionId, ranchId],
   );
+
+  function showToast(type, message) {
+    setToast({ isOpen: true, type: type, message: message });
+  }
+
+  function closeToast() {
+    setToast(function (prev) {
+      return { ...prev, isOpen: false };
+    });
+  }
 
   async function loadCertificates() {
     try {
       setLoading(true);
-      const response = await getHealthCertificates(
-        competitionId,
-        activeRole.ranchId,
-      );
+      setLoadError(false);
+      const response = await getHealthCertificates(competitionId, ranchId);
       setCertificates(response.data?.data || []);
     } catch {
+      // A failed request is NOT an empty competition. Without this the page
+      // rendered "אין סוסים רשומים לתחרות זו" for a 403, a 500 or a dropped
+      // connection alike.
       setCertificates([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -80,15 +117,11 @@ function HealthCertificatesContent({ competitionId }) {
         const key = `${cert.horseId}-${competitionId}`;
         try {
           setActionLoadingKey(key);
-          await approveHealthCertificate(
-            cert.horseId,
-            competitionId,
-            activeRole.ranchId,
-          );
+          await approveHealthCertificate(cert.horseId, competitionId, ranchId);
           closeConfirmDialog();
           await loadCertificates();
         } catch {
-          alert("שגיאה באישור תעודת הבריאות");
+          showToast("error", APPROVE_ERROR_MESSAGE);
         } finally {
           setActionLoadingKey(null);
         }
@@ -107,6 +140,13 @@ function HealthCertificatesContent({ competitionId }) {
 
   return (
     <>
+      <ToastMessage
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+      />
+
       <div className="mx-auto max-w-[1450px] space-y-6">
         <div className="rounded-[28px] border border-[#E6DCD5] bg-white shadow-sm overflow-hidden">
           <div className="border-b border-[#EFE5DF] px-8 py-7">
@@ -124,7 +164,13 @@ function HealthCertificatesContent({ competitionId }) {
               <p className="text-center text-[#8A7268] py-10">טוען תעודות...</p>
             )}
 
-            {!loading && certificates.length === 0 && (
+            {!loading && loadError && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
+                {LOAD_ERROR_MESSAGE}
+              </div>
+            )}
+
+            {!loading && !loadError && certificates.length === 0 && (
               <div className="text-center py-16">
                 <p className="text-[#8A7268] text-sm">
                   אין סוסים רשומים לתחרות זו
@@ -132,7 +178,7 @@ function HealthCertificatesContent({ competitionId }) {
               </div>
             )}
 
-            {!loading && certificates.length > 0 && (
+            {!loading && !loadError && certificates.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[700px] text-right">
                   <thead>

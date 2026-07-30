@@ -73,23 +73,6 @@ function uploadHealthCertificateFile(params) {
   return axios.post("/Horses/health-certificates/upload", formData);
 }
 
-function saveHealthCertificate(horseId, competitionId, ranchId, hcPath) {
-  return axios.post("/Horses/health-certificates/save", {
-    horseId: horseId,
-    competitionId: competitionId,
-    ranchId: ranchId,
-    hcPath: hcPath,
-  });
-}
-
-function approveHealthCertificate(horseId, competitionId, ranchId) {
-  return axios.post("/Horses/health-certificates/approve", {
-    horseId: horseId,
-    competitionId: competitionId,
-    ranchId: ranchId,
-  });
-}
-
 export {
   getHorsesByRanch,
   getRealHorsesByRanch,
@@ -97,6 +80,4 @@ export {
   updateHorseBarnName,
   getHealthCertificates,
   uploadHealthCertificateFile,
-  saveHealthCertificate,
-  approveHealthCertificate,
 };

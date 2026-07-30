@@ -42,6 +42,27 @@ namespace RideOnServer.BL
             );
         }
 
+        // Competition-wide read for the HostSecretary of the hosting ranch: every
+        // participating horse, visiting ranches included.
+        //
+        // No ranch id, and no authorization here. Whether a caller is entitled to
+        // this scope is decided in HorsesController, which is where this project
+        // keeps role and ranch checks - see GetHealthCertificatesForCompetition
+        // above, which likewise validates only its arguments.
+        public static List<HealthCertificateItem> GetHealthCertificatesForHostedCompetition(
+            int competitionId
+        )
+        {
+            if (competitionId <= 0)
+            {
+                throw new ArgumentException("מזהה תחרות לא תקין");
+            }
+
+            HorseDAL dal = new HorseDAL();
+
+            return dal.GetHealthCertificatesForHostedCompetition(competitionId);
+        }
+
         public static void SaveHealthCertificate(SaveHealthCertificateRequest request)
         {
             if (request.HorseId <= 0 || request.CompetitionId <= 0)
