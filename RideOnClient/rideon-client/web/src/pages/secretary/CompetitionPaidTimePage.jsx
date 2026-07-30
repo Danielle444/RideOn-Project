@@ -816,8 +816,14 @@ export default function CompetitionPaidTimePage() {
           setSlotDetailsTarget(null);
         }}
         onChanged={function () {
+          // Both, in the same order as the in-grid assign/unassign handlers: the
+          // modal's transfer and unassign move a request between slots, so the
+          // slots table's assigned/available/pending counts go stale too, and
+          // nothing reloads them on the way back out of assignment mode.
           page.loadRequests();
+          page.loadSlots();
         }}
+        onShowToast={showToast}
       />
     </CompetitionWorkspaceLayout>
   );

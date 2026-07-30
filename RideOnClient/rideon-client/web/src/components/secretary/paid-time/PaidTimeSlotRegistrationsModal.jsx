@@ -4,6 +4,7 @@ import {
   getPaidTimeSlotRegistrations,
   transferPaidTimeRequestToSlot,
 } from "../../../services/paidTimeRequestService";
+import { getErrorMessage } from "../../../utils/competitionForm.utils";
 
 // Secretary "click on slot" modal. Shows everyone registered for that slot
 // (assigned + pending requests) and exposes per-row actions:
@@ -20,12 +21,17 @@ import {
 //   onClose          : close handler
 //   onChanged        : called after a successful transfer/unassign so the
 //                      page can reload its schedule grid
+//   onShowToast      : (type, message) - the page's shared toast, used for every
+//                      action failure in here. The server already collapses its
+//                      side to a controlled Hebrew message or a generic one, so
+//                      what arrives is safe to display as-is.
 export default function PaidTimeSlotRegistrationsModal(props) {
   var isOpen = !!props.isOpen;
   var slotInCompId = props.slotInCompId;
   var ranchId = props.ranchId;
   var slotMeta = props.slotMeta || {};
   var allSlots = Array.isArray(props.allSlotsInComp) ? props.allSlotsInComp : [];
+  var onShowToast = props.onShowToast;
 
   var [items, setItems] = useState([]);
   var [loading, setLoading] = useState(false);
@@ -50,7 +56,9 @@ export default function PaidTimeSlotRegistrationsModal(props) {
         setItems(Array.isArray(res.data) ? res.data : []);
       })
       .catch(function (err) {
-        setError(String(err?.response?.data || err?.message || "שגיאה בטעינה"));
+        setError(
+          getErrorMessage(err, "אירעה שגיאה בטעינת הרשמות הפייד־טיים"),
+        );
         setItems([]);
       })
       .finally(function () {
@@ -69,16 +77,25 @@ export default function PaidTimeSlotRegistrationsModal(props) {
       await load();
       if (props.onChanged) props.onChanged();
     } catch (err) {
-      alert(String(err?.response?.data || err?.message || "שגיאה בביטול שיבוץ"));
+      onShowToast?.(
+        "error",
+        getErrorMessage(err, "אירעה שגיאה בביטול שיבוץ בקשת פייד־טיים"),
+      );
     } finally {
       setActionBusyId(null);
     }
   }
 
-  async function handleTransfer(item) {
-    var target = transferTargets[item.paidTimeRequestId];
+  // targetSlotId is optional: the dropdown flow omits it and the selection is
+  // read from transferTargets, while "שבץ כאן" passes the current slot id
+  // directly. It must stay a parameter rather than a setState + read-back,
+  // because this function closes over the transferTargets of the render it was
+  // created in - a setTargetFor() immediately before the call cannot be visible
+  // to it, whatever the state update is scheduled behind.
+  async function handleTransfer(item, targetSlotId) {
+    var target = targetSlotId || transferTargets[item.paidTimeRequestId];
     if (!target) {
-      alert("בחר סלוט יעד");
+      onShowToast?.("error", "יש לבחור סלוט יעד");
       return;
     }
 
@@ -92,7 +109,10 @@ export default function PaidTimeSlotRegistrationsModal(props) {
       await load();
       if (props.onChanged) props.onChanged();
     } catch (err) {
-      alert(String(err?.response?.data || err?.message || "שגיאה בהעברה"));
+      onShowToast?.(
+        "error",
+        getErrorMessage(err, "אירעה שגיאה בהעברת בקשת פייד־טיים"),
+      );
     } finally {
       setActionBusyId(null);
     }
@@ -242,12 +262,7 @@ export default function PaidTimeSlotRegistrationsModal(props) {
                       type="button"
                       onClick={function () {
                         // assign this pending request to current slot
-                        setTargetFor(item.paidTimeRequestId, String(slotInCompId));
-                        setTimeout(function () {
-                          handleTransfer({
-                            paidTimeRequestId: item.paidTimeRequestId,
-                          });
-                        }, 0);
+                        handleTransfer(item, slotInCompId);
                       }}
                       disabled={actionBusyId === item.paidTimeRequestId}
                       className="rounded-lg bg-[#7B5A4D] px-3 py-1 text-xs font-bold text-white hover:bg-[#6B4D42] disabled:opacity-50"

@@ -774,8 +774,14 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
+                // Read path for the secretary's slot-registrations modal. It has no
+                // controlled business vocabulary of its own - public.usp_getpaidtimeslotregistrations
+                // raises only internal English text ("Paid time slot not found",
+                // "Permission denied: not the host ranch secretary") - so there is
+                // nothing to allowlist here and the whole catch collapses to one
+                // generic message. The raw text stays in the log line above.
                 Console.WriteLine($"Error in GetPaidTimeSlotRegistrations: {ex.Message}");
-                return BadRequest(ex.Message);
+                return BadRequest("אירעה שגיאה בטעינת הרשמות הפייד־טיים");
             }
         }
 
@@ -814,8 +820,111 @@ namespace RideOnServer.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in TransferPaidTimeRequestToSlot: {ex.Message}");
-                return BadRequest(ex.Message);
+
+                // request is non-null here: the guard above returns rather than
+                // throws, so anything reaching this catch got past it. The
+                // null-conditional only keeps the fallback choice defined if that
+                // ever stops being true.
+                return BadRequest(
+                    ResolveTransferErrorMessage(ex.Message, request?.NewSlotInCompId == null));
             }
+        }
+
+        // ================= controlled error messages: transfer =================
+        //
+        // The secretary's slot-registrations modal drives BOTH placement actions
+        // through this one endpoint: a transfer carries a target slot, a modal
+        // unassign carries NewSlotInCompId = null. The resolver therefore takes a
+        // flag and picks the matching generic fallback.
+        //
+        // Reachable controlled text, read from the deployed functions (verified
+        // with pg_get_functiondef, which matched the repo .sql exactly):
+        //
+        //   * public.usp_transferpaidtimerequesttoslot raises SIX messages, all
+        //     English. Three are actionable for the secretary and are mapped to
+        //     Hebrew below. The other three describe a stale or hand-crafted
+        //     payload, not something a secretary can act on, and stay behind the
+        //     generic fallback: the controller authorizes against the client-sent
+        //     RanchId while the function authorizes against the competition's real
+        //     host ranch, so echoing "not found" versus "permission denied" would
+        //     tell a caller whether a foreign request or slot id exists.
+        //
+        //   * public.usp_recalculatepaidtimeslotassignments, which proc 151 calls
+        //     for the target slot and again for a vacated source slot, raises the
+        //     six approved Hebrew messages - those pass through verbatim - plus one
+        //     internal English message ("Paid time slot not found for this ranch")
+        //     which is unreachable from here, since proc 151 derives both the ranch
+        //     id and the slot ids from the same competition row.
+        //
+        // Payment is deliberately not a factor. Neither function touches a product,
+        // price, bill, charge or payment record: payment freezes billing-related
+        // changes, not placement. Nothing here adds a payment-based restriction.
+        //
+        // Reuses NormalizeDatabaseErrorMessage with the assign and unassign paths,
+        // unchanged. That helper is not the security boundary - the exact-match
+        // allowlist below it is - so peeling can only ever expose more technical
+        // text, never turn an unlisted message into a listed one.
+
+        // The six messages public.usp_recalculatepaidtimeslotassignments raises.
+        // These are byte-identical to UnassignBusinessErrorMessages *today*, and
+        // only because both endpoints delegate their Hebrew to that one function.
+        // The sets are kept separate because their provenance differs: this one is
+        // defined by what proc 151's two recalc calls can raise. If proc 151 ever
+        // gains validation of its own, widening it must not widen unassign too.
+        private static readonly HashSet<string> TransferBusinessErrorMessages =
+            new HashSet<string>(StringComparer.Ordinal)
+        {
+            "השיבוץ הידני יוצר חפיפה בתוך הסלוט",
+            "אין מספיק זמן בסלוט להשלמת השיבוץ לפי סדר הכניסה הנוכחי",
+            "השיבוץ הידני יוצר חפיפה בזמני המאמן",
+            "השיבוץ הידני יוצר חפיפה בזמני הרוכב",
+            "השיבוץ הידני יוצר חפיפה בזמני הסוס",
+            "קיים יותר משיבוץ אחד באותו מיקום בסלוט"
+        };
+
+        // The three proc-151 messages worth showing the secretary, mapped to stable
+        // Hebrew. The keys are what the deployed function raises, verbatim; mapping
+        // here rather than in the function keeps this shippable with the code and
+        // leaves proc 151 untouched. Business meanings:
+        //   * cancelled request  - the payer or ranch admin cancelled while the
+        //                          modal was open; the row on screen is stale.
+        //   * target slot        - the chosen slot was deleted after the dropdown
+        //                          was built from the already-loaded slots.
+        //   * published slot     - the target slot's schedule is already published
+        //                          to payers; moving a rider in would silently
+        //                          change a published schedule.
+        private static readonly Dictionary<string, string> TransferBusinessErrorTranslations =
+            new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Cannot transfer a cancelled request"] = "לא ניתן להעביר בקשה שבוטלה",
+            ["Target slot not found"] = "סלוט היעד לא נמצא. יש לרענן את המסך ולנסות שוב",
+            ["Cannot transfer into a published slot"] = "לא ניתן להעביר בקשה לסלוט שפורסם"
+        };
+
+        private const string TransferGenericMessage =
+            "אירעה שגיאה בהעברת בקשת פייד־טיים";
+
+        // Matches the /unassign endpoint's generic text on purpose: to the
+        // secretary both are the same action ("clear this placement"), even though
+        // they reach different endpoints and different functions.
+        private const string ModalUnassignGenericMessage =
+            "אירעה שגיאה בביטול שיבוץ בקשת פייד־טיים";
+
+        private static string ResolveTransferErrorMessage(string message, bool isUnassign)
+        {
+            string candidate = NormalizeDatabaseErrorMessage(message);
+
+            if (TransferBusinessErrorMessages.Contains(candidate))
+            {
+                return candidate;
+            }
+
+            if (TransferBusinessErrorTranslations.TryGetValue(candidate, out string? translated))
+            {
+                return translated;
+            }
+
+            return isUnassign ? ModalUnassignGenericMessage : TransferGenericMessage;
         }
     }
 }
