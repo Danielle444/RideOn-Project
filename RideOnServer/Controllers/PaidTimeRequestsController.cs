@@ -122,8 +122,113 @@ namespace RideOnServer.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in AssignPaidTimeRequest: {ex.Message}");
-                return BadRequest(ex.Message);
+                return BadRequest(ResolveAssignErrorMessage(ex.Message));
             }
+        }
+
+        // ================= controlled error messages =================
+        //
+        // Both assign and unassign echo a *closed set* of Hebrew business messages
+        // back to the secretary and collapse everything else to a generic message.
+        // The raw text stays in the Console.WriteLine of each catch block.
+        //
+        // A controlled message reaches the controller wrapped twice:
+        //   1. Npgsql 8 builds PostgresException.Message as "{SqlState}: {MessageText}",
+        //      and plpgsql's `raise exception` always uses SQLSTATE P0001;
+        //   2. the DAL re-wraps every NpgsqlException as "Database error: {ex.Message}".
+        // So the live shape is "Database error: P0001: <message>". Normalization
+        // peels those two layers - at most one each, never in a loop - and the
+        // result is only ever a *candidate*: it still has to pass an exact
+        // allowlist (or the one anchored dynamic pattern) before it is returned.
+        private const string DatabaseErrorPrefix = "Database error: ";
+
+        // Exactly five ASCII letters/digits followed by ": ", anchored at the start.
+        // Matches a real SQLSTATE (P0001, 42P01, 57014, 28P01...). "ERROR: " also
+        // has five letters, which is harmless: peeling it can only expose more
+        // technical text, never turn an unlisted message into an allowlisted one.
+        private static readonly Regex SqlStatePrefix =
+            new Regex("^[0-9A-Za-z]{5}: ", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+        private static string NormalizeDatabaseErrorMessage(string? message)
+        {
+            string candidate = message ?? "";
+
+            if (candidate.StartsWith(DatabaseErrorPrefix, StringComparison.Ordinal))
+            {
+                candidate = candidate.Substring(DatabaseErrorPrefix.Length);
+            }
+
+            Match sqlState = SqlStatePrefix.Match(candidate);
+
+            if (sqlState.Success)
+            {
+                candidate = candidate.Substring(sqlState.Length);
+            }
+
+            return candidate;
+        }
+
+        // Controlled business validation messages reachable from the assign path:
+        // the two raised by public.usp_assignpaidtimerequest itself, plus the six
+        // raised by public.usp_recalculatepaidtimeslotassignments, which assign
+        // calls for the target slot and again for a vacated previous slot. This
+        // list mirrors the deployed functions exactly.
+        private static readonly HashSet<string> AssignBusinessErrorMessages =
+            new HashSet<string>(StringComparer.Ordinal)
+        {
+            "לא ניתן לשבץ בקשה שבוטלה",
+            "לא ניתן לשבץ בקשה בסלוט שפורסם",
+            "השיבוץ הידני יוצר חפיפה בתוך הסלוט",
+            "אין מספיק זמן בסלוט להשלמת השיבוץ לפי סדר הכניסה הנוכחי",
+            "השיבוץ הידני יוצר חפיפה בזמני המאמן",
+            "השיבוץ הידני יוצר חפיפה בזמני הרוכב",
+            "השיבוץ הידני יוצר חפיפה בזמני הסוס",
+            "קיים יותר משיבוץ אחד באותו מיקום בסלוט"
+        };
+
+        // The one controlled assign message that carries data: the occupied entry
+        // order and the horse's barn/horse name, both interpolated by
+        // usp_assignpaidtimerequest. The three literal segments below are the
+        // whole template - they are used BOTH to build the anchored pattern and to
+        // rebuild the returned string, so a match can never be echoed verbatim and
+        // no appended DETAIL/CONTEXT text can ride along.
+        private const string OccupiedOrderPrefixText = "המקום ";
+        private const string OccupiedOrderMiddleText = " כבר תפוס על ידי ";
+        private const string OccupiedOrderSuffixText = ". יש לבחור מקום פנוי או לשחרר את השיבוץ הקיים";
+
+        // \A and \z (not ^ and $): $ also matches just before a trailing newline,
+        // which would let "...הקיים\n" through.
+        private static readonly Regex OccupiedOrderPattern = new Regex(
+            @"\A" + Regex.Escape(OccupiedOrderPrefixText) +
+            @"(?<order>[0-9]{1,4})" + Regex.Escape(OccupiedOrderMiddleText) +
+            @"(?<name>[^\r\n]{1,60})" + Regex.Escape(OccupiedOrderSuffixText) + @"\z",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+        private static string BuildOccupiedOrderMessage(string order, string name)
+        {
+            return OccupiedOrderPrefixText + order + OccupiedOrderMiddleText + name + OccupiedOrderSuffixText;
+        }
+
+        private static string ResolveAssignErrorMessage(string message)
+        {
+            string candidate = NormalizeDatabaseErrorMessage(message);
+
+            if (AssignBusinessErrorMessages.Contains(candidate))
+            {
+                return candidate;
+            }
+
+            Match occupied = OccupiedOrderPattern.Match(candidate);
+
+            if (occupied.Success)
+            {
+                return BuildOccupiedOrderMessage(
+                    occupied.Groups["order"].Value,
+                    occupied.Groups["name"].Value
+                );
+            }
+
+            return "אירעה שגיאה בשיבוץ בקשת פייד־טיים";
         }
 
         [HttpPost("unassign")]
@@ -174,19 +279,15 @@ namespace RideOnServer.Controllers
             "קיים יותר משיבוץ אחד באותו מיקום בסלוט"
         };
 
-        // The DAL re-wraps every NpgsqlException as "Database error: {ex.Message}",
-        // so a single leading prefix is removed before the exact-match check.
-        // Anything that is not an exact allowlist hit falls back to the generic
-        // message; the full detail is already in the Console.WriteLine above.
+        // Shares NormalizeDatabaseErrorMessage with the assign path. The earlier
+        // version of this method stripped only the DAL's "Database error: " wrap,
+        // which was not enough: a live message also carries Npgsql's SQLSTATE
+        // segment ("Database error: P0001: ..."), so no controlled message ever
+        // reached the exact-match check and every unassign failure collapsed to
+        // the generic text. The allowlist and the fallback below are unchanged.
         private static string ResolveUnassignErrorMessage(string message)
         {
-            string candidate = message ?? "";
-            const string databaseErrorPrefix = "Database error: ";
-
-            if (candidate.StartsWith(databaseErrorPrefix, StringComparison.Ordinal))
-            {
-                candidate = candidate.Substring(databaseErrorPrefix.Length);
-            }
+            string candidate = NormalizeDatabaseErrorMessage(message);
 
             if (UnassignBusinessErrorMessages.Contains(candidate))
             {

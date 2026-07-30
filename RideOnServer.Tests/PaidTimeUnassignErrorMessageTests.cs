@@ -12,14 +12,24 @@ namespace RideOnServer.Tests
     //
     // What the gate must guarantee: the controlled Hebrew business messages
     // raised by public.usp_recalculatepaidtimeslotassignments reach the
-    // secretary verbatim (with the DAL's "Database error: " wrap removed), and
-    // everything else — internal English SP messages, raw PostgreSQL/Npgsql
-    // detail, near-misses — collapses to the generic Hebrew message.
+    // secretary verbatim (with the server-side wraps removed), and everything
+    // else — internal English SP messages, raw PostgreSQL/Npgsql detail,
+    // near-misses — collapses to the generic Hebrew message.
+    //
+    // Regression this file now pins: a live controlled message arrives as
+    //   "Database error: P0001: <text>"
+    // because Npgsql 8 builds PostgresException.Message as
+    // "{SqlState}: {MessageText}" (plpgsql's `raise exception` is always P0001)
+    // and the DAL then wraps that. The first version of this gate stripped only
+    // "Database error: ", so NO controlled message ever reached the exact-match
+    // check and every real unassign failure collapsed to the generic text. Every
+    // case below is therefore exercised under all four prefix shapes.
     public class PaidTimeUnassignErrorMessageTests
     {
         private const string GenericMessage = "אירעה שגיאה בביטול שיבוץ בקשת פייד־טיים";
 
         private const string DatabaseErrorPrefix = "Database error: ";
+        private const string SqlStatePrefix = "P0001: ";
 
         private static readonly MethodInfo Resolver =
             typeof(PaidTimeRequestsController)
@@ -59,7 +69,7 @@ namespace RideOnServer.Tests
             Resolve(message).Should().Be(message);
         }
 
-        // ===== 2. exact allowlisted message behind the DAL's wrap =====
+        // ===== 2. exact allowlisted message behind the server-side wraps =====
         [Theory]
         [MemberData(nameof(ControlledMessages))]
         public void Strips_the_database_error_prefix_and_returns_the_clean_hebrew_message(string message)
@@ -67,15 +77,35 @@ namespace RideOnServer.Tests
             Resolve(DatabaseErrorPrefix + message).Should().Be(message);
         }
 
-        [Fact]
-        public void Strips_only_one_leading_database_error_prefix()
+        [Theory]
+        [MemberData(nameof(ControlledMessages))]
+        public void Strips_the_sqlstate_prefix_and_returns_the_clean_hebrew_message(string message)
         {
-            // A doubled prefix is not something the DAL produces; if it ever
-            // appeared it must NOT be peeled twice into an allowlist hit.
-            string doubled = DatabaseErrorPrefix + DatabaseErrorPrefix +
-                "השיבוץ הידני יוצר חפיפה בזמני המאמן";
+            Resolve(SqlStatePrefix + message).Should().Be(message);
+        }
 
-            Resolve(doubled).Should().Be(GenericMessage);
+        // The shape a real unassign failure actually has.
+        [Theory]
+        [MemberData(nameof(ControlledMessages))]
+        public void Strips_both_live_prefixes_and_returns_the_clean_hebrew_message(string message)
+        {
+            Resolve(DatabaseErrorPrefix + SqlStatePrefix + message).Should().Be(message);
+        }
+
+        [Theory]
+        // A doubled prefix is not something the DAL or Npgsql produces; if one
+        // ever appeared it must NOT be peeled twice into an allowlist hit.
+        [InlineData("Database error: Database error: השיבוץ הידני יוצר חפיפה בזמני המאמן")]
+        [InlineData("Database error: Database error: P0001: השיבוץ הידני יוצר חפיפה בזמני המאמן")]
+        [InlineData("Database error: P0001: P0001: השיבוץ הידני יוצר חפיפה בזמני המאמן")]
+        [InlineData("P0001: P0001: השיבוץ הידני יוצר חפיפה בזמני המאמן")]
+        // wrong order: the DAL wrap is only ever the outermost one
+        [InlineData("P0001: Database error: השיבוץ הידני יוצר חפיפה בזמני המאמן")]
+        // a SQLSTATE-shaped segment that is not the leading one stays put
+        [InlineData("some text P0001: השיבוץ הידני יוצר חפיפה בזמני המאמן")]
+        public void Peels_each_prefix_at_most_once(string message)
+        {
+            Resolve(message).Should().Be(GenericMessage);
         }
 
         // ===== 3. unknown Hebrew-containing database error =====
@@ -92,12 +122,19 @@ namespace RideOnServer.Tests
             Resolve(leaky).Should().Be(GenericMessage);
         }
 
-        [Fact]
-        public void Returns_the_generic_message_for_an_unlisted_hebrew_business_message()
+        [Theory]
+        // Raised by usp_assignpaidtimerequest, NOT reachable from unassign. These
+        // must stay rejected here even though assign now allowlists them, and
+        // under every prefix shape the shared normalization can produce.
+        [InlineData("לא ניתן לשבץ בקשה שבוטלה")]
+        [InlineData("לא ניתן לשבץ בקשה בסלוט שפורסם")]
+        [InlineData("המקום 3 כבר תפוס על ידי רוח צפונית. יש לבחור מקום פנוי או לשחרר את השיבוץ הקיים")]
+        public void Returns_the_generic_message_for_an_unlisted_hebrew_business_message(string message)
         {
-            // Raised by usp_assignpaidtimerequest, NOT reachable from unassign.
-            Resolve(DatabaseErrorPrefix + "לא ניתן לשבץ בקשה שבוטלה")
-                .Should().Be(GenericMessage);
+            Resolve(message).Should().Be(GenericMessage);
+            Resolve(DatabaseErrorPrefix + message).Should().Be(GenericMessage);
+            Resolve(SqlStatePrefix + message).Should().Be(GenericMessage);
+            Resolve(DatabaseErrorPrefix + SqlStatePrefix + message).Should().Be(GenericMessage);
         }
 
         // ===== 4. internal English SP messages =====
@@ -109,6 +146,8 @@ namespace RideOnServer.Tests
         {
             Resolve(message).Should().Be(GenericMessage);
             Resolve(DatabaseErrorPrefix + message).Should().Be(GenericMessage);
+            Resolve(SqlStatePrefix + message).Should().Be(GenericMessage);
+            Resolve(DatabaseErrorPrefix + SqlStatePrefix + message).Should().Be(GenericMessage);
         }
 
         // ===== 5. infrastructure / schema-shaped PostgreSQL errors =====
@@ -120,6 +159,7 @@ namespace RideOnServer.Tests
         [InlineData("28P01: password authentication failed for user \"rideon_app\"")]
         public void Returns_the_generic_message_for_infrastructure_and_schema_errors(string message)
         {
+            Resolve(message).Should().Be(GenericMessage);
             Resolve(DatabaseErrorPrefix + message).Should().Be(GenericMessage);
         }
 
@@ -150,6 +190,8 @@ namespace RideOnServer.Tests
         {
             Resolve(message).Should().Be(GenericMessage);
             Resolve(DatabaseErrorPrefix + message).Should().Be(GenericMessage);
+            Resolve(SqlStatePrefix + message).Should().Be(GenericMessage);
+            Resolve(DatabaseErrorPrefix + SqlStatePrefix + message).Should().Be(GenericMessage);
         }
 
         // ===== defensive =====
@@ -157,6 +199,8 @@ namespace RideOnServer.Tests
         [InlineData(null)]
         [InlineData("")]
         [InlineData("Database error: ")]
+        [InlineData("P0001: ")]
+        [InlineData("Database error: P0001: ")]
         public void Returns_the_generic_message_for_empty_and_null_input(string? message)
         {
             Resolve(message).Should().Be(GenericMessage);
