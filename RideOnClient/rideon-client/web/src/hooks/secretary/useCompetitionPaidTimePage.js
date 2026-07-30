@@ -569,15 +569,25 @@ export default function useCompetitionPaidTimePage(options) {
   }
 
   async function handleUnassignRequest(requestId) {
-    await unassignPaidTimeRequest({
-      ranchId,
-      paidTimeRequestId: requestId,
-    });
+    try {
+      await unassignPaidTimeRequest({
+        ranchId,
+        paidTimeRequestId: requestId,
+      });
 
-    await loadRequests();
-    await loadSlots();
+      await loadRequests();
+      await loadSlots();
 
-    onShowToast?.("success", "הוסר שיבוץ");
+      onShowToast?.("success", "הוסר שיבוץ");
+    } catch (err) {
+      // The server returns the controlled Hebrew validation message raised by
+      // the slot re-sequencing SP; without this catch it was lost as an
+      // unhandled rejection and the secretary saw nothing at all.
+      onShowToast?.(
+        "error",
+        getErrorMessage(err, "אירעה שגיאה בביטול שיבוץ בקשת פייד־טיים"),
+      );
+    }
   }
 
   /* =======================
