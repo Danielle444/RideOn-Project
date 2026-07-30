@@ -1,19 +1,35 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import usePaidTimeChatbot from "../../../hooks/usePaidTimeChatbot";
 import ChatProgress from "./ChatProgress";
+import BulkSelectionSummary from "./BulkSelectionSummary";
+import StepNavBar from "./StepNavBar";
+import StepNavContext from "./StepNavContext";
 import styles, { COLORS } from "../../../styles/paidTimeChatbotStyles";
 import { loadPaidTimeChatbotContext } from "../../../services/paidTimeChatbotService";
+import {
+  buildSelectionSummary,
+  getStepTitle,
+} from "../../../utils/paidTimeBulkReview";
+import { evaluateBulkCandidatesAvailability } from "../../../utils/paidTimeBookingAvailability";
 
 import Step01_Intro from "./Step01_Intro";
 import Step02_PickCoaches from "./Step02_PickCoaches";
@@ -89,6 +105,55 @@ export default function PaidTimeChatbotModal(props) {
     [chatbot, onClose]
   );
 
+  // ניווט השלב מוצהר על ידי StepLayout ומרונדר כאן, מחוץ לגלילה, כדי
+  // ש"חזרה"/"המשך" יישארו תמיד במקום קבוע בתחתית המסך.
+  const navHandlersRef = useRef({ onNext: null, onBack: null });
+  const [navState, setNavState] = useState(null);
+
+  const navApi = useMemo(
+    function () {
+      return { handlersRef: navHandlersRef, setNavState: setNavState };
+    },
+    []
+  );
+
+  const handleNavNext = useCallback(function () {
+    const handler = navHandlersRef.current.onNext;
+    if (typeof handler === "function") handler();
+  }, []);
+
+  const handleNavBack = useCallback(function () {
+    const handler = navHandlersRef.current.onBack;
+    if (typeof handler === "function") handler();
+  }, []);
+
+  const selectionSummary = useMemo(
+    function () {
+      return buildSelectionSummary({
+        answers: chatbot.state.answers,
+        context: chatbot.state.context,
+        requestCount: chatbot.totalRequests,
+      });
+    },
+    [chatbot.state.answers, chatbot.state.context, chatbot.totalRequests]
+  );
+
+  const stepTitle = getStepTitle(chatbot.currentStep);
+
+  // המועמדים (מאמן עם סוסים רשומים) נטענים רק כאן, ולכן זו הנקודה
+  // הראשונה שבה אפשר לדעת שאין עם מי לבנות הזמנה מרוכזת. בלי הבדיקה
+  // המשתמשת הייתה נתקעת בשלב "בחירת מאמנים" בלי אפשרות להתקדם.
+  const candidates = useMemo(
+    function () {
+      return evaluateBulkCandidatesAvailability(chatbot.state.context);
+    },
+    [chatbot.state.context]
+  );
+
+  const hasContext = !!chatbot.state.context;
+  const blockedMessage =
+    hasContext && !candidates.hasCandidates ? candidates.message : "";
+
   return (
     <Modal
       visible={visible}
@@ -96,19 +161,46 @@ export default function PaidTimeChatbotModal(props) {
       onRequestClose={handleClose}
       presentationStyle="fullScreen"
     >
-      <SafeAreaView style={styles.screen} edges={["top"]}>
+      {/*
+        presentationStyle="fullScreen" מציג את המודל בהיררכיית View נפרדת,
+        ולכן ה-SafeAreaProvider שברמת האפליקציה לא מודד עבורו. בלי Provider
+        משלו ה-insets יוצאים 0 והתוכן העליון נכנס אל מתחת ל-Dynamic Island.
+        זו ההנחיה של react-native-safe-area-context עצמה - לא ספרייה חדשה.
+
+        edges מכיל top/left/right בלבד, בדיוק כמו MobileScreenLayout.
+        ה-bottom מטופל ב-StepNavBar דרך useSafeAreaInsets, כמו MobileBottomNav,
+        כדי שהרקע של הסרגל ימשיך עד קצה המסך ורק הכפתורים יעלו מעל
+        פס הבית - ולא ייווצר ריפוד כפול.
+      */}
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
         <View style={styles.headerBar}>
-          <Pressable style={styles.iconButton} onPress={handleClose}>
+          <Pressable
+            style={styles.iconButton}
+            onPress={handleClose}
+            accessibilityRole="button"
+            accessibilityLabel="סגירה"
+          >
             <Ionicons name="close" size={24} color={COLORS.textPrimary} />
           </Pressable>
-          <Text style={styles.headerTitle}>הזמנה חכמה - פייד טיים</Text>
+
+          <View style={styles.headerTitleBlock}>
+            <Text style={styles.headerTitle}>הזמנה מרוכזת לפייד־טיים</Text>
+            {stepTitle ? (
+              <Text style={styles.headerStepName}>
+                {stepTitle} · שלב {chatbot.currentStepIndex + 1} מתוך{" "}
+                {chatbot.totalSteps}
+              </Text>
+            ) : null}
+          </View>
+
           <View style={styles.iconButton} />
         </View>
 
         {loadingContext ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={styles.loadingText}>מכין את הצ'אטבוט...</Text>
+            <Text style={styles.loadingText}>טוען נתוני הזמנה מרוכזת...</Text>
           </View>
         ) : loadError ? (
           <View style={{ padding: 16 }}>
@@ -116,18 +208,60 @@ export default function PaidTimeChatbotModal(props) {
               <Text style={styles.errorText}>{loadError}</Text>
             </View>
           </View>
+        ) : blockedMessage ? (
+          <View style={{ padding: 16 }}>
+            <View style={styles.warningBanner}>
+              <Text style={styles.warningTitle}>
+                אי אפשר להתחיל הזמנה מרוכזת
+              </Text>
+              <Text style={styles.warningText}>{blockedMessage}</Text>
+            </View>
+
+            <Pressable
+              style={[styles.bottomBarButton, styles.bottomBarSecondary]}
+              onPress={handleClose}
+              accessibilityRole="button"
+            >
+              <Text style={styles.bottomBarSecondaryText}>סגירה</Text>
+            </Pressable>
+          </View>
         ) : (
-          <>
-            <ChatProgress
-              current={chatbot.currentStepIndex + 1}
-              total={chatbot.totalSteps}
-            />
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-              <StepRouter chatbot={chatbot} onClose={handleClose} />
-            </ScrollView>
-          </>
+          <StepNavContext.Provider value={navApi}>
+            <KeyboardAvoidingView
+              style={{ flex: 1 }}
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+            >
+              <ChatProgress
+                current={chatbot.currentStepIndex + 1}
+                total={chatbot.totalSteps}
+              />
+
+              <BulkSelectionSummary summary={selectionSummary} />
+
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                <StepRouter chatbot={chatbot} onClose={handleClose} />
+              </ScrollView>
+
+              {navState ? (
+                <StepNavBar
+                  canAdvance={navState.canAdvance}
+                  nextLabel={navState.nextLabel}
+                  backLabel={navState.backLabel}
+                  showBack={navState.showBack}
+                  incompleteReason={navState.incompleteReason}
+                  onNext={handleNavNext}
+                  onBack={handleNavBack}
+                />
+              ) : null}
+            </KeyboardAvoidingView>
+          </StepNavContext.Provider>
         )}
-      </SafeAreaView>
+        </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }

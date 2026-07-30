@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from "react";
-import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   getRidersByRanch,
@@ -9,6 +8,20 @@ import { getCompetitionInvitationDetails } from "../services/competitionService"
 import { getHorsesByRanch } from "../services/horsesService";
 import { getManagedPayers } from "../services/payerService";
 import { createPaidTimeRequest } from "../services/paidTimeRequestsService";
+import {
+  validatePaidTimeForm,
+  clearFieldError,
+  buildPaidTimeReviewModel,
+  buildPaidTimeRequestPayload,
+  buildSuccessSnapshot,
+  getHebrewDateLabel,
+  formatDisplayTime,
+  formatDurationLabel,
+  formatPriceLabel,
+} from "../utils/paidTimeRequestForm";
+
+var CREATE_ERROR_MESSAGE =
+  "אירעה שגיאה בשמירת בקשת הפייד טיים. אנא נסי שוב.";
 
 function normalizeHorseItem(item) {
   if (!item) {
@@ -104,28 +117,6 @@ function normalizePriceCatalogItem(item) {
   };
 }
 
-function getHebrewDateLabel(dateValue) {
-  if (!dateValue) {
-    return "";
-  }
-
-  try {
-    var date = new Date(dateValue);
-
-    if (Number.isNaN(date.getTime())) {
-      return "";
-    }
-
-    return date.toLocaleDateString("he-IL", {
-      weekday: "long",
-      day: "numeric",
-      month: "numeric",
-    });
-  } catch (error) {
-    return "";
-  }
-}
-
 function formatHorseLabel(item) {
   if (!item) {
     return "";
@@ -157,20 +148,6 @@ function formatPayerLabel(item) {
   return String(item.fullName || "").trim();
 }
 
-function formatDisplayTime(timeValue) {
-  if (!timeValue) {
-    return "";
-  }
-
-  var timeText = String(timeValue).trim();
-
-  if (timeText.length >= 5) {
-    return timeText.slice(0, 5);
-  }
-
-  return timeText;
-}
-
 function formatRequestedSlotLabel(item) {
   if (!item) {
     return "";
@@ -193,10 +170,8 @@ function formatPriceCatalogLabel(item) {
     return "";
   }
 
-  var duration = item.durationMinutes
-    ? String(item.durationMinutes) + " דק׳"
-    : "";
-  var price = item.itemPrice ? String(item.itemPrice) + " ₪" : "";
+  var duration = formatDurationLabel(item.durationMinutes);
+  var price = formatPriceLabel(item.itemPrice);
 
   return [item.productName || "", duration, price].filter(Boolean).join(" • ");
 }
@@ -205,6 +180,8 @@ export default function useAdminCompetitionPaidTimes(params) {
   var user = params.user;
   var activeRole = params.activeRole;
   var competitionId = params.competitionId;
+  // רק לתצוגה במסך האישור. אם המסך לא מספק שם תחרות, פשוט לא מוצגת שורה.
+  var competitionName = params.competitionName || "";
 
   var [horses, setHorses] = useState([]);
   var [riders, setRiders] = useState([]);
@@ -234,6 +211,21 @@ export default function useAdminCompetitionPaidTimes(params) {
   var [loading, setLoading] = useState(false);
   var [isSaving, setIsSaving] = useState(false);
   var [screenError, setScreenError] = useState("");
+
+  // ולידציה ברמת השדה: מפה של fieldKey -> הודעה, כדי שכל השדות החסרים
+  // יוצגו יחד מתחת לשדה שלהם במקום Alert עם השגיאה הראשונה בלבד.
+  var [fieldErrors, setFieldErrors] = useState({});
+  // שגיאה שאינה של שדה בטופס (משתמש מחובר / חווה פעילה חסרים).
+  var [formError, setFormError] = useState("");
+  // בקשת גלילה לסקשן הראשון שנכשל. ה-token משתנה בכל ניסיון כושל.
+  var [scrollRequest, setScrollRequest] = useState(null);
+
+  var [isReviewOpen, setIsReviewOpen] = useState(false);
+  var [reviewModel, setReviewModel] = useState(null);
+  var [submitError, setSubmitError] = useState("");
+
+  var [successSnapshot, setSuccessSnapshot] = useState(null);
+  var [isSuccessOpen, setIsSuccessOpen] = useState(false);
 
   useFocusEffect(
     useCallback(
@@ -353,6 +345,35 @@ export default function useAdminCompetitionPaidTimes(params) {
     }
   }
 
+  // עוטפים את ה-setters כדי לנקות את שגיאת השדה ברגע שהמשתמשת מתקנת אותו.
+  // ניקוי בחירה (בחירת null) לא מנקה את השגיאה - השדה עדיין חסר.
+  function buildFieldSetter(setValue, fieldKey) {
+    return function (nextValue) {
+      setValue(nextValue);
+
+      if (!nextValue) {
+        return;
+      }
+
+      setFieldErrors(function (prevErrors) {
+        return clearFieldError(prevErrors, fieldKey);
+      });
+    };
+  }
+
+  var setSelectedPriceCatalogField = buildFieldSetter(
+    setSelectedPriceCatalog,
+    "priceCatalog",
+  );
+  var setSelectedRequestedSlotField = buildFieldSetter(
+    setSelectedRequestedSlot,
+    "requestedSlot",
+  );
+  var setSelectedHorseField = buildFieldSetter(setSelectedHorse, "horse");
+  var setSelectedRiderField = buildFieldSetter(setSelectedRider, "rider");
+  var setSelectedTrainerField = buildFieldSetter(setSelectedTrainer, "coach");
+  var setSelectedPayerField = buildFieldSetter(setSelectedPayer, "payer");
+
   function handleToggleLock(fieldKey) {
     setLocks(function (prevLocks) {
       return {
@@ -392,100 +413,115 @@ export default function useAdminCompetitionPaidTimes(params) {
     });
   }
 
-  function validateForm() {
-    if (!selectedPriceCatalog || !selectedPriceCatalog.priceCatalogId) {
-      return "יש לבחור סוג פייד טיים";
-    }
-
-    if (!selectedRequestedSlot || !selectedRequestedSlot.paidTimeSlotInCompId) {
-      return "יש לבחור סלוט מבוקש";
-    }
-
-    if (!selectedRider || !selectedRider.federationMemberId) {
-      return "יש לבחור רוכב";
-    }
-
-    if (!selectedHorse || !selectedHorse.horseId) {
-      return "יש לבחור סוס";
-    }
-
-    if (!selectedTrainer || !selectedTrainer.federationMemberId) {
-      return "יש לבחור מאמן";
-    }
-
-    if (!selectedPayer || !selectedPayer.personId) {
-      return "יש לבחור משלם";
-    }
-
-    if (!user || !user.personId) {
-      return "לא נמצאו פרטי משתמש מחובר";
-    }
-
-    if (!activeRole || !activeRole.ranchId) {
-      return "לא נמצאה חווה פעילה";
-    }
-
-    return "";
+  function getFormValues() {
+    return {
+      requestedSlot: selectedRequestedSlot,
+      priceCatalog: selectedPriceCatalog,
+      horse: selectedHorse,
+      rider: selectedRider,
+      coach: selectedTrainer,
+      payer: selectedPayer,
+      notes: notes,
+      user: user,
+      activeRole: activeRole,
+      competitionName: competitionName,
+    };
   }
 
-  async function handleCreatePaidTimeRequest() {
-    var validationMessage = validateForm();
+  var labelFormatters = {
+    formatHorseLabel: formatHorseLabel,
+    formatMemberLabel: formatMemberLabel,
+    formatPayerLabel: formatPayerLabel,
+  };
 
-    if (validationMessage) {
-      Alert.alert("שגיאה", validationMessage);
+  // הפעולה הראשית של הטופס: ולידציה של הכל במכה אחת, ואם תקין - פתיחת
+  // מסך האישור. אין כאן קריאה ליצירה; היא קורית רק מ-handleConfirmSubmit.
+  function handleContinueToReview() {
+    var result = validatePaidTimeForm(getFormValues());
+
+    setFieldErrors(result.fieldErrors);
+    setFormError(result.contextError);
+
+    if (!result.isValid) {
+      if (result.firstInvalidFieldKey) {
+        setScrollRequest(function (prevRequest) {
+          return {
+            fieldKey: result.firstInvalidFieldKey,
+            token: (prevRequest ? prevRequest.token : 0) + 1,
+          };
+        });
+      }
+
+      return;
+    }
+
+    setSubmitError("");
+    setReviewModel(buildPaidTimeReviewModel(getFormValues(), labelFormatters));
+    setIsReviewOpen(true);
+  }
+
+  function handleBackToEdit() {
+    if (isSaving) {
+      return;
+    }
+
+    setIsReviewOpen(false);
+    setSubmitError("");
+  }
+
+  async function handleConfirmSubmit() {
+    // הגנה כפולה מפני שליחה כפולה: גם הכפתור מושבת בזמן שמירה, וגם כאן.
+    if (isSaving) {
+      return;
+    }
+
+    var values = getFormValues();
+    var result = validatePaidTimeForm(values);
+
+    if (!result.isValid) {
+      setFieldErrors(result.fieldErrors);
+      setFormError(result.contextError);
+      setIsReviewOpen(false);
       return;
     }
 
     try {
       setIsSaving(true);
+      setSubmitError("");
 
-      var payload = {
-        orderedBySystemUserId: user.personId,
-        ranchId: activeRole.ranchId,
-        horseId: selectedHorse.horseId,
-        riderFederationMemberId: selectedRider.federationMemberId,
-        coachFederationMemberId: selectedTrainer.federationMemberId,
-        paidByPersonId: selectedPayer.personId,
-        priceCatalogId: selectedPriceCatalog.priceCatalogId,
-        requestedCompSlotId: selectedRequestedSlot.paidTimeSlotInCompId,
-        notes: notes ? notes.trim() : null,
-      };
+      await createPaidTimeRequest(buildPaidTimeRequestPayload(values));
 
-      await createPaidTimeRequest(payload);
+      // צילום המצב לפני האיפוס - כדי שמסך ההצלחה יציג את מה שנשלח גם
+      // אחרי שהשדות הלא נעולים התרוקנו.
+      setSuccessSnapshot(buildSuccessSnapshot(values, labelFormatters));
+      setIsReviewOpen(false);
+      setReviewModel(null);
+      setIsSuccessOpen(true);
+      setFieldErrors({});
+      setFormError("");
 
-      Alert.alert("נשמר", "בקשת הפייד טיים נוספה בהצלחה");
+      // התנהגות הנעילה/השימור נשארה בדיוק כפי שהייתה.
       resetUnlockedFields();
     } catch (error) {
-      Alert.alert(
-        "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה בשמירת בקשת הפייד טיים"),
-      );
+      // בכוונה לא מוצג טקסט השרת/מסד הנתונים - רק הודעה בעברית למשתמשת.
+      setSubmitError(CREATE_ERROR_MESSAGE);
     } finally {
       setIsSaving(false);
     }
   }
 
+  function handleCloseSuccess() {
+    setIsSuccessOpen(false);
+    setSuccessSnapshot(null);
+  }
+
+  // "המשך לאישור" חייב להיות לחיץ גם כשחסרים שדות - זו הפעולה שמפעילה את
+  // הוולידציה ומציגה את כל השגיאות יחד. לכן החסימה היחידה היא שמירה פעילה.
   var canSubmit = useMemo(
     function () {
-      return (
-        !!selectedPriceCatalog &&
-        !!selectedRequestedSlot &&
-        !!selectedHorse &&
-        !!selectedRider &&
-        !!selectedTrainer &&
-        !!selectedPayer &&
-        !isSaving
-      );
+      return !isSaving;
     },
-    [
-      selectedPriceCatalog,
-      selectedRequestedSlot,
-      selectedHorse,
-      selectedRider,
-      selectedTrainer,
-      selectedPayer,
-      isSaving,
-    ],
+    [isSaving],
   );
 
   return {
@@ -504,12 +540,12 @@ export default function useAdminCompetitionPaidTimes(params) {
     selectedPayer,
     notes,
 
-    setSelectedPriceCatalog,
-    setSelectedRequestedSlot,
-    setSelectedHorse,
-    setSelectedRider,
-    setSelectedTrainer,
-    setSelectedPayer,
+    setSelectedPriceCatalog: setSelectedPriceCatalogField,
+    setSelectedRequestedSlot: setSelectedRequestedSlotField,
+    setSelectedHorse: setSelectedHorseField,
+    setSelectedRider: setSelectedRiderField,
+    setSelectedTrainer: setSelectedTrainerField,
+    setSelectedPayer: setSelectedPayerField,
     setNotes,
 
     locks,
@@ -520,7 +556,20 @@ export default function useAdminCompetitionPaidTimes(params) {
     screenError,
     canSubmit,
 
-    handleCreatePaidTimeRequest,
+    fieldErrors,
+    formError,
+    scrollRequest,
+
+    isReviewOpen,
+    reviewModel,
+    submitError,
+    handleContinueToReview,
+    handleBackToEdit,
+    handleConfirmSubmit,
+
+    isSuccessOpen,
+    successSnapshot,
+    handleCloseSuccess,
 
     formatHorseLabel,
     formatMemberLabel,

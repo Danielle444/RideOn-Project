@@ -74,8 +74,9 @@ export default function Step08_TrainingOrder(props) {
   return (
     <StepLayout
       bubbles={[
-        "סדר אימון מועדף - השתמש בחצים כדי לסדר.",
-        "אם לא תזיז כלום - המערכת תקבע סדר חכם. זו העדפה, לא חובה.",
+        "סדר אימון",
+        "סדרי את הסוסים בעזרת החצים.",
+        "אם לא ישונה דבר, המערכת תקבע סדר בעצמה. זו העדפה, לא חובה.",
       ]}
       onNext={chatbot.next}
       onBack={chatbot.prev}

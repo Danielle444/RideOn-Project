@@ -62,7 +62,8 @@ export default function Step06_TimeConstraints(props) {
   return (
     <StepLayout
       bubbles={[
-        "אילוצי זמן לכל מאמן - מתי המאמן לא יכול בשום אופן?",
+        "אילוצי זמן",
+        "מתי כל מאמן לא יכול בשום אופן?",
         "אילוץ הוא תנאי חובה. אם אי אפשר לעמוד בו, הבקשה לא תיווצר.",
       ]}
       onNext={chatbot.next}

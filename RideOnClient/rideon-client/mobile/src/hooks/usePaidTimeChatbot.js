@@ -285,12 +285,16 @@ export default function usePaidTimeChatbot(config) {
 
   const currentStep = STEPS[state.currentStepIndex];
 
-  const totalRequests = useMemo(
+  // תצוגה בלבד: אותם items שנשלחים בפועל, כדי שמסך הסיכום יציג בדיוק את מה
+  // שייווצר. אין כאן חישוב חדש - זו אותה buildItems ששימשה כבר ל-totalRequests.
+  const items = useMemo(
     function () {
-      return buildItems(state.answers, state.context).length;
+      return buildItems(state.answers, state.context);
     },
     [state.answers, state.context]
   );
+
+  const totalRequests = items.length;
 
   return {
     STEPS: STEPS,
@@ -299,6 +303,7 @@ export default function usePaidTimeChatbot(config) {
     currentStepIndex: state.currentStepIndex,
     totalSteps: STEPS.length,
     totalRequests: totalRequests,
+    items: items,
     initContext: initContext,
     next: next,
     prev: prev,

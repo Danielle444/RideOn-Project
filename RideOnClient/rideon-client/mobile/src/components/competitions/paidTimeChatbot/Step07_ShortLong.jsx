@@ -3,6 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import StepLayout from "./StepLayout";
 import CoachAccordion from "./CoachAccordion";
 import styles, { COLORS } from "../../../styles/paidTimeChatbotStyles";
+import { formatPriceLabel } from "../../../utils/paidTimeBulkReview";
 
 function formatHorseLabel(horse) {
   const name = horse.horseName || "סוס";
@@ -26,8 +27,15 @@ export default function Step07_ShortLong(props) {
 
   const shortMin = ctx.priceCatalog?.short?.durationMinutes || 7;
   const longMin = ctx.priceCatalog?.long?.durationMinutes || 10;
-  const shortLabel = "קצר (" + shortMin + " דק')";
-  const longLabel = "ארוך (" + longMin + " דק')";
+
+  // המחיר מוצג רק כשהוא באמת קיים בקטלוג - אין כאן ברירת מחדל מומצאת.
+  const shortPrice = formatPriceLabel(ctx.priceCatalog?.short?.itemPrice);
+  const longPrice = formatPriceLabel(ctx.priceCatalog?.long?.itemPrice);
+
+  const shortLabel =
+    "קצר (" + shortMin + " דק')" + (shortPrice ? " · " + shortPrice : "");
+  const longLabel =
+    "ארוך (" + longMin + " דק')" + (longPrice ? " · " + longPrice : "");
 
   function setHorse(horseId, value) {
     chatbot.setAnswer("shortLong", {
@@ -48,11 +56,8 @@ export default function Step07_ShortLong(props) {
   return (
     <StepLayout
       bubbles={[
-        "לכל סוס בחר אם הפייד טיים יהיה " +
-          shortLabel +
-          " או " +
-          longLabel +
-          ".",
+        "סוג פייד טיים",
+        "לכל סוס בחרי " + shortLabel + " או " + longLabel + ".",
       ]}
       onNext={chatbot.next}
       onBack={chatbot.prev}
