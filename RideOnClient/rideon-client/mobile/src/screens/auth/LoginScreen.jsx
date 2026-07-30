@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { useNavigation } from "@react-navigation/native";
 
 import { validateLoginForm } from "../../../../shared/auth/validations/loginValidation";
 import { useAuth } from "../../context/AuthContext";
+import { getRememberMe } from "../../services/storageService";
 
 import styles from "../../styles/authStyles";
 
@@ -25,8 +26,39 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // ברגע שהמשתמש נוגע בתיבה, הבחירה שלו גוברת על ההעדפה השמורה — גם אם
+  // הקריאה מהאחסון מסתיימת אחריה.
+  const hasToggledRememberMeRef = useRef(false);
+
   const navigation = useNavigation();
   const { loginAndInitialize } = useAuth();
+
+  useEffect(function () {
+    let isMounted = true;
+
+    async function loadStoredRememberMe() {
+      let storedRememberMe = false;
+
+      try {
+        storedRememberMe = await getRememberMe();
+      } catch (error) {
+        // כשל בקריאת האחסון נופל לברירת המחדל הסגורה: לא זוכרים.
+        storedRememberMe = false;
+      }
+
+      if (!isMounted || hasToggledRememberMeRef.current) {
+        return;
+      }
+
+      setRememberMe(storedRememberMe === true);
+    }
+
+    loadStoredRememberMe();
+
+    return function () {
+      isMounted = false;
+    };
+  }, []);
 
   async function handleLogin() {
     const validationError = validateLoginForm(username, password);
@@ -125,6 +157,7 @@ export default function LoginScreen() {
               <Pressable
                 style={styles.rememberWrapper}
                 onPress={function () {
+                  hasToggledRememberMeRef.current = true;
                   setRememberMe(!rememberMe);
                 }}
               >
