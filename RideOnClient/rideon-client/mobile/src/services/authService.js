@@ -3,6 +3,12 @@ import { API_BASE_URL } from "../config/apiBaseUrl";
 import { normalizeIdentifier } from "../../../shared/auth/utils/normalizeIdentifier";
 
 
+// ההתחברות היא הבקשה היחידה שעלולה לפגוש שרת מצונן (Render מרדים מופע לא
+// פעיל, וההשכמה ארוכה בהרבה מ-8 שניות). פסק זמן קצר מדי גרם לכך שהשרת סיים
+// את ההתחברות בהצלחה בזמן שהלקוח כבר ויתר, והמשתמשת נשארה במסך ההתחברות.
+// שאר הבקשות יוצאות אחרי שהשרת כבר ער ולכן נשארות על פסק הזמן הגלובלי.
+const LOGIN_TIMEOUT_MS = 30000;
+
 function login(username, password) {
   return axios.post(
     `${API_BASE_URL}/SystemUsers/login`,
@@ -11,7 +17,7 @@ function login(username, password) {
       password: password,
     },
     {
-      timeout: 8000,
+      timeout: LOGIN_TIMEOUT_MS,
     }
   );
 }

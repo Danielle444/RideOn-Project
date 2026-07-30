@@ -16,6 +16,7 @@ import {
 } from "../services/storageService";
 import { registerUnauthorizedHandler } from "../services/axiosInstance";
 import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
+import { getLoginErrorMessage } from "../utils/loginErrors";
 import { useUser } from "./UserContext";
 import { useActiveRole } from "./ActiveRoleContext";
 
@@ -168,25 +169,16 @@ export function AuthProvider(props) {
         user: userData,
       };
     } catch (err) {
+      // סשן מאומת שפג עדיין מנקה את המצב, בדיוק כפי שהיה. אחרי הפטור
+      // שנוסף לאינטרספטור, 401 מההתחברות עצמה כבר לא מגיע לכאן בצורה הזו.
       if (err && err.isAuthError) {
         await logout();
-
-        return {
-          ok: false,
-          message: "ההתחברות פגה, יש להתחבר מחדש",
-        };
       }
 
-      if (err?.response?.data === "PENDING_APPROVAL") {
-        return {
-          ok: false,
-          message: "חשבונך ממתין לאישור מנהל המערכת",
-        };
-      }
-
+      // המיפוי מחזיר מחרוזת קבועה בלבד — אף פעם לא טקסט מהשרת או מ-axios.
       return {
         ok: false,
-        message: "שגיאה בהתחברות",
+        message: getLoginErrorMessage(err),
       };
     }
   }

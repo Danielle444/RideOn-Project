@@ -1,6 +1,7 @@
 import axios from "axios";
 import { getToken, clearAuthStorage } from "./storageService";
 import { API_BASE_URL } from "../config/apiBaseUrl";
+import { isLoginRequestUrl } from "../utils/loginErrors";
 
 let unauthorizedHandler = null;
 
@@ -34,6 +35,14 @@ axiosInstance.interceptors.response.use(
   },
   async function (error) {
     if (error.response && error.response.status === 401) {
+      // 401 מנקודת הקצה של ההתחברות אינו סשן מאומת שפג — הוא פשוט שם משתמש
+      // או סיסמה שגויים. הוא מוחזר כמו שהוא ל-loginAndInitialize, בלי לנקות
+      // מצב אימות ובלי להפעיל את מטפל ה-401 הגלובלי, שאחרת היה מציג
+      // "ההתחברות פגה" על ניסיון התחברות ראשון.
+      if (isLoginRequestUrl(error.config?.url, error.config?.baseURL)) {
+        return Promise.reject(error);
+      }
+
       await clearAuthStorage();
 
       if (typeof unauthorizedHandler === "function") {
