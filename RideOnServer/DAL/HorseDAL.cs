@@ -215,34 +215,7 @@ namespace RideOnServer.DAL
 
                         while (reader.Read())
                         {
-                            list.Add(new HealthCertificateItem
-                            {
-                                HorseId = Convert.ToInt32(reader["HorseId"]),
-                                HorseName = reader["HorseName"].ToString() ?? string.Empty,
-                                BarnName = reader["BarnName"] == DBNull.Value
-                                    ? null
-                                    : reader["BarnName"].ToString(),
-
-                                HcPath = reader["HcPath"] == DBNull.Value
-                                    ? null
-                                    : reader["HcPath"].ToString(),
-
-                                HcUploadDate = reader["HcUploadDate"] == DBNull.Value
-                                    ? null
-                                    : Convert.ToDateTime(reader["HcUploadDate"]),
-
-                                HcApprovalStatus = reader["HcApprovalStatus"] == DBNull.Value
-                                    ? null
-                                    : reader["HcApprovalStatus"].ToString(),
-
-                                HcApprovalDate = reader["HcApprovalDate"] == DBNull.Value
-                                    ? null
-                                    : DateOnly.FromDateTime(Convert.ToDateTime(reader["HcApprovalDate"])),
-
-                                HcApproverSystemUserId = reader["HcApproverSystemUserId"] == DBNull.Value
-                                    ? null
-                                    : Convert.ToInt32(reader["HcApproverSystemUserId"])
-                            });
+                            list.Add(ReadHealthCertificateItem(reader));
                         }
 
                         return list;
@@ -254,6 +227,89 @@ namespace RideOnServer.DAL
                 Console.WriteLine($"Error in GetHealthCertificatesForCompetition: {ex.Message}");
                 throw;
             }
+        }
+
+        // Competition-wide sibling of GetHealthCertificatesForCompetition, backed by
+        // usp_gethealthcertificatesforhostedcompetition (repo file 184): the same
+        // eight columns without the h.ranchid filter, so a HostSecretary of the
+        // hosting ranch sees visiting ranches' horses too.
+        //
+        // Deliberately takes no ranch id. The read scope is decided by
+        // HorsesController before either method is reached - never by a parameter a
+        // caller could supply. One call, one round trip: nothing here iterates over
+        // ranches.
+        public List<HealthCertificateItem> GetHealthCertificatesForHostedCompetition(
+            int competitionId
+        )
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@p_competitionid", competitionId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_gethealthcertificatesforhostedcompetition",
+                        connection,
+                        paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<HealthCertificateItem> list = new List<HealthCertificateItem>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(ReadHealthCertificateItem(reader));
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetHealthCertificatesForHostedCompetition: {ex.Message}");
+                throw;
+            }
+        }
+
+        // Shared by both health-certificate readers. The two stored procedures
+        // return the same eight columns in the same order, so extracting this keeps
+        // the mapping from drifting between them.
+        private static HealthCertificateItem ReadHealthCertificateItem(NpgsqlDataReader reader)
+        {
+            return new HealthCertificateItem
+            {
+                HorseId = Convert.ToInt32(reader["HorseId"]),
+                HorseName = reader["HorseName"].ToString() ?? string.Empty,
+                BarnName = reader["BarnName"] == DBNull.Value
+                    ? null
+                    : reader["BarnName"].ToString(),
+
+                HcPath = reader["HcPath"] == DBNull.Value
+                    ? null
+                    : reader["HcPath"].ToString(),
+
+                HcUploadDate = reader["HcUploadDate"] == DBNull.Value
+                    ? null
+                    : Convert.ToDateTime(reader["HcUploadDate"]),
+
+                HcApprovalStatus = reader["HcApprovalStatus"] == DBNull.Value
+                    ? null
+                    : reader["HcApprovalStatus"].ToString(),
+
+                HcApprovalDate = reader["HcApprovalDate"] == DBNull.Value
+                    ? null
+                    : DateOnly.FromDateTime(Convert.ToDateTime(reader["HcApprovalDate"])),
+
+                HcApproverSystemUserId = reader["HcApproverSystemUserId"] == DBNull.Value
+                    ? null
+                    : Convert.ToInt32(reader["HcApproverSystemUserId"])
+            };
         }
 
         public void SaveHealthCertificate(int horseId, int competitionId, string hcPath, DateTime uploadDate)
