@@ -1,18 +1,15 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import StepLayout from "./StepLayout";
-import ChatBubble from "./ChatBubble";
 import CoachAccordion from "./CoachAccordion";
 import styles, { COLORS } from "../../../styles/paidTimeChatbotStyles";
+import {
+  buildBulkReviewModel,
+  formatHorseLabel,
+} from "../../../utils/paidTimeBulkReview";
 
 function pad2(n) {
   return String(n).padStart(2, "0");
-}
-
-function fmtTimeFromMinutes(min) {
-  if (min == null) return null;
-  return pad2(Math.floor(min / 60)) + ":" + pad2(min % 60);
 }
 
 function fmtIsoToTime(iso) {
@@ -26,20 +23,7 @@ function fmtDateHebrew(value) {
   if (!value) return "";
   const d = new Date(value);
   if (isNaN(d.getTime())) return String(value);
-  return (
-    pad2(d.getDate()) +
-    "/" +
-    pad2(d.getMonth() + 1) +
-    "/" +
-    d.getFullYear()
-  );
-}
-
-function formatHorseLabel(horse) {
-  if (!horse) return "סוס";
-  const name = horse.horseName || "סוס";
-  const barn = horse.barnName || "";
-  return barn ? name + " (" + barn + ")" : name;
+  return pad2(d.getDate()) + "/" + pad2(d.getMonth() + 1) + "/" + d.getFullYear();
 }
 
 function buildHorseLookup(coachesWithHorses) {
@@ -60,62 +44,79 @@ function buildCoachLookup(coachesWithHorses) {
   return out;
 }
 
-function buildOrderedHorses(coach, horsesPerCoach, trainingOrder) {
-  const coachId = coach.coachFederationMemberId;
-  const selectedIds = horsesPerCoach[coachId] || [];
-  const allHorses = coach.horses || [];
-  const order = trainingOrder[coachId];
+function DetailRow(props) {
+  if (!props.value) return null;
 
-  const selected = allHorses.filter(function (h) {
-    return selectedIds.map(String).includes(String(h.horseId));
-  });
-
-  if (Array.isArray(order) && order.length === selected.length) {
-    const byId = {};
-    for (const h of selected) byId[h.horseId] = h;
-    const ordered = order.map(function (id) {
-      return byId[id];
-    }).filter(Boolean);
-    if (ordered.length === selected.length) return ordered;
-  }
-  return selected;
-}
-
-function describeTimePref(pref) {
-  if (!pref) return null;
-  const e = fmtTimeFromMinutes(pref.earliestMinutes);
-  const l = fmtTimeFromMinutes(pref.latestMinutes);
-  if (e && l) return e + " - " + l;
-  if (e) return "מ-" + e + " והלאה";
-  if (l) return "עד " + l;
-  return null;
-}
-
-function pairMatches(p, pair) {
   return (
-    (String(p.horseA) === String(pair.a.horseId) &&
-      String(p.horseB) === String(pair.b.horseId)) ||
-    (String(p.horseA) === String(pair.b.horseId) &&
-      String(p.horseB) === String(pair.a.horseId))
+    <View style={styles.requestDetailRow}>
+      <Text style={styles.requestDetailLabel}>{props.label}</Text>
+      <Text style={styles.requestDetailValue}>{props.value}</Text>
+    </View>
   );
 }
 
-function describeSpacing(pair, spacing) {
-  const adjacency = (spacing && spacing.adjacency) || [];
-  if (adjacency.some(function (p) { return pairMatches(p, pair); })) {
-    return "צמודים";
-  }
-  const minSpacingList = (spacing && spacing.minSpacing) || [];
-  const found = minSpacingList.find(function (p) {
-    return pairMatches(p, pair);
-  });
-  if (!found || found.minutes === 0) return "לא משנה";
-  const m = found.minutes;
-  const h = Math.floor(m / 60);
-  const mm = m % 60;
-  if (h > 0 && mm > 0) return "לפחות " + h + "ש' " + mm + " דק'";
-  if (h > 0) return "לפחות " + h + " שעות";
-  return "לפחות " + mm + " דק'";
+function StatusBadge(props) {
+  const ok = !!props.isIncluded;
+
+  return (
+    <View
+      style={[
+        styles.statusBadge,
+        ok ? styles.statusBadgeOk : styles.statusBadgeBlocked,
+      ]}
+    >
+      <Text
+        style={[
+          styles.statusBadgeText,
+          ok ? styles.statusBadgeTextOk : styles.statusBadgeTextBlocked,
+        ]}
+      >
+        {ok ? "תישלח" : "לא תישלח"}
+      </Text>
+    </View>
+  );
+}
+
+// כרטיס בקשה אחת בסקירה הסופית: סוס, רוכב, משלם, סלוט, סוג, משך ומחיר.
+// כשהבקשה לא תיווצר, מוצג בדיוק מה חסר לה - במקום שהיא פשוט תיעלם מהספירה.
+function RequestCard(props) {
+  const horse = props.horse;
+
+  return (
+    <View
+      style={[
+        styles.requestCard,
+        !horse.isIncluded ? styles.requestCardExcluded : null,
+      ]}
+    >
+      <View style={styles.requestCardTopRow}>
+        <Text style={styles.requestHorseName}>{horse.horseLabel}</Text>
+        {horse.isIncluded && horse.priceLabel ? (
+          <Text style={styles.requestPrice}>{horse.priceLabel}</Text>
+        ) : (
+          <StatusBadge isIncluded={horse.isIncluded} />
+        )}
+      </View>
+
+      <DetailRow label="רוכב" value={horse.riderName} />
+      <DetailRow label="משלם" value={horse.payerName} />
+      <DetailRow label="סלוט" value={horse.slotLabel} />
+      <DetailRow
+        label="סוג"
+        value={[horse.typeName, horse.durationLabel].filter(Boolean).join(" · ")}
+      />
+      <DetailRow label="הערות" value={horse.notes} />
+
+      {!horse.isIncluded && horse.missingReasons.length > 0 ? (
+        <View style={styles.warningBanner}>
+          <Text style={styles.warningTitle}>הבקשה לא תישלח</Text>
+          <Text style={styles.warningText}>
+            חסר: {horse.missingReasons.join(", ")}.
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 export default function Step10_Summary(props) {
@@ -129,12 +130,14 @@ export default function Step10_Summary(props) {
   const serverError = chatbot.state.serverError;
 
   const coachesWithHorses = ctx.coachesWithHorses || [];
+
   const horseLookup = useMemo(
     function () {
       return buildHorseLookup(coachesWithHorses);
     },
     [coachesWithHorses]
   );
+
   const coachLookup = useMemo(
     function () {
       return buildCoachLookup(coachesWithHorses);
@@ -142,64 +145,48 @@ export default function Step10_Summary(props) {
     [coachesWithHorses]
   );
 
-  const selectedCoaches = useMemo(
+  const model = useMemo(
     function () {
-      const ids = (answers.selectedCoachIds || []).map(String);
-      return coachesWithHorses.filter(function (c) {
-        return ids.includes(String(c.coachFederationMemberId));
+      return buildBulkReviewModel({
+        answers: answers,
+        context: ctx,
+        items: chatbot.items,
       });
     },
-    [answers.selectedCoachIds, coachesWithHorses]
-  );
-
-  const totalRequests = useMemo(
-    function () {
-      let sum = 0;
-      for (const coach of selectedCoaches) {
-        const hids = answers.horsesPerCoach[coach.coachFederationMemberId] || [];
-        sum += hids.length;
-      }
-      return sum;
-    },
-    [selectedCoaches, answers.horsesPerCoach]
-  );
-
-  const arenaName = useMemo(
-    function () {
-      const a = (ctx.arenas || []).find(function (x) {
-        return x.key === answers.arenaKey;
-      });
-      return a ? a.arenaName : "";
-    },
-    [ctx.arenas, answers.arenaKey]
+    [answers, ctx, chatbot.items]
   );
 
   async function handleSubmit() {
+    if (isSubmitting) return;
     await chatbot.submit({ confirmedOverflow: false });
   }
 
   async function handleSubmitWithOverflow() {
+    if (isSubmitting) return;
     await chatbot.submit({ confirmedOverflow: true });
   }
 
-  // -------- WARNINGS GATE (true overflow only) --------
+  // ---------------- אישור חריגת קיבולת (אזהרה שניתן לאשר) ----------------
   if (warnings.length > 0 && !result) {
     return (
       <View>
-        <ChatBubble
-          from="bot"
-          text="שים לב - אין מספיק מקום בסלוט/ים הבאים גם אם הסלוט ריק:"
-        />
+        <Text style={styles.sectionHeading}>נדרש אישור לפני שליחה</Text>
+        <Text style={styles.sectionHelp}>
+          אין מספיק מקום בסלוט/ים הבאים, גם אם הסלוט ריק לגמרי.
+        </Text>
+
         {warnings.map(function (w, idx) {
-          const over = (w.newRequestMinutes || 0) - (w.totalCapacityMinutes || 0);
+          const over =
+            (w.newRequestMinutes || 0) - (w.totalCapacityMinutes || 0);
+
           return (
             <View key={"warn-" + idx} style={styles.warningBanner}>
               <Text style={styles.warningTitle}>
                 סלוט #{w.requestedCompSlotId}
               </Text>
               <Text style={styles.warningText}>
-                קיבולת הסלוט: {w.totalCapacityMinutes} דק'. הבקשות שביקשת מצטברות
-                ל-{w.newRequestMinutes} דק' (חריגה של {over} דק').
+                קיבולת הסלוט: {w.totalCapacityMinutes} דק׳. הבקשות שביקשת
+                מצטברות ל-{w.newRequestMinutes} דק׳ (חריגה של {over} דק׳).
               </Text>
               <Text style={[styles.warningText, { marginTop: 4 }]}>
                 חלק מהבקשות לא ישובצו אוטומטית ויעברו לטיפול ידני של המזכירה.
@@ -207,33 +194,57 @@ export default function Step10_Summary(props) {
             </View>
           );
         })}
-        <ChatBubble
-          from="bot"
-          text="אפשר להמשיך בכל זאת (חלק יעברו לידני), או לחזור ולהוריד סוסים/לבחור סלוט אחר."
-        />
-        <View style={{ flexDirection: "row-reverse", gap: 8, marginTop: 8 }}>
+
+        <View style={styles.infoNote}>
+          <Text style={styles.infoNoteText}>
+            אפשר לאשר ולהמשיך (חלק מהבקשות יעברו לשיבוץ ידני), או לחזור ולהוריד
+            סוסים / לבחור סלוט אחר.
+          </Text>
+        </View>
+
+        {serverError ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>{String(serverError)}</Text>
+          </View>
+        ) : null}
+
+        <View style={{ flexDirection: "row-reverse", gap: 10, marginTop: 8 }}>
           <Pressable
-            style={[styles.primaryButton, { flex: 1 }]}
+            style={[
+              styles.bottomBarButton,
+              styles.bottomBarPrimary,
+              isSubmitting ? styles.bottomBarPrimaryDisabled : null,
+            ]}
+            disabled={isSubmitting}
             onPress={handleSubmitWithOverflow}
+            accessibilityRole="button"
           >
-            <Text style={styles.primaryButtonText}>אישור והמשך</Text>
+            {isSubmitting ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.bottomBarPrimaryText}>אישור ושליחה</Text>
+            )}
           </Pressable>
+
           <Pressable
-            style={[styles.secondaryButton, { flex: 1 }]}
+            style={[styles.bottomBarButton, styles.bottomBarSecondary]}
+            disabled={isSubmitting}
             onPress={chatbot.prev}
+            accessibilityRole="button"
           >
-            <Text style={styles.secondaryButtonText}>חזרה</Text>
+            <Text style={styles.bottomBarSecondaryText}>חזרה לעריכה</Text>
           </Pressable>
         </View>
       </View>
     );
   }
 
-  // -------- SUCCESS RESULT --------
+  // ------------------------------ הצלחה ------------------------------
   if (result) {
     return (
       <SuccessResult
         result={result}
+        model={model}
         coachLookup={coachLookup}
         horseLookup={horseLookup}
         onNewBooking={chatbot.restart}
@@ -242,53 +253,86 @@ export default function Step10_Summary(props) {
     );
   }
 
-  // -------- PRE-SUBMIT REVIEW --------
+  // --------------------------- סקירה לפני שליחה ---------------------------
+  const canSubmit = !isSubmitting && model.requestCount > 0;
+
   return (
     <View>
-      <ChatBubble
-        from="bot"
-        text="סיכום הבקשות לפני שליחה. עברתי על כל מה שבחרת."
-      />
+      <Text style={styles.sectionHeading}>סיכום ההזמנה המרוכזת</Text>
+      <Text style={styles.sectionHelp}>
+        אלו הבקשות שייווצרו. עברי עליהן לפני השליחה.
+      </Text>
 
-      <View style={styles.answerCard}>
-        <Text style={[styles.bubbleTextBot, { fontWeight: "700", marginBottom: 6 }]}>
-          פרטים כלליים:
-        </Text>
-        <Text style={styles.bubbleTextBot}>
-          יום: {fmtDateHebrew(answers.day)}
-        </Text>
-        <Text style={styles.bubbleTextBot}>
-          מגרש: {arenaName || "—"}
-        </Text>
-        {answers.beforeOrAfterCompetition ? (
-          <Text style={styles.bubbleTextBot}>
-            יחס לתחרות:{" "}
-            {answers.beforeOrAfterCompetition === "before"
-              ? "לפני התחרות"
-              : "אחרי התחרות"}
+      <View style={styles.totalsCard}>
+        <View style={styles.totalsRow}>
+          <Text style={styles.totalsLabel}>יום</Text>
+          <Text style={styles.totalsValue}>
+            {fmtDateHebrew(model.dayLabel) || "—"}
           </Text>
+        </View>
+
+        <View style={styles.totalsRow}>
+          <Text style={styles.totalsLabel}>מגרש</Text>
+          <Text style={styles.totalsValue}>{model.arenaName || "—"}</Text>
+        </View>
+
+        {answers.beforeOrAfterCompetition ? (
+          <View style={styles.totalsRow}>
+            <Text style={styles.totalsLabel}>יחס לתחרות</Text>
+            <Text style={styles.totalsValue}>
+              {answers.beforeOrAfterCompetition === "before"
+                ? "לפני התחרות"
+                : "אחרי התחרות"}
+            </Text>
+          </View>
         ) : null}
-        <Text
-          style={[
-            styles.bubbleTextBot,
-            { marginTop: 6, color: COLORS.primary, fontWeight: "700" },
-          ]}
-        >
-          סה״כ {totalRequests} בקשות
-        </Text>
+
+        <View style={styles.totalsRow}>
+          <Text style={styles.totalsLabel}>סה״כ בקשות</Text>
+          <Text style={styles.totalsValueStrong}>{model.requestCount}</Text>
+        </View>
+
+        {model.totalPriceLabel ? (
+          <View style={styles.totalsRow}>
+            <Text style={styles.totalsLabel}>סה״כ לתשלום</Text>
+            <Text style={styles.totalsValueStrong}>
+              {model.totalPriceLabel}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
-      <ChatBubble from="bot" text="פירוט מלא לפי מאמן:" />
+      {model.excludedCount > 0 ? (
+        <View style={styles.warningBanner}>
+          <Text style={styles.warningTitle}>
+            {model.excludedCount} סוסים שנבחרו לא יישלחו
+          </Text>
+          <Text style={styles.warningText}>
+            חסרים להם פרטים. הם מסומנים בפירוט למטה, ואפשר לחזור ולתקן.
+          </Text>
+        </View>
+      ) : null}
 
-      {selectedCoaches.map(function (coach) {
+      {model.coaches.map(function (coach) {
         return (
-          <CoachReviewCard
-            key={"rev-" + coach.coachFederationMemberId}
-            coach={coach}
-            answers={answers}
-            shortMin={ctx.priceCatalog?.short?.durationMinutes || 7}
-            longMin={ctx.priceCatalog?.long?.durationMinutes || 10}
-          />
+          <CoachAccordion
+            key={"rev-" + coach.coachId}
+            title={coach.coachName}
+            subtitle={
+              coach.includedCount +
+              " בקשות" +
+              (coach.excludedCount > 0
+                ? " · " + coach.excludedCount + " לא יישלחו"
+                : "")
+            }
+            defaultOpen={true}
+          >
+            {coach.horses.map(function (horse) {
+              return (
+                <RequestCard key={"req-" + horse.horseId} horse={horse} />
+              );
+            })}
+          </CoachAccordion>
         );
       })}
 
@@ -298,140 +342,46 @@ export default function Step10_Summary(props) {
         </View>
       ) : null}
 
-      <ChatBubble
-        from="bot"
-        text="שים לב: זו הערכה. השיבוץ האמיתי ייעשה אוטומטית מיד אחרי השליחה."
-      />
+      <View style={styles.infoNote}>
+        <Text style={styles.infoNoteText}>
+          השיבוץ בפועל מתבצע אוטומטית מיד אחרי השליחה. השעות המדויקות ייקבעו אז.
+        </Text>
+      </View>
 
-      <View style={{ flexDirection: "row-reverse", gap: 8, marginTop: 8 }}>
+      <View style={{ flexDirection: "row-reverse", gap: 10, marginTop: 8 }}>
         <Pressable
           style={[
-            styles.primaryButton,
-            { flex: 1 },
-            isSubmitting || totalRequests === 0
-              ? styles.primaryButtonDisabled
-              : null,
+            styles.bottomBarButton,
+            styles.bottomBarPrimary,
+            !canSubmit ? styles.bottomBarPrimaryDisabled : null,
           ]}
-          disabled={isSubmitting || totalRequests === 0}
+          disabled={!canSubmit}
           onPress={handleSubmit}
+          accessibilityRole="button"
         >
           {isSubmitting ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.primaryButtonText}>שלח בקשות</Text>
+            <Text style={styles.bottomBarPrimaryText}>שליחת כל הבקשות</Text>
           )}
         </Pressable>
+
         <Pressable
-          style={[styles.secondaryButton, { flex: 1 }]}
+          style={[styles.bottomBarButton, styles.bottomBarSecondary]}
           onPress={chatbot.prev}
           disabled={isSubmitting}
+          accessibilityRole="button"
         >
-          <Text style={styles.secondaryButtonText}>חזרה</Text>
+          <Text style={styles.bottomBarSecondaryText}>חזרה לעריכה</Text>
         </Pressable>
       </View>
     </View>
   );
 }
 
-function CoachReviewCard(props) {
-  const coach = props.coach;
-  const answers = props.answers;
-  const shortMin = props.shortMin;
-  const longMin = props.longMin;
-  const coachId = coach.coachFederationMemberId;
-
-  const orderedHorses = buildOrderedHorses(
-    coach,
-    answers.horsesPerCoach || {},
-    answers.trainingOrder || {}
-  );
-
-  if (orderedHorses.length === 0) return null;
-
-  const pref = (answers.timePreferences?.coachLevel || {})[coachId];
-  const constraint = (answers.timeConstraints?.coachLevel || {})[coachId];
-  const prefStr = describeTimePref(pref);
-  const constraintStr = describeTimePref(constraint);
-
-  // build consecutive pairs for spacing
-  const spacingPairs = [];
-  for (let i = 0; i < orderedHorses.length - 1; i++) {
-    spacingPairs.push({
-      a: orderedHorses[i],
-      b: orderedHorses[i + 1],
-    });
-  }
-
-  return (
-    <CoachAccordion
-      title={coach.coachName}
-      subtitle={orderedHorses.length + " סוסים"}
-      defaultOpen={false}
-    >
-      <Text style={[styles.bubbleTextBot, { fontWeight: "700", marginBottom: 4 }]}>
-        סוסים (לפי סדר אימון):
-      </Text>
-      {orderedHorses.map(function (h, idx) {
-        const length = (answers.shortLong || {})[h.horseId] || "short";
-        const lengthLabel =
-          length === "short"
-            ? "קצר " + shortMin + " דק'"
-            : "ארוך " + longMin + " דק'";
-        return (
-          <Text
-            key={"h-" + h.horseId}
-            style={[styles.bubbleTextBot, { marginBottom: 2 }]}
-          >
-            {idx + 1}. {formatHorseLabel(h)} — {lengthLabel}
-          </Text>
-        );
-      })}
-
-      {prefStr ? (
-        <View style={{ marginTop: 8 }}>
-          <Text style={[styles.bubbleTextBot, { fontWeight: "700" }]}>
-            העדפת זמן: {prefStr}
-          </Text>
-        </View>
-      ) : null}
-
-      {constraintStr ? (
-        <View style={{ marginTop: 4 }}>
-          <Text
-            style={[
-              styles.bubbleTextBot,
-              { fontWeight: "700", color: COLORS.danger },
-            ]}
-          >
-            אילוץ זמן: {constraintStr}
-          </Text>
-        </View>
-      ) : null}
-
-      {spacingPairs.length > 0 ? (
-        <View style={{ marginTop: 8 }}>
-          <Text style={[styles.bubbleTextBot, { fontWeight: "700", marginBottom: 4 }]}>
-            מרווחים:
-          </Text>
-          {spacingPairs.map(function (pair, idx) {
-            return (
-              <Text
-                key={"sp-" + idx}
-                style={[styles.bubbleTextBot, { fontSize: 13, marginBottom: 2 }]}
-              >
-                • {pair.a.horseName} ← {pair.b.horseName}:{" "}
-                {describeSpacing(pair, answers.spacing)}
-              </Text>
-            );
-          })}
-        </View>
-      ) : null}
-    </CoachAccordion>
-  );
-}
-
 function SuccessResult(props) {
   const result = props.result;
+  const model = props.model;
   const coachLookup = props.coachLookup;
   const horseLookup = props.horseLookup;
   const sched = result.scheduling;
@@ -439,7 +389,6 @@ function SuccessResult(props) {
   const scheduledItems = sched ? sched.scheduledItems || [] : [];
   const unscheduledItems = sched ? sched.unscheduledItems || [] : [];
 
-  // group scheduled by coach
   const byCoach = {};
   for (const item of scheduledItems) {
     const cid = item.coachFederationMemberId;
@@ -447,51 +396,55 @@ function SuccessResult(props) {
     byCoach[cid].push(item);
   }
 
+  const coachNames = model.coaches
+    .map(function (coach) {
+      return coach.coachName;
+    })
+    .join(", ");
+
   return (
     <View>
-      <ChatBubble
-        from="bot"
-        text={"הצלחה - נוצרו " + totalCreated + " בקשות פייד טיים."}
-      />
+      <View style={styles.successIconWrap}>
+        <Ionicons name="checkmark-circle" size={36} color={COLORS.success} />
+      </View>
 
-      <View
-        style={[
-          styles.answerCard,
-          {
-            borderColor: COLORS.success,
-            borderWidth: 1,
-            backgroundColor: "#F0F7EE",
-          },
-        ]}
-      >
-        <View style={{ flexDirection: "row-reverse", alignItems: "center", gap: 8 }}>
-          <Ionicons name="checkmark-circle" size={22} color={COLORS.success} />
-          <Text
-            style={[
-              styles.bubbleTextBot,
-              { fontWeight: "700", color: COLORS.success },
-            ]}
-          >
-            שובצו אוטומטית: {scheduledItems.length}
-          </Text>
+      <Text style={styles.successTitle}>
+        נוצרו {totalCreated} בקשות פייד טיים
+      </Text>
+      <Text style={styles.successSubtitle}>
+        ההזמנה המרוכזת נשלחה בהצלחה.
+      </Text>
+
+      <View style={styles.totalsCard}>
+        {coachNames ? (
+          <View style={styles.totalsRow}>
+            <Text style={styles.totalsLabel}>מאמן</Text>
+            <Text style={styles.totalsValue}>{coachNames}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.totalsRow}>
+          <Text style={styles.totalsLabel}>בקשות שנוצרו</Text>
+          <Text style={styles.totalsValueStrong}>{totalCreated}</Text>
         </View>
+
+        <View style={styles.totalsRow}>
+          <Text style={styles.totalsLabel}>שובצו אוטומטית</Text>
+          <Text style={styles.totalsValue}>{scheduledItems.length}</Text>
+        </View>
+
         {unscheduledItems.length > 0 ? (
-          <View
-            style={{
-              flexDirection: "row-reverse",
-              alignItems: "center",
-              gap: 8,
-              marginTop: 8,
-            }}
-          >
-            <Ionicons name="time" size={22} color={COLORS.warning} />
-            <Text
-              style={[
-                styles.bubbleTextBot,
-                { fontWeight: "700", color: COLORS.warning },
-              ]}
-            >
-              בהמתנה: {unscheduledItems.length}
+          <View style={styles.totalsRow}>
+            <Text style={styles.totalsLabel}>ממתינות לשיבוץ ידני</Text>
+            <Text style={styles.totalsValue}>{unscheduledItems.length}</Text>
+          </View>
+        ) : null}
+
+        {model.totalPriceLabel ? (
+          <View style={styles.totalsRow}>
+            <Text style={styles.totalsLabel}>סה״כ לתשלום</Text>
+            <Text style={styles.totalsValueStrong}>
+              {model.totalPriceLabel}
             </Text>
           </View>
         ) : null}
@@ -499,28 +452,32 @@ function SuccessResult(props) {
 
       {scheduledItems.length > 0 ? (
         <View>
-          <ChatBubble from="bot" text="פירוט שיבוצים שבוצעו:" />
+          <Text style={styles.sectionHeading}>שיבוצים שבוצעו</Text>
           {Object.keys(byCoach).map(function (cid) {
             const coach = coachLookup[cid];
             const items = byCoach[cid].slice().sort(function (a, b) {
-              return new Date(a.assignedStartTime) - new Date(b.assignedStartTime);
+              return (
+                new Date(a.assignedStartTime) - new Date(b.assignedStartTime)
+              );
             });
-            const coachName = coach ? coach.coachName : "מאמן";
+
             return (
-              <View key={"sched-c-" + cid} style={styles.answerCard}>
-                <Text style={[styles.bubbleTextBot, { fontWeight: "700" }]}>
-                  {coachName}
+              <View key={"sched-c-" + cid} style={styles.requestCard}>
+                <Text style={styles.requestHorseName}>
+                  {coach ? coach.coachName : "מאמן"}
                 </Text>
                 {items.map(function (it) {
                   const horse = horseLookup[it.horseId];
-                  const horseLabel = horse ? formatHorseLabel(horse) : "סוס #" + it.horseId;
                   return (
-                    <Text
+                    <DetailRow
                       key={"item-" + it.paidTimeRequestId}
-                      style={[styles.bubbleTextBot, { marginTop: 4 }]}
-                    >
-                      • {horseLabel} — {fmtIsoToTime(it.assignedStartTime)}
-                    </Text>
+                      label={fmtIsoToTime(it.assignedStartTime)}
+                      value={
+                        horse
+                          ? formatHorseLabel(horse)
+                          : "סוס #" + it.horseId
+                      }
+                    />
                   );
                 })}
               </View>
@@ -531,17 +488,17 @@ function SuccessResult(props) {
 
       {unscheduledItems.length > 0 ? (
         <View>
-          <ChatBubble
-            from="bot"
-            text="בקשות שלא שובצו - המזכירה תטפל ידנית:"
-          />
+          <Text style={styles.sectionHeading}>ממתינות לטיפול המזכירה</Text>
           {unscheduledItems.map(function (item, idx) {
             const horse = horseLookup[item.horseId];
             const coach = coachLookup[item.coachFederationMemberId];
+
             return (
               <View key={"u-" + idx} style={styles.warningBanner}>
                 <Text style={styles.warningTitle}>
-                  {horse ? formatHorseLabel(horse) : "בקשה #" + item.paidTimeRequestId}
+                  {horse
+                    ? formatHorseLabel(horse)
+                    : "בקשה #" + item.paidTimeRequestId}
                   {coach ? " (" + coach.coachName + ")" : ""}
                 </Text>
                 <Text style={styles.warningText}>{item.reason}</Text>
@@ -551,18 +508,21 @@ function SuccessResult(props) {
         </View>
       ) : null}
 
-      <View style={{ flexDirection: "row-reverse", gap: 8, marginTop: 16 }}>
+      <View style={{ flexDirection: "row-reverse", gap: 10, marginTop: 16 }}>
         <Pressable
-          style={[styles.primaryButton, { flex: 1 }]}
+          style={[styles.bottomBarButton, styles.bottomBarPrimary]}
           onPress={props.onNewBooking}
+          accessibilityRole="button"
         >
-          <Text style={styles.primaryButtonText}>הזמנה חכמה נוספת</Text>
+          <Text style={styles.bottomBarPrimaryText}>הזמנה מרוכזת נוספת</Text>
         </Pressable>
+
         <Pressable
-          style={[styles.secondaryButton, { flex: 1 }]}
+          style={[styles.bottomBarButton, styles.bottomBarSecondary]}
           onPress={props.onClose}
+          accessibilityRole="button"
         >
-          <Text style={styles.secondaryButtonText}>סיום</Text>
+          <Text style={styles.bottomBarSecondaryText}>סיום</Text>
         </Pressable>
       </View>
     </View>

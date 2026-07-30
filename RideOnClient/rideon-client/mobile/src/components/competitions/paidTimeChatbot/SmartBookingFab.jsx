@@ -1,26 +1,22 @@
 import React from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
+import { COLORS } from "../../../styles/paidTimeChatbotStyles";
+
+// כפתור צף לפתיחת ההזמנה המרוכזת מתוך טאב הפייד טיים במסך ההרשמות.
+//
+// קודם הופיעה כאן התראת מערכת ("האם להמשיך?") לפני הפתיחה. היא הוסרה:
+// PaidTimeBookingModeModal כבר מסביר בדיוק מה עושה "כמה הזמנות יחד", ולכן
+// אישור שני היה מיותר. הלחיצה פותחת את הזרימה ישירות.
+//
+// props:
+//   onConfirm (function) - נשמר בשמו הקיים כדי לא לשבור את מסך ההרשמות
 export default function SmartBookingFab(props) {
   const onConfirm = props.onConfirm;
 
   function handlePress() {
-    Alert.alert(
-      "הזמנה חכמה - פייד טיים",
-      "המעבר להזמנה חכמה יעזור לך לרשום מספר בקשות בבת אחת לפי העדפות ואילוצים שתגדיר. האם להמשיך?",
-      [
-        { text: "חזרה", style: "cancel" },
-        {
-          text: "אישור והמשך",
-          style: "default",
-          onPress: function () {
-            if (typeof onConfirm === "function") onConfirm();
-          },
-        },
-      ],
-      { cancelable: true }
-    );
+    if (typeof onConfirm === "function") onConfirm();
   }
 
   return (
@@ -47,10 +43,12 @@ export default function SmartBookingFab(props) {
       >
         <Pressable
           onPress={handlePress}
+          accessibilityRole="button"
+          accessibilityLabel="פתיחת הזמנה מרוכזת לפייד טיים"
           style={({ pressed }) => ({
             flexDirection: "row-reverse",
             alignItems: "center",
-            backgroundColor: "#5A4036",
+            backgroundColor: COLORS.primary,
             paddingVertical: 12,
             paddingHorizontal: 16,
             borderRadius: 28,
@@ -63,9 +61,9 @@ export default function SmartBookingFab(props) {
             elevation: 10,
           })}
         >
-          <Ionicons name="sparkles" size={20} color="#FFFFFF" />
+          <Ionicons name="albums-outline" size={20} color="#FFFFFF" />
           <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "700" }}>
-            הזמנה חכמה
+            הזמנה מרוכזת
           </Text>
         </Pressable>
       </View>

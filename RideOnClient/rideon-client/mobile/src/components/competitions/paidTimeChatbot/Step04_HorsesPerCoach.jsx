@@ -1,16 +1,19 @@
-import React from "react";
-import { Text, View } from "react-native";
+import React, { useState } from "react";
+import { Pressable, Text, TextInput, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import StepLayout from "./StepLayout";
 import OptionRow from "./OptionRow";
 import CoachAccordion from "./CoachAccordion";
 import styles, { COLORS } from "../../../styles/paidTimeChatbotStyles";
+import { formatHorseLabel } from "../../../utils/paidTimeBulkReview";
 
-function formatHorseLabel(horse) {
-  const name = horse.horseName || "סוס";
-  const barn = horse.barnName || "";
-  return barn ? name + " (" + barn + ")" : name;
-}
-
+// שלב בחירת הסוסים לכל מאמן - הליבה של ההזמנה המרוכזת.
+//
+// לוגיקת הבחירה לא השתנתה: אותו answers.horsesPerCoach, אותו toggle,
+// אותו כלל התקדמות (לכל מאמן שנבחר חייב להיות לפחות סוס אחד).
+// מה שנוסף הוא תצוגה: חיפוש בתוך רשימת הסוסים של המאמן, צ'יפים של הסוסים
+// שכבר נבחרו (כולל הסרה נקודתית), ומונה נבחרים - כדי שלא צריך לפתוח את
+// הרשימה כדי להבין מה נבחר.
 export default function Step04_HorsesPerCoach(props) {
   const chatbot = props.chatbot;
   const ctx = chatbot.state.context || {};
@@ -18,11 +21,25 @@ export default function Step04_HorsesPerCoach(props) {
   const selectedCoachIds = chatbot.state.answers.selectedCoachIds || [];
   const horsesPerCoach = chatbot.state.answers.horsesPerCoach || {};
 
+  const [searchByCoach, setSearchByCoach] = useState({});
+
   const selectedCoaches = coachesWithHorses.filter(function (c) {
     return selectedCoachIds
       .map(String)
       .includes(String(c.coachFederationMemberId));
   });
+
+  function getSearch(coachId) {
+    return searchByCoach[coachId] || "";
+  }
+
+  function setSearch(coachId, value) {
+    setSearchByCoach(function (prev) {
+      const next = { ...prev };
+      next[coachId] = value;
+      return next;
+    });
+  }
 
   function toggleHorse(coachId, horseId) {
     const current = horsesPerCoach[coachId] || [];
@@ -33,6 +50,17 @@ export default function Step04_HorsesPerCoach(props) {
     chatbot.setAnswer("horsesPerCoach", {
       ...horsesPerCoach,
       [coachId]: Array.from(set).map(Number),
+    });
+  }
+
+  function removeHorse(coachId, horseId) {
+    const current = horsesPerCoach[coachId] || [];
+    const next = current.filter(function (id) {
+      return String(id) !== String(horseId);
+    });
+    chatbot.setAnswer("horsesPerCoach", {
+      ...horsesPerCoach,
+      [coachId]: next,
     });
   }
 
@@ -60,36 +88,61 @@ export default function Step04_HorsesPerCoach(props) {
     return list.length === 0;
   });
 
-  const canAdvance =
-    totalSelected > 0 && coachesMissingHorses.length === 0;
+  const canAdvance = totalSelected > 0 && coachesMissingHorses.length === 0;
+
+  const incompleteReason =
+    coachesMissingHorses.length > 0
+      ? "יש לבחור לפחות סוס אחד עבור: " +
+        coachesMissingHorses
+          .map(function (c) {
+            return c.coachName;
+          })
+          .join(", ")
+      : totalSelected === 0
+        ? "יש לבחור לפחות סוס אחד כדי להמשיך."
+        : "";
 
   return (
     <StepLayout
       bubbles={[
-        "אלו הסוסים תחת כל מאמן. בחר אילו לרשום לפייד טיים.",
+        "בחירת סוסים",
+        "לכל מאמן שנבחר, סמני אילו סוסים לרשום לפייד טיים. אפשר לבחור כמה סוסים לאותו מאמן.",
       ]}
       onNext={chatbot.next}
       onBack={chatbot.prev}
       canAdvance={canAdvance}
+      incompleteReason={incompleteReason}
     >
       {selectedCoaches.length === 0 ? (
-        <Text style={styles.bubbleTextBot}>
-          לא נבחרו מאמנים. חזור צעד אחורה.
+        <Text style={styles.sectionHelp}>
+          לא נבחרו מאמנים. חזרי צעד אחורה ובחרי מאמן.
         </Text>
       ) : (
         <View>
           {selectedCoaches.map(function (coach) {
             const coachId = coach.coachFederationMemberId;
             const horses = coach.horses || [];
-            const selectedHorseIds = horsesPerCoach[coachId] || [];
+            const selectedHorseIds = (horsesPerCoach[coachId] || []).map(String);
             const allIds = horses.map(function (h) {
               return h.horseId;
             });
             const isAll =
               allIds.length > 0 && selectedHorseIds.length === allIds.length;
+
+            const selectedHorses = horses.filter(function (h) {
+              return selectedHorseIds.includes(String(h.horseId));
+            });
+
+            const search = getSearch(coachId).trim().toLowerCase();
+            const visibleHorses = search
+              ? horses.filter(function (h) {
+                  return formatHorseLabel(h).toLowerCase().includes(search);
+                })
+              : horses;
+
             const subtitle =
-              selectedHorseIds.length > 0
-                ? "נבחרו " + selectedHorseIds.length + " מתוך " + horses.length
+              selectedHorses.length > 0
+                ? "נבחרו " + selectedHorses.length + " מתוך " + horses.length
                 : "טרם נבחרו סוסים";
 
             return (
@@ -100,11 +153,66 @@ export default function Step04_HorsesPerCoach(props) {
                 defaultOpen={true}
               >
                 {horses.length === 0 ? (
-                  <Text style={styles.bubbleTextBot}>
+                  <Text style={styles.sectionHelp}>
                     אין סוסים תחת מאמן זה.
                   </Text>
                 ) : (
                   <>
+                    <Text style={styles.selectedCountText}>
+                      נבחרו {selectedHorses.length} מתוך {horses.length} סוסים
+                    </Text>
+
+                    {selectedHorses.length > 0 ? (
+                      <View style={styles.chipsWrap}>
+                        {selectedHorses.map(function (horse) {
+                          return (
+                            <View
+                              key={"chip-" + coachId + "-" + horse.horseId}
+                              style={styles.horseChip}
+                            >
+                              <Text style={styles.horseChipText}>
+                                {formatHorseLabel(horse)}
+                              </Text>
+                              <Pressable
+                                onPress={function () {
+                                  removeHorse(coachId, horse.horseId);
+                                }}
+                                hitSlop={8}
+                                style={styles.chipRemoveHit}
+                                accessibilityRole="button"
+                                accessibilityLabel={
+                                  "הסרת " + formatHorseLabel(horse)
+                                }
+                              >
+                                <Ionicons
+                                  name="close-circle"
+                                  size={16}
+                                  color={COLORS.primary}
+                                />
+                              </Pressable>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ) : (
+                      <Text style={styles.emptySelectionText}>
+                        עדיין לא נבחרו סוסים למאמן הזה.
+                      </Text>
+                    )}
+
+                    {horses.length > 4 ? (
+                      <TextInput
+                        value={getSearch(coachId)}
+                        onChangeText={function (value) {
+                          setSearch(coachId, value);
+                        }}
+                        placeholder="חיפוש סוס"
+                        placeholderTextColor={COLORS.textMuted}
+                        style={styles.searchInput}
+                        textAlign="right"
+                      />
+                    ) : null}
+
                     <OptionRow
                       multi={true}
                       selected={isAll}
@@ -113,51 +221,53 @@ export default function Step04_HorsesPerCoach(props) {
                         toggleAllForCoach(coachId, horses);
                       }}
                     />
-                    <View style={{ height: 6 }} />
-                    {horses.map(function (horse) {
-                      const isSel = selectedHorseIds
-                        .map(String)
-                        .includes(String(horse.horseId));
-                      return (
-                        <OptionRow
-                          key={"h-" + coachId + "-" + horse.horseId}
-                          multi={true}
-                          selected={isSel}
-                          label={formatHorseLabel(horse)}
-                          onPress={function () {
-                            toggleHorse(coachId, horse.horseId);
-                          }}
-                        />
-                      );
-                    })}
+
+                    {visibleHorses.length === 0 ? (
+                      <Text style={styles.emptySelectionText}>
+                        לא נמצאו סוסים שתואמים לחיפוש.
+                      </Text>
+                    ) : (
+                      visibleHorses.map(function (horse) {
+                        const isSel = selectedHorseIds.includes(
+                          String(horse.horseId)
+                        );
+                        return (
+                          <OptionRow
+                            key={"h-" + coachId + "-" + horse.horseId}
+                            multi={true}
+                            selected={isSel}
+                            label={formatHorseLabel(horse)}
+                            onPress={function () {
+                              toggleHorse(coachId, horse.horseId);
+                            }}
+                          />
+                        );
+                      })
+                    )}
                   </>
                 )}
               </CoachAccordion>
             );
           })}
 
-          <Text
-            style={[
-              styles.bubbleTextBot,
-              { textAlign: "center", marginTop: 8, color: COLORS.primary },
-            ]}
-          >
-            סה״כ נבחרו {totalSelected} שיבוצי סוס
-          </Text>
+          <View style={styles.totalsCard}>
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>סה״כ סוסים שנבחרו</Text>
+              <Text style={styles.totalsValue}>{totalSelected}</Text>
+            </View>
+          </View>
 
           {coachesMissingHorses.length > 0 ? (
-            <View style={[styles.warningBanner, { marginTop: 10 }]}>
-              <Text style={styles.warningTitle}>
-                חסר סוס למאמן/ים
-              </Text>
+            <View style={styles.warningBanner}>
+              <Text style={styles.warningTitle}>חסר סוס למאמן/ים</Text>
               <Text style={styles.warningText}>
-                כדי להתקדם, בחר לפחות סוס אחד עבור:{" "}
+                כדי להתקדם, בחרי לפחות סוס אחד עבור:{" "}
                 {coachesMissingHorses
                   .map(function (c) {
                     return c.coachName;
                   })
                   .join(", ")}
-                . אם אין סוס מתאים, חזור לשלב המאמנים והסר אותם מהבחירה.
+                . אם אין סוס מתאים, חזרי לשלב המאמנים והסירי אותם מהבחירה.
               </Text>
             </View>
           ) : null}

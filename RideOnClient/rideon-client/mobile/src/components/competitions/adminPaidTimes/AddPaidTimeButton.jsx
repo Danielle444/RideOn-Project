@@ -1,20 +1,25 @@
-import { Alert, View } from "react-native";
+import { useState } from "react";
+import { View } from "react-native";
 
 import Button from "../../ui/Button";
+import PaidTimeBookingModeModal from "./PaidTimeBookingModeModal";
 
 // כפתור "הוסף פייד טיים" במסך הפייד טיימים של אדמין.
-// בלחיצה - Alert עם 2 אופציות: הזמנה רגילה / הזמנה חכמה.
-// שניהם מובילים למסך AdminCompetitionRegistrations בטאב פייד טיים.
-// "חכמה" מועברת עם param openSmartBooking=true - המסך עצמו פותח את הצ'אטבוט אוטומטית.
+// בלחיצה נפתח PaidTimeBookingModeModal עם שתי אפשרויות גלויות:
+// "הזמנה אחת" ו-"כמה הזמנות יחד". קודם זה היה Alert של המערכת.
 //
-// הצביעה בלבד עברה לכפתור המשותף (החום היה #5A4036 - החום השגוי - והוא
-// עכשיו #7B5A4D דרך ה-Button). הלוגיקה של ההזמנה החכמה, ה-Alert והניווט
-// לא נגעו בהם.
+// הניווט לא השתנה: שניהם מובילים למסך AdminCompetitionRegistrations בטאב
+// פייד טיים, ו-"כמה הזמנות יחד" ממשיך להעביר openSmartBooking=true - המסך
+// עצמו פותח את הצ'אטבוט (הזרימה החכמה/המרוכזת) אוטומטית, בדיוק כמו קודם.
 export default function AddPaidTimeButton(props) {
   var navigation = props.navigation;
   var competitionId = props.competitionId;
 
+  var [isModeModalOpen, setIsModeModalOpen] = useState(false);
+
   function navigateToRegistration(openSmart) {
+    setIsModeModalOpen(false);
+
     if (!navigation) return;
     navigation.navigate("AdminCompetitionRegistrations", {
       competitionId: competitionId,
@@ -24,26 +29,19 @@ export default function AddPaidTimeButton(props) {
   }
 
   function handlePress() {
-    Alert.alert(
-      "הוספת פייד טיים",
-      "באיזה אופן תרצה ליצור את הבקשה?",
-      [
-        { text: "ביטול", style: "cancel" },
-        {
-          text: "הזמנה רגילה",
-          onPress: function () {
-            navigateToRegistration(false);
-          },
-        },
-        {
-          text: "הזמנה חכמה",
-          onPress: function () {
-            navigateToRegistration(true);
-          },
-        },
-      ],
-      { cancelable: true }
-    );
+    setIsModeModalOpen(true);
+  }
+
+  function handleCloseModeModal() {
+    setIsModeModalOpen(false);
+  }
+
+  function handleSelectSingle() {
+    navigateToRegistration(false);
+  }
+
+  function handleSelectBulk() {
+    navigateToRegistration(true);
   }
 
   return (
@@ -53,6 +51,13 @@ export default function AddPaidTimeButton(props) {
         icon="add-circle"
         label="הוסף פייד טיים"
         onPress={handlePress}
+      />
+
+      <PaidTimeBookingModeModal
+        visible={isModeModalOpen}
+        onClose={handleCloseModeModal}
+        onSelectSingle={handleSelectSingle}
+        onSelectBulk={handleSelectBulk}
       />
     </View>
   );

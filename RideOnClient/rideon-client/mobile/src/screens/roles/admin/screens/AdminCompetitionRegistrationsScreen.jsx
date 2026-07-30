@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
@@ -26,6 +26,8 @@ import useAdminCompetitionShavings from "../../../../hooks/useAdminCompetitionSh
 
 import PaidTimeChatbotModal from "../../../../components/competitions/paidTimeChatbot/PaidTimeChatbotModal";
 import SmartBookingFab from "../../../../components/competitions/paidTimeChatbot/SmartBookingFab";
+
+import { evaluatePaidTimeBookingAvailability } from "../../../../utils/paidTimeBookingAvailability";
 
 function RegistrationsTabs(props) {
   return (
@@ -119,7 +121,15 @@ export default function AdminCompetitionRegistrationsScreen(props) {
   var shouldAutoOpenChatbot = !!routeParams.openSmartBooking;
 
   var [activeTab, setActiveTab] = useState(initialTab);
-  var [isChatbotOpen, setIsChatbotOpen] = useState(shouldAutoOpenChatbot);
+
+  // הצ'אטבוט כבר לא נפתח מיד עם הפרמטר מהניווט. קודם ממתינים לנתוני
+  // הפייד טיים של התחרות, ורק אם יש הגדרות מספקות נפתחת ההזמנה המרוכזת -
+  // אחרת המשתמשת הייתה נכנסת לזרימה שאי אפשר להתקדם בה.
+  var [isChatbotOpen, setIsChatbotOpen] = useState(false);
+  var autoOpenHandledRef = useRef(false);
+
+  // משמש את טופס הפייד טיים הבודד כדי לגלול לסקשן הראשון שנכשל בוולידציה.
+  var contentScrollRef = useRef(null);
 
   var userContext = useUser();
   var activeRoleContext = useActiveRole();
@@ -144,6 +154,7 @@ export default function AdminCompetitionRegistrationsScreen(props) {
     user: user,
     activeRole: activeRole,
     competitionId: competitionId,
+    competitionName: activeCompetition ? activeCompetition.competitionName : "",
   });
 
   var stallBookings = useAdminCompetitionStallBookings({
@@ -161,6 +172,48 @@ export default function AdminCompetitionRegistrationsScreen(props) {
     isActiveTab: activeTab === "shavings",
   });
 
+  // מקור אמת יחיד לשתי נקודות הכניסה (SmartBookingFab וגם המעבר מ-
+  // PaidTimeBookingModeModal עם openSmartBooking), וגם לטופס הבודד -
+  // כולם דורשים בדיוק את אותם סלוטים ומחירים.
+  var paidTimeAvailability = useMemo(
+    function () {
+      return evaluatePaidTimeBookingAvailability({
+        requestableSlots: paidTime.requestableSlots,
+        priceCatalogItems: paidTime.priceCatalogItems,
+      });
+    },
+    [paidTime.requestableSlots, paidTime.priceCatalogItems],
+  );
+
+  var isPaidTimeDataReady = !paidTime.loading && !paidTime.screenError;
+
+  useEffect(
+    function () {
+      if (!shouldAutoOpenChatbot || autoOpenHandledRef.current) {
+        return;
+      }
+
+      if (!isPaidTimeDataReady) {
+        return;
+      }
+
+      autoOpenHandledRef.current = true;
+
+      if (paidTimeAvailability.canBookBulk) {
+        setIsChatbotOpen(true);
+      }
+    },
+    [shouldAutoOpenChatbot, isPaidTimeDataReady, paidTimeAvailability.canBookBulk],
+  );
+
+  function handleOpenSmartBooking() {
+    if (!paidTimeAvailability.canBookBulk) {
+      return;
+    }
+
+    setIsChatbotOpen(true);
+  }
+
   function handleCompetitionMenuPress(item) {
     props.navigation.navigate(item.screen);
   }
@@ -168,6 +221,29 @@ export default function AdminCompetitionRegistrationsScreen(props) {
   async function handleExitCompetition() {
     await competitionContext.clearCompetition();
     props.navigation.navigate("AdminCompetitionsBoard");
+  }
+
+  function handleScrollToOffset(offsetY) {
+    var scrollView = contentScrollRef.current;
+
+    if (!scrollView || typeof scrollView.scrollTo !== "function") {
+      return;
+    }
+
+    scrollView.scrollTo({ y: Math.max(0, offsetY), animated: true });
+  }
+
+  // "בקשה נוספת" - סוגר את מצב ההצלחה ונשאר בטופס. השדות כבר אופסו לפי
+  // לוגיקת הנעילה הקיימת, כך שרק מה שננעל נשמר.
+  function handleAddAnotherPaidTime() {
+    paidTime.handleCloseSuccess();
+    handleScrollToOffset(0);
+  }
+
+  // "סיום" - חוזר למסך הפייד טיימים הקיים (מסלול מאומת ב-AppNavigator).
+  function handleFinishPaidTime() {
+    paidTime.handleCloseSuccess();
+    props.navigation.navigate("AdminCompetitionPaidTimes");
   }
 
   return (
@@ -193,6 +269,7 @@ export default function AdminCompetitionRegistrationsScreen(props) {
       }}
     >
       <ScrollView
+        ref={contentScrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.screenContent}
       >
@@ -259,14 +336,27 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             setNotes={paidTime.setNotes}
             locks={paidTime.locks}
             onToggleLock={paidTime.handleToggleLock}
-            formatPriceCatalogLabel={paidTime.formatPriceCatalogLabel}
             formatRequestedSlotLabel={paidTime.formatRequestedSlotLabel}
             formatMemberLabel={paidTime.formatMemberLabel}
             formatHorseLabel={paidTime.formatHorseLabel}
             formatPayerLabel={paidTime.formatPayerLabel}
             canSubmit={paidTime.canSubmit}
             isSaving={paidTime.isSaving}
-            onSubmit={paidTime.handleCreatePaidTimeRequest}
+            fieldErrors={paidTime.fieldErrors}
+            formError={paidTime.formError}
+            scrollRequest={paidTime.scrollRequest}
+            onScrollToOffset={handleScrollToOffset}
+            onContinueToReview={paidTime.handleContinueToReview}
+            isReviewOpen={paidTime.isReviewOpen}
+            reviewModel={paidTime.reviewModel}
+            submitError={paidTime.submitError}
+            onBackToEdit={paidTime.handleBackToEdit}
+            onConfirmSubmit={paidTime.handleConfirmSubmit}
+            isSuccessOpen={paidTime.isSuccessOpen}
+            successSnapshot={paidTime.successSnapshot}
+            onAddAnother={handleAddAnotherPaidTime}
+            onFinish={handleFinishPaidTime}
+            availability={paidTimeAvailability}
           />
         ) : null}
 
@@ -391,12 +481,12 @@ export default function AdminCompetitionRegistrationsScreen(props) {
       />
     </MobileScreenLayout>
 
-      {activeTab === "paidTimes" ? (
-        <SmartBookingFab
-          onConfirm={function () {
-            setIsChatbotOpen(true);
-          }}
-        />
+      {/*
+        הכפתור הצף מוסתר כשאין הגדרות פייד טיים, כדי שלא יהיה כפתור שלא
+        עושה כלום. ההסבר עצמו מוצג בתוך הטאב דרך PaidTimeSetupNotice.
+      */}
+      {activeTab === "paidTimes" && paidTimeAvailability.canBookBulk ? (
+        <SmartBookingFab onConfirm={handleOpenSmartBooking} />
       ) : null}
     </View>
   );

@@ -1,6 +1,9 @@
 import React from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import CompetitionPaidTimeFormCard from "./CompetitionPaidTimeFormCard";
+import PaidTimeRequestReviewModal from "./PaidTimeRequestReviewModal";
+import PaidTimeRequestSuccessModal from "./PaidTimeRequestSuccessModal";
+import PaidTimeSetupNotice from "./PaidTimeSetupNotice";
 import styles from "../../styles/adminCompetitionPaidTimesStyles";
 
 export default function CompetitionPaidTimeTab(props) {
@@ -10,6 +13,21 @@ export default function CompetitionPaidTimeTab(props) {
         <ActivityIndicator size="large" color="#7B5A4D" />
         <Text style={styles.loadingText}>טוענת נתוני פייד טיים...</Text>
       </View>
+    );
+  }
+
+  var fieldErrors = props.fieldErrors || {};
+  var hasFieldErrors = Object.keys(fieldErrors).length > 0;
+  var availability = props.availability || null;
+
+  // אין סלוטים או אין מחירים - הטופס לא יכול להצליח, ולכן מוצג הסבר
+  // במקום טופס שכל שליחה שלו תיכשל.
+  if (availability && !availability.canBookSingle && !props.screenError) {
+    return (
+      <PaidTimeSetupNotice
+        message={availability.message}
+        hint={availability.hint}
+      />
     );
   }
 
@@ -44,12 +62,28 @@ export default function CompetitionPaidTimeTab(props) {
         setNotes={props.setNotes}
         locks={props.locks}
         onToggleLock={props.onToggleLock}
-        formatPriceCatalogLabel={props.formatPriceCatalogLabel}
         formatRequestedSlotLabel={props.formatRequestedSlotLabel}
         formatMemberLabel={props.formatMemberLabel}
         formatHorseLabel={props.formatHorseLabel}
         formatPayerLabel={props.formatPayerLabel}
+        fieldErrors={fieldErrors}
+        scrollRequest={props.scrollRequest}
+        onScrollToOffset={props.onScrollToOffset}
       />
+
+      {hasFieldErrors ? (
+        <View style={styles.errorCard}>
+          <Text style={styles.errorText}>
+            חסרים שדות חובה. ההשלמות המסומנות מופיעות מתחת לכל שדה.
+          </Text>
+        </View>
+      ) : null}
+
+      {props.formError ? (
+        <View style={styles.errorCard}>
+          <Text style={styles.errorText}>{props.formError}</Text>
+        </View>
+      ) : null}
 
       <Pressable
         style={[
@@ -57,12 +91,27 @@ export default function CompetitionPaidTimeTab(props) {
           !props.canSubmit ? styles.primaryButtonDisabled : null,
         ]}
         disabled={!props.canSubmit}
-        onPress={props.onSubmit}
+        onPress={props.onContinueToReview}
+        accessibilityRole="button"
       >
-        <Text style={styles.primaryButtonText}>
-          {props.isSaving ? "שומרת..." : "הוסף בקשה"}
-        </Text>
+        <Text style={styles.primaryButtonText}>המשך לאישור</Text>
       </Pressable>
+
+      <PaidTimeRequestReviewModal
+        visible={!!props.isReviewOpen}
+        model={props.reviewModel}
+        isSaving={props.isSaving}
+        errorMessage={props.submitError}
+        onBackToEdit={props.onBackToEdit}
+        onConfirm={props.onConfirmSubmit}
+      />
+
+      <PaidTimeRequestSuccessModal
+        visible={!!props.isSuccessOpen}
+        snapshot={props.successSnapshot}
+        onAddAnother={props.onAddAnother}
+        onFinish={props.onFinish}
+      />
     </>
   );
 }

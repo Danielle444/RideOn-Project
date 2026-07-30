@@ -38,11 +38,13 @@ export default function Step02_PickCoaches(props) {
   return (
     <StepLayout
       bubbles={[
-        "מצאתי את המאמנים שיש להם סוסים רשומים למקצים בתחרות מטעם החווה שלך. בחר את כולם או מאמנים מסוימים.",
+        "בחירת מאמנים",
+        "אלו המאמנים שיש להם סוסים רשומים למקצים בתחרות מטעם החווה שלך. אפשר לבחור מאמן אחד או כמה.",
       ]}
       onNext={chatbot.next}
       onBack={chatbot.prev}
       canAdvance={selected.length > 0}
+      incompleteReason="יש לבחור לפחות מאמן אחד כדי להמשיך."
     >
       {coachesWithHorses.length === 0 ? (
         <Text style={styles.bubbleTextBot}>

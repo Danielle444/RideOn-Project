@@ -2,21 +2,18 @@ import React from "react";
 import { Text, View } from "react-native";
 import styles from "../../../styles/paidTimeChatbotStyles";
 
+// היה בועת צ'אט (עם "מי מדבר"), והפך להערת עזר בטופס.
+//
+// השם נשמר כי כל השלבים מייבאים אותו, וכך אין צורך לגעת בעשרת הקבצים.
+// props.from כבר לא משפיע על העיצוב - אין באפליקציה צד "משתמש" מול "בוט".
 export default function ChatBubble(props) {
-  const isUser = props.from === "user";
+  if (!props.text) {
+    return null;
+  }
 
   return (
-    <View
-      style={[
-        styles.bubbleRow,
-        isUser ? styles.bubbleRowUser : styles.bubbleRowBot,
-      ]}
-    >
-      <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleBot]}>
-        <Text style={isUser ? styles.bubbleTextUser : styles.bubbleTextBot}>
-          {props.text}
-        </Text>
-      </View>
+    <View style={styles.infoNote}>
+      <Text style={styles.infoNoteText}>{props.text}</Text>
     </View>
   );
 }

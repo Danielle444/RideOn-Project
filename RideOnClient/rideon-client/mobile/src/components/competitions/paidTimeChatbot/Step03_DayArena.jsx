@@ -95,11 +95,21 @@ export default function Step03_DayArena(props) {
   return (
     <StepLayout
       bubbles={[
-        "באיזה יום תרצה לבצע את הפייד טיימים? בחר יום מתוך הימים שיש בהם סלוטים.",
+        "יום ומגרש",
+        "באיזה יום לבצע את הפייד טיימים? מוצגים רק ימים שיש בהם סלוטים.",
       ]}
       onNext={handleNext}
       onBack={chatbot.prev}
       canAdvance={canAdvance}
+      incompleteReason={
+        !day
+          ? "יש לבחור יום כדי להמשיך."
+          : !onlyOneArena && !arenaKey
+            ? "יש לבחור מגרש כדי להמשיך."
+            : showBeforeAfter && !beforeOrAfter
+              ? "יש לבחור אם הפייד טיים הוא לפני או אחרי התחרות."
+              : ""
+      }
     >
       {days.length === 0 ? (
         <Text style={styles.bubbleTextBot}>
