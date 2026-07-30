@@ -9,8 +9,13 @@
 -- and target slot must belong to the same competition.
 --
 -- Guards:
---   - Request exists, not paid, not cancelled
---   - Target slot exists in the same competition
+--   - Request exists, not cancelled
+--   - Target slot exists in the same competition, and is not published
+--
+-- Payment: a paid request MAY be transferred or unassigned. Payment freezes
+-- billing-related changes (product, short/long type, duration, price, charge
+-- state), not placement, and this procedure changes placement only - it never
+-- touches a product, price, bill, charge or payment record.
 -- ============================================================================
 
 DROP FUNCTION IF EXISTS public.usp_transferpaidtimerequesttoslot(
@@ -25,7 +30,6 @@ CREATE OR REPLACE FUNCTION public.usp_transferpaidtimerequesttoslot(
 RETURNS void
 LANGUAGE plpgsql AS $$
 DECLARE
-    v_paymentid           integer;
     v_status              varchar;
     v_requested_slot      integer;
     v_request_compid      integer;
@@ -39,21 +43,18 @@ DECLARE
     v_new_order           integer;
 BEGIN
     SELECT
-        sr.paymentid,
         ptr.status,
         ptr.requestedcompslotid,
         ptr.assignedcompslotid,
         slot_req.competitionid,
         c.hostranchid
     INTO
-        v_paymentid,
         v_status,
         v_requested_slot,
         v_source_slotid,
         v_request_compid,
         v_hostranchid
     FROM public.paidtimerequest ptr
-    JOIN public.servicerequest sr ON sr.srequestid = ptr.paidtimerequestid
     JOIN public.paidtimeslotincompetition slot_req
         ON slot_req.paidtimeslotincompid = ptr.requestedcompslotid
     JOIN public.competition c ON c.competitionid = slot_req.competitionid
@@ -80,10 +81,6 @@ BEGIN
 
     IF v_status = 'Cancelled' THEN
         RAISE EXCEPTION 'Cannot transfer a cancelled request';
-    END IF;
-
-    IF v_paymentid IS NOT NULL THEN
-        RAISE EXCEPTION 'Cannot transfer a paid request';
     END IF;
 
     -- ענף שחרור (target NULL): החזרה ל-Pending + איפוס שדות + origin NULL.
