@@ -1,6 +1,13 @@
 -- ============================================================================
 -- usp_insertentry — allow NULL coach
 -- ============================================================================
+-- HISTORICAL NOTE ONLY. This file contains no SQL — it records the rationale
+-- for the nullable-coach fix, which has been live for some time. The
+-- authoritative tracked body of usp_insertentry is
+-- 185_usp_InsertEntry.sql; the guard described below is present there,
+-- unchanged. Do not deploy from this file, and do not duplicate the function
+-- body into it.
+-- ============================================================================
 -- BUG: existing SP raises 'Coach not found' even when p_coachfederationmemberid
 -- IS NULL, because `WHERE federationmemberid = NULL` always returns no rows,
 -- so IF NOT EXISTS always evaluates true.

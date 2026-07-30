@@ -1,10 +1,11 @@
 -- Competition-wide sibling of 117_usp_GetHealthCertificatesForCompetition
 -- (HostSecretary scope).
 --
--- STATUS: NOT YET DEPLOYED. This file is AHEAD of live as of 2026-07-30. The
--- live function still drives from horseparticipationincompetition. Deploy this
--- definition manually in Supabase, then re-read pg_get_functiondef and confirm
--- it matches this file before treating live as fixed.
+-- STATUS: DEPLOYED. Verified against live on 2026-07-30 via pg_get_functiondef:
+-- the live body is entry-derived and joins horseparticipationincompetition with
+-- a LEFT JOIN for certificate metadata only. Live and this file agree
+-- character for character apart from case and whitespace (normalised md5
+-- f24ee90768d4ca9b8f1e49dabb565c7c on both sides).
 --
 -- 117 filters `h.ranchid = p_ranchid`, which is correct for a RanchAdmin and
 -- wrong for a HostSecretary: the secretary of the hosting ranch must see every

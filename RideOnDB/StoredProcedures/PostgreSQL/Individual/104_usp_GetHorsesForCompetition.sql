@@ -1,10 +1,12 @@
 -- Ranch-scoped horse list for a competition.
 -- Backs HorseDAL.GetHorsesForCompetition -> GET api/Horses/competition-horses.
 --
--- STATUS: NOT YET DEPLOYED. This file is AHEAD of live as of 2026-07-30. The
--- live function still drives from horseparticipationincompetition. Deploy this
--- definition manually in Supabase, then re-read pg_get_functiondef and confirm
--- it matches this file before treating live as fixed.
+-- STATUS: DEPLOYED. Verified against live on 2026-07-30 via pg_get_functiondef:
+-- the live body is entry-derived and does not reference
+-- horseparticipationincompetition at all. Live and this file agree character
+-- for character apart from case and whitespace (normalised md5
+-- 3cdc799ef03e37b743844d3f99c9b5dc on both sides); live spells its keywords in
+-- upper case where this file uses lower case.
 --
 -- THE PREVIOUS REPO COPY OF THIS FILE WAS STALE - in signature, not just body.
 -- It declared usp_GetHorsesForCompetition(p_CompetitionId INTEGER) returning
