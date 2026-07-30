@@ -1,9 +1,11 @@
 -- Ranch-scoped health-certificate list for a competition (RanchAdmin scope).
 --
--- STATUS: NOT YET DEPLOYED. This file is AHEAD of live as of 2026-07-30. The
--- live function still drives from horseparticipationincompetition. Deploy this
--- definition manually in Supabase, then re-read pg_get_functiondef and confirm
--- it matches this file before treating live as fixed.
+-- STATUS: DEPLOYED. Verified against live on 2026-07-30 via pg_get_functiondef:
+-- the live body is entry-derived and joins horseparticipationincompetition with
+-- a LEFT JOIN for certificate metadata only. Live and this file agree
+-- character for character apart from case and whitespace (normalised md5
+-- b6a3f63666c2ec995e9bb61b38554fff on both sides); live carries no blank lines
+-- inside the query where this file has them.
 --
 -- WHY THIS CHANGED
 -- ----------------
