@@ -8,7 +8,9 @@ RETURNS VOID
 LANGUAGE plpgsql AS $$
 declare
     v_request_competitionid integer;
+    v_request_status varchar;
     v_assigned_competitionid integer;
+    v_assigned_ispublished boolean;
     v_previous_slotid integer;
     v_existing_name text;
     v_slot_start_ts timestamp with time zone;
@@ -39,12 +41,30 @@ begin
     -- של אותה תחרות. מזהה-התחרות קבוע ולכן נקרא לפני הנעילה.
     perform pg_advisory_xact_lock(1734, v_request_competitionid);
 
+    -- בקשה שבוטלה אינה בת-שיבוץ. מצב-הבקשה נקרא כאן *אחרי* נעילת-הייעוץ, כדי
+    -- שההחלטה תתבסס על מצב מקובע ולא על ערך שנקרא לפני הנעילה ויכול היה
+    -- להשתנות בינתיים. החזרת בקשה שבוטלה למצב Assigned היא פעולת-מחזור-חיים
+    -- מפורשת ואינה חלק ממסלול השיבוץ הידני.
+    select ptr.status
+    into v_request_status
+    from paidtimerequest ptr
+    where ptr.paidtimerequestid = p_paidtimerequestid;
+
+    if v_request_status = 'Cancelled' then
+        raise exception 'לא ניתן לשבץ בקשה שבוטלה';
+    end if;
+
+    -- תשלום אינו חוסם שינוי מיקום, ולכן אין כאן בדיקת paymentid במכוון.
+    -- הפרוצדורה אינה משנה מוצר, משך, מחיר או מצב-חיוב.
+
     select
         ptc.competitionid,
-        (ptc.slotdate + ptc.starttime)::timestamp with time zone
+        (ptc.slotdate + ptc.starttime)::timestamp with time zone,
+        coalesce(ptc.ispublished, false)
     into
         v_assigned_competitionid,
-        v_slot_start_ts
+        v_slot_start_ts,
+        v_assigned_ispublished
     from paidtimeslotincompetition ptc
     inner join competition c
         on c.competitionid = ptc.competitionid
@@ -57,6 +77,13 @@ begin
 
     if v_request_competitionid <> v_assigned_competitionid then
         raise exception 'Cannot assign paid time request to a slot from another competition';
+    end if;
+
+    -- סלוט שפורסם שייך למזכירה בלבד ואינו בתחום השיבוץ הידני דרך מסלול זה.
+    -- נבדק *אחרי* נעילת-הייעוץ, כדי שמצב-הפרסום שנקרא יהיה קבוע להמשך
+    -- הטרנזקציה. פרוצדורה 151 (העברה בין סלוטים) אוכפת את אותו כלל.
+    if v_assigned_ispublished then
+        raise exception 'לא ניתן לשבץ בקשה בסלוט שפורסם';
     end if;
 
     select coalesce(h.barnname, h.horsename)
