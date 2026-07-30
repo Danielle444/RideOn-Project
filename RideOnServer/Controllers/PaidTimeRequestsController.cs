@@ -155,8 +155,45 @@ namespace RideOnServer.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in UnassignPaidTimeRequest: {ex.Message}");
-                return BadRequest("אירעה שגיאה בביטול שיבוץ בקשת פייד־טיים");
+                return BadRequest(ResolveUnassignErrorMessage(ex.Message));
             }
+        }
+
+        // Controlled business validation messages raised by
+        // public.usp_recalculatepaidtimeslotassignments, which usp_unassignpaidtimerequest
+        // calls to re-sequence the slot it emptied. This list mirrors those messages
+        // exactly; it is the only text the unassign endpoint echoes back to the
+        // secretary, so raw Npgsql/PostgreSQL detail can never reach the client.
+        private static readonly HashSet<string> UnassignBusinessErrorMessages = new HashSet<string>
+        {
+            "השיבוץ הידני יוצר חפיפה בתוך הסלוט",
+            "אין מספיק זמן בסלוט להשלמת השיבוץ לפי סדר הכניסה הנוכחי",
+            "השיבוץ הידני יוצר חפיפה בזמני המאמן",
+            "השיבוץ הידני יוצר חפיפה בזמני הרוכב",
+            "השיבוץ הידני יוצר חפיפה בזמני הסוס",
+            "קיים יותר משיבוץ אחד באותו מיקום בסלוט"
+        };
+
+        // The DAL re-wraps every NpgsqlException as "Database error: {ex.Message}",
+        // so a single leading prefix is removed before the exact-match check.
+        // Anything that is not an exact allowlist hit falls back to the generic
+        // message; the full detail is already in the Console.WriteLine above.
+        private static string ResolveUnassignErrorMessage(string message)
+        {
+            string candidate = message ?? "";
+            const string databaseErrorPrefix = "Database error: ";
+
+            if (candidate.StartsWith(databaseErrorPrefix, StringComparison.Ordinal))
+            {
+                candidate = candidate.Substring(databaseErrorPrefix.Length);
+            }
+
+            if (UnassignBusinessErrorMessages.Contains(candidate))
+            {
+                return candidate;
+            }
+
+            return "אירעה שגיאה בביטול שיבוץ בקשת פייד־טיים";
         }
 
         [HttpPost("auto-schedule")]
