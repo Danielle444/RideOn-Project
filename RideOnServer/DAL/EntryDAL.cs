@@ -6,28 +6,90 @@ namespace RideOnServer.DAL
 {
     public class EntryDAL : DBServices
     {
+        // Builds the public.usp_insertentry call using explicit PostgreSQL named
+        // argument notation, deliberately NOT the generic positional helper
+        // CreateCommandWithStoredProcedure.
+        //
+        // WHY: that helper emits "SELECT * FROM fn(@p1, @p2, ...)" and binds
+        // strictly by Dictionary insertion order - the dictionary keys only pick
+        // an NpgsqlDbType, they never reach the SQL. The dictionary this method
+        // used to build listed the payer sixth and the coach seventh, while the
+        // live function takes p_coachfederationmemberid sixth and
+        // p_paidbypersonid seventh, so the two were crossed on the wire: the
+        // payer was written to servicerequest.coachfederationmemberid, and the
+        // coach to bill.paidbypersonid and billcharge.paidbypersonid. Because
+        // federationmember.federationmemberid is itself a person.personid
+        // (fk_federationmember_person), every guard and foreign key still passed
+        // whenever the payer happened to be a federation member, so the swap was
+        // silent. A null coach additionally left p_paidbypersonid null, which
+        // made the function raise 'Payer not found' and broke every no-coach
+        // registration outright.
+        //
+        // Named arguments remove the dependency on argument order entirely. That
+        // matters here specifically: this DAL's order never changed since it was
+        // written - the deployed function's argument order was changed underneath
+        // it - so an order-based fix would leave the same trap in place. Same
+        // notation as PaidTimeRequestDAL.CreatePaidTimeRequest.
+        //
+        // public static (not private) so it can be unit tested with no database,
+        // per the project convention used by PaidTimeRequest.BuildVerifiedApplyPlan
+        // and PredictionService.ComputePrediction - instead of InternalsVisibleTo.
+        public static NpgsqlCommand BuildInsertEntryCommand(
+            CreateEntryRequest request,
+            NpgsqlConnection? connection)
+        {
+            NpgsqlCommand command = new NpgsqlCommand(@"
+                SELECT public.usp_insertentry(
+                    p_classincompid           := @classInCompId,
+                    p_orderedbysystemuserid   := @orderedBySystemUserId,
+                    p_ranchid                 := @ranchId,
+                    p_horseid                 := @horseId,
+                    p_riderfederationmemberid := @riderFederationMemberId,
+                    p_coachfederationmemberid := @coachFederationMemberId,
+                    p_paidbypersonid          := @paidByPersonId,
+                    p_prizerecipientname      := @prizeRecipientName
+                );", connection);
+
+            command.Parameters.Add("@classInCompId", NpgsqlDbType.Integer).Value =
+                request.ClassInCompId;
+
+            command.Parameters.Add("@orderedBySystemUserId", NpgsqlDbType.Integer).Value =
+                request.OrderedBySystemUserId;
+
+            command.Parameters.Add("@ranchId", NpgsqlDbType.Integer).Value =
+                request.RanchId;
+
+            command.Parameters.Add("@horseId", NpgsqlDbType.Integer).Value =
+                request.HorseId;
+
+            command.Parameters.Add("@riderFederationMemberId", NpgsqlDbType.Integer).Value =
+                request.RiderFederationMemberId;
+
+            // Nullable by design: the live function skips its coach existence
+            // check when this argument is null, and the payer is unaffected.
+            command.Parameters.Add("@coachFederationMemberId", NpgsqlDbType.Integer).Value =
+                request.CoachFederationMemberId.HasValue
+                    ? (object)request.CoachFederationMemberId.Value
+                    : DBNull.Value;
+
+            command.Parameters.Add("@paidByPersonId", NpgsqlDbType.Integer).Value =
+                request.PaidByPersonId;
+
+            // p_prizerecipientname is character varying in the live function.
+            // Null stays null; an empty string is still sent as an empty string,
+            // matching what the previous parameter builder did.
+            command.Parameters.Add("@prizeRecipientName", NpgsqlDbType.Varchar).Value =
+                (object?)request.PrizeRecipientName ?? DBNull.Value;
+
+            return command;
+        }
+
         public int InsertEntry(CreateEntryRequest request)
         {
-            var paramDic = new Dictionary<string, object?>
-            {
-                { "@p_classincompid", request.ClassInCompId },
-                { "@p_orderedbysystemuserid", request.OrderedBySystemUserId },
-                { "@p_ranchid", request.RanchId },
-                { "@p_horseid", request.HorseId },
-                { "@p_riderfederationmemberid", request.RiderFederationMemberId },
-                { "@p_paidbypersonid", request.PaidByPersonId },
-                { "@p_coachfederationmemberid", request.CoachFederationMemberId },
-                { "@p_prizerecipientname", request.PrizeRecipientName }
-            };
-
             using var connection = Connect("DefaultConnection");
             connection.Open();
 
-            using var command = CreateCommandWithStoredProcedure(
-                "usp_insertentry",
-                connection,
-                paramDic
-            );
+            using var command = BuildInsertEntryCommand(request, connection);
 
             object? result = command.ExecuteScalar();
 

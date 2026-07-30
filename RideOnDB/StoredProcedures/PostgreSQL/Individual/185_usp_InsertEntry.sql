@@ -93,9 +93,54 @@
 --   * usp_savehealthcertificate (118) and usp_approvehealthcertificate (119)
 --     are deliberately unchanged.
 --   * The existing bare hpc rows are retained. No cleanup, no backfill.
---   * The suspected payer/coach parameter-order mismatch in
---     RideOnServer/DAL/EntryDAL.cs is a separate, unresolved issue. The
---     parameter names and their order below are live's, untouched.
+--   * The payer/coach parameter-order mismatch in
+--     RideOnServer/DAL/EntryDAL.cs is RESOLVED, in C# only. The parameter
+--     names and their order below are live's, untouched.
+--
+-- PAYER/COACH MISMATCH - RESOLVED IN THE DAL, NOT HERE
+-- ----------------------------------------------------
+-- The mismatch was confirmed and then fixed on the C# side alone.
+--
+--   * THE LIVE FUNCTION REMAINS UNCHANGED. Its argument order below -
+--     p_coachfederationmemberid sixth, p_paidbypersonid seventh - is correct
+--     and is what public.usp_insertpaidtimerequest also uses. Nothing was
+--     deployed, no migration was written, and this file's SQL body is
+--     byte-identical to the definition verified live on 2026-07-31
+--     (normalised md5 660418c6e58747489355bb76fa9b66b9, length 4346).
+--
+--   * WHAT WAS WRONG. EntryDAL.InsertEntry passed its arguments through
+--     DBServices.CreateCommandWithStoredProcedure, which emits
+--     "SELECT * FROM fn(@p1, @p2, ...)" and binds strictly by Dictionary
+--     insertion order - the dictionary keys only select an NpgsqlDbType and
+--     never reach the SQL. That dictionary listed the payer sixth and the
+--     coach seventh, so the two were crossed on the wire: the payer was
+--     written to servicerequest.coachfederationmemberid while
+--     bill.paidbypersonid and billcharge.paidbypersonid received the coach.
+--     It stayed silent because federationmember.federationmemberid is itself
+--     a person.personid (fk_federationmember_person), so every guard and
+--     foreign key still passed whenever the payer was also a federation
+--     member. A null coach additionally left p_paidbypersonid null, so the
+--     'Payer not found' guard fired and every no-coach registration failed.
+--
+--   * THE FIX. EntryDAL.InsertEntry now calls this function with explicit
+--     PostgreSQL named argument notation (p_coachfederationmemberid := ...),
+--     the same notation PaidTimeRequestDAL.CreatePaidTimeRequest uses, which
+--     removes the dependency on argument order entirely. Covered by
+--     RideOnServer.Tests/EntryDalInsertEntryCommandTests.cs.
+--
+--   * WHY NAMED ARGUMENTS RATHER THAN REORDERING THE DICTIONARY. The DAL's
+--     order never changed since it was written (629a3be, 2026-04-18); this
+--     function's argument order was changed underneath it, between
+--     2026-04-21 and 2026-04-23, most likely while hand-applying the
+--     nullable-coach fix described in 144 (a parameter rename or reorder
+--     needs DROP + CREATE, so the header was re-authored). Entries created
+--     on 2026-04-21 are stored correctly; everything from 2026-04-23 onward
+--     is swapped. An order-based fix would have left the same trap in place.
+--
+--   * STILL OPEN: 16 historical entry rows are conclusively swapped
+--     (14, 291-296, 9920, 9921, 10094-10100), all in Draft or unstatused
+--     competitions with no paid charges. Their repair is deliberately
+--     deferred and is NOT part of this file or the DAL fix.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_insertentry(p_classincompid integer, p_orderedbysystemuserid integer, p_ranchid integer, p_horseid integer, p_riderfederationmemberid integer, p_coachfederationmemberid integer, p_paidbypersonid integer, p_prizerecipientname character varying)
