@@ -22,6 +22,11 @@ namespace RideOnServer.BL
         public string? StallMapUrl { get; set; }
         public string? FieldName { get; set; }
 
+        // True when the payer has paid into this competition (entries, paid-time,
+        // or product requests). Only populated by the payer-board query; defaults
+        // to false for every other competition source.
+        public bool HasParticipated { get; set; }
+
         internal static List<Competition> GetCompetitionsByHostRanch(CompetitionFiltersRequest filters)
         {
             if (filters.RanchId <= 0)
@@ -174,15 +179,22 @@ namespace RideOnServer.BL
                 .ToList();
         }
 
-        internal static List<Competition> GetCompetitionsForMobilePayer(int personId)
+        internal static List<Competition> GetCompetitionsForMobilePayer(int ranchId, int personId)
         {
+            if (ranchId <= 0)
+            {
+                throw new Exception("RanchId is invalid");
+            }
+
             if (personId <= 0)
             {
                 throw new Exception("PersonId is invalid");
             }
 
             CompetitionDAL dal = new CompetitionDAL();
-            List<Competition> list = dal.GetCompetitionsForMobilePayer(personId);
+            List<Competition> list = dal.GetCompetitionsForMobilePayer(ranchId, personId);
+
+            DateTime today = DateTime.Today;
 
             foreach (Competition item in list)
             {
@@ -190,8 +202,42 @@ namespace RideOnServer.BL
             }
 
             return list
+                .Where(item => IsVisibleOnPayerBoard(item, today))
                 .OrderBy(item => item.CompetitionStartDate)
                 .ToList();
+        }
+
+        // Payer-board visibility (decisions locked with Oren 2026-07-31):
+        // - Drafts are never shown, even a competition the payer was part of that
+        //   later reverted to draft (the was-active-now-draft edge case).
+        // - Enrolled (paid into it): shown regardless of ranch. A cancelled one
+        //   lingers for one month past its end date so the payer isn't left
+        //   wondering where it went, then drops out of view.
+        // - Not enrolled: only FUTURE competitions at the selected ranch, so the
+        //   payer can see what's coming. Current/active/finished/cancelled they
+        //   never joined stay hidden.
+        private const int CancelledVisibilityDays = 30;
+
+        private static bool IsVisibleOnPayerBoard(Competition item, DateTime today)
+        {
+            string status = item.CompetitionStatus ?? string.Empty;
+
+            if (status == CompetitionStatuses.Draft)
+            {
+                return false;
+            }
+
+            if (item.HasParticipated)
+            {
+                if (status == CompetitionStatuses.Cancelled)
+                {
+                    return today <= item.CompetitionEndDate.Date.AddDays(CancelledVisibilityDays);
+                }
+
+                return true;
+            }
+
+            return status == CompetitionStatuses.Future;
         }
 
         internal static List<Competition> GetCompetitionsForMobileAdminHome(int systemUserId)
