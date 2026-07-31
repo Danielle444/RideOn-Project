@@ -330,7 +330,7 @@ namespace RideOnServer.Controllers
                     RoleNames.Payer
                 );
 
-                List<Competition> list = Competition.GetCompetitionsForMobilePayer(personId);
+                List<Competition> list = Competition.GetCompetitionsForMobilePayer(ranchId, personId);
                 return Ok(list);
             }
             catch (UnauthorizedAccessException ex)

@@ -21,14 +21,83 @@ import { getMobilePayerCompetitionsBoard } from "../../../../services/competitio
 import { canPayerEnterCompetition } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
 import { useCompetition } from "../../../../context/CompetitionContext";
 
-function sortAndTakeNearest(items) {
-  return [...items]
+// Effective competition statuses (Hebrew) as returned by the backend.
+var STATUS_FUTURE = "עתידית";
+var STATUS_ACTIVE = "פעילה";
+var STATUS_CURRENT = "כעת";
+var STATUS_FINISHED = "הסתיימה";
+
+var RECENTLY_FINISHED_DAYS = 7;
+var UPCOMING_SOON_DAYS = 30;
+var HOME_MAX_ITEMS = 3;
+
+function startOfDay(value) {
+  var date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function daysBetween(fromDate, toDate) {
+  return Math.round((toDate.getTime() - fromDate.getTime()) / 86400000);
+}
+
+// Home teaser selection (locked with Oren 2026-07-31): only the most relevant
+// handful — competitions the payer is enrolled in that are still live
+// (active/current/upcoming) or finished within the last week, plus ranch
+// competitions coming up within the next month even if not yet enrolled.
+function selectHomeCompetitions(items) {
+  var source = Array.isArray(items) ? items : [];
+  var today = startOfDay(new Date());
+
+  var selected = source.filter(function (item) {
+    if (!item) {
+      return false;
+    }
+
+    var status = item.competitionStatus;
+    var startDate = startOfDay(item.competitionStartDate);
+    var endDate = startOfDay(item.competitionEndDate);
+
+    if (item.hasParticipated) {
+      if (
+        status === STATUS_ACTIVE ||
+        status === STATUS_CURRENT ||
+        status === STATUS_FUTURE
+      ) {
+        return true;
+      }
+
+      if (status === STATUS_FINISHED && endDate) {
+        return daysBetween(endDate, today) <= RECENTLY_FINISHED_DAYS;
+      }
+
+      return false;
+    }
+
+    if (status === STATUS_FUTURE && startDate) {
+      var daysUntilStart = daysBetween(today, startDate);
+      return daysUntilStart >= 0 && daysUntilStart <= UPCOMING_SOON_DAYS;
+    }
+
+    return false;
+  });
+
+  return selected
     .sort(function (a, b) {
+      if (Boolean(a.hasParticipated) !== Boolean(b.hasParticipated)) {
+        return a.hasParticipated ? -1 : 1;
+      }
+
       return String(a.competitionStartDate || "").localeCompare(
         String(b.competitionStartDate || ""),
       );
     })
-    .slice(0, 2);
+    .slice(0, HOME_MAX_ITEMS);
 }
 
 export default function PayerHomeScreen(props) {
@@ -60,7 +129,7 @@ export default function PayerHomeScreen(props) {
 
       var response = await getMobilePayerCompetitionsBoard(activeRole.ranchId);
       var items = Array.isArray(response.data) ? response.data : [];
-      setCompetitions(sortAndTakeNearest(items));
+      setCompetitions(selectHomeCompetitions(items));
     } catch (error) {
       console.error(error);
       setCompetitions([]);
@@ -242,7 +311,11 @@ export default function PayerHomeScreen(props) {
                 <HomeCompetitionCard
                   key={String(item.competitionId)}
                   item={item}
-                  ranchName={(activeRole && activeRole.ranchName) || ""}
+                  ranchName={
+                    item.hostRanchName ||
+                    (activeRole && activeRole.ranchName) ||
+                    ""
+                  }
                   actions={buildCompetitionActions(item)}
                 />
               );

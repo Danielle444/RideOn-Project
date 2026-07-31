@@ -18,6 +18,28 @@ import { canPayerEnterCompetition } from "../../../../../../shared/auth/utils/co
 import { sortCompetitionsByStatusAndDate } from "../../../../../../shared/auth/utils/competitions/competitionSorting";
 import { MOBILE_COMPETITION_STATUS_ORDER } from "../../../../config/competitionStatusOrder";
 
+// Relevance order for the payer board: competitions the payer is enrolled in
+// (highest relevance) come first, then everything else. Each group keeps the
+// standard status + date ordering. `hasParticipated` is set by the backend.
+function sortPayerCompetitionsByRelevance(items) {
+  var source = Array.isArray(items) ? items : [];
+
+  var enrolled = source.filter(function (item) {
+    return item && item.hasParticipated;
+  });
+
+  var others = source.filter(function (item) {
+    return !(item && item.hasParticipated);
+  });
+
+  return sortCompetitionsByStatusAndDate(
+    enrolled,
+    MOBILE_COMPETITION_STATUS_ORDER,
+  ).concat(
+    sortCompetitionsByStatusAndDate(others, MOBILE_COMPETITION_STATUS_ORDER),
+  );
+}
+
 export default function PayerCompetitionsBoardScreen(props) {
   var userContext = useUser();
   var activeRoleContext = useActiveRole();
@@ -48,9 +70,8 @@ export default function PayerCompetitionsBoardScreen(props) {
 
       var response = await getMobilePayerCompetitionsBoard(activeRole.ranchId);
       setCompetitions(
-        sortCompetitionsByStatusAndDate(
+        sortPayerCompetitionsByRelevance(
           Array.isArray(response.data) ? response.data : [],
-          MOBILE_COMPETITION_STATUS_ORDER,
         ),
       );
     } catch (error) {
@@ -134,7 +155,8 @@ export default function PayerCompetitionsBoardScreen(props) {
           item.competitionEndDate,
         )}
         ranchName={
-          activeRole && activeRole.ranchName ? activeRole.ranchName : ""
+          item.hostRanchName ||
+          (activeRole && activeRole.ranchName ? activeRole.ranchName : "")
         }
         status={item.competitionStatus}
         actions={buildActions(item)}
