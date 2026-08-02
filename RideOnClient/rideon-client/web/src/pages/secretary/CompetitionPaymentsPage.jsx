@@ -3,7 +3,9 @@ import { ArrowRight, RefreshCw } from "lucide-react";
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import CreatePaymentModal from "../../components/secretary/competition-payments/CreatePaymentModal";
 import FederationCoverageApplyModal from "../../components/secretary/competition-payments/FederationCoverageApplyModal";
-import PayerAccountCards from "../../components/secretary/competition-payments/PayerAccountCards";
+import PayerAccountCards, {
+  MoneyTile,
+} from "../../components/secretary/competition-payments/PayerAccountCards";
 import PayersList from "../../components/secretary/competition-payments/PayersList";
 import PaymentCategoriesSidebar from "../../components/secretary/competition-payments/PaymentCategoriesSidebar";
 import PaymentChargesTable from "../../components/secretary/competition-payments/PaymentChargesTable";
@@ -25,10 +27,6 @@ function getValue(item, camelKey, pascalKey, fallback) {
   }
 
   return fallback;
-}
-
-function formatMoney(value) {
-  return "₪" + Number(value || 0).toLocaleString("he-IL");
 }
 
 function PaymentsPageContent(props) {
@@ -138,11 +136,12 @@ function PaymentsPageContent(props) {
           </p>
         </div>
 
-        <div className="shrink-0 rounded-2xl border border-[#E6DCD5] bg-white px-6 py-4 text-right shadow-sm">
-          <p className="text-xs font-bold text-[#8A7268]">נבחר לתשלום</p>
-          <p className="mt-1 text-2xl font-black text-[#3F312B]">
-            {formatMoney(page.selectedTotal)}
-          </p>
+        <div className="shrink-0">
+          <MoneyTile
+            label="נבחר לתשלום"
+            amount={page.selectedTotal}
+            colorClass="text-[#7B5A4D]"
+          />
         </div>
       </div>
 
@@ -185,63 +184,65 @@ function PaymentsPageContent(props) {
             federationCoverageLoading={page.federationCoverageLoading}
           />
 
-          <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
-            <div className="min-w-0">
-              <PaymentCategoriesSidebar
-                items={page.categorySummary}
-                activeOwner={page.selectedOwner}
-                activeCategoryKey={page.selectedCategoryKey}
-                onSelectCategory={page.selectCategory}
-              />
-            </div>
+          <section className="rounded-[28px] border border-[#E6DCD5] bg-white p-8 shadow-sm">
+            <div className="mb-7 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="min-w-0">
+                <h2 className="text-3xl font-black text-[#3F312B]">
+                  שורות חיוב לתשלום
+                </h2>
 
-            <div className="min-w-0 space-y-4 overflow-hidden">
-              <div className="flex min-w-0 flex-col gap-3 rounded-[24px] border border-[#E6DCD5] bg-white p-5 shadow-sm xl:flex-row xl:items-center xl:justify-between">
-                <div className="min-w-0">
-                  <h2 className="text-xl font-black text-[#3F312B]">
-                    שורות חיוב
-                  </h2>
-
-                  <p className="mt-1 text-sm text-[#8A7268]">
-                    בחירת שורת מקצה תבחר אוטומטית גם את חלק המארגן וגם את חלק
-                    ההתאחדות של אותו מקצה. בנסורת, בחירת שורה אחת בוחרת את כל
-                    חיוב הנסורת של אותו משלם.
-                  </p>
-                </div>
-
-                <div className="flex shrink-0 flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={page.clearSelectedCharges}
-                    disabled={page.selectedChargeIds.length === 0}
-                    className="rounded-2xl border border-[#D8CBC3] bg-white px-5 py-3 font-bold text-[#6D4C41] transition-colors hover:bg-[#F8F3EF] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    ניקוי בחירה
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={page.openPaymentModal}
-                    disabled={page.selectedChargeIds.length === 0}
-                    className="rounded-2xl bg-[#8B5E4C] px-6 py-3 font-bold text-white transition-colors hover:bg-[#765041] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {paymentActionText}
-                  </button>
-                </div>
+                <p className="mt-2 text-sm text-[#8A7268]">
+                  בחירת שורת מקצה תבחר אוטומטית גם את חלק המארגן וגם את חלק
+                  ההתאחדות של אותו מקצה. בנסורת, בחירת שורה אחת בוחרת את כל
+                  חיוב הנסורת של אותו משלם.
+                </p>
               </div>
 
-              <PaymentChargesTable
-                items={page.visibleCharges}
-                selectedChargeIds={page.selectedChargeIds}
-                visibleSelectableChargeIds={page.visibleSelectableChargeIds}
-                allVisibleChargesSelected={page.allVisibleChargesSelected}
-                onToggleCharge={page.toggleCharge}
-                onToggleSelectAllVisibleCharges={
-                  page.toggleSelectAllVisibleCharges
-                }
-              />
+              <div className="flex shrink-0 flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={page.clearSelectedCharges}
+                  disabled={page.selectedChargeIds.length === 0}
+                  className="rounded-2xl border border-[#D8CBC3] bg-white px-5 py-3 font-bold text-[#6D4C41] transition-colors hover:bg-[#F8F3EF] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ניקוי בחירה
+                </button>
+
+                <button
+                  type="button"
+                  onClick={page.openPaymentModal}
+                  disabled={page.selectedChargeIds.length === 0}
+                  className="rounded-2xl bg-[#8B5E4C] px-6 py-3 font-bold text-white transition-colors hover:bg-[#765041] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {paymentActionText}
+                </button>
+              </div>
             </div>
-          </div>
+
+            <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
+              <div className="min-w-0">
+                <PaymentCategoriesSidebar
+                  items={page.categorySummary}
+                  activeOwner={page.selectedOwner}
+                  activeCategoryKey={page.selectedCategoryKey}
+                  onSelectCategory={page.selectCategory}
+                />
+              </div>
+
+              <div className="min-w-0 overflow-hidden">
+                <PaymentChargesTable
+                  items={page.visibleCharges}
+                  selectedChargeIds={page.selectedChargeIds}
+                  visibleSelectableChargeIds={page.visibleSelectableChargeIds}
+                  allVisibleChargesSelected={page.allVisibleChargesSelected}
+                  onToggleCharge={page.toggleCharge}
+                  onToggleSelectAllVisibleCharges={
+                    page.toggleSelectAllVisibleCharges
+                  }
+                />
+              </div>
+            </div>
+          </section>
         </>
       )}
 

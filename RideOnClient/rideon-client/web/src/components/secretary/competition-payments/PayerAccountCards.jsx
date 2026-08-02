@@ -146,6 +146,31 @@ function FederationCoverageMiniStatus(props) {
   );
 }
 
+function MoneyTile(props) {
+  var colorClass = props.colorClass || "text-[#7B5A4D]";
+  var compact = props.compact === true;
+
+  return (
+    <div
+      className={
+        "min-w-0 rounded-2xl border border-[#E3D7D0] bg-white text-right shadow-sm " +
+        (compact ? "px-4 py-3" : "px-6 py-5")
+      }
+    >
+      <p className="text-sm font-bold text-[#6D4C41]">{props.label}</p>
+
+      <p
+        className={
+          "mt-3 break-words text-2xl font-black tabular-nums lg:text-3xl " +
+          colorClass
+        }
+      >
+        {formatMoney(props.amount)}
+      </p>
+    </div>
+  );
+}
+
 function AccountCard(props) {
   var item = props.item || {};
   var owner = props.owner;
@@ -184,27 +209,27 @@ function AccountCard(props) {
         />
       </div>
 
-      <div className="mt-6 grid grid-cols-3 gap-3">
-        <div>
-          <p className="text-xs font-bold text-[#8A7268]">סה״כ</p>
-          <p className="mt-1 text-lg font-black text-[#3F312B]">
-            {formatMoney(getValue(item, "totalAmount", "TotalAmount", 0))}
-          </p>
-        </div>
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <MoneyTile
+          label="סה״כ"
+          amount={getValue(item, "totalAmount", "TotalAmount", 0)}
+          colorClass="text-[#7B5A4D]"
+          compact
+        />
 
-        <div>
-          <p className="text-xs font-bold text-[#8A7268]">שולם</p>
-          <p className="mt-1 text-lg font-black text-[#2E7D32]">
-            {formatMoney(getValue(item, "paidAmount", "PaidAmount", 0))}
-          </p>
-        </div>
+        <MoneyTile
+          label="שולם"
+          amount={getValue(item, "paidAmount", "PaidAmount", 0)}
+          colorClass="text-[#2E7D32]"
+          compact
+        />
 
-        <div>
-          <p className="text-xs font-bold text-[#8A7268]">יתרה</p>
-          <p className="mt-1 text-lg font-black text-[#C62828]">
-            {formatMoney(getValue(item, "unpaidAmount", "UnpaidAmount", 0))}
-          </p>
-        </div>
+        <MoneyTile
+          label="יתרה"
+          amount={getValue(item, "unpaidAmount", "UnpaidAmount", 0)}
+          colorClass="text-[#C62828]"
+          compact
+        />
       </div>
 
       {owner === "Federation" ? (
@@ -223,23 +248,35 @@ export default function PayerAccountCards(props) {
   var federation = findSummary(props.items, "Federation");
 
   return (
-    <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-      <AccountCard
-        owner="Organizer"
-        item={organizer}
-        activeOwner={props.activeOwner}
-        onSelectOwner={props.onSelectOwner}
-      />
+    <section className="rounded-[28px] border border-[#E6DCD5] bg-white p-8 shadow-sm">
+      <div className="mb-7">
+        <h2 className="text-3xl font-black text-[#3F312B]">חשבונות המשלם</h2>
 
-      <AccountCard
-        owner="Federation"
-        item={federation}
-        activeOwner={props.activeOwner}
-        onSelectOwner={props.onSelectOwner}
-        federationCoverageStatus={props.federationCoverageStatus}
-        federationValidation={props.federationValidation}
-        federationCoverageLoading={props.federationCoverageLoading}
-      />
-    </div>
+        <p className="mt-2 text-sm text-[#8A7268]">
+          סה״כ, שולם ויתרה עבור חשבון המארגן וחשבון ההתאחדות של המשלם.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <AccountCard
+          owner="Organizer"
+          item={organizer}
+          activeOwner={props.activeOwner}
+          onSelectOwner={props.onSelectOwner}
+        />
+
+        <AccountCard
+          owner="Federation"
+          item={federation}
+          activeOwner={props.activeOwner}
+          onSelectOwner={props.onSelectOwner}
+          federationCoverageStatus={props.federationCoverageStatus}
+          federationValidation={props.federationValidation}
+          federationCoverageLoading={props.federationCoverageLoading}
+        />
+      </div>
+    </section>
   );
 }
+
+export { MoneyTile };

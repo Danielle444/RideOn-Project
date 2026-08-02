@@ -401,7 +401,7 @@ export default function PaymentChargesTable(props) {
   }
 
   return (
-    <div className="max-w-full overflow-hidden rounded-[24px] border border-[#E6DCD5] bg-white shadow-sm">
+    <div className="max-w-full overflow-hidden rounded-2xl border border-[#E3D7D0] bg-white">
       <div className="flex flex-col gap-3 border-b border-[#EFE5DF] px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h3 className="text-lg font-black text-[#3F312B]">פירוט חיובים</h3>
@@ -491,7 +491,12 @@ export default function PaymentChargesTable(props) {
                     </div>
                   </td>
 
-                  <td className="px-4 py-4 font-black">
+                  <td
+                    className={
+                      "px-4 py-4 font-black tabular-nums " +
+                      (canSelect ? "text-[#7B5A4D]" : "")
+                    }
+                  >
                     {formatMoney(
                       getValue(charge, "amountToPay", "AmountToPay", 0),
                     )}

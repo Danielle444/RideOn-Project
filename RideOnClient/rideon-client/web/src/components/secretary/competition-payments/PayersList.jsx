@@ -476,11 +476,11 @@ export default function PayersList(props) {
                       {getValue(payer, "payerName", "PayerName", "-")}
                     </td>
 
-                    <td className="px-6 py-5 font-bold">
+                    <td className="px-6 py-5 font-bold tabular-nums">
                       {formatMoney(totalAmount)}
                     </td>
 
-                    <td className="px-6 py-5 font-bold text-[#2E7D32]">
+                    <td className="px-6 py-5 font-bold tabular-nums text-[#2E7D32]">
                       {formatMoney(
                         getValue(payer, "paidAmount", "PaidAmount", 0),
                       )}
@@ -488,7 +488,7 @@ export default function PayersList(props) {
 
                     <td
                       className={
-                        "px-6 py-5 font-bold " +
+                        "px-6 py-5 font-bold tabular-nums " +
                         (unpaidAmount > 0 ? "text-[#C62828]" : "text-[#2E7D32]")
                       }
                     >
