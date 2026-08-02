@@ -388,6 +388,50 @@ namespace RideOnServer.BL
             return response;
         }
 
+        // Reschedule v1: forward-only postponement by a positive whole number
+        // of calendar days. This is deliberately a SEPARATE operation from
+        // UpdateCompetition — it is a multi-table business transaction
+        // (competition + classes + paid-time + stall bookings + shavings),
+        // not a plain field edit. BL performs only cheap, DB-free shape
+        // validation here; every date-dependent and concurrent-data
+        // precondition (has the competition started, pending change
+        // requests, existing out-of-range schedule, horse stall overlap) is
+        // authoritative in usp_RescheduleCompetition, which runs them all
+        // inside the same locked transaction as the writes.
+        //
+        // competitionstatus is never consulted for the "has started" check
+        // anywhere in this path — see the audit finding that a competition
+        // can remain stored as CompetitionStatuses.Draft long after its
+        // start date has passed.
+        internal static RescheduleCompetitionResponse RescheduleCompetition(RescheduleCompetitionRequest request)
+        {
+            if (request == null)
+            {
+                throw new Exception("Invalid request");
+            }
+
+            if (request.CompetitionId <= 0)
+            {
+                throw new Exception("CompetitionId is invalid");
+            }
+
+            if (request.HostRanchId <= 0)
+            {
+                throw new Exception("HostRanchId is invalid");
+            }
+
+            if (request.OffsetDays <= 0)
+            {
+                throw new ValidationException("מספר ימי הדחייה חייב להיות גדול מאפס.");
+            }
+
+            CompetitionDAL dal = new CompetitionDAL();
+            RescheduleCompetitionResponse response = dal.RescheduleCompetition(request.CompetitionId, request.OffsetDays);
+            response.Message = "התחרות וכל מועדי השירותים שלה נדחו בהצלחה.";
+
+            return response;
+        }
+
         private static void ValidateCompetitionRequest(
             string competitionName,
             byte fieldId,

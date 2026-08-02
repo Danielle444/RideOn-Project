@@ -19,6 +19,36 @@
 -- Returns: new stallbookingid.
 --
 -- Ownership: secretary of the competition's host ranch.
+--
+-- REVIEW-GATE CORRECTION (2026-08-02): added pg_advisory_xact_lock(1735,
+-- p_horseid) for a horse booking (skipped for tack) before the INSERT --
+-- one of five confirmed writers of stallbooking.startdate/enddate/horseid
+-- that must share this lock convention so a concurrent competition
+-- reschedule cannot race this procedure for the same horse. See
+-- 187_usp_RescheduleCompetition.sql's header for the full audit.
+--
+-- REVIEW-GATE CORRECTION (2026-08-02, owner decision): added a horse-overlap
+-- validation, using the EXACT predicate already verified in
+-- usp_createstallbooking (188) -- horse bookings only, excludes bookings
+-- superseded by an approved-and-not-cancelling change request. Runs
+-- immediately after the lock and before any read or write (competition
+-- lookup, secretary/payer checks, price lookup, bill, productrequest,
+-- billproductrequest, stallbooking, billcharge), so a rejected request
+-- leaves no partial financial rows. Closes the SEQUENTIAL (non-concurrent)
+-- double-booking gap noted in the prior review-gate pass. Tack bookings are
+-- unaffected -- gated by the same NOT COALESCE(p_isfortack, FALSE)
+-- condition already used for the lock.
+--
+-- REVIEW-GATE CORRECTION (2026-08-03, owner decision): the overlap check was
+-- previously scoped to a same-competition-only `pr.competitionid = ...`
+-- filter, which let the same horse hold overlapping bookings across two
+-- DIFFERENT competitions -- a state usp_reschedulecompetition (187) would
+-- then refuse to move, since 187's own overlap rule was always
+-- cross-competition. A horse cannot physically occupy two stalls at once
+-- regardless of which competition either booking belongs to, so the
+-- competition-id restriction is removed here; the check is now GLOBAL by
+-- horseid across all competitions. See 187's header for the full
+-- cross-competition consistency note.
 -- ============================================================================
 
 DROP FUNCTION IF EXISTS public.usp_secretarycreatestallbookingforpayer(
@@ -54,6 +84,40 @@ BEGIN
 
     IF NOT p_isfortack AND p_horseid IS NULL THEN
         RAISE EXCEPTION 'Horse is required for a non-tack stall booking';
+    END IF;
+
+    IF NOT COALESCE(p_isfortack, FALSE) THEN
+        PERFORM pg_advisory_xact_lock(1735, p_horseid);
+    END IF;
+
+    -- Reject an overlapping horse booking BEFORE any read or write below.
+    -- Exact predicate family verified in usp_createstallbooking (188):
+    -- GLOBAL across all competitions, same horse, horse bookings only,
+    -- excludes bookings superseded by an approved-and-not-cancelling change
+    -- request. Tack bookings skip this entirely.
+    IF NOT COALESCE(p_isfortack, FALSE) THEN
+        IF EXISTS (
+            SELECT 1
+            FROM public.stallbooking sb
+            INNER JOIN public.productrequest pr
+                ON pr.prequestid = sb.stallbookingid
+            LEFT JOIN public.productchangerequest pcr
+                ON pcr.originalprequestid = pr.prequestid
+               AND pcr.status = 'Approved'
+            WHERE sb.horseid = p_horseid
+              AND sb.isfortack = false
+              AND (
+                    pcr.productchangerequestid IS NULL
+                    OR (
+                        pcr.iscancelled = false
+                        AND pcr.newprequestid IS NULL
+                    )
+                  )
+              AND daterange(sb.startdate, sb.enddate, '[]')
+                  && daterange(p_startdate, p_enddate, '[]')
+        ) THEN
+            RAISE EXCEPTION 'An active overlapping stall booking already exists for this horse';
+        END IF;
     END IF;
 
     -- Competition + host ranch

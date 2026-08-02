@@ -3,6 +3,7 @@ import {
   createCompetition,
   getCompetitionById,
   updateCompetition,
+  rescheduleCompetition,
 } from "../../services/competitionService";
 import {
   getAllFields,
@@ -29,6 +30,20 @@ export default function useCompetitionDetailsStep(options) {
 
   var [loadingPage, setLoadingPage] = useState(false);
   var [savingDetails, setSavingDetails] = useState(false);
+  var [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  var [savingReschedule, setSavingReschedule] = useState(false);
+
+  // Persisted (server-confirmed) competition dates, kept SEPARATE from
+  // detailsForm.competitionStartDate/competitionEndDate. detailsForm is form
+  // state — even though those two fields are now rendered read-only for an
+  // existing competition, the state itself is still nominally editable, and
+  // the reschedule preview must never be able to anchor on anything but the
+  // last value the server actually returned. Only loadExistingCompetition
+  // (below) is allowed to set these.
+  var [persistedCompetitionStartDate, setPersistedCompetitionStartDate] =
+    useState("");
+  var [persistedCompetitionEndDate, setPersistedCompetitionEndDate] =
+    useState("");
 
   var [fields, setFields] = useState([]);
   var [arenas, setArenas] = useState([]);
@@ -58,6 +73,15 @@ export default function useCompetitionDetailsStep(options) {
     notes: "",
   });
 
+  // Re-runs on either a ranch change OR a route competition-id change, so
+  // navigating from /competitions/{id1}/edit to /competitions/{id2}/edit
+  // without a remount (React Router reuses the same component instance
+  // across param-only navigations on the same route) still reloads
+  // everything for id2 through the one existing path below —
+  // loadInitialData always re-fetches the ranch-scoped lookups too, which
+  // is a harmless redundant call when only the competition id changed, not
+  // a second fetch mechanism. competitionIdFromRoute is a plain prop this
+  // hook never writes to, so this cannot create a loop.
   useEffect(
     function () {
       if (!currentRanchId) {
@@ -66,7 +90,7 @@ export default function useCompetitionDetailsStep(options) {
 
       loadInitialData();
     },
-    [currentRanchId],
+    [currentRanchId, competitionIdFromRoute],
   );
 
   useEffect(
@@ -150,6 +174,12 @@ export default function useCompetitionDetailsStep(options) {
 
       setCompetitionId(competition.competitionId);
       setCurrentStatus(competition.competitionStatus || "טיוטה");
+      setPersistedCompetitionStartDate(
+        toInputDate(competition.competitionStartDate),
+      );
+      setPersistedCompetitionEndDate(
+        toInputDate(competition.competitionEndDate),
+      );
 
       setDetailsForm({
         competitionName: competition.competitionName || "",
@@ -317,6 +347,66 @@ export default function useCompetitionDetailsStep(options) {
     }
   }
 
+  // Postponing a competition is a separate, explicit business operation from
+  // the ordinary "save details" flow above — it is never triggered by
+  // editing competitionStartDate/competitionEndDate in the form. It calls
+  // its own dedicated endpoint (POST /Competitions/{id}/reschedule), and on
+  // success reloads the competition the same way saveDetails does, so every
+  // shifted date (including the two shown on this page) reflects the new,
+  // server-confirmed state rather than being guessed at client-side.
+  function openRescheduleModal() {
+    if (!competitionId) {
+      return;
+    }
+
+    setRescheduleModalOpen(true);
+  }
+
+  function closeRescheduleModal() {
+    if (savingReschedule) {
+      return;
+    }
+
+    setRescheduleModalOpen(false);
+  }
+
+  async function handleReschedule(offsetDays) {
+    if (savingReschedule || !competitionId || !currentRanchId) {
+      return;
+    }
+
+    try {
+      setSavingReschedule(true);
+
+      var response = await rescheduleCompetition(competitionId, {
+        competitionId: competitionId,
+        hostRanchId: currentRanchId,
+        offsetDays: offsetDays,
+      });
+
+      var successMessage =
+        response.data?.message ||
+        response.data?.Message ||
+        "התחרות וכל מועדי השירותים שלה נדחו בהצלחה.";
+
+      setRescheduleModalOpen(false);
+      onShowToast("success", successMessage);
+
+      await loadExistingCompetition(competitionId, currentRanchId);
+    } catch (error) {
+      console.error(error);
+      onShowToast(
+        "error",
+        getErrorMessage(
+          error,
+          "אירעה שגיאה בדחיית התחרות. לא בוצעו שינויים.",
+        ),
+      );
+    } finally {
+      setSavingReschedule(false);
+    }
+  }
+
   return {
     loadingPage,
     savingDetails,
@@ -330,6 +420,8 @@ export default function useCompetitionDetailsStep(options) {
     competitionId,
     currentStatus,
     detailsForm,
+    persistedCompetitionStartDate,
+    persistedCompetitionEndDate,
     selectedCompetitionJudgeIds,
     setSelectedCompetitionJudgeIds,
     setCompetitionId,
@@ -339,5 +431,10 @@ export default function useCompetitionDetailsStep(options) {
     setJudgesManually,
     loadExistingCompetition,
     saveDetails,
+    rescheduleModalOpen,
+    savingReschedule,
+    openRescheduleModal,
+    closeRescheduleModal,
+    handleReschedule,
   };
 }

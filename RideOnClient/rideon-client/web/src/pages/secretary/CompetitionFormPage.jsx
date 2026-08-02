@@ -6,6 +6,7 @@ import CompetitionClassesStep from "../../components/secretary/competition-form/
 import CompetitionPaidTimeStep from "../../components/secretary/competition-form/CompetitionPaidTimeStep";
 import CompetitionFormHeader from "../../components/secretary/competition-form/CompetitionFormHeader";
 import DuplicateCompetitionSetupSection from "../../components/secretary/competition-form/DuplicateCompetitionSetupSection";
+import RescheduleCompetitionModal from "../../components/secretary/competition-form/RescheduleCompetitionModal";
 import ClassInCompetitionModal from "../../components/secretary/ClassInCompetitionModal";
 import PaidTimeSlotInCompetitionModal from "../../components/secretary/PaidTimeSlotInCompetitionModal";
 import { useUser } from "../../context/UserContext";
@@ -160,6 +161,7 @@ export default function CompetitionFormPage(props) {
               onSaveAndContinue={function () {
                 page.handleSaveDetails("continue");
               }}
+              onOpenReschedule={page.openRescheduleModal}
             />
 
             <CompetitionClassesStep
@@ -257,6 +259,15 @@ export default function CompetitionFormPage(props) {
         competitionEndDate={page.detailsForm.competitionEndDate}
         error={page.paidTimeModalError}
         saving={page.savingPaidTime}
+      />
+
+      <RescheduleCompetitionModal
+        isOpen={page.rescheduleModalOpen}
+        onClose={page.closeRescheduleModal}
+        onConfirm={page.handleReschedule}
+        saving={page.savingReschedule}
+        competitionStartDate={page.persistedCompetitionStartDate}
+        competitionEndDate={page.persistedCompetitionEndDate}
       />
 
       <ToastMessage

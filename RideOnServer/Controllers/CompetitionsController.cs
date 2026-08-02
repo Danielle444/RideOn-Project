@@ -248,6 +248,24 @@ namespace RideOnServer.Controllers
                     return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לערוך תחרות זו");
                 }
 
+                // Ordinary edits must not be able to move an EXISTING competition's
+                // dates — that would silently desynchronize classes/paid-time/stall
+                // bookings/shavings from the competition row, bypassing the atomic
+                // reschedule operation. usp_UpdateCompetition itself has no such
+                // guard (it is a plain column UPDATE), so this must be enforced
+                // here, before the BL/DAL call, using the already-fetched
+                // persisted row as the source of truth. Name/field/notes/status
+                // and the manually-managed registration/paid-time admin dates are
+                // untouched by this check and continue through unchanged.
+                if (existingCompetition.CompetitionStartDate.Date != request.CompetitionStartDate.Date ||
+                    existingCompetition.CompetitionEndDate.Date != request.CompetitionEndDate.Date)
+                {
+                    return StatusCode(
+                        StatusCodes.Status409Conflict,
+                        "לא ניתן לשנות תאריכי תחרות קיימת דרך העריכה הרגילה. יש להשתמש בפעולת דחיית התחרות."
+                    );
+                }
+
                 Competition.UpdateCompetition(request);
 
                 return Ok("Competition updated successfully");
@@ -260,6 +278,69 @@ namespace RideOnServer.Controllers
             {
                 Console.WriteLine($"Error in UpdateCompetition: {ex.Message}");
                 return BadRequest("אירעה שגיאה בעדכון תחרות");
+            }
+        }
+
+        // Dedicated reschedule endpoint — deliberately NOT folded into
+        // UpdateCompetition. Rescheduling is a multi-table atomic business
+        // operation (competition + classes + paid-time + stall bookings +
+        // undelivered shavings), not a plain field edit, and needs its own
+        // failure-mapping (409 for expected business conflicts) that
+        // UpdateCompetition's callers do not expect.
+        [HttpPost("{competitionId}/reschedule")]
+        public IActionResult RescheduleCompetition(int competitionId, [FromBody] RescheduleCompetitionRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                if (competitionId != request.CompetitionId)
+                {
+                    return BadRequest("CompetitionId in URL does not match body");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.HostRanchId,
+                    RoleNames.HostSecretary
+                );
+
+                Competition? existingCompetition = Competition.GetCompetitionById(request.CompetitionId);
+
+                if (existingCompetition == null)
+                {
+                    return NotFound("Competition not found");
+                }
+
+                if (existingCompetition.HostRanchId != request.HostRanchId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לדחות תחרות זו");
+                }
+
+                RescheduleCompetitionResponse response = Competition.RescheduleCompetition(request);
+
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Expected business-rule failure (already started, invalid
+                // offset, pending requests, out-of-range schedule, stall
+                // overlap) — an actionable conflict, not a server error.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in RescheduleCompetition: {ex.Message}");
+                return BadRequest("אירעה שגיאה בדחיית התחרות. לא בוצעו שינויים.");
             }
         }
 
