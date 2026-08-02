@@ -530,7 +530,8 @@ export default function useCompetitionPaidTimePage(options) {
   }
 
   function handleDragStart(event) {
-    var request = event.active.data.current?.request;
+    var dragData = event.active.data.current || {};
+    var request = dragData.request || dragData.assignment;
 
     if (request) {
       setActiveRequest(request);
@@ -538,12 +539,28 @@ export default function useCompetitionPaidTimePage(options) {
   }
 
   async function handleDragEnd(event) {
-    var request = event.active.data.current?.request;
+    var dragData = event.active.data.current || {};
+    var request = dragData.request || dragData.assignment;
+    var sourceTimeCell = dragData.sourceTimeCell || null;
     var timeCell = event.over?.data.current?.timeCell;
 
     setActiveRequest(null);
 
     if (!request || !timeCell) {
+      return;
+    }
+
+    if (
+      sourceTimeCell &&
+      sourceTimeCell.slotId === timeCell.slotId &&
+      sourceTimeCell.assignedOrder === timeCell.assignedOrder
+    ) {
+      return;
+    }
+
+    // Reposition-to-empty only: a real swap onto an occupied slot isn't wired (the
+    // assign SP just refuses it), so a reposition drag never targets an occupied cell.
+    if (timeCell.assignment) {
       return;
     }
 
@@ -555,6 +572,26 @@ export default function useCompetitionPaidTimePage(options) {
   }
 
   async function handleAssignRequest(requestId, slotId, order) {
+    var previousRequests = requests;
+
+    setRequests(
+      previousRequests.map(function (request) {
+        if (getRequestId(request) !== requestId) {
+          return request;
+        }
+
+        return {
+          ...request,
+          status: "Assigned",
+          Status: "Assigned",
+          assignedCompSlotId: slotId,
+          AssignedCompSlotId: slotId,
+          assignedOrder: order,
+          AssignedOrder: order,
+        };
+      }),
+    );
+
     try {
       await assignPaidTimeRequest({
         ranchId,
@@ -568,6 +605,8 @@ export default function useCompetitionPaidTimePage(options) {
 
       onShowToast?.("success", "שובץ בהצלחה");
     } catch (err) {
+      setRequests(previousRequests);
+
       // The server returns the controlled Hebrew validation message raised by
       // the assign SP or by the slot re-sequencing SP it calls. Without this
       // catch the drop was rejected silently: dnd-kit does not await onDragEnd,

@@ -158,12 +158,12 @@ export default function PaidTimeRequestCard({ request, disabled }) {
       draggingClassName="border-[#795548] bg-[#F5EDE8] shadow-xl opacity-90 z-50"
     >
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-sm font-bold text-[#3F312B]">{horseName}</p>
-          <p className="text-xs text-[#7A655C]">רוכב/ת: {riderName}</p>
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <p className="truncate text-sm font-bold text-[#3F312B]">{horseName}</p>
+          <p className="truncate text-xs text-[#7A655C]">רוכב/ת: {riderName}</p>
         </div>
 
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex shrink-0 flex-col items-end gap-1">
           <span className="rounded-full bg-[#F5EDE8] px-2 py-1 text-[11px] font-semibold text-[#7B5A4D]">
             {getPaidTimeType(productName)}
           </span>
@@ -175,9 +175,9 @@ export default function PaidTimeRequestCard({ request, disabled }) {
         </div>
       </div>
 
-      <div className="mt-2 space-y-1 text-xs text-[#7A655C]">
-        <p>מאמן/ת: {coachName || "לא צוין"}</p>
-        <p>משלם: {payerName}</p>
+      <div className="mt-2 min-w-0 space-y-1 text-xs text-[#7A655C]">
+        <p className="truncate">מאמן/ת: {coachName || "לא צוין"}</p>
+        <p className="truncate">משלם: {payerName}</p>
       </div>
 
       <div className="mt-2 rounded-xl bg-[#F8F5F2] px-2 py-1.5 text-xs text-[#6B574F]">

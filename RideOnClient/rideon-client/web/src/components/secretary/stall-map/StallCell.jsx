@@ -1,5 +1,6 @@
 import { DoorOpen, Package, X } from "lucide-react";
 import DroppableBox from "../../common/dnd/DroppableBox";
+import DraggableItem from "../../common/dnd/DraggableItem";
 
 function getAssignmentTitle(assignment) {
   if (!assignment) return "";
@@ -51,7 +52,12 @@ export default function StallCell({ cell, assignment, onUnassign }) {
 
       {isOccupied ? (
         <>
-          <div className="mt-2 flex max-w-full flex-col items-center leading-tight">
+          <DraggableItem
+            id={`stall-cell-booking-${assignment.stallBookingId}`}
+            data={{ assignment: assignment, sourceCell: cell }}
+            className="mt-2 flex max-w-full cursor-grab flex-col items-center leading-tight active:cursor-grabbing"
+            draggingClassName="opacity-40"
+          >
             <span className="mb-0.5 flex items-center gap-1 text-[8px] text-[#7B5A4D]">
               {assignment.isForTack ? (
                 <Package size={9} />
@@ -67,7 +73,7 @@ export default function StallCell({ cell, assignment, onUnassign }) {
             <span className="mt-0.5 max-w-full truncate text-center text-[8px] font-semibold text-[#7B5A4D]">
               {getAssignmentTitle(assignment)}
             </span>
-          </div>
+          </DraggableItem>
 
           <button
             type="button"
