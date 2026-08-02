@@ -357,7 +357,12 @@ namespace RideOnServer.Controllers
                     return StatusCode(403, "אין לך הרשאה לאשר תעודות בתחרות זו");
                 }
 
-                HorseParticipationInCompetition.ApproveHealthCertificate(request, currentPersonId);
+                bool approved = HorseParticipationInCompetition.ApproveHealthCertificate(request, currentPersonId);
+
+                if (!approved)
+                {
+                    return StatusCode(409, "לא ניתן לאשר את תעודת הבריאות: היא אינה קיימת, לא הועלה עבורה קובץ, או שאינה ממתינה לאישור.");
+                }
 
                 return Ok(new { message = "תעודת הבריאות אושרה בהצלחה" });
             }
