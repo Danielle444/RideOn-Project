@@ -27,7 +27,6 @@ import JudgesManagementPage from "../pages/superuser/JudgesManagementPage";
 import ReiningPatternsManagementPage from "../pages/superuser/ReiningPatternsManagementPage";
 import PrizesManagementPage from "../pages/superuser/PrizesManagementPage";
 import FinesManagementPage from "../pages/superuser/FinesManagementPage";
-import NotificationsManagementPage from "../pages/superuser/NotificationsManagementPage";
 import UnauthorizedPage from "../pages/shared/UnauthorizedPage";
 
 const SECRETARY_ROLE = "מזכירת חווה מארחת";
@@ -301,14 +300,6 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute requireSuperUser={true}>
         <FinesManagementPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/superuser/notifications",
-    element: (
-      <ProtectedRoute requireSuperUser={true}>
-        <NotificationsManagementPage />
       </ProtectedRoute>
     ),
   },

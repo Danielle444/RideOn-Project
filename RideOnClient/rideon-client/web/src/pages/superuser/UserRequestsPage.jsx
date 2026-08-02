@@ -5,6 +5,7 @@ import RequestsTabs from "../../components/superuser/RequestsTabs";
 import RequestsFiltersBar from "../../components/superuser/RequestsFiltersBar";
 import RequestsTable from "../../components/superuser/RequestsTable";
 import ConfirmDialog from "../../components/superuser/ConfirmDialog";
+import ToastMessage from "../../components/common/ToastMessage";
 import {
   getRoleRequests,
   getRanchRequests,
@@ -46,7 +47,21 @@ export default function UserRequestsPage() {
     onConfirm: null,
   });
 
+  const [toast, setToast] = useState({
+    isOpen: false,
+    type: "success",
+    message: "",
+  });
+
   const pageTitle = "ניהול בקשות משתמשים וחוות";
+
+  function showToast(type, message) {
+    setToast({ isOpen: true, type, message });
+  }
+
+  function closeToast() {
+    setToast({ isOpen: false, type: "success", message: "" });
+  }
 
   useEffect(
     function () {
@@ -99,7 +114,7 @@ export default function UserRequestsPage() {
       }
     } catch (err) {
       console.error("Failed loading requests:", err);
-      alert(err.response?.data || "שגיאה בטעינת הנתונים");
+      showToast("error", err.response?.data || "שגיאה בטעינת הנתונים");
       setRows([]);
     } finally {
       setLoading(false);
@@ -171,7 +186,7 @@ export default function UserRequestsPage() {
       await refreshAfterAction();
     } catch (err) {
       console.error("Approve failed:", err);
-      alert(err.response?.data || "שגיאה באישור הבקשה");
+      showToast("error", err.response?.data || "שגיאה באישור הבקשה");
     } finally {
       setActionLoadingKey("");
     }
@@ -206,7 +221,7 @@ export default function UserRequestsPage() {
       await refreshAfterAction();
     } catch (err) {
       console.error("Reject failed:", err);
-      alert(err.response?.data || "שגיאה בדחיית הבקשה");
+      showToast("error", err.response?.data || "שגיאה בדחיית הבקשה");
     } finally {
       setActionLoadingKey("");
     }
@@ -215,8 +230,8 @@ export default function UserRequestsPage() {
   function handleUndoApprove(item) {
     setConfirmDialog({
       isOpen: true,
-      title: "ביטול אישור בקשה",
-      message: "האם את בטוחה שברצונך לבטל את האישור של הבקשה?",
+      title: "החזרת בקשה לסטטוס ממתין",
+      message: "האם את בטוחה שברצונך להחזיר את הבקשה לסטטוס ממתין?",
       onConfirm: async function () {
         const rowKey = getRowKey(item);
 
@@ -226,14 +241,14 @@ export default function UserRequestsPage() {
           if (activeTab === "ranch") {
             await updateRanchRequestStatus({
               requestId: item.requestId,
-              newStatus: "Rejected",
+              newStatus: "Pending",
             });
           } else {
             await updateRoleRequestStatus({
               personId: item.personId,
               ranchId: item.ranchId,
               roleId: item.roleId,
-              roleStatus: "Rejected",
+              roleStatus: "Pending",
             });
           }
 
@@ -241,7 +256,7 @@ export default function UserRequestsPage() {
           await refreshAfterAction();
         } catch (err) {
           console.error("Undo approve failed:", err);
-          alert(err.response?.data || "שגיאה בביטול האישור");
+          showToast("error", err.response?.data || "שגיאה בביטול האישור");
         } finally {
           setActionLoadingKey("");
         }
@@ -278,7 +293,7 @@ export default function UserRequestsPage() {
           await refreshAfterAction();
         } catch (err) {
           console.error("Approve rejected request failed:", err);
-          alert(err.response?.data || "שגיאה באישור מחדש של הבקשה");
+          showToast("error", err.response?.data || "שגיאה באישור מחדש של הבקשה");
         } finally {
           setActionLoadingKey("");
         }
@@ -299,7 +314,7 @@ export default function UserRequestsPage() {
     <SuperUserLayout activeItemKey="requests">
       <div className="bg-white rounded-[26px] shadow-sm border border-[#E6DCD5] overflow-hidden">
         <div className="px-8 pt-8 pb-6">
-          <h1 className="text-[2rem] font-bold text-[#3F312B] text-center">
+          <h1 className="text-[2rem] font-bold text-[#3F312B]">
             {pageTitle}
           </h1>
 
@@ -341,6 +356,13 @@ export default function UserRequestsPage() {
         message={confirmDialog.message}
         onCancel={closeConfirmDialog}
         onConfirm={confirmDialog.onConfirm}
+      />
+
+      <ToastMessage
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
       />
     </SuperUserLayout>
   );
