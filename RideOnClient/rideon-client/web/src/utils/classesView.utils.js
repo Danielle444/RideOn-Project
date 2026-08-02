@@ -114,7 +114,6 @@ var COLUMN_VIEWS = {
 
   organizerCost: [CLASSES_VIEW_FINANCIAL],
   federationCost: [CLASSES_VIEW_FINANCIAL],
-  totalCost: [CLASSES_VIEW_FINANCIAL],
   prizes: [CLASSES_VIEW_FINANCIAL],
 
   status: PLANNING_AND_ACTUALS,

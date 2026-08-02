@@ -416,6 +416,7 @@ export default function DuplicateCompetitionSetupSection(props) {
 
   var judgeCreation = useJudgeCreation({
     fieldId: formData.fieldId,
+    onShowToast: props.onShowToast,
     onJudgesUpdated: function (refreshedJudges) {
       setFieldJudges(Array.isArray(refreshedJudges) ? refreshedJudges : []);
     },
@@ -1651,6 +1652,7 @@ export default function DuplicateCompetitionSetupSection(props) {
         initialJudge={null}
         fields={judgeCreation.judgeFields}
         error={judgeCreation.judgeModalError}
+        onShowToast={props.onShowToast}
       />
     </SectionCard>
   );
