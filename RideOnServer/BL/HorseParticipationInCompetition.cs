@@ -75,13 +75,17 @@ namespace RideOnServer.BL
             dal.SaveHealthCertificate(request.HorseId, request.CompetitionId, request.HcPath, DateTime.UtcNow);
         }
 
-        public static void ApproveHealthCertificate(ApproveHealthCertificateRequest request, int approverSystemUserId)
+        // Returns true only when the certificate was actually eligible and got
+        // approved (see HorseDAL.ApproveHealthCertificate / repo file 186). No
+        // eligibility logic is duplicated here - the stored procedure is the sole
+        // source of truth for what counts as an approvable row.
+        public static bool ApproveHealthCertificate(ApproveHealthCertificateRequest request, int approverSystemUserId)
         {
             if (request.HorseId <= 0 || request.CompetitionId <= 0)
                 throw new ArgumentException("מזהה סוס או תחרות לא תקין");
 
             HorseDAL dal = new HorseDAL();
-            dal.ApproveHealthCertificate(request.HorseId, request.CompetitionId, approverSystemUserId);
+            return dal.ApproveHealthCertificate(request.HorseId, request.CompetitionId, approverSystemUserId);
         }
     }
 }

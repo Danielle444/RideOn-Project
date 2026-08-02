@@ -344,7 +344,13 @@ namespace RideOnServer.DAL
             }
         }
 
-        public void ApproveHealthCertificate(int horseId, int competitionId, int approverSystemUserId)
+        // Returns true only when usp_ApproveHealthCertificate actually updated one
+        // eligible row (exact horse/competition match, status Pending, hcpath set
+        // and non-blank) - see repo file 186. The four-entry dictionary order below
+        // is the positional contract with the stored procedure's parameter order
+        // (HorseId, CompetitionId, HcApproverSystemUserId, HcApprovalDate) and must
+        // not change without changing the procedure to match.
+        public bool ApproveHealthCertificate(int horseId, int competitionId, int approverSystemUserId)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
@@ -365,7 +371,19 @@ namespace RideOnServer.DAL
                         connection,
                         paramDic))
                     {
-                        command.ExecuteNonQuery();
+                        object? result = command.ExecuteScalar();
+
+                        if (result == null || result == DBNull.Value)
+                        {
+                            return false;
+                        }
+
+                        if (result is bool approved)
+                        {
+                            return approved;
+                        }
+
+                        return false;
                     }
                 }
             }
