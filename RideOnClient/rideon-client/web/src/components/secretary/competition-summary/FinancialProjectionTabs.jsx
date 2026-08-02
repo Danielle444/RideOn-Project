@@ -1,9 +1,4 @@
-import { useState } from "react";
-
 import { FINANCIAL_PROJECTION_COPY } from "./financialProjectionCopy";
-import FinancialProjectionPanel from "./FinancialProjectionPanel";
-import FinancialActualPanel from "./FinancialActualPanel";
-import FinancialComparisonPanel from "./FinancialComparisonPanel";
 
 var TAB_PROJECTION = "projection";
 var TAB_ACTUAL = "actual";
@@ -27,6 +22,9 @@ function getTabClass(isActive, isAvailable) {
   return "border-[#E2D5CE] bg-white text-[#6B574F] hover:bg-[#FAF5F1]";
 }
 
+// Controlled tab strip -- mirrors SecretaryClassesViewTabs. The page owns the active view and
+// the guard against landing on an unavailable view; this component only renders the strip and
+// reports clicks back via onChangeView.
 export default function FinancialProjectionTabs(props) {
   var copy = FINANCIAL_PROJECTION_COPY;
 
@@ -38,30 +36,12 @@ export default function FinancialProjectionTabs(props) {
     comparison: !!props.registrationClosed && !!props.hasActualData,
   };
 
-  var defaultTab = availability.actual ? TAB_ACTUAL : TAB_PROJECTION;
-  var [activeTab, setActiveTab] = useState(defaultTab);
-
-  // Guard against landing on a tab that is not available (e.g. state changed under us).
-  var effectiveTab = availability[activeTab] ? activeTab : TAB_PROJECTION;
-
-  function renderPanel() {
-    if (effectiveTab === TAB_ACTUAL) {
-      return <FinancialActualPanel actual={props.actual} />;
-    }
-
-    if (effectiveTab === TAB_COMPARISON) {
-      return <FinancialComparisonPanel actual={props.actual} />;
-    }
-
-    return <FinancialProjectionPanel projection={props.projection} />;
-  }
-
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap gap-2" role="tablist">
         {TAB_ORDER.map(function (tabKey) {
           var tabCopy = copy.tabs[tabKey];
-          var isActive = effectiveTab === tabKey;
+          var isActive = props.activeView === tabKey;
           var isAvailable = availability[tabKey];
           var hint = isAvailable ? tabCopy.hint : tabCopy.unavailableHint;
 
@@ -73,8 +53,8 @@ export default function FinancialProjectionTabs(props) {
               aria-selected={isActive}
               aria-disabled={!isAvailable}
               onClick={function () {
-                if (isAvailable) {
-                  setActiveTab(tabKey);
+                if (isAvailable && props.onChangeView) {
+                  props.onChangeView(tabKey);
                 }
               }}
               className={
@@ -92,8 +72,8 @@ export default function FinancialProjectionTabs(props) {
           );
         })}
       </div>
-
-      {renderPanel()}
     </section>
   );
 }
+
+export { TAB_PROJECTION, TAB_ACTUAL, TAB_COMPARISON };

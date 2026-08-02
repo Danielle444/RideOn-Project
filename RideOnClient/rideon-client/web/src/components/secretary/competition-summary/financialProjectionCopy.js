@@ -100,6 +100,11 @@ var FINANCIAL_PROJECTION_COPY = {
   noPredictions:
     "עדיין אין חיזוי כניסות למקצי תחרות זו, ולכן לא ניתן להציג תחזית הכנסות.",
 
+  // Pointer line shown under the projection cards once actuals exist, directing the secretary to
+  // the בפועל tab instead of leaving a full actuals table on this view. Approved by Oren.
+  projectionActualsPointer:
+    'נסגרה ההרשמה — נתוני אמת זמינים בלשונית "בפועל".',
+
   // Tab 2 (actual). Entry income is computed from real Active entries; stall/shavings actuals
   // come from real bookings and are not wired yet -- stated, not faked.
   actualTitle: "הכנסות בפועל",
@@ -113,9 +118,9 @@ var FINANCIAL_PROJECTION_COPY = {
   // competition -- the same distinction the planned-vs-actual entries panel makes.
   comparisonTitle: "תחזית מול בפועל",
   comparisonUnavailable: "התצוגה תהיה זמינה כשיצטברו נתוני הרשמה בפועל.",
-  comparisonWithinBand: "ההכנסה בפועל בתוך טווח התחזית",
-  comparisonBelowBand: "ההכנסה בפועל מתחת לטווח התחזית",
-  comparisonAboveBand: "ההכנסה בפועל מעל טווח התחזית",
+  comparisonWithinBand: "תחזית ההכנסות התאמתה",
+  comparisonBelowBand: "תחזית ההכנסות הייתה גבוהה מדי",
+  comparisonAboveBand: "תחזית ההכנסות הייתה נמוכה מדי",
   comparisonLine: function (actual, lo, hi) {
     return (
       "הכנסה ממקצים בפועל " + actual + " מול תחזית של " + lo + " עד " + hi

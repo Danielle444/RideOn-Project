@@ -2,19 +2,30 @@ import { FINANCIAL_PROJECTION_COPY } from "./financialProjectionCopy";
 import { formatMoney } from "./financialFormat";
 
 // Tab 3 -- reliability scorecard. Judges the FORECAST, not the competition: an actual income
-// below the projected band means the entry forecast ran high, which is a modelling fact, not a
-// marketing failure. Only the entry income band is compared (the one with both a projection and
-// a real actual today); stall/shavings comparison follows once booking actuals are wired.
+// outside the projected band means the entry forecast was biased, which is a modelling fact, not
+// a marketing failure. Colors mirror PlannedVsActualPanel's forecast-reliability framing: on-target
+// is green, a biased forecast (either direction) is amber -- there is no red state. Only the entry
+// income band is compared (the one with both a projection and a real actual today); stall/shavings
+// comparison follows once booking actuals are wired.
 function verdictLabel(actual, lo, hi, copy) {
   if (actual < Math.floor(lo)) {
-    return { text: copy.comparisonBelowBand, color: "text-[#C62828]" };
+    return {
+      text: copy.comparisonBelowBand,
+      cardClass: "border-[#EFDCA8] bg-[#FDF8E8] text-[#7A6320]",
+    };
   }
 
   if (actual > Math.ceil(hi)) {
-    return { text: copy.comparisonAboveBand, color: "text-[#2E7D32]" };
+    return {
+      text: copy.comparisonAboveBand,
+      cardClass: "border-[#EFDCA8] bg-[#FDF8E8] text-[#7A6320]",
+    };
   }
 
-  return { text: copy.comparisonWithinBand, color: "text-[#6D4C41]" };
+  return {
+    text: copy.comparisonWithinBand,
+    cardClass: "border-[#CBE3D1] bg-[#F2FAF4] text-[#2F6B3B]",
+  };
 }
 
 export default function FinancialComparisonPanel(props) {
@@ -40,9 +51,13 @@ export default function FinancialComparisonPanel(props) {
     <div className="space-y-4">
       <h3 className="text-lg font-bold text-[#3F312B]">{copy.comparisonTitle}</h3>
 
-      <div className="rounded-2xl border border-[#E3D7D0] bg-white px-6 py-5 text-right shadow-sm">
-        <p className={"text-lg font-black " + verdict.color}>{verdict.text}</p>
-        <p className="mt-2 text-sm text-[#6D4C41]">
+      <div
+        className={
+          "rounded-2xl border px-6 py-5 text-right shadow-sm " + verdict.cardClass
+        }
+      >
+        <p className="text-lg font-black">{verdict.text}</p>
+        <p className="mt-2 text-sm leading-relaxed">
           {copy.comparisonLine(
             formatMoney(actual.entryIncomeActual),
             formatMoney(actual.entryIncomePredictedLo),

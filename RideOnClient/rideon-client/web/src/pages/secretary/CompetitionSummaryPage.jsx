@@ -1,7 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import CompetitionSummarySection from "../../components/secretary/competition-summary/CompetitionSummarySection";
-import FinancialProjectionTabs from "../../components/secretary/competition-summary/FinancialProjectionTabs";
+import FinancialProjectionTabs, {
+  TAB_PROJECTION,
+  TAB_ACTUAL,
+  TAB_COMPARISON,
+} from "../../components/secretary/competition-summary/FinancialProjectionTabs";
+import FinancialProjectionPanel from "../../components/secretary/competition-summary/FinancialProjectionPanel";
+import FinancialComparisonPanel from "../../components/secretary/competition-summary/FinancialComparisonPanel";
+import { FINANCIAL_PROJECTION_COPY } from "../../components/secretary/competition-summary/financialProjectionCopy";
 import SummaryDetailsModal from "../../components/secretary/competition-summary/SummaryDetailsModal";
 import SummaryPaymentsBreakdownModal from "../../components/secretary/competition-summary/SummaryPaymentsBreakdownModal";
 import CashDeskModal from "../../components/secretary/competition-summary/CashDeskModal";
@@ -9,6 +16,10 @@ import { getCompetitionById } from "../../services/competitionService";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import useCompetitionSummaryPage from "../../hooks/secretary/useCompetitionSummaryPage";
 import FederationMatchingSuggestionsModal from "../../components/secretary/competition-summary/FederationMatchingSuggestionsModal";
+import {
+  resolveFinancialActiveView,
+  resolveEffectiveFinancialView,
+} from "../../utils/financialSummaryView.utils";
 
 function SummaryPageContent(props) {
   var layout = props.layout;
@@ -18,6 +29,61 @@ function SummaryPageContent(props) {
     competitionId: Number(layout.competitionId),
     ranchId: activeRole?.ranchId || null,
   });
+
+  // D5: land on Actual once registration is closed, else Prediction. financialRegistrationClosed
+  // is NOT known synchronously -- it derives from finCompetition, which useCompetitionSummaryPage
+  // fetches asynchronously and starts as null (isRegistrationClosed(null) is false), so a
+  // useState initializer here would always see "open" and could never resolve to Actual for a
+  // closed competition. resolveFinancialActiveView is re-run below every time registration-closed
+  // becomes known, is skipped once the secretary has picked a tab herself, and always re-resolves
+  // on a competition switch (mirrors resolveDefaultClassesView / hasChosenView on the classes page).
+  var [activeView, setActiveView] = useState(TAB_PROJECTION);
+  var [hasChosenView, setHasChosenView] = useState(false);
+  var lastCompetitionIdRef = useRef(layout.competitionId);
+
+  var hasActualData = page.financialActual
+    ? page.financialActual.hasActualData
+    : false;
+
+  var financialViewAvailability = {
+    projection: true,
+    actual: !!page.financialRegistrationClosed,
+    comparison: !!page.financialRegistrationClosed && !!hasActualData,
+  };
+
+  // Guard against landing on a view that is not available (e.g. state changed under us). The tab
+  // strip and the page body both key off this same value, never off the raw activeView.
+  var effectiveView = resolveEffectiveFinancialView(
+    activeView,
+    financialViewAvailability,
+  );
+
+  useEffect(
+    function () {
+      var resolution = resolveFinancialActiveView({
+        previousCompetitionId: lastCompetitionIdRef.current,
+        competitionId: layout.competitionId,
+        hasChosenView: hasChosenView,
+        currentActiveView: activeView,
+        registrationClosed: page.financialRegistrationClosed,
+      });
+
+      lastCompetitionIdRef.current = layout.competitionId;
+      setActiveView(resolution.activeView);
+      setHasChosenView(resolution.hasChosenView);
+    },
+    [
+      layout.competitionId,
+      page.financialRegistrationClosed,
+      hasChosenView,
+      activeView,
+    ],
+  );
+
+  function changeActiveView(nextView) {
+    setHasChosenView(true);
+    setActiveView(nextView);
+  }
 
   useEffect(
     function () {
@@ -81,54 +147,72 @@ function SummaryPageContent(props) {
       ) : null}
 
       {/* Phase 8 read-time income projection. Its tab format is borrowed from the classes
-          view, but it lives here on the summary page, where the money already lives. Renders
-          regardless of the summary's own loading state -- its data loads independently. */}
+          view, but it lives here on the summary page, where the money already lives. The tab
+          strip itself renders regardless of the summary's own loading state -- its data loads
+          independently. Each view now owns the full page body below (D1): Prediction and
+          Comparison never wait on the organizer/federation summary load; only Actual does. */}
       <FinancialProjectionTabs
-        projection={page.financialProjection}
-        actual={page.financialActual}
+        activeView={effectiveView}
+        onChangeView={changeActiveView}
         registrationClosed={page.financialRegistrationClosed}
-        hasActualData={
-          page.financialActual ? page.financialActual.hasActualData : false
-        }
+        hasActualData={hasActualData}
       />
 
-      {page.loading ? (
-        <div className="rounded-[28px] border border-[#E6DCD5] bg-white px-8 py-12 text-center text-[#7B5A4D] shadow-sm">
-          טוען סיכום תחרות...
-        </div>
-      ) : (
-        <>
-          <CompetitionSummarySection
-            title="מארגן"
-            description="הכנסות המארגן ממקצים, פייד־טיים, תאים ונסורת"
-            totals={page.summary.organizer}
-            categories={page.summary.organizerCategories}
-            actionType="cash"
-            onActionClick={page.openCashDetails}
-            onCategoryClick={page.openOrganizerCategoryDetails}
-            onPaidAmountClick={page.openOrganizerPaidBreakdown}
-          />
+      {effectiveView === TAB_PROJECTION ? (
+        <div className="space-y-4">
+          <FinancialProjectionPanel projection={page.financialProjection} />
 
-          <CompetitionSummarySection
-            title="התאחדות"
-            description="חלק ההתאחדות מתוך הרשמות המקצים"
-            totals={page.summary.federation}
-            categories={page.summary.federationCategories}
-            actionType="invoice"
-            actionLoading={page.federationInvoiceImporting}
-            actionError={page.federationInvoiceImportError}
-            actionSuccess={page.federationInvoiceImportSuccess}
-            invoiceImportResult={page.federationInvoiceImportResult}
-            showQuantity={true}
-            quantity={federationQuantity}
-            showCategoriesTable={false}
-            onInvoiceFileSelected={page.importFederationInvoices}
-            onSecondaryActionClick={page.openFederationMatchingModal}
-            secondaryActionLabel="התאמת קבלות"
-            onExpectedAmountClick={page.openFederationClassesDetails}
-          />
-        </>
-      )}
+          {hasActualData ? (
+            <p className="rounded-xl border border-[#EFE3DC] bg-[#FBF7F4] px-4 py-2 text-xs text-[#8D6E63]">
+              {FINANCIAL_PROJECTION_COPY.projectionActualsPointer}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {effectiveView === TAB_ACTUAL ? (
+        page.loading ? (
+          <div className="rounded-[28px] border border-[#E6DCD5] bg-white px-8 py-12 text-center text-[#7B5A4D] shadow-sm">
+            טוען סיכום תחרות...
+          </div>
+        ) : (
+          <>
+            <CompetitionSummarySection
+              title="מארגן"
+              description="הכנסות המארגן ממקצים, פייד־טיים, תאים ונסורת"
+              totals={page.summary.organizer}
+              categories={page.summary.organizerCategories}
+              actionType="cash"
+              onActionClick={page.openCashDetails}
+              onCategoryClick={page.openOrganizerCategoryDetails}
+              onPaidAmountClick={page.openOrganizerPaidBreakdown}
+            />
+
+            <CompetitionSummarySection
+              title="התאחדות"
+              description="חלק ההתאחדות מתוך הרשמות המקצים"
+              totals={page.summary.federation}
+              categories={page.summary.federationCategories}
+              actionType="invoice"
+              actionLoading={page.federationInvoiceImporting}
+              actionError={page.federationInvoiceImportError}
+              actionSuccess={page.federationInvoiceImportSuccess}
+              invoiceImportResult={page.federationInvoiceImportResult}
+              showQuantity={true}
+              quantity={federationQuantity}
+              showCategoriesTable={false}
+              onInvoiceFileSelected={page.importFederationInvoices}
+              onSecondaryActionClick={page.openFederationMatchingModal}
+              secondaryActionLabel="התאמת קבלות"
+              onExpectedAmountClick={page.openFederationClassesDetails}
+            />
+          </>
+        )
+      ) : null}
+
+      {effectiveView === TAB_COMPARISON ? (
+        <FinancialComparisonPanel actual={page.financialActual} />
+      ) : null}
 
       <SummaryDetailsModal
         modal={page.detailsModal}
