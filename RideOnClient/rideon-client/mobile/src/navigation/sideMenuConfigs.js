@@ -40,6 +40,12 @@ function getWorkerMenuItems() {
       screen: "WorkerCompetitionsBoard",
       icon: "trophy-outline",
     },
+    {
+      key: "profile",
+      label: "פרופיל",
+      screen: "WorkerProfile",
+      icon: "person-outline",
+    },
   ];
 }
 

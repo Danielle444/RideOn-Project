@@ -27,11 +27,13 @@ import { useCompetition } from "../../../context/CompetitionContext";
 import {
   getAdminBottomNavConfig,
   getPayerBottomNavConfig,
+  getWorkerBottomNavConfig,
 } from "../../../navigation/bottomNavConfigs";
 
 import {
   getAdminMenuItems,
   getPayerMenuItems,
+  getWorkerMenuItems,
 } from "../../../navigation/sideMenuConfigs";
 
 import { getAdminCompetitionMenuItems } from "../../../navigation/competitionMenuConfigs";
@@ -164,6 +166,7 @@ export default function CompetitionInvitationScreen(props) {
   var roleName = activeRole?.roleName || "";
   var isAdmin = roleName === "אדמין חווה";
   var isPayer = roleName === "משלם";
+  var isWorker = roleName === "עובד חווה";
 
   var classGroups = useMemo(
     function () {
@@ -260,6 +263,10 @@ export default function CompetitionInvitationScreen(props) {
       return getPayerBottomNavConfig(props.navigation);
     }
 
+    if (isWorker) {
+      return getWorkerBottomNavConfig(props.navigation);
+    }
+
     return [];
   }
 
@@ -270,6 +277,10 @@ export default function CompetitionInvitationScreen(props) {
 
     if (isPayer) {
       return getPayerMenuItems();
+    }
+
+    if (isWorker) {
+      return getWorkerMenuItems();
     }
 
     return [];

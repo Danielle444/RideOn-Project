@@ -12,6 +12,7 @@ import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLa
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
+import { useCompetition } from "../../../../context/CompetitionContext";
 import { getWorkerMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { getWorkerBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import homeScreenStyles from "../../../../styles/homeScreenStyles";
@@ -33,6 +34,7 @@ function sortAndTakeNearest(items) {
 export default function WorkerHomeScreen(props) {
   var userContext = useUser();
   var activeRoleContext = useActiveRole();
+  var competitionContext = useCompetition();
 
   var user = userContext.user;
   var activeRole = activeRoleContext.activeRole;
@@ -74,11 +76,6 @@ export default function WorkerHomeScreen(props) {
   }
 
   function handleMenuPress(item) {
-    if (item.screen === "WorkerProfile") {
-      Alert.alert("בהמשך", "מסך פרופיל העובד יחובר בהמשך");
-      return;
-    }
-
     props.navigation.navigate(item.screen);
   }
 
@@ -88,7 +85,10 @@ export default function WorkerHomeScreen(props) {
         key: "details",
         label: "פרטי תחרות",
         onPress: function () {
-          Alert.alert("בהמשך", "מסך פרטי תחרות יחובר בהמשך");
+          props.navigation.navigate("WorkerCompetitionDetails", {
+            competitionId: item.competitionId,
+            competitionName: item.competitionName,
+          });
         },
         disabled: false,
         variant: "secondary",
@@ -96,8 +96,18 @@ export default function WorkerHomeScreen(props) {
       {
         key: "enter",
         label: "כניסה",
-        onPress: function () {
-          Alert.alert("בהמשך", "כניסה לתחרות תחובר בהמשך");
+        onPress: async function () {
+          await competitionContext.setActiveCompetitionAndPersist({
+            competitionId: item.competitionId,
+            competitionName: item.competitionName,
+            competitionStatus: item.competitionStatus,
+            ranchId: activeRole.ranchId,
+          });
+
+          props.navigation.navigate("WorkerCompetitionShavingsOrders", {
+            competitionId: item.competitionId,
+            competitionName: item.competitionName,
+          });
         },
         disabled: !canWorkerEnterCompetition(item.competitionStatus),
         variant: "primary",
@@ -121,7 +131,7 @@ export default function WorkerHomeScreen(props) {
           label: "פרופיל",
           icon: "person-outline",
           onPress: function () {
-            Alert.alert("בהמשך", "מסך פרופיל העובד יחובר בהמשך");
+            props.navigation.navigate("WorkerProfile");
           },
         },
         {
@@ -201,7 +211,7 @@ export default function WorkerHomeScreen(props) {
           <Ionicons name="arrow-back-outline" size={24} color="#FFFFFF" />
           <View style={homeScreenStyles.quickButtonTextWrap}>
             <Text style={homeScreenStyles.quickButtonTitle}>
-              מעבר מהיר ללוח התחרויות
+              לוח התחרויות
             </Text>
             <Text style={homeScreenStyles.quickButtonSubtitle}>
               לצפייה בתחרויות הקרובות וכניסה לעבודה
