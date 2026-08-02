@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import SuperUserLayout from "../../components/superuser/SuperUserLayout";
 import SuperUsersTable from "../../components/superuser/SuperUsersTable";
 import CreateSuperUserModal from "../../components/superuser/CreateSuperUserModal";
+import ToastMessage from "../../components/common/ToastMessage";
 import {
   createSuperUser,
   getAllSuperUsers,
@@ -16,6 +17,20 @@ export default function SuperUsersManagementPage() {
   const [createErrorMessage, setCreateErrorMessage] = useState("");
   const [createSuccessMessage, setCreateSuccessMessage] = useState("");
 
+  const [toast, setToast] = useState({
+    isOpen: false,
+    type: "success",
+    message: "",
+  });
+
+  function showToast(type, message) {
+    setToast({ isOpen: true, type, message });
+  }
+
+  function closeToast() {
+    setToast({ isOpen: false, type: "success", message: "" });
+  }
+
   async function loadSuperUsers() {
     try {
       setLoading(true);
@@ -23,7 +38,7 @@ export default function SuperUsersManagementPage() {
       setRows(response.data || []);
     } catch (err) {
       console.error("Failed loading super users:", err);
-      alert(err.response?.data || "שגיאה בטעינת משתמשי המערכת");
+      showToast("error", err.response?.data || "שגיאה בטעינת משתמשי המערכת");
       setRows([]);
     } finally {
       setLoading(false);
@@ -109,6 +124,13 @@ export default function SuperUsersManagementPage() {
         loading={createLoading}
         errorMessage={createErrorMessage}
         successMessage={createSuccessMessage}
+      />
+
+      <ToastMessage
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
       />
     </SuperUserLayout>
   );

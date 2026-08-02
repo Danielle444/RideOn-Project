@@ -6,7 +6,6 @@ import {
   Gavel,
   Award,
   AlertTriangle,
-  Bell,
   Route,
 } from "lucide-react";
 
@@ -19,7 +18,6 @@ const superUserMenu = [
   { key: "reining-patterns", label: "מסלולי ריינינג", icon: Route },
   { key: "prizes", label: "פרסים", icon: Award },
   { key: "fines", label: "קנסות", icon: AlertTriangle },
-  { key: "notifications", label: "התראות", icon: Bell },
 ];
 
 export default superUserMenu;
