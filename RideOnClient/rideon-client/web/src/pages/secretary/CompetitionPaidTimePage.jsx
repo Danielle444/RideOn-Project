@@ -4,6 +4,8 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  closestCenter,
+  pointerWithin,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -79,6 +81,33 @@ function getPendingRequestsCount(slot) {
 
 function getCoachName(request) {
   return request.coachName || request.CoachName || "";
+}
+
+function getDragTitle(request) {
+  if (!request) return "";
+
+  return (
+    request.barnName ||
+    request.BarnName ||
+    request.horseName ||
+    request.HorseName ||
+    "בקשת פייד־טיים"
+  );
+}
+
+// Neither surface's DndContext set collisionDetection, so both fell back to dnd-kit's
+// default rectIntersection (scores by dragged-rectangle overlap area, not the cursor).
+// Paid-time's overlay used to blanket several slots and hide the target underneath it;
+// pointerWithin fixes that, with closestCenter as a fallback so gaps between slots don't
+// become dead zones.
+function paidTimeCollisionDetection(args) {
+  var pointerCollisions = pointerWithin(args);
+
+  if (pointerCollisions.length > 0) {
+    return pointerCollisions;
+  }
+
+  return closestCenter(args);
 }
 
 function formatDate(value) {
@@ -547,6 +576,7 @@ export default function CompetitionPaidTimePage() {
     return (
       <DndContext
         sensors={sensors}
+        collisionDetection={paidTimeCollisionDetection}
         onDragStart={page.handleDragStart}
         onDragEnd={page.handleDragEnd}
       >
@@ -694,11 +724,8 @@ export default function CompetitionPaidTimePage() {
 
         <DragOverlay>
           {page.activeRequest ? (
-            <div className="w-72">
-              <PaidTimeRequestCard
-                request={page.activeRequest}
-                disabled={false}
-              />
+            <div className="rounded-xl border-2 border-[#795548] bg-[#F5EDE8] px-3 py-2 text-sm font-semibold text-[#3F312B] shadow-xl">
+              {getDragTitle(page.activeRequest)}
             </div>
           ) : null}
         </DragOverlay>

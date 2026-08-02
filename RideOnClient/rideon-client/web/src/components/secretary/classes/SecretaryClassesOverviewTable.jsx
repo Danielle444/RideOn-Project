@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil, Trash2 } from "lucide-react";
 import DataTableShell from "../../common/table/DataTableShell";
 import DataTableEmptyState from "../../common/table/DataTableEmptyState";
 import DataTableLoadingState from "../../common/table/DataTableLoadingState";
@@ -177,12 +177,6 @@ function renderPlannedVsActualCell(comparison) {
   );
 }
 
-var SCHEDULE_VIEW_MODES = [
-  { key: "avg", label: "ממוצע" },
-  { key: "min", label: "מינימום" },
-  { key: "max", label: "מקסימום" },
-];
-
 export default function SecretaryClassesOverviewTable(props) {
   var items = Array.isArray(props.items) ? props.items : [];
   var [predictionViewMode, setPredictionViewMode] = useState("value");
@@ -238,10 +232,6 @@ export default function SecretaryClassesOverviewTable(props) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-[#3F312B]">מקצים בתחרות</h2>
-          <p className="text-xs text-[#8D6E63]">
-            לחצי על שם מקצה לצפייה בכניסות שלו, או על המס׳ לצפייה בכל המקצים
-            באותו מספר.
-          </p>
         </div>
       </div>
 
@@ -249,35 +239,7 @@ export default function SecretaryClassesOverviewTable(props) {
         <thead className="bg-[#FAF5F1] text-sm text-[#6B574F]">
           <tr>
             {showScheduleColumns ? (
-              <th className="px-4 py-3">
-                <div className="flex flex-col items-center gap-1">
-                  <span>{SCHEDULE_COPY.planning.columnHeader}</span>
-                  <div className="flex overflow-hidden rounded-full border border-[#E3D5CC] text-[10px]">
-                    {SCHEDULE_VIEW_MODES.map(function (mode) {
-                      return (
-                        <button
-                          key={mode.key}
-                          type="button"
-                          onClick={function () {
-                            if (props.onScheduleViewModeChange) {
-                              props.onScheduleViewModeChange(mode.key);
-                            }
-                          }}
-                          className={
-                            "px-2 py-0.5 transition-colors " +
-                            (props.scheduleViewMode === mode.key
-                              ? "bg-[#7B5A4D] text-white"
-                              : "bg-transparent text-[#7B5A4D]")
-                          }
-                          title="הצגת לוח הזמנים לפי משך ממוצע / מינימלי / מקסימלי למקצה"
-                        >
-                          {mode.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </th>
+              <th className="px-4 py-3">{SCHEDULE_COPY.planning.columnHeader}</th>
             ) : null}
 
             {showScheduleColumns ? (
@@ -524,6 +486,15 @@ export default function SecretaryClassesOverviewTable(props) {
 
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap justify-end gap-2">
+                        <TableActionButton
+                          icon={<Eye size={15} />}
+                          label="צפייה בכניסות"
+                          title="צפייה בכניסות של מקצה זה"
+                          onClick={function () {
+                            props.onOpenClassEntries(item);
+                          }}
+                        />
+
                         <TableActionButton
                           icon={<Pencil size={15} />}
                           iconOnly

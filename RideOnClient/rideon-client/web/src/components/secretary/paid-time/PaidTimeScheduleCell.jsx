@@ -1,5 +1,6 @@
 import { Info, X } from "lucide-react";
 import DroppableBox from "../../common/dnd/DroppableBox";
+import DraggableItem from "../../common/dnd/DraggableItem";
 
 export default function PaidTimeScheduleCell({
   timeCell,
@@ -61,7 +62,11 @@ export default function PaidTimeScheduleCell({
 
       {assignment ? (
         <div className="flex items-center justify-between gap-3">
-          <div>
+          <DraggableItem
+            id={"paid-time-cell-booking-" + requestId}
+            data={{ assignment: assignment, sourceTimeCell: timeCell }}
+            className="cursor-grab active:cursor-grabbing"
+          >
             <p className="text-sm font-bold text-[#3F312B]">{horseName}</p>
 
             <p className="text-xs text-[#7A655C]">
@@ -71,7 +76,7 @@ export default function PaidTimeScheduleCell({
             <p className="mt-0.5 text-xs font-medium text-[#7B5A4D]">
               מאמן/ת: {coachName || "לא צוין"}
             </p>
-          </div>
+          </DraggableItem>
 
           <button
             type="button"

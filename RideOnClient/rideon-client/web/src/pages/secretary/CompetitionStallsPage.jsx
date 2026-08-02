@@ -94,7 +94,8 @@ export default function CompetitionStallsPage() {
   );
 
   function handleDragStart(event) {
-    const item = event.active.data.current?.item;
+    const dragData = event.active.data.current || {};
+    const item = dragData.item || dragData.assignment;
 
     if (item) {
       setActiveItem(item);
@@ -104,10 +105,22 @@ export default function CompetitionStallsPage() {
   async function handleDragEnd(event) {
     setActiveItem(null);
 
-    const item = event.active.data.current?.item;
+    const dragData = event.active.data.current || {};
+    const item = dragData.item || dragData.assignment;
+    const sourceCell = dragData.sourceCell || null;
     const cell = event.over?.data.current?.cell;
 
     if (!item || !cell || !cell.stallId) return;
+
+    if (sourceCell && sourceCell.stallNumber === cell.stallNumber) return;
+
+    // Reposition-to-empty only: dropping onto an already-occupied stall would evict its
+    // occupant server-side (a real swap needs stored-procedure changes, out of scope here).
+    const isOccupiedTarget = page.activeAssignments.some(function (assignment) {
+      return assignment.stallNumber === cell.stallNumber;
+    });
+
+    if (isOccupiedTarget) return;
 
     await page.handleAssign(cell, item);
   }

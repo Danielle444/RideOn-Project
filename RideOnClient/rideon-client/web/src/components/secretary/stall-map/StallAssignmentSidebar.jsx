@@ -127,19 +127,32 @@ function BookingSection({ title, items }) {
 export default function StallAssignmentSidebar({ items }) {
   const sortedItems = sortItemsForAssignment(items || []);
 
-  const horseItems = sortedItems.filter(function (item) {
+  const unassignedItems = sortedItems.filter(function (item) {
+    return !item.isAssigned;
+  });
+
+  const assignedItems = sortedItems.filter(function (item) {
+    return item.isAssigned;
+  });
+
+  const unassignedHorseItems = unassignedItems.filter(function (item) {
     return !item.isForTack;
   });
 
-  const tackItems = sortedItems.filter(function (item) {
+  const unassignedTackItems = unassignedItems.filter(function (item) {
     return item.isForTack;
   });
 
-  const assignedCount = sortedItems.filter(function (item) {
-    return item.isAssigned;
-  }).length;
+  const assignedHorseItems = assignedItems.filter(function (item) {
+    return !item.isForTack;
+  });
 
-  const waitingCount = sortedItems.length - assignedCount;
+  const assignedTackItems = assignedItems.filter(function (item) {
+    return item.isForTack;
+  });
+
+  const waitingCount = unassignedItems.length;
+  const assignedCount = assignedItems.length;
 
   return (
     <div
@@ -155,8 +168,15 @@ export default function StallAssignmentSidebar({ items }) {
 
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-1 pb-2">
         <div className="flex min-w-0 flex-col gap-3">
-          <BookingSection title="סוסים" items={horseItems} />
-          <BookingSection title="תאי ציוד" items={tackItems} />
+          <BookingSection title="סוסים" items={unassignedHorseItems} />
+          <BookingSection title="תאי ציוד" items={unassignedTackItems} />
+
+          {unassignedItems.length > 0 && assignedItems.length > 0 ? (
+            <div className="border-t border-[#EFE5DF] pt-1" />
+          ) : null}
+
+          <BookingSection title="סוסים" items={assignedHorseItems} />
+          <BookingSection title="תאי ציוד" items={assignedTackItems} />
 
           {sortedItems.length === 0 && (
             <p className="py-4 text-center text-xs text-[#BCAAA4]">

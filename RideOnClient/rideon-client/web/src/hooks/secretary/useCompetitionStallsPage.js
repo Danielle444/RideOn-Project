@@ -178,6 +178,52 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
 
     if (!compound || !item || !item.stallBookingId) return;
 
+    const previousAssignments = assignments;
+    const previousOverviewItems = overviewItems;
+
+    const priorAssignment = previousAssignments.find(function (assignment) {
+      return assignment.stallBookingId === item.stallBookingId;
+    });
+
+    const optimisticAssignment = {
+      assignmentId: priorAssignment ? priorAssignment.assignmentId : null,
+      stallBookingId: item.stallBookingId,
+      compoundId: compound.compoundId,
+      stallId: cell.stallId,
+      stallNumber: cell.stallNumber,
+      bookingRanchId: item.bookingRanchId,
+      bookingRanchName: item.bookingRanchName,
+      horseId: item.horseId,
+      horseName: item.horseName,
+      barnName: item.barnName,
+      isForTack: item.isForTack,
+      productName: item.productName,
+    };
+
+    setAssignments(
+      previousAssignments
+        .filter(function (assignment) {
+          return assignment.stallBookingId !== item.stallBookingId;
+        })
+        .concat(optimisticAssignment),
+    );
+
+    setOverviewItems(
+      previousOverviewItems.map(function (overviewItem) {
+        if (overviewItem.stallBookingId !== item.stallBookingId) {
+          return overviewItem;
+        }
+
+        return {
+          ...overviewItem,
+          isAssigned: true,
+          assignedCompoundId: compound.compoundId,
+          assignedStallId: cell.stallId,
+          assignedStallNumber: cell.stallNumber,
+        };
+      }),
+    );
+
     try {
       await assignStallBooking(
         competitionId,
@@ -189,6 +235,8 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
 
       await refreshAssignmentsAndOverview();
     } catch {
+      setAssignments(previousAssignments);
+      setOverviewItems(previousOverviewItems);
       setError("שגיאה בשיבוץ הזמנת התא");
     }
   }
