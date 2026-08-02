@@ -60,6 +60,14 @@ function duplicateCompetitionFromSelection(data) {
   );
 }
 
+function rescheduleCompetition(competitionId, data) {
+  return axios.post(
+    `${API}/Competitions/${competitionId}/reschedule`,
+    data,
+    getAuthHeaders(),
+  );
+}
+
 export {
   getCompetitionsByHostRanch,
   getCompetitionById,
@@ -67,4 +75,5 @@ export {
   updateCompetition,
   duplicateCompetition,
   duplicateCompetitionFromSelection,
+  rescheduleCompetition,
 };

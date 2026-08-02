@@ -451,6 +451,56 @@ namespace RideOnServer.DAL
             }
         }
 
+        public RescheduleCompetitionResponse RescheduleCompetition(int competitionId, int offsetDays)
+        {
+            // Positional binding: order must match usp_RescheduleCompetition's
+            // parameter list (p_competitionid, p_offsetdays).
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@CompetitionId", competitionId },
+                { "@OffsetDays", offsetDays }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_RescheduleCompetition", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return new RescheduleCompetitionResponse
+                            {
+                                OffsetDays = Convert.ToInt32(reader["offsetdays"]),
+                                ClassesMoved = Convert.ToInt32(reader["classesmoved"]),
+                                PaidTimeSlotsMoved = Convert.ToInt32(reader["paidtimeslotsmoved"]),
+                                PaidTimeAssignmentsMoved = Convert.ToInt32(reader["paidtimeassignmentsmoved"]),
+                                StallBookingsMoved = Convert.ToInt32(reader["stallbookingsmoved"]),
+                                ShavingsOrdersMoved = Convert.ToInt32(reader["shavingsordersmoved"])
+                            };
+                        }
+
+                        throw new Exception("Reschedule competition did not return a result");
+                    }
+                }
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule guard raised inside the stored procedure (already
+                // started, invalid offset, pending requests, out-of-range
+                // schedule, stall overlap, or a failed post-condition). Surface
+                // its exact Hebrew message to the user.
+                throw new BL.ValidationException(ex.MessageText);
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
         private Competition MapCompetition(NpgsqlDataReader reader)
         {
             return new Competition

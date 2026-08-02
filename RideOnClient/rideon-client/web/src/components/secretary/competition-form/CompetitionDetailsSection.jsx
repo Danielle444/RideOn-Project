@@ -25,6 +25,37 @@ export default function CompetitionDetailsSection(props) {
   var registrationEndDate = props.detailsForm.registrationEndDate;
   var competitionStartDate = props.detailsForm.competitionStartDate;
 
+  // Existing-competition dates are read-only in the ordinary details form —
+  // the server rejects a changed start/end date on this same PUT with 409
+  // regardless (CompetitionsController.UpdateCompetition), so this is a UI
+  // convenience that also prevents the desync warning from ever showing.
+  // Creation mode (no competitionId yet) keeps both fields editable.
+  var isExistingCompetition = !!props.competitionId;
+
+  // Client-side convenience gate only — never based on currentStatus, which
+  // can legitimately stay "טיוטה" long after competitionstartdate has
+  // passed (a manually-stored status is never overwritten by a date crossing
+  // it). The server (usp_RescheduleCompetition) re-checks CURRENT_DATE
+  // against the live competitionstartdate independently and is the only
+  // authoritative source for this rule.
+  var canOfferReschedule = !!(
+    props.competitionId && competitionStartDate
+  );
+
+  if (canOfferReschedule) {
+    var startDateValue = new Date(competitionStartDate + "T00:00:00Z");
+    var todayValue = new Date();
+    var todayUtc = new Date(
+      Date.UTC(
+        todayValue.getFullYear(),
+        todayValue.getMonth(),
+        todayValue.getDate(),
+      ),
+    );
+
+    canOfferReschedule = startDateValue.getTime() > todayUtc.getTime();
+  }
+
   var registrationEndError = "";
 
   if (registrationEndDate) {
@@ -77,9 +108,19 @@ export default function CompetitionDetailsSection(props) {
         <div className="text-right text-[#6D4C41]">טוען נתונים...</div>
       ) : (
         <div className="space-y-7">
-          <div className="flex items-center justify-start gap-3">
+          <div className="flex flex-wrap items-center justify-start gap-3">
             <span className="text-sm font-semibold text-[#6D4C41]">סטטוס:</span>
             <StatusBadge status={props.currentStatus} />
+
+            {canOfferReschedule ? (
+              <button
+                type="button"
+                onClick={props.onOpenReschedule}
+                className="mr-auto rounded-xl border border-[#8B6352] px-4 py-2 text-sm font-semibold text-[#6D4C41] transition-colors hover:bg-[#FCF8F5]"
+              >
+                דחיית התחרות
+              </button>
+            ) : null}
           </div>
 
           <div className="grid grid-cols-1 gap-x-8 gap-y-7 md:grid-cols-2">
@@ -132,11 +173,17 @@ export default function CompetitionDetailsSection(props) {
               <input
                 type="date"
                 value={props.detailsForm.competitionStartDate}
+                disabled={isExistingCompetition}
                 onChange={function (e) {
                   props.onChange("competitionStartDate", e.target.value);
                 }}
-                className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right"
+                className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right disabled:cursor-not-allowed disabled:bg-[#F3EEEA] disabled:text-[#8A7268]"
               />
+              {isExistingCompetition ? (
+                <div className="mt-1.5 text-right text-xs text-[#8A7268]">
+                  לשינוי תאריך יש להשתמש בפעולת "דחיית התחרות"
+                </div>
+              ) : null}
             </div>
 
             <div>
@@ -147,11 +194,17 @@ export default function CompetitionDetailsSection(props) {
               <input
                 type="date"
                 value={props.detailsForm.competitionEndDate}
+                disabled={isExistingCompetition}
                 onChange={function (e) {
                   props.onChange("competitionEndDate", e.target.value);
                 }}
-                className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right"
+                className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right disabled:cursor-not-allowed disabled:bg-[#F3EEEA] disabled:text-[#8A7268]"
               />
+              {isExistingCompetition ? (
+                <div className="mt-1.5 text-right text-xs text-[#8A7268]">
+                  לשינוי תאריך יש להשתמש בפעולת "דחיית התחרות"
+                </div>
+              ) : null}
             </div>
 
             <div>
