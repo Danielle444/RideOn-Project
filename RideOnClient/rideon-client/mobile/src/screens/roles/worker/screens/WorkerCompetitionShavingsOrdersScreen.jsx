@@ -37,6 +37,14 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
 
   useEffect(function () {
     loadCompetitions();
+
+    const pid = props.route?.params?.competitionId;
+    if (pid) {
+      handleSelectCompetition({
+        competitionId: pid,
+        competitionName: props.route?.params?.competitionName || "",
+      });
+    }
   }, []);
 
   async function loadCompetitions() {

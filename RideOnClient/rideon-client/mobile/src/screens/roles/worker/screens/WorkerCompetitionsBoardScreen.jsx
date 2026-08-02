@@ -62,19 +62,6 @@ export default function WorkerCompetitionsBoardScreen(props) {
     }
   }
 
-  async function setCompetitionAndNavigate(item, screen) {
-    await competitionContext.setActiveCompetitionAndPersist({
-      competitionId: item.competitionId,
-      competitionName: item.competitionName,
-      competitionStatus: item.competitionStatus,
-      ranchId: activeRole.ranchId,
-    });
-
-    setSelectedCompetition(item);
-    setMenuMode("competition");
-    props.navigation.navigate(screen);
-  }
-
   function openCompetitionMenu(competition) {
     setSelectedCompetition(competition);
     setMenuMode("competition");
@@ -106,7 +93,10 @@ export default function WorkerCompetitionsBoardScreen(props) {
         key: "details",
         label: "פרטי תחרות",
         onPress: function () {
-          setCompetitionAndNavigate(item, "WorkerCompetitionShavingsOrders");
+          props.navigation.navigate("WorkerCompetitionDetails", {
+            competitionId: item.competitionId,
+            competitionName: item.competitionName,
+          });
         },
         disabled: false,
         variant: "secondary",
@@ -114,8 +104,20 @@ export default function WorkerCompetitionsBoardScreen(props) {
       {
         key: "enter",
         label: "כניסה",
-        onPress: function () {
-          setCompetitionAndNavigate(item, "WorkerCompetitionShavingsOrders");
+        onPress: async function () {
+          await competitionContext.setActiveCompetitionAndPersist({
+            competitionId: item.competitionId,
+            competitionName: item.competitionName,
+            competitionStatus: item.competitionStatus,
+            ranchId: activeRole.ranchId,
+          });
+
+          setSelectedCompetition(item);
+          setMenuMode("competition");
+          props.navigation.navigate("WorkerCompetitionShavingsOrders", {
+            competitionId: item.competitionId,
+            competitionName: item.competitionName,
+          });
         },
         disabled: !canWorkerEnterCompetition(item.competitionStatus),
         variant: "primary",

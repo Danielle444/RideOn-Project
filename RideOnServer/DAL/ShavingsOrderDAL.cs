@@ -157,6 +157,55 @@ namespace RideOnServer.DAL
             return orders;
         }
 
+        public static List<WorkerShavingsOrderItem> GetWorkerHomeShavingsFeed(int workerSystemUserId, int ranchId)
+        {
+            ShavingsOrderDAL dal = new ShavingsOrderDAL();
+
+            // Positional-dict binding: entry order (workerSystemUserId, ranchId) matches
+            // usp_getworkerhomeshavingsfeed(p_workersystemuserid, p_ranchid).
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@workerSystemUserId", workerSystemUserId },
+                { "@ranchId", ranchId }
+            };
+
+            List<WorkerShavingsOrderItem> orders = new List<WorkerShavingsOrderItem>();
+
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = dal.CreateCommandWithStoredProcedure(
+                "usp_getworkerhomeshavingsfeed",
+                conn,
+                paramDic);
+
+            using NpgsqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                orders.Add(new WorkerShavingsOrderItem
+                {
+                    ShavingsOrderId = Convert.ToInt32(reader["ShavingsOrderId"]),
+                    BagQuantity = Convert.ToInt32(reader["BagQuantity"]),
+                    Notes = reader["Notes"] as string,
+                    RequestedDeliveryTime = reader["RequestedDeliveryTime"] as DateTime?,
+                    ArrivalTime = reader["ArrivalTime"] as DateTime?,
+                    DeliveryStatus = reader["DeliveryStatus"]?.ToString() ?? string.Empty,
+                    DeliveryPhotoUrl = reader["DeliveryPhotoUrl"] as string,
+                    DeliveryPhotoDate = reader["DeliveryPhotoDate"] as DateTime?,
+                    PayerFirstName = reader["PayerFirstName"]?.ToString() ?? string.Empty,
+                    PayerLastName = reader["PayerLastName"]?.ToString() ?? string.Empty,
+                    StallNumber = reader["StallNumber"] as string,
+                    CompetitionId = reader["CompetitionId"] == DBNull.Value ? null : Convert.ToInt32(reader["CompetitionId"]),
+                    CompetitionName = reader["CompetitionName"] as string,
+                    WorkerSystemUserId = reader["WorkerSystemUserId"] == DBNull.Value ? null : Convert.ToInt32(reader["WorkerSystemUserId"]),
+                    WorkerFirstName = reader["WorkerFirstName"] as string,
+                    WorkerLastName = reader["WorkerLastName"] as string,
+                });
+            }
+
+            return orders;
+        }
+
         public static bool ClaimShavingsOrder(int shavingsOrderId, int workerSystemUserId)
         {
             ShavingsOrderDAL dal = new ShavingsOrderDAL();

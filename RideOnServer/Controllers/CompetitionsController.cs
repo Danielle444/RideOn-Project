@@ -417,6 +417,14 @@ namespace RideOnServer.Controllers
                         RoleNames.Payer
                     );
                 }
+                else if (roles.Contains(RoleNames.RanchWorker))
+                {
+                    UserAccessValidator.EnsureUserHasRoleInRanch(
+                        personId,
+                        competition.HostRanchId,
+                        RoleNames.RanchWorker
+                    );
+                }
                 else
                 {
                     return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לצפות בפרטי תחרות");

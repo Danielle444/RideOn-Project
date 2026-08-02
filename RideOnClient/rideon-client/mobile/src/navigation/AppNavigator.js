@@ -421,6 +421,19 @@ export default function AppNavigator(props) {
         }}
       </Stack.Screen>
 
+      <Stack.Screen name="WorkerCompetitionDetails">
+        {function (screenProps) {
+          return withGuard(
+            screenProps,
+            ["עובד חווה"],
+            <CompetitionInvitationScreen
+              {...screenProps}
+              onLogout={props.onLogout}
+            />,
+          );
+        }}
+      </Stack.Screen>
+
       <Stack.Screen name="WorkerProfile">
         {function (screenProps) {
           return withGuard(

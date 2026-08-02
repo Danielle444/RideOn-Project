@@ -12,12 +12,22 @@ import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLa
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
+import { useCompetition } from "../../../../context/CompetitionContext";
 import { getWorkerMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { getWorkerBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import homeScreenStyles from "../../../../styles/homeScreenStyles";
 import HomeCompetitionCard from "../../../../components/home/HomeCompetitionCard";
 import HomeShortcutGrid from "../../../../components/home/HomeShortcutGrid";
 import { getMobileWorkerCompetitionsBoard } from "../../../../services/competitionService";
+import {
+  getWorkerHomeShavingsFeed,
+  claimShavingsOrder,
+} from "../../../../services/shavingsOrderService";
+import {
+  getWorkerHomeFeedCardFlags,
+  sortWorkerHomeFeed,
+} from "../../../../utils/workerHomeShavingsFeed";
+import WorkerShavingsOrderCard from "../components/WorkerShavingsOrderCard";
 import { canWorkerEnterCompetition } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
 
 function sortAndTakeNearest(items) {
@@ -33,12 +43,16 @@ function sortAndTakeNearest(items) {
 export default function WorkerHomeScreen(props) {
   var userContext = useUser();
   var activeRoleContext = useActiveRole();
+  var competitionContext = useCompetition();
 
   var user = userContext.user;
   var activeRole = activeRoleContext.activeRole;
 
   var [competitions, setCompetitions] = useState([]);
   var [loading, setLoading] = useState(false);
+  var [shavingsFeed, setShavingsFeed] = useState([]);
+  var [loadingFeed, setLoadingFeed] = useState(false);
+  var [claimingOrderId, setClaimingOrderId] = useState(null);
 
   useEffect(
     function () {
@@ -47,6 +61,7 @@ export default function WorkerHomeScreen(props) {
       }
 
       loadHomeCompetitions();
+      loadShavingsFeed();
     },
     [activeRole],
   );
@@ -67,6 +82,50 @@ export default function WorkerHomeScreen(props) {
     }
   }
 
+  async function loadShavingsFeed() {
+    if (!activeRole || !activeRole.ranchId) {
+      return;
+    }
+
+    try {
+      setLoadingFeed(true);
+
+      var response = await getWorkerHomeShavingsFeed(activeRole.ranchId);
+      var items = Array.isArray(response.data?.data) ? response.data.data : [];
+      setShavingsFeed(sortWorkerHomeFeed(items, user?.personId));
+    } catch (error) {
+      console.error(error);
+      setShavingsFeed([]);
+      Alert.alert("שגיאה", "אירעה שגיאה בטעינת הזמנות הנסורת להיום");
+    } finally {
+      setLoadingFeed(false);
+    }
+  }
+
+  async function handleClaimShavingsOrder(order) {
+    try {
+      setClaimingOrderId(order.shavingsOrderId);
+      await claimShavingsOrder(order.shavingsOrderId);
+      await loadShavingsFeed();
+    } catch (error) {
+      if (error?.response?.status === 409) {
+        Alert.alert("לא ניתן", "ההזמנה כבר נלקחה לטיפול על ידי עובד אחר");
+        await loadShavingsFeed();
+      } else {
+        Alert.alert("שגיאה", "לא ניתן לקחת את ההזמנה לטיפול");
+      }
+    } finally {
+      setClaimingOrderId(null);
+    }
+  }
+
+  function handleGoToShavingsWorkflow(order) {
+    props.navigation.navigate("WorkerCompetitionShavingsOrders", {
+      competitionId: order.competitionId,
+      competitionName: order.competitionName,
+    });
+  }
+
   async function handleLogout() {
     if (props.onLogout) {
       await props.onLogout();
@@ -74,11 +133,6 @@ export default function WorkerHomeScreen(props) {
   }
 
   function handleMenuPress(item) {
-    if (item.screen === "WorkerProfile") {
-      Alert.alert("בהמשך", "מסך פרופיל העובד יחובר בהמשך");
-      return;
-    }
-
     props.navigation.navigate(item.screen);
   }
 
@@ -88,7 +142,10 @@ export default function WorkerHomeScreen(props) {
         key: "details",
         label: "פרטי תחרות",
         onPress: function () {
-          Alert.alert("בהמשך", "מסך פרטי תחרות יחובר בהמשך");
+          props.navigation.navigate("WorkerCompetitionDetails", {
+            competitionId: item.competitionId,
+            competitionName: item.competitionName,
+          });
         },
         disabled: false,
         variant: "secondary",
@@ -96,8 +153,18 @@ export default function WorkerHomeScreen(props) {
       {
         key: "enter",
         label: "כניסה",
-        onPress: function () {
-          Alert.alert("בהמשך", "כניסה לתחרות תחובר בהמשך");
+        onPress: async function () {
+          await competitionContext.setActiveCompetitionAndPersist({
+            competitionId: item.competitionId,
+            competitionName: item.competitionName,
+            competitionStatus: item.competitionStatus,
+            ranchId: activeRole.ranchId,
+          });
+
+          props.navigation.navigate("WorkerCompetitionShavingsOrders", {
+            competitionId: item.competitionId,
+            competitionName: item.competitionName,
+          });
         },
         disabled: !canWorkerEnterCompetition(item.competitionStatus),
         variant: "primary",
@@ -121,7 +188,7 @@ export default function WorkerHomeScreen(props) {
           label: "פרופיל",
           icon: "person-outline",
           onPress: function () {
-            Alert.alert("בהמשך", "מסך פרופיל העובד יחובר בהמשך");
+            props.navigation.navigate("WorkerProfile");
           },
         },
         {
@@ -136,7 +203,10 @@ export default function WorkerHomeScreen(props) {
           key: "refresh",
           label: "רענון נתונים",
           icon: "refresh-outline",
-          onPress: loadHomeCompetitions,
+          onPress: function () {
+            loadHomeCompetitions();
+            loadShavingsFeed();
+          },
         },
       ];
     },
@@ -201,7 +271,7 @@ export default function WorkerHomeScreen(props) {
           <Ionicons name="arrow-back-outline" size={24} color="#FFFFFF" />
           <View style={homeScreenStyles.quickButtonTextWrap}>
             <Text style={homeScreenStyles.quickButtonTitle}>
-              מעבר מהיר ללוח התחרויות
+              לוח התחרויות
             </Text>
             <Text style={homeScreenStyles.quickButtonSubtitle}>
               לצפייה בתחרויות הקרובות וכניסה לעבודה
@@ -237,6 +307,57 @@ export default function WorkerHomeScreen(props) {
         <View style={homeScreenStyles.sectionCard}>
           <Text style={homeScreenStyles.sectionTitle}>קיצורים</Text>
           <HomeShortcutGrid items={shortcutItems} />
+        </View>
+
+        <View style={homeScreenStyles.sectionCard}>
+          <Text style={homeScreenStyles.sectionTitle}>הזמנות נסורת להיום</Text>
+
+          {loadingFeed ? (
+            <View style={homeScreenStyles.loadingWrapper}>
+              <ActivityIndicator size="large" color="#8B6352" />
+            </View>
+          ) : shavingsFeed.length === 0 ? (
+            <View style={homeScreenStyles.loadingWrapper}>
+              <Text style={homeScreenStyles.welcomeTitle}>
+                כל הכבוד, סיימת להיום!
+              </Text>
+              <Text style={homeScreenStyles.emptyText}>
+                אין הזמנות נסורת שממתינות לך כרגע.
+              </Text>
+            </View>
+          ) : (
+            shavingsFeed.map(function (order) {
+              var flags = getWorkerHomeFeedCardFlags(order, user?.personId);
+
+              return (
+                <WorkerShavingsOrderCard
+                  key={order.shavingsOrderId}
+                  orderTitle={`הזמנה #${order.shavingsOrderId}`}
+                  deliveryStatus={order.deliveryStatus}
+                  arrivalTime={order.arrivalTime}
+                  workerSystemUserId={order.workerSystemUserId}
+                  stallNumber={order.stallNumber}
+                  bagQuantity={order.bagQuantity}
+                  payerFirstName={order.payerFirstName}
+                  payerLastName={order.payerLastName}
+                  workerFirstName={order.workerFirstName}
+                  workerLastName={order.workerLastName}
+                  isMyOrder={flags.isMyOrder}
+                  isUnclaimed={flags.isUnclaimed}
+                  isTakenByOther={flags.isTakenByOther}
+                  claiming={claimingOrderId === order.shavingsOrderId}
+                  onClaim={function () {
+                    handleClaimShavingsOrder(order);
+                  }}
+                  onCapturePhoto={function () {
+                    handleGoToShavingsWorkflow(order);
+                  }}
+                  capturePhotoIcon="arrow-back-outline"
+                  capturePhotoLabel="מעבר למסך האספקה"
+                />
+              );
+            })
+          )}
         </View>
       </ScrollView>
     </MobileScreenLayout>
