@@ -122,13 +122,13 @@ export default function WorkerShavingsOrderCard(props) {
               ) : (
                 <>
                   <Ionicons
-                    name="camera-outline"
+                    name={props.capturePhotoIcon || "camera-outline"}
                     size={18}
                     color="#fff"
                     style={{ marginLeft: 6 }}
                   />
                   <Text style={roleSharedStyles.primaryButtonText}>
-                    צלם ואשר אספקה
+                    {props.capturePhotoLabel || "צלם ואשר אספקה"}
                   </Text>
                 </>
               )}

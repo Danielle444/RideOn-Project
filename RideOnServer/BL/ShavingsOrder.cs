@@ -27,6 +27,11 @@ namespace RideOnServer.BL
             return dal.GetWorkerShavingsOrders(workerSystemUserId);
         }
 
+        public static List<WorkerShavingsOrderItem> GetWorkerHomeFeed(int workerSystemUserId, int ranchId)
+        {
+            return ShavingsOrderDAL.GetWorkerHomeShavingsFeed(workerSystemUserId, ranchId);
+        }
+
         public static void SaveDeliveryPhoto(SaveDeliveryPhotoRequest request)
         {
             if (request.ShavingsOrderId <= 0)

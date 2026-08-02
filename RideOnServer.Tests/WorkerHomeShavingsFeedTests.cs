@@ -1,0 +1,460 @@
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using FluentAssertions;
+using Microsoft.AspNetCore.Mvc;
+using RideOnServer.BL;
+using RideOnServer.BL.DTOs.ShavingsOrders;
+using RideOnServer.Controllers;
+using RideOnServer.DAL;
+
+namespace RideOnServer.Tests
+{
+    // DB-free coverage of D4 ("my shavings for today"): GET worker-home-feed,
+    // ShavingsOrder.GetWorkerHomeFeed, ShavingsOrderDAL.GetWorkerHomeShavingsFeed,
+    // WorkerShavingsOrderItem.CompetitionId, and the new stored procedure file.
+    //
+    // No connection is opened and nothing is mocked, mirroring
+    // HealthCertificateAuthorizationTests / EntryDalInsertEntryCommandTests: the
+    // controller and DAL methods need a JWT principal / a live connection to run
+    // for real, so authorization, envelope shape, parameter order and stored
+    // procedure wiring are pinned against the source text and reflected member
+    // signatures instead.
+    public class WorkerHomeShavingsFeedTests
+    {
+        private static string TestSourceDirectory([CallerFilePath] string callerFilePath = "")
+        {
+            return Path.GetDirectoryName(callerFilePath)!;
+        }
+
+        private static string ControllerSource()
+        {
+            string path = Path.GetFullPath(
+                Path.Combine(
+                    TestSourceDirectory(),
+                    "..",
+                    "RideOnServer",
+                    "Controllers",
+                    "ShavingsOrdersController.cs"));
+
+            File.Exists(path).Should().BeTrue("ShavingsOrdersController.cs was expected at {0}", path);
+
+            return File.ReadAllText(path);
+        }
+
+        private static string DalSource()
+        {
+            string path = Path.GetFullPath(
+                Path.Combine(TestSourceDirectory(), "..", "RideOnServer", "DAL", "ShavingsOrderDAL.cs"));
+
+            File.Exists(path).Should().BeTrue("ShavingsOrderDAL.cs was expected at {0}", path);
+
+            return File.ReadAllText(path);
+        }
+
+        private static string BlSource()
+        {
+            string path = Path.GetFullPath(
+                Path.Combine(TestSourceDirectory(), "..", "RideOnServer", "BL", "ShavingsOrder.cs"));
+
+            File.Exists(path).Should().BeTrue("ShavingsOrder.cs was expected at {0}", path);
+
+            return File.ReadAllText(path);
+        }
+
+        private static string SqlSource()
+        {
+            string path = Path.GetFullPath(
+                Path.Combine(
+                    TestSourceDirectory(),
+                    "..",
+                    "RideOnDB",
+                    "StoredProcedures",
+                    "PostgreSQL",
+                    "Individual",
+                    "190_usp_GetWorkerHomeShavingsFeed.sql"));
+
+            File.Exists(path).Should().BeTrue(
+                "the D4 stored procedure file was expected at {0}", path);
+
+            return File.ReadAllText(path);
+        }
+
+        // Bounded by the next action's [HttpGet(...)], since GetWorkerHomeFeed sits
+        // immediately before worker-by-competition in the controller.
+        private static string ControllerMethodBody(string source, string fromMarker, string toMarker)
+        {
+            int from = source.IndexOf(fromMarker, StringComparison.Ordinal);
+            from.Should().BeGreaterThan(-1, "{0} was expected in ShavingsOrdersController", fromMarker);
+
+            string rest = source.Substring(from);
+
+            int to = rest.IndexOf(toMarker, StringComparison.Ordinal);
+            to.Should().BeGreaterThan(-1, "the body of {0} could not be bounded", fromMarker);
+
+            return rest.Substring(0, to);
+        }
+
+        // Bounded by the DAL method's own "return orders;" - the method has no
+        // try/catch (unlike the HorseDAL readers), so this is the first line that
+        // is unambiguously past its body.
+        private static string DalMethodBody(string dalSource, string methodSignature)
+        {
+            int from = dalSource.IndexOf(methodSignature, StringComparison.Ordinal);
+            from.Should().BeGreaterThan(-1, "{0} was expected in ShavingsOrderDAL", methodSignature);
+
+            string rest = dalSource.Substring(from);
+
+            int to = rest.IndexOf("return orders;", StringComparison.Ordinal);
+            to.Should().BeGreaterThan(-1);
+
+            return rest.Substring(0, to);
+        }
+
+        private const string ControllerMethodStart = "public IActionResult GetWorkerHomeFeed(";
+        private const string ControllerMethodEnd = "[HttpGet(\"worker-by-competition\")]";
+        private const string DalMethodStart =
+            "public static List<WorkerShavingsOrderItem> GetWorkerHomeShavingsFeed(";
+
+        private static string GetWorkerHomeFeedBody()
+        {
+            return ControllerMethodBody(ControllerSource(), ControllerMethodStart, ControllerMethodEnd);
+        }
+
+        private static string GetWorkerHomeShavingsFeedBody()
+        {
+            return DalMethodBody(DalSource(), DalMethodStart);
+        }
+
+        // =================================================================
+        // 1. Controller route, verb and request shape.
+        // =================================================================
+
+        [Fact]
+        public void The_endpoint_is_a_get_at_worker_home_feed()
+        {
+            MethodInfo action = typeof(ShavingsOrdersController)
+                .GetMethod("GetWorkerHomeFeed", BindingFlags.Public | BindingFlags.Instance)
+                ?? throw new InvalidOperationException("GetWorkerHomeFeed was not found.");
+
+            HttpGetAttribute? attribute = action
+                .GetCustomAttributes<HttpGetAttribute>()
+                .FirstOrDefault();
+
+            attribute.Should().NotBeNull("the action must be a GET");
+            attribute!.Template.Should().Be("worker-home-feed");
+        }
+
+        [Fact]
+        public void The_endpoint_accepts_only_ranchId_from_the_caller()
+        {
+            MethodInfo action = typeof(ShavingsOrdersController)
+                .GetMethod("GetWorkerHomeFeed", BindingFlags.Public | BindingFlags.Instance)!;
+
+            ParameterInfo[] parameters = action.GetParameters();
+
+            parameters.Should().HaveCount(1, "a workerSystemUserId parameter here would let the client supply its own identity");
+            parameters[0].Name.Should().Be("ranchId");
+            parameters[0].ParameterType.Should().Be(typeof(int));
+        }
+
+        // =================================================================
+        // 2. Worker identity comes from claims, not from the request.
+        // =================================================================
+
+        [Fact]
+        public void The_worker_id_is_read_from_claims_inside_the_body()
+        {
+            GetWorkerHomeFeedBody().Should().Contain(
+                "int workerSystemUserId = UserAccessValidator.GetPersonIdFromClaims(User);");
+        }
+
+        [Fact]
+        public void No_workerSystemUserId_value_is_read_from_the_request()
+        {
+            string body = GetWorkerHomeFeedBody();
+
+            body.Should().NotContain("[FromQuery] int workerSystemUserId");
+            body.Should().NotContain("[FromBody]");
+            body.Should().NotContain("Request.Query[\"workerSystemUserId\"]");
+        }
+
+        // =================================================================
+        // 3. RanchWorker authorization, checked before the feed is read.
+        // =================================================================
+
+        [Fact]
+        public void The_endpoint_checks_ranchworker_authorization_with_the_claims_id_and_the_query_ranchId()
+        {
+            string body = GetWorkerHomeFeedBody();
+
+            body.Should().Contain(
+                "UserAccessValidator.EnsureUserHasRoleInRanch(\n                    workerSystemUserId,\n                    ranchId,\n                    RoleNames.RanchWorker\n                );"
+                    .Replace("\n", Environment.NewLine));
+        }
+
+        [Fact]
+        public void Authorization_runs_before_the_feed_is_fetched()
+        {
+            string body = GetWorkerHomeFeedBody();
+
+            int authAt = body.IndexOf("EnsureUserHasRoleInRanch(", StringComparison.Ordinal);
+            int fetchAt = body.IndexOf("ShavingsOrder.GetWorkerHomeFeed(", StringComparison.Ordinal);
+
+            authAt.Should().BeGreaterThan(-1);
+            fetchAt.Should().BeGreaterThan(-1);
+            authAt.Should().BeLessThan(fetchAt, "an unauthorized worker must never reach the DAL");
+        }
+
+        [Fact]
+        public void A_denied_authorization_still_produces_the_safe_403()
+        {
+            string body = GetWorkerHomeFeedBody();
+
+            body.Should().Contain("catch (UnauthorizedAccessException ex)");
+            body.Should().Contain("return StatusCode(StatusCodes.Status403Forbidden, ex.Message);");
+        }
+
+        // =================================================================
+        // 4. Response envelope.
+        // =================================================================
+
+        [Fact]
+        public void The_endpoint_returns_the_data_envelope()
+        {
+            GetWorkerHomeFeedBody().Should().Contain("return Ok(new { data = orders });");
+        }
+
+        [Fact]
+        public void The_endpoint_does_not_leak_raw_exception_text_on_failure()
+        {
+            string body = GetWorkerHomeFeedBody();
+
+            body.Should().Contain("return StatusCode(500, \"שגיאה בשליפת הזמנות הנסורת להיום\");");
+            body.Should().NotContain("StatusCode(500, ex.Message)");
+        }
+
+        // =================================================================
+        // 5. DAL: stored procedure name and parameter order.
+        // =================================================================
+
+        [Fact]
+        public void The_dal_names_the_worker_home_feed_stored_procedure()
+        {
+            DalSource().Should().Contain("\"usp_getworkerhomeshavingsfeed\"");
+        }
+
+        [Fact]
+        public void The_dal_method_declares_workerSystemUserId_then_ranchId()
+        {
+            MethodInfo method = typeof(ShavingsOrderDAL)
+                .GetMethod("GetWorkerHomeShavingsFeed", BindingFlags.Public | BindingFlags.Static)
+                ?? throw new InvalidOperationException(
+                    "ShavingsOrderDAL.GetWorkerHomeShavingsFeed was not found.");
+
+            ParameterInfo[] parameters = method.GetParameters();
+
+            parameters.Should().HaveCount(2);
+            parameters.Select(p => p.Name).Should().Equal("workerSystemUserId", "ranchId");
+            parameters.Select(p => p.ParameterType).Should().AllBeEquivalentTo(typeof(int));
+
+            method.ReturnType.Should().Be(typeof(List<WorkerShavingsOrderItem>));
+        }
+
+        [Fact]
+        public void The_parameter_dictionary_binds_workerSystemUserId_before_ranchId()
+        {
+            // CreateCommandWithStoredProcedure binds strictly by dictionary
+            // insertion order into p1, p2, ... - so the entry order here must
+            // match usp_getworkerhomeshavingsfeed(p_workersystemuserid, p_ranchid)
+            // exactly, the same class of bug EntryDalInsertEntryCommandTests exists
+            // to catch on usp_insertentry.
+            string body = GetWorkerHomeShavingsFeedBody();
+
+            int workerEntryAt = body.IndexOf("{ \"@workerSystemUserId\", workerSystemUserId }", StringComparison.Ordinal);
+            int ranchEntryAt = body.IndexOf("{ \"@ranchId\", ranchId }", StringComparison.Ordinal);
+
+            workerEntryAt.Should().BeGreaterThan(-1);
+            ranchEntryAt.Should().BeGreaterThan(-1);
+            workerEntryAt.Should().BeLessThan(ranchEntryAt);
+        }
+
+        [Fact]
+        public void The_dal_method_issues_exactly_one_stored_procedure_call()
+        {
+            string body = GetWorkerHomeShavingsFeedBody();
+
+            int occurrences = 0;
+            int index = body.IndexOf("CreateCommandWithStoredProcedure(", StringComparison.Ordinal);
+
+            while (index > -1)
+            {
+                occurrences++;
+                index = body.IndexOf("CreateCommandWithStoredProcedure(", index + 1, StringComparison.Ordinal);
+            }
+
+            occurrences.Should().Be(1, "the feed must be a single round trip, not an N+1");
+        }
+
+        // =================================================================
+        // 6. CompetitionId mapping, and the ResponseTime decision.
+        // =================================================================
+
+        [Fact]
+        public void The_dto_exposes_a_nullable_competitionId()
+        {
+            PropertyInfo? property = typeof(WorkerShavingsOrderItem).GetProperty("CompetitionId");
+
+            property.Should().NotBeNull();
+            property!.PropertyType.Should().Be(typeof(int?));
+        }
+
+        [Fact]
+        public void The_dal_maps_competitionId_from_the_reader()
+        {
+            GetWorkerHomeShavingsFeedBody().Should().Contain(
+                "CompetitionId = reader[\"CompetitionId\"] == DBNull.Value ? null : Convert.ToInt32(reader[\"CompetitionId\"]),");
+        }
+
+        // The proc returns ResponseTime (see the RETURNS TABLE shape and the
+        // ORDER BY key), exactly like usp_getworkershavingsorders does for the
+        // pre-existing GetWorkerShavingsOrders method - and that established
+        // sibling also does not surface ResponseTime on WorkerShavingsOrderItem.
+        // This is a deliberate, pre-existing convention in this DTO, not a new
+        // omission introduced here: there is nothing on the DTO to map the
+        // returned column into, so this test pins the omission as consistent
+        // with the sibling method rather than leaving it an unverified assumption.
+        [Fact]
+        public void ResponseTime_is_returned_by_the_proc_but_the_dto_has_no_such_property_so_neither_worker_dal_method_maps_it()
+        {
+            SqlSource().Should().Contain("\"ResponseTime\" timestamp without time zone");
+
+            typeof(WorkerShavingsOrderItem).GetProperty("ResponseTime").Should().BeNull(
+                "WorkerShavingsOrderItem has never exposed ResponseTime - adding it here without the DTO " +
+                "having the property would be inventing a field, not mapping one");
+
+            string dal = DalSource();
+
+            dal.Should().NotContain("reader[\"ResponseTime\"]");
+        }
+
+        // =================================================================
+        // 7. BL forwards straight to the DAL with the same argument order.
+        // =================================================================
+
+        [Fact]
+        public void The_bl_method_declares_workerSystemUserId_then_ranchId_and_forwards_to_the_dal()
+        {
+            MethodInfo method = typeof(ShavingsOrder)
+                .GetMethod("GetWorkerHomeFeed", BindingFlags.Public | BindingFlags.Static)
+                ?? throw new InvalidOperationException("ShavingsOrder.GetWorkerHomeFeed was not found.");
+
+            ParameterInfo[] parameters = method.GetParameters();
+
+            parameters.Should().HaveCount(2);
+            parameters.Select(p => p.Name).Should().Equal("workerSystemUserId", "ranchId");
+
+            BlSource().Should().Contain(
+                "return ShavingsOrderDAL.GetWorkerHomeShavingsFeed(workerSystemUserId, ranchId);");
+        }
+
+        // =================================================================
+        // 8. The stored procedure file: signature, timezone fix, and filters.
+        // =================================================================
+
+        [Fact]
+        public void The_sql_file_exists_and_declares_the_expected_signature()
+        {
+            SqlSource().Should().Contain(
+                "CREATE OR REPLACE FUNCTION public.usp_getworkerhomeshavingsfeed(p_workersystemuserid integer, p_ranchid integer)");
+        }
+
+        [Fact]
+        public void The_sql_computes_one_israel_business_date_and_never_uses_raw_current_date()
+        {
+            string sql = SqlSource();
+
+            sql.Should().Contain(
+                "v_businessdate := (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date;");
+
+            // Every occurrence of CURRENT_DATE would resolve in the session/UTC
+            // timezone, not Israel's - which is exactly the bug this fix closes.
+            sql.ToUpperInvariant().Should().NotContain("CURRENT_DATE");
+        }
+
+        [Fact]
+        public void The_sql_uses_the_business_date_for_delivery_and_both_competition_bounds()
+        {
+            string sql = SqlSource();
+
+            sql.Should().Contain("so.requesteddeliverytime::date = v_businessdate");
+            sql.Should().Contain("c.competitionstartdate <= v_businessdate");
+            sql.Should().Contain("c.competitionenddate >= v_businessdate");
+        }
+
+        [Theory]
+        [InlineData("c.hostranchid = p_RanchId")]
+        [InlineData("(so.workersystemuserid = p_WorkerSystemUserId OR so.workersystemuserid IS NULL)")]
+        [InlineData("so.requesteddeliverytime::date = v_businessdate")]
+        [InlineData("c.competitionstartdate <= v_businessdate")]
+        [InlineData("c.competitionenddate >= v_businessdate")]
+        [InlineData("(c.competitionstatus IS NULL OR c.competitionstatus NOT IN ('טיוטה','בוטלה'))")]
+        [InlineData("so.arrivaltime IS NULL")]
+        [InlineData("COALESCE(so.deliverystatus, 'Pending') <> 'Delivered'")]
+        public void The_sql_contains_every_required_filter_predicate(string predicate)
+        {
+            SqlSource().Should().Contain(predicate);
+        }
+
+        [Fact]
+        public void The_sql_never_admits_an_order_claimed_by_a_different_worker()
+        {
+            // The only worker-scoping predicate is the mine-or-unclaimed OR; there
+            // is no separate branch that would let a foreign claim through.
+            string sql = SqlSource();
+
+            sql.Should().Contain(
+                "(so.workersystemuserid = p_WorkerSystemUserId OR so.workersystemuserid IS NULL)");
+
+            int occurrences = 0;
+            int index = sql.IndexOf("workersystemuserid", StringComparison.OrdinalIgnoreCase);
+
+            while (index > -1)
+            {
+                occurrences++;
+                index = sql.IndexOf("workersystemuserid", index + 1, StringComparison.OrdinalIgnoreCase);
+            }
+
+            // so.workersystemuserid: SELECT projection, the WHERE predicate (twice),
+            // and worker.personid join has its own column name - the projection and
+            // WHERE clause account for 3 occurrences of so.workersystemuserid.
+            occurrences.Should().BeGreaterThanOrEqualTo(3);
+        }
+
+        [Fact]
+        public void The_sql_excludes_delivered_orders()
+        {
+            string sql = SqlSource();
+
+            sql.Should().Contain("so.arrivaltime IS NULL");
+            sql.Should().Contain("COALESCE(so.deliverystatus, 'Pending') <> 'Delivered'");
+        }
+
+        [Fact]
+        public void The_return_shape_includes_competitionId_and_competitionName()
+        {
+            SqlSource().Should().Contain("\"CompetitionId\" integer, \"CompetitionName\" character varying");
+        }
+
+        [Fact]
+        public void The_dedup_key_and_final_ordering_are_by_shavingsorderid_not_by_worker()
+        {
+            // DISTINCT ON requires shavingsorderid to lead the ORDER BY, so this
+            // query cannot express "mine first" itself - the client re-sorts.
+            SqlSource().Should().Contain(
+                "SELECT DISTINCT ON (so.shavingsorderid)");
+
+            SqlSource().Should().Contain(
+                "ORDER BY so.shavingsorderid, so.requesteddeliverytime ASC NULLS LAST;");
+        }
+    }
+}

@@ -32,6 +32,33 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("worker-home-feed")]
+        public IActionResult GetWorkerHomeFeed([FromQuery] int ranchId)
+        {
+            try
+            {
+                int workerSystemUserId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    workerSystemUserId,
+                    ranchId,
+                    RoleNames.RanchWorker
+                );
+
+                var orders = ShavingsOrder.GetWorkerHomeFeed(workerSystemUserId, ranchId);
+                return Ok(new { data = orders });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetWorkerHomeFeed: {ex.Message}");
+                return StatusCode(500, "שגיאה בשליפת הזמנות הנסורת להיום");
+            }
+        }
+
         [HttpGet("worker-by-competition")]
         public IActionResult GetWorkerOrdersByCompetition([FromQuery] int competitionId, [FromQuery] int ranchId)
         {

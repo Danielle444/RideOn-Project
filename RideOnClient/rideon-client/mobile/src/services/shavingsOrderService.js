@@ -10,6 +10,12 @@ function getWorkerShavingsOrdersByCompetition(competitionId, ranchId) {
   });
 }
 
+function getWorkerHomeShavingsFeed(ranchId) {
+  return axios.get("/ShavingsOrders/worker-home-feed", {
+    params: { ranchId },
+  });
+}
+
 function claimShavingsOrder(shavingsOrderId) {
   return axios.post("/ShavingsOrders/claim", { shavingsOrderId });
 }
@@ -65,6 +71,7 @@ function getAllShavingsOrderDetailsForCompetitionAndRanch(
 export {
   getWorkerShavingsOrders,
   getWorkerShavingsOrdersByCompetition,
+  getWorkerHomeShavingsFeed,
   claimShavingsOrder,
   saveDeliveryPhoto,
   markDelivered,
