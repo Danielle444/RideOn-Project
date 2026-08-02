@@ -79,12 +79,6 @@ function getStartTime(item) {
   return item.startTime || item.StartTime;
 }
 
-function getTotalCost(item) {
-  return (
-    Number(getOrganizerCost(item) || 0) + Number(getFederationCost(item) || 0)
-  );
-}
-
 function formatPredictionNumber(value) {
   if (value === null || value === undefined) {
     return "-";
@@ -233,7 +227,6 @@ export default function SecretaryClassesOverviewTable(props) {
     "startTime",
     "organizerCost",
     "federationCost",
-    "totalCost",
     "prizes",
     "actions",
   ];
@@ -348,9 +341,6 @@ export default function SecretaryClassesOverviewTable(props) {
             ) : null}
             {showColumn("federationCost") ? (
               <th className="px-4 py-3">עלות התאחדות</th>
-            ) : null}
-            {showColumn("totalCost") ? (
-              <th className="px-4 py-3">סה״כ מחיר</th>
             ) : null}
             {showColumn("prizes") ? <th className="px-4 py-3">פרסים</th> : null}
             <th className="px-4 py-3">פעולות</th>
@@ -525,12 +515,6 @@ export default function SecretaryClassesOverviewTable(props) {
                     {showColumn("federationCost") ? (
                       <td className="px-4 py-3">
                         {formatMoney(getFederationCost(item))}
-                      </td>
-                    ) : null}
-
-                    {showColumn("totalCost") ? (
-                      <td className="px-4 py-3 font-bold">
-                        {formatMoney(getTotalCost(item))}
                       </td>
                     ) : null}
 

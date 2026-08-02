@@ -129,6 +129,7 @@ export default function CompetitionFormPage(props) {
             saving={page.savingDuplicate}
             error={page.duplicateError}
             onSubmit={page.handleDuplicateCompetition}
+            onShowToast={page.showToast}
           />
         ) : null}
 

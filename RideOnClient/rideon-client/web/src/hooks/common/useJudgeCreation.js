@@ -10,6 +10,7 @@ export default function useJudgeCreation(options) {
   var fieldId = options.fieldId;
   var onJudgesUpdated = options.onJudgesUpdated;
   var onJudgeCreated = options.onJudgeCreated;
+  var onShowToast = options.onShowToast;
 
   var [judgeModalOpen, setJudgeModalOpen] = useState(false);
   var [judgeModalError, setJudgeModalError] = useState("");
@@ -41,6 +42,10 @@ export default function useJudgeCreation(options) {
     try {
       setJudgeModalError("");
       await createJudge(formData);
+
+      if (onShowToast) {
+        onShowToast("success", "השופט נוצר בהצלחה");
+      }
 
       var judgesRes = await getAllJudges(fieldId || null);
       var refreshedJudges = Array.isArray(judgesRes.data) ? judgesRes.data : [];

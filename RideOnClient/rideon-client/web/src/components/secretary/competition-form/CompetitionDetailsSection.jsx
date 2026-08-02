@@ -45,6 +45,7 @@ export default function CompetitionDetailsSection(props) {
 
   var judgeCreation = useJudgeCreation({
     fieldId: props.detailsForm.fieldId,
+    onShowToast: props.onShowToast,
     onJudgesUpdated: function (refreshedJudges) {
       setLocalJudges(refreshedJudges);
 

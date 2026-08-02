@@ -111,7 +111,7 @@ describe("isClassesViewAvailable", () => {
 
 describe("column visibility", () => {
   it("shows only the financial columns in the financial view", () => {
-    ["organizerCost", "federationCost", "totalCost", "prizes"].forEach(function (key) {
+    ["organizerCost", "federationCost", "prizes"].forEach(function (key) {
       expect(isColumnVisible(key, CLASSES_VIEW_FINANCIAL)).toBe(true);
     });
 
@@ -122,7 +122,7 @@ describe("column visibility", () => {
   });
 
   it("moves ONLY the financial columns out of planning and actuals", () => {
-    ["organizerCost", "federationCost", "totalCost", "prizes"].forEach(function (key) {
+    ["organizerCost", "federationCost", "prizes"].forEach(function (key) {
       expect(isColumnVisible(key, CLASSES_VIEW_PLANNING)).toBe(false);
       expect(isColumnVisible(key, CLASSES_VIEW_ACTUALS)).toBe(false);
     });
