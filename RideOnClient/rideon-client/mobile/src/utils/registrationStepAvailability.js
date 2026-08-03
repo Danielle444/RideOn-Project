@@ -48,7 +48,7 @@ function buildStatusUnavailableAvailability() {
   };
 }
 
-function buildEndedAvailability() {
+function buildEndedAvailability(status) {
   return {
     classes: {
       isVisible: true,
@@ -62,13 +62,21 @@ function buildEndedAvailability() {
       isReadOnly: true,
       unavailableReason: null,
     },
-    paidTimes: {
-      isVisible: true,
-      isEnabled: false,
-      isReadOnly: true,
-      unavailableReason: null,
-      openingDate: null,
-    },
+    paidTimes: status.paidTimeConfigured
+      ? {
+          isVisible: true,
+          isEnabled: false,
+          isReadOnly: true,
+          unavailableReason: null,
+          openingDate: null,
+        }
+      : {
+          isVisible: false,
+          isEnabled: false,
+          isReadOnly: false,
+          unavailableReason: REASON_NOT_CONFIGURED,
+          openingDate: null,
+        },
     shavings: {
       isVisible: true,
       isEnabled: false,
@@ -185,7 +193,7 @@ export function computeRegistrationStepAvailability(status) {
   }
 
   if (status.isCompetitionEnded) {
-    return buildEndedAvailability();
+    return buildEndedAvailability(status);
   }
 
   return {
