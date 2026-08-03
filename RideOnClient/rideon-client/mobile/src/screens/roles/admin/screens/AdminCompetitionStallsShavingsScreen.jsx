@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 
 import {
   ActivityIndicator,
@@ -24,6 +25,7 @@ import { useActiveRole } from "../../../../context/ActiveRoleContext";
 import { useCompetition } from "../../../../context/CompetitionContext";
 
 import useAdminCompetitionStallsOverview from "../../../../hooks/useAdminCompetitionStallsOverview";
+import useRegistrationStepStatus from "../../../../hooks/useRegistrationStepStatus";
 
 import CompetitionStallCard from "../../../../components/competitions/CompetitionStallCard";
 
@@ -35,7 +37,10 @@ import StallBookingCreateModal from "../../../../components/competitions/StallBo
 
 import StallMapModal from "../../../../components/competitions/StallMapModal";
 
+import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
+
 import { createStallBookingCancelRequest } from "../../../../services/stallBookingsService";
+import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
 
 import styles from "../../../../styles/adminCompetitionStallsStyles";
 
@@ -61,6 +66,73 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
   var [showStallMap, setShowStallMap] = useState(false);
 
   var [stallMapFocus, setStallMapFocus] = useState(null);
+
+  var registrationStepStatus = useRegistrationStepStatus({
+    competitionId: activeCompetition?.competitionId,
+    ranchId: activeRole?.ranchId,
+    enabled: true,
+  });
+
+  var availability = registrationStepStatus.availability;
+  var isRegistrationStatusLoading = registrationStepStatus.loading;
+  var registrationStatusError = registrationStepStatus.error;
+  var reloadRegistrationStepStatus = registrationStepStatus.reload;
+
+  // Same dedup pattern proven in Stage 3: useFocusEffect also fires once on
+  // initial mount (already focused), on top of the hook's own internal
+  // mount/param-change effect - without this guard that's a duplicate
+  // fetch. A genuine re-focus with the SAME reload identity still refreshes
+  // exactly once.
+  var lastTriggeredReloadRef = useRef(null);
+
+  useFocusEffect(
+    useCallback(
+      function () {
+        if (lastTriggeredReloadRef.current !== reloadRegistrationStepStatus) {
+          lastTriggeredReloadRef.current = reloadRegistrationStepStatus;
+          return;
+        }
+
+        reloadRegistrationStepStatus();
+      },
+      [reloadRegistrationStepStatus],
+    ),
+  );
+
+  // Stalls and Shavings are independent gates - each gets its OWN force-close
+  // effect, so disabling one section can never touch a modal belonging to
+  // the other, still-enabled section.
+  useEffect(
+    function () {
+      if (availability.stalls.isEnabled) {
+        return;
+      }
+
+      if (showCreateStallModal) {
+        setShowCreateStallModal(false);
+      }
+
+      if (showEditModal) {
+        setShowEditModal(false);
+        setSelectedStallForEdit(null);
+      }
+    },
+    [availability.stalls.isEnabled, showCreateStallModal, showEditModal],
+  );
+
+  useEffect(
+    function () {
+      if (availability.shavings.isEnabled) {
+        return;
+      }
+
+      if (showShavingsModal) {
+        setShowShavingsModal(false);
+        setSelectedStallForShavings(null);
+      }
+    },
+    [availability.shavings.isEnabled, showShavingsModal],
+  );
 
   function handleOpenStallMap() {
     setStallMapFocus(null);
@@ -99,6 +171,10 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
   }
 
   function handleOpenCreateStallModal() {
+    if (!availability.stalls.isEnabled) {
+      return;
+    }
+
     setShowCreateStallModal(true);
   }
 
@@ -108,15 +184,26 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
 
   async function handleStallCreated() {
     await overview.reload();
+    // A new stall booking changes hasRelevantActiveNonTackStallBooking, which
+    // drives the Shavings gate on THIS same screen.
+    reloadRegistrationStepStatus();
   }
 
   function handleOpenGeneralShavingsModal() {
+    if (!availability.shavings.isEnabled) {
+      return;
+    }
+
     setSelectedStallForShavings(null);
 
     setShowShavingsModal(true);
   }
 
   function handleAddShavingsForStall(item) {
+    if (!availability.shavings.isEnabled) {
+      return;
+    }
+
     setSelectedStallForShavings(item);
 
     setShowShavingsModal(true);
@@ -135,6 +222,10 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
   }
 
   function handleEditStallBooking(item) {
+    if (!availability.stalls.isEnabled) {
+      return;
+    }
+
     if (!item || !item.stallBookingId) {
       Alert.alert("שגיאה", "לא נמצא מזהה הזמנת תא תקין");
       return;
@@ -166,11 +257,16 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
 
   async function handleEditCreated() {
     await overview.reload();
+    reloadRegistrationStepStatus();
 
     setSelectedStallForEdit(null);
   }
 
   function handleCancelStallBooking(item) {
+    if (!availability.stalls.isEnabled) {
+      return;
+    }
+
     if (!item || !item.stallBookingId) {
       Alert.alert("שגיאה", "לא נמצא מזהה הזמנת תא תקין");
       return;
@@ -204,6 +300,10 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
         text: "כן, שלחי בקשה",
         style: "destructive",
         onPress: async function () {
+          if (!availability.stalls.isEnabled) {
+            return;
+          }
+
           try {
             await createStallBookingCancelRequest({
               stallBookingId: item.stallBookingId,
@@ -211,6 +311,7 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
             });
 
             await overview.reload();
+            reloadRegistrationStepStatus();
 
             Alert.alert("נשלח", "בקשת ביטול התא נשלחה בהצלחה");
           } catch (error) {
@@ -304,10 +405,46 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           />
         }
       >
+        {registrationStatusError ? (
+          <View style={styles.errorWrap}>
+            <Text style={styles.errorText}>{registrationStatusError}</Text>
+
+            <Button
+              variant="outline"
+              label="נסה שוב"
+              onPress={reloadRegistrationStepStatus}
+              style={{ marginTop: 8 }}
+            />
+          </View>
+        ) : null}
+
+        {!availability.stalls.isEnabled ? (
+          <RegistrationStepNotice
+            message={buildRegistrationStepNoticeMessage(
+              availability.stalls,
+              isRegistrationStatusLoading,
+            )}
+            containerStyle={styles.errorWrap}
+            textStyle={styles.errorText}
+          />
+        ) : null}
+
+        {!availability.shavings.isEnabled ? (
+          <RegistrationStepNotice
+            message={buildRegistrationStepNoticeMessage(
+              availability.shavings,
+              isRegistrationStatusLoading,
+            )}
+            containerStyle={styles.errorWrap}
+            textStyle={styles.errorText}
+          />
+        ) : null}
+
         <View style={styles.topActionsRow}>
           <Button
             variant="solid"
             label="+ הוסף תא"
+            disabled={!availability.stalls.isEnabled}
             onPress={handleOpenCreateStallModal}
             style={{ flex: 1 }}
           />
@@ -315,6 +452,7 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           <Button
             variant="outline"
             label="+ הוסף הזמנת נסורת"
+            disabled={!availability.shavings.isEnabled}
             onPress={handleOpenGeneralShavingsModal}
             style={{ flex: 1 }}
           />
@@ -330,14 +468,14 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
         {renderContent()}
 
         <StallBookingCreateModal
-          visible={showCreateStallModal}
+          visible={showCreateStallModal && availability.stalls.isEnabled}
           competitionId={activeCompetition?.competitionId}
           onClose={handleCloseCreateStallModal}
           onCreated={handleStallCreated}
         />
 
         <ShavingsOrderModal
-          visible={showShavingsModal}
+          visible={showShavingsModal && availability.shavings.isEnabled}
           competitionId={activeCompetition?.competitionId}
           initialStallBookingId={
             selectedStallForShavings
@@ -349,7 +487,7 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
         />
 
         <StallBookingEditModal
-          visible={showEditModal}
+          visible={showEditModal && availability.stalls.isEnabled}
           item={selectedStallForEdit}
           competitionId={activeCompetition?.competitionId}
           onClose={handleCloseEditModal}
