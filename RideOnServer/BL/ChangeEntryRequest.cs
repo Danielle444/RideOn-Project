@@ -1,4 +1,5 @@
-﻿using RideOnServer.BL.Services;
+﻿using RideOnServer.BL.DTOs.ChangeEntryRequest;
+using RideOnServer.BL.Services;
 using RideOnServer.DAL;
 
 namespace RideOnServer.BL
@@ -21,12 +22,33 @@ namespace RideOnServer.BL
 
         public decimal? FineAmountSnapshot { get; set; }
 
+        // Thin passthrough to the read-only authorization-context lookup (218).
+        // Called by the controller BEFORE CreateRequest, so 404/400/403/409 can
+        // be classified from plain booleans - never from exception text.
+        internal static ChangeEntryRequestAuthorizationContext GetAuthorizationContext(
+            int originalEntryId,
+            int? newEntryId,
+            int competitionId,
+            int personId
+        )
+        {
+            ChangeEntryRequestDAL dal = new ChangeEntryRequestDAL();
+
+            return dal.GetAuthorizationContext(
+                originalEntryId,
+                newEntryId,
+                competitionId,
+                personId
+            );
+        }
 
         internal static int CreateRequest(
             Competition competition,
             int originalEntryId,
             int? newEntryId,
-            bool isCancelled
+            bool isCancelled,
+            int personId,
+            int competitionId
         )
         {
             string fineReason =
@@ -49,7 +71,9 @@ namespace RideOnServer.BL
                 newEntryId,
                 isCancelled,
                 fine?.FineId,
-                fine?.FineAmount
+                fine?.FineAmount,
+                personId,
+                competitionId
             );
         }
 

@@ -18,6 +18,83 @@ namespace RideOnServer.Controllers
         {
             try
             {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                // Structured, pre-write classification via plain booleans from
+                // usp_getchangeentryrequestauthorizationcontext (218) - never by
+                // parsing exception text. personId is JWT-derived only; the
+                // entry's real competition/ranch are resolved server-side and
+                // cross-checked against dto.CompetitionId, never trusted as-is.
+                ChangeEntryRequestAuthorizationContext ctx =
+                    ChangeEntryRequest.GetAuthorizationContext(
+                        dto.OriginalEntryId,
+                        dto.NewEntryId,
+                        dto.CompetitionId,
+                        personId
+                    );
+
+                if (!ctx.EntryExists)
+                {
+                    return NotFound("Original entry not found");
+                }
+
+                if (ctx.ActualCompetitionId != dto.CompetitionId)
+                {
+                    return BadRequest(
+                        "Competition id does not match the entry's actual competition"
+                    );
+                }
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ctx.HostRanchId ?? 0,
+                    RoleNames.RanchAdmin
+                );
+
+                if (!ctx.IsWithinModelCScope)
+                {
+                    throw new UnauthorizedAccessException(
+                        "אין לך הרשאה לבצע פעולה זו עבור הכניסה שנבחרה"
+                    );
+                }
+
+                if (ctx.IsCompetitionEnded)
+                {
+                    return StatusCode(
+                        StatusCodes.Status409Conflict,
+                        "לא ניתן ליצור בקשת שינוי או ביטול לאחר סיום התחרות"
+                    );
+                }
+
+                if (!dto.IsCancelled)
+                {
+                    if (!ctx.NewEntryExists)
+                    {
+                        return NotFound("New entry not found");
+                    }
+
+                    if (
+                        ctx.NewEntryCompetitionId != ctx.ActualCompetitionId ||
+                        ctx.NewEntryHostRanchId != ctx.HostRanchId
+                    )
+                    {
+                        return BadRequest(
+                            "New entry does not belong to the same competition or ranch as the original entry"
+                        );
+                    }
+
+                    if (!ctx.NewEntryCreatedByAdmin)
+                    {
+                        throw new UnauthorizedAccessException(
+                            "הכניסה החדשה לא נוצרה על ידך"
+                        );
+                    }
+                }
+
+                // Existence is already guaranteed by ctx.EntryExists +
+                // ctx.ActualCompetitionId matching dto.CompetitionId above, so
+                // this can only return null on a genuine race; kept as a
+                // defensive fallback, not the primary existence check.
                 Competition? competition =
                     Competition.GetCompetitionById(
                         dto.CompetitionId
@@ -35,7 +112,9 @@ namespace RideOnServer.Controllers
                         competition,
                         dto.OriginalEntryId,
                         dto.NewEntryId,
-                        dto.IsCancelled
+                        dto.IsCancelled,
+                        personId,
+                        dto.CompetitionId
                     );
 
                 return Ok(requestId);
@@ -44,6 +123,19 @@ namespace RideOnServer.Controllers
             {
                 return StatusCode(
                     StatusCodes.Status403Forbidden,
+                    ex.Message
+                );
+            }
+            catch (ValidationException ex)
+            {
+                // Business-rule/race guard raised inside
+                // usp_insertchangeentryrequestsecured (RN001) - the SP-level
+                // defense-in-depth backstop. By the time execution reaches the
+                // SP, the checks above already passed, so anything the SP
+                // itself still rejects represents a conflict with state that
+                // changed between the check and the write.
+                return StatusCode(
+                    StatusCodes.Status409Conflict,
                     ex.Message
                 );
             }
