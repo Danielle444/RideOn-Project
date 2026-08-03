@@ -151,6 +151,7 @@ declare
     v_competitionid integer;
     v_organizercost numeric(10,2);
     v_federationcost numeric(10,2);
+    v_competitionenddate date;
     v_billid integer;
     v_srequestid integer;
     v_entryid integer;
@@ -169,6 +170,15 @@ begin
 
     if v_competitionid is null then
         raise exception 'Class not found';
+    end if;
+
+    select c.competitionenddate
+    into v_competitionenddate
+    from public.competition c
+    where c.competitionid = v_competitionid;
+
+    if (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate then
+        raise exception 'Competition has already ended' using errcode = 'RN001';
     end if;
 
     select h.ranchid
