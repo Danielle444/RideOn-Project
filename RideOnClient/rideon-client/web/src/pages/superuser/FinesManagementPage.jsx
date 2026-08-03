@@ -4,6 +4,7 @@ import FinesTable from "../../components/superuser/FinesTable";
 import FineModal from "../../components/superuser/FineModal";
 import ToastMessage from "../../components/common/ToastMessage";
 import { getAllFines, updateFine } from "../../services/superUserService";
+import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function FinesManagementPage() {
   const [fines, setFines] = useState([]);
@@ -28,7 +29,7 @@ export default function FinesManagementPage() {
       setFines(res.data || []);
     } catch (err) {
       console.error(err);
-      showToast("error", err.response?.data || "שגיאה בטעינת קנסות");
+      showToast("error", getErrorMessage(err, "שגיאה בטעינת קנסות"));
       setFines([]);
     } finally {
       setLoading(false);
@@ -102,7 +103,7 @@ export default function FinesManagementPage() {
     } catch (err) {
       console.error(err);
 
-      setError(err.response?.data || "שגיאה בשמירת הקנס");
+      setError(getErrorMessage(err, "שגיאה בשמירת הקנס"));
     }
   }
 

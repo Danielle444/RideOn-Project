@@ -16,6 +16,7 @@ import {
   rejectPayerRegistration,
   getPendingRequestsSummary,
 } from "../../services/superUserService";
+import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function UserRequestsPage() {
   const [searchParams] = useSearchParams();
@@ -114,7 +115,13 @@ export default function UserRequestsPage() {
       }
     } catch (err) {
       console.error("Failed loading requests:", err);
-      showToast("error", err.response?.data || "שגיאה בטעינת הנתונים");
+
+      const fallbackMessage =
+        activeTab === "payer"
+          ? "אירעה שגיאה בטעינת הרשמות משלמים ממתינות"
+          : "שגיאה בטעינת הנתונים";
+
+      showToast("error", getErrorMessage(err, fallbackMessage));
       setRows([]);
     } finally {
       setLoading(false);
@@ -184,9 +191,10 @@ export default function UserRequestsPage() {
       }
 
       await refreshAfterAction();
+      showToast("success", "הבקשה אושרה בהצלחה");
     } catch (err) {
       console.error("Approve failed:", err);
-      showToast("error", err.response?.data || "שגיאה באישור הבקשה");
+      showToast("error", getErrorMessage(err, "שגיאה באישור הבקשה"));
     } finally {
       setActionLoadingKey("");
     }
@@ -219,9 +227,10 @@ export default function UserRequestsPage() {
       }
 
       await refreshAfterAction();
+      showToast("success", "הבקשה נדחתה בהצלחה");
     } catch (err) {
       console.error("Reject failed:", err);
-      showToast("error", err.response?.data || "שגיאה בדחיית הבקשה");
+      showToast("error", getErrorMessage(err, "שגיאה בדחיית הבקשה"));
     } finally {
       setActionLoadingKey("");
     }
@@ -254,9 +263,10 @@ export default function UserRequestsPage() {
 
           closeConfirmDialog();
           await refreshAfterAction();
+          showToast("success", "הבקשה הוחזרה לסטטוס ממתין בהצלחה");
         } catch (err) {
           console.error("Undo approve failed:", err);
-          showToast("error", err.response?.data || "שגיאה בביטול האישור");
+          showToast("error", getErrorMessage(err, "שגיאה בביטול האישור"));
         } finally {
           setActionLoadingKey("");
         }
@@ -291,9 +301,10 @@ export default function UserRequestsPage() {
 
           closeConfirmDialog();
           await refreshAfterAction();
+          showToast("success", "הבקשה אושרה מחדש בהצלחה");
         } catch (err) {
           console.error("Approve rejected request failed:", err);
-          showToast("error", err.response?.data || "שגיאה באישור מחדש של הבקשה");
+          showToast("error", getErrorMessage(err, "שגיאה באישור מחדש של הבקשה"));
         } finally {
           setActionLoadingKey("");
         }
