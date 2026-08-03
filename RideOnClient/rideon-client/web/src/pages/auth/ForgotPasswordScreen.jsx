@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { forgotPassword } from "../../services/authService";
+import { authTheme } from "../../../../shared/auth/theme/authTheme";
+import Field from "../../components/common/Field";
+import AuthButton from "../../components/common/AuthButton";
+
+const { palette } = authTheme;
 
 export default function ForgotPasswordScreen() {
   const navigate = useNavigate();
@@ -32,15 +37,30 @@ export default function ForgotPasswordScreen() {
 
   if (submitted) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F5EDE8]" dir="rtl">
-        <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg text-center">
-          <h2 className="mb-4 text-2xl font-bold text-[#4E342E]">בדוק את תיבת הדואר</h2>
-          <p className="text-[#5D4037] mb-6">
+      <div
+        className="flex min-h-screen items-center justify-center"
+        style={{ backgroundColor: palette.background }}
+        dir="rtl"
+      >
+        <div
+          className="w-full max-w-md rounded-2xl p-8 shadow-lg text-center"
+          style={{ backgroundColor: palette.surface }}
+        >
+          <h2
+            className="mb-4 text-2xl font-bold"
+            style={{ color: palette.heading }}
+          >
+            בדוק את תיבת הדואר
+          </h2>
+          <p className="mb-6" style={{ color: palette.text }}>
             אם המייל קיים במערכת, ישלח אליך קישור לאיפוס הסיסמה.
           </p>
           <button
-            onClick={function () { navigate("/login"); }}
-            className="text-[#795548] hover:underline text-sm"
+            onClick={function () {
+              navigate("/login");
+            }}
+            className="hover:underline text-sm"
+            style={{ color: palette.primary }}
           >
             חזרה לכניסה
           </button>
@@ -50,24 +70,51 @@ export default function ForgotPasswordScreen() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F5EDE8]" dir="rtl">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
-        <h2 className="mb-2 text-center text-2xl font-bold text-[#4E342E]">שכחתי סיסמה</h2>
-        <p className="mb-6 text-center text-sm text-[#8D6E63]">
+    <div
+      className="flex min-h-screen items-center justify-center"
+      style={{ backgroundColor: palette.background }}
+      dir="rtl"
+    >
+      <div
+        className="w-full max-w-md rounded-2xl p-8 shadow-lg"
+        style={{ backgroundColor: palette.surface }}
+      >
+        <h2
+          className="mb-2 text-center text-2xl font-bold"
+          style={{ color: palette.heading }}
+        >
+          שכחתי סיסמה
+        </h2>
+        <p
+          className="mb-6 text-center text-sm"
+          style={{ color: palette.mutedText }}
+        >
           הזן את כתובת המייל שלך ונשלח לך קישור לאיפוס הסיסמה.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm text-[#5D4037]">כתובת מייל</label>
+          <Field label="כתובת מייל">
             <input
               type="email"
               value={email}
-              onChange={function (e) { setEmail(e.target.value); }}
-              className="w-full rounded-xl border border-[#D7CCC8] px-4 py-2 text-right focus:border-[#795548] focus:outline-none"
+              onChange={function (e) {
+                setEmail(e.target.value);
+              }}
+              className="w-full rounded-xl px-4 py-2 text-right focus:outline-none"
+              style={{
+                borderWidth: 1,
+                borderStyle: "solid",
+                borderColor: palette.border,
+              }}
+              onFocus={function (e) {
+                e.currentTarget.style.borderColor = palette.primary;
+              }}
+              onBlur={function (e) {
+                e.currentTarget.style.borderColor = palette.border;
+              }}
               placeholder="example@email.com"
             />
-          </div>
+          </Field>
 
           {errorMessage && (
             <div className="rounded-xl bg-red-50 px-4 py-2 text-sm text-red-600">
@@ -75,19 +122,18 @@ export default function ForgotPasswordScreen() {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full rounded-xl bg-[#795548] py-2 text-white transition hover:bg-[#6D4C41] disabled:opacity-60"
-          >
+          <AuthButton type="submit" disabled={isLoading}>
             {isLoading ? "שולח..." : "שלח קישור לאיפוס"}
-          </button>
+          </AuthButton>
         </form>
 
-        <p className="mt-6 text-center text-sm text-[#6D4C41]">
+        <p className="mt-6 text-center text-sm" style={{ color: palette.text }}>
           <span
-            onClick={function () { navigate("/login"); }}
-            className="cursor-pointer font-semibold text-[#795548] hover:underline"
+            onClick={function () {
+              navigate("/login");
+            }}
+            className="cursor-pointer font-semibold hover:underline"
+            style={{ color: palette.primary }}
           >
             חזרה לכניסה
           </span>

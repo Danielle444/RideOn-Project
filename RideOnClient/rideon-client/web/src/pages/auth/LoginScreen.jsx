@@ -3,7 +3,12 @@ import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { getPostLoginRoute } from "../../../../shared/auth/utils/authNavigation";
 import { validateLoginForm } from "../../../../shared/auth/validations/loginValidation";
+import { authTheme } from "../../../../shared/auth/theme/authTheme";
 import { useAuth } from "../../context/AuthContext";
+import Field from "../../components/common/Field";
+import AuthButton from "../../components/common/AuthButton";
+
+const { palette } = authTheme;
 
 export default function LoginScreen() {
   const navigate = useNavigate();
@@ -84,38 +89,54 @@ export default function LoginScreen() {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center bg-[#F5EDE8]"
+      className="flex min-h-screen items-center justify-center"
+      style={{ backgroundColor: palette.background }}
       dir="rtl"
     >
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
-        <h2 className="mb-4 text-center text-2xl font-bold text-[#4E342E]">
+      <div
+        className="w-full max-w-md rounded-2xl p-8 shadow-lg"
+        style={{ backgroundColor: palette.surface }}
+      >
+        <h2
+          className="mb-4 text-center text-2xl font-bold"
+          style={{ color: palette.heading }}
+        >
           התחברות למערכת
         </h2>
 
         {isSuperUserMode && (
-          <p className="mb-4 text-center text-sm font-semibold text-[#8B0000]">
+          <p
+            className="mb-4 text-center text-sm font-semibold"
+            style={{ color: palette.danger.text }}
+          >
             מצב מנהל מערכת
           </p>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm text-[#5D4037]">
-              {isSuperUserMode ? "כתובת מייל" : "שם משתמש"}
-            </label>
+          <Field label={isSuperUserMode ? "כתובת מייל" : "שם משתמש"}>
             <input
               type={isSuperUserMode ? "email" : "text"}
               value={username}
               onChange={function (e) {
                 setUsername(e.target.value);
               }}
-              className="w-full rounded-xl border border-[#D7CCC8] px-4 py-2 text-right focus:border-[#795548] focus:outline-none"
+              className="w-full rounded-xl px-4 py-2 text-right focus:outline-none"
+              style={{
+                borderWidth: 1,
+                borderStyle: "solid",
+                borderColor: palette.border,
+              }}
+              onFocus={function (e) {
+                e.currentTarget.style.borderColor = palette.primary;
+              }}
+              onBlur={function (e) {
+                e.currentTarget.style.borderColor = palette.border;
+              }}
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className="mb-1 block text-sm text-[#5D4037]">סיסמה</label>
-
+          <Field label="סיסמה">
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -123,7 +144,18 @@ export default function LoginScreen() {
                 onChange={function (e) {
                   setPassword(e.target.value);
                 }}
-                className="w-full rounded-xl border border-[#D7CCC8] px-4 py-2 pl-11 text-right focus:border-[#795548] focus:outline-none"
+                className="w-full rounded-xl px-4 py-2 pl-11 text-right focus:outline-none"
+                style={{
+                  borderWidth: 1,
+                  borderStyle: "solid",
+                  borderColor: palette.border,
+                }}
+                onFocus={function (e) {
+                  e.currentTarget.style.borderColor = palette.primary;
+                }}
+                onBlur={function (e) {
+                  e.currentTarget.style.borderColor = palette.border;
+                }}
               />
 
               <button
@@ -133,15 +165,25 @@ export default function LoginScreen() {
                     return !prev;
                   });
                 }}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8D6E63] transition-colors hover:text-[#5D4037]"
+                className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors"
+                style={{ color: palette.mutedText }}
+                onMouseEnter={function (e) {
+                  e.currentTarget.style.color = palette.text;
+                }}
+                onMouseLeave={function (e) {
+                  e.currentTarget.style.color = palette.mutedText;
+                }}
                 title={showPassword ? "הסתרת סיסמה" : "הצגת סיסמה"}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-          </div>
+          </Field>
 
-          <div className="flex items-center justify-between text-sm text-[#5D4037]">
+          <div
+            className="flex items-center justify-between text-sm"
+            style={{ color: palette.text }}
+          >
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -158,7 +200,8 @@ export default function LoginScreen() {
               onClick={function () {
                 setShowForgotPopup(true);
               }}
-              className="text-[#795548] hover:underline"
+              className="hover:underline"
+              style={{ color: palette.primary }}
             >
               שכחתי סיסמה
             </button>
@@ -170,37 +213,47 @@ export default function LoginScreen() {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full rounded-xl bg-[#795548] py-2 text-white transition hover:bg-[#6D4C41] disabled:opacity-60"
-          >
+          <AuthButton type="submit" disabled={isLoading}>
             {isLoading
               ? "מתחבר..."
               : isSuperUserMode
               ? "כניסת מנהל מערכת"
               : "התחבר"}
-          </button>
+          </AuthButton>
         </form>
 
         {!isSuperUserMode && (
-          <p className="mt-6 text-center text-sm text-[#6D4C41]">
+          <p
+            className="mt-6 text-center text-sm"
+            style={{ color: palette.text }}
+          >
             אין לך חשבון?{" "}
             <Link
               onClick={function () {
                 navigate("/register");
               }}
-              className="cursor-pointer font-semibold text-[#795548] hover:underline"
+              className="cursor-pointer font-semibold hover:underline"
+              style={{ color: palette.primary }}
             >
               להרשמה
             </Link>
           </p>
         )}
 
-        <div className="mt-6 text-center text-xs text-[#BCAAA4]">
+        <div
+          className="mt-6 text-center text-xs"
+          style={{ color: palette.subtleText }}
+        >
           <span
             onClick={toggleSuperUserMode}
-            className="cursor-pointer select-none hover:text-[#8D6E63]"
+            className="cursor-pointer select-none transition-colors"
+            style={{ color: palette.subtleText }}
+            onMouseEnter={function (e) {
+              e.currentTarget.style.color = palette.mutedText;
+            }}
+            onMouseLeave={function (e) {
+              e.currentTarget.style.color = palette.subtleText;
+            }}
             title="כניסת מנהל מערכת"
           >
             © RideOn
@@ -209,28 +262,46 @@ export default function LoginScreen() {
       </div>
 
       {showForgotPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" dir="rtl">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-3 text-lg font-bold text-[#4E342E]">איפוס סיסמה</h3>
-            <p className="mb-6 text-sm text-[#5D4037]">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          dir="rtl"
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-6 shadow-xl"
+            style={{ backgroundColor: palette.surface }}
+          >
+            <h3
+              className="mb-3 text-lg font-bold"
+              style={{ color: palette.heading }}
+            >
+              איפוס סיסמה
+            </h3>
+            <p className="mb-6 text-sm" style={{ color: palette.text }}>
               להמשך תהליך איפוס הסיסמה, תועבר למסך הבא. להמשיך?
             </p>
             <div className="flex gap-3 justify-end">
-              <button
-                onClick={function () { setShowForgotPopup(false); }}
-                className="rounded-xl border border-[#D7CCC8] px-4 py-2 text-sm text-[#5D4037] hover:bg-[#F5EDE8]"
-              >
-                ביטול
-              </button>
-              <button
+              <AuthButton
+                variant="outline"
+                fullWidth={false}
                 onClick={function () {
                   setShowForgotPopup(false);
-                  navigate(isSuperUserMode ? "/superuser-forgot-password" : "/forgot-password");
                 }}
-                className="rounded-xl bg-[#795548] px-4 py-2 text-sm text-white hover:bg-[#6D4C41]"
+              >
+                ביטול
+              </AuthButton>
+              <AuthButton
+                fullWidth={false}
+                onClick={function () {
+                  setShowForgotPopup(false);
+                  navigate(
+                    isSuperUserMode
+                      ? "/superuser-forgot-password"
+                      : "/forgot-password"
+                  );
+                }}
               >
                 {isSuperUserMode ? "כן, שלח לי קוד" : "כן, שלח לי קישור"}
-              </button>
+              </AuthButton>
             </div>
           </div>
         </div>
