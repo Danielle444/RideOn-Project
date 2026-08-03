@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Info, X } from "lucide-react";
 import logo from "../../../../shared/assets/logo.png";
+import { authTheme } from "../../../../shared/auth/theme/authTheme";
 import Field from "../../components/common/Field";
+import AuthButton from "../../components/common/AuthButton";
 import CustomDropdown from "../../components/common/CustomDropdown";
 import {
   register,
@@ -26,6 +28,8 @@ import {
   validatePersonalSection,
   validateUserSection,
 } from "../../../../shared/auth/validations/registerValidation";
+
+const { palette } = authTheme;
 
 export default function RegisterScreen() {
   const navigate = useNavigate();
@@ -497,10 +501,42 @@ export default function RegisterScreen() {
   var filteredRoles = filterRegisterRoles(roles);
 
   const inputCls =
-    "w-full px-4 py-2.5 rounded-xl border-2 border-[#D7CCC8] bg-[#FAFAFA] text-right text-[#212121] placeholder-[#BCAAA4] focus:outline-none focus:border-[#795548] focus:bg-white focus:ring-2 focus:ring-[#795548]/15 transition-all text-sm";
+    "w-full px-4 py-2.5 rounded-xl text-right placeholder-[#BCAAA4] focus:outline-none transition-all text-sm";
 
   const readOnlyCls =
-    "w-full px-4 py-2.5 rounded-xl border-2 border-[#E5D7CF] bg-[#F3ECE8] text-right text-[#6D4C41] placeholder-[#BCAAA4] cursor-not-allowed text-sm";
+    "w-full px-4 py-2.5 rounded-xl text-right placeholder-[#BCAAA4] cursor-not-allowed text-sm";
+
+  function getEditableFieldStyle() {
+    return {
+      borderWidth: 2,
+      borderStyle: "solid",
+      borderColor: palette.border,
+      backgroundColor: palette.surfaceMuted,
+      color: palette.text,
+    };
+  }
+
+  function getReadOnlyFieldStyle() {
+    return {
+      borderWidth: 2,
+      borderStyle: "solid",
+      borderColor: palette.borderSoft,
+      backgroundColor: palette.surfaceMuted,
+      color: palette.text,
+    };
+  }
+
+  function handleEditableFieldFocus(e) {
+    e.currentTarget.style.borderColor = palette.primary;
+    e.currentTarget.style.backgroundColor = palette.surface;
+    e.currentTarget.style.boxShadow = "0 0 0 3px rgba(123, 90, 77, 0.15)";
+  }
+
+  function handleEditableFieldBlur(e) {
+    e.currentTarget.style.borderColor = palette.border;
+    e.currentTarget.style.backgroundColor = palette.surfaceMuted;
+    e.currentTarget.style.boxShadow = "none";
+  }
 
   var personalFieldsLocked = !nationalIdChecked || existingSystemUserFound;
 
@@ -521,9 +557,11 @@ export default function RegisterScreen() {
     return (
       <div
         className="w-screen min-h-screen flex items-center justify-center"
-        style={{ background: "#F5EDE8" }}
+        style={{ backgroundColor: palette.background }}
       >
-        <p className="text-[#795548] font-medium">טוען נתונים...</p>
+        <p className="font-medium" style={{ color: palette.primary }}>
+          טוען נתונים...
+        </p>
       </div>
     );
   }
@@ -532,9 +570,7 @@ export default function RegisterScreen() {
     <div
       className="w-screen min-h-screen flex flex-col items-center py-8 px-4 sm:py-12"
       dir="rtl"
-      style={{
-        background: "linear-gradient(135deg, #EFEBE9 0%, #F5EDE8 100%)",
-      }}
+      style={{ backgroundColor: palette.background }}
     >
       <div className="text-center mb-8 w-full max-w-3xl">
         <img
@@ -542,23 +578,41 @@ export default function RegisterScreen() {
           alt="RideOn"
           className="h-20 sm:h-24 object-contain mx-auto mb-3"
         />
-        <h2 className="text-2xl sm:text-3xl font-bold text-[#212121] mt-1">
+        <h2
+          className="text-2xl sm:text-3xl font-bold mt-1"
+          style={{ color: palette.heading }}
+        >
           הרשמה למערכת
         </h2>
-        <p className="text-sm text-[#795548] mt-2">
+        <p className="text-sm mt-2" style={{ color: palette.primary }}>
           מלאו את הפרטים הבאים. הבקשה תועבר לאישור מנהל.
         </p>
       </div>
 
-      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-[#E8D5C9] overflow-visible">
+      <div
+        className="w-full max-w-4xl rounded-2xl shadow-xl overflow-visible"
+        style={{
+          backgroundColor: palette.surface,
+          borderWidth: 1,
+          borderStyle: "solid",
+          borderColor: palette.borderSoft,
+        }}
+      >
         <form onSubmit={handleSubmit}>
-          <div className="border-b border-[#F5EBE4]">
+          <div
+            style={{
+              borderBottomWidth: 1,
+              borderBottomStyle: "solid",
+              borderBottomColor: palette.borderSoft,
+            }}
+          >
             <button
               type="button"
               onClick={function () {
                 setActiveSection(1);
               }}
-              className="w-full text-right px-6 sm:px-8 py-4 font-bold text-[#5D4037] flex items-center justify-between"
+              className="w-full text-right px-6 sm:px-8 py-4 font-bold flex items-center justify-between"
+              style={{ color: palette.text }}
             >
               <span>פרטים אישיים</span>
               <span>{activeSection === 1 ? "▲" : "▼"}</span>
@@ -573,20 +627,31 @@ export default function RegisterScreen() {
                         type="text"
                         value={form.nationalId}
                         onChange={set("nationalId")}
-                        onBlur={handleNationalIdBlur}
+                        onBlur={function (e) {
+                          handleEditableFieldBlur(e);
+                          handleNationalIdBlur();
+                        }}
+                        onFocus={handleEditableFieldFocus}
                         placeholder="9 ספרות"
                         maxLength={9}
                         className={inputCls}
+                        style={getEditableFieldStyle()}
                       />
 
                       {checkingNationalId && (
-                        <p className="mt-1 text-xs text-[#8D6E63] text-right">
+                        <p
+                          className="mt-1 text-xs text-right"
+                          style={{ color: palette.mutedText }}
+                        >
                           בודק תעודת זהות...
                         </p>
                       )}
 
                       {!checkingNationalId && nationalIdMessage && (
-                        <p className="mt-1 text-xs text-[#8D6E63] text-right">
+                        <p
+                          className="mt-1 text-xs text-right"
+                          style={{ color: palette.mutedText }}
+                        >
                           {nationalIdMessage}
                         </p>
                       )}
@@ -598,6 +663,13 @@ export default function RegisterScreen() {
                       value={form.gender}
                       onChange={set("gender")}
                       className={genderLocked ? readOnlyCls : inputCls}
+                      style={
+                        genderLocked
+                          ? getReadOnlyFieldStyle()
+                          : getEditableFieldStyle()
+                      }
+                      onFocus={genderLocked ? undefined : handleEditableFieldFocus}
+                      onBlur={genderLocked ? undefined : handleEditableFieldBlur}
                       dir="rtl"
                       disabled={genderLocked}
                     >
@@ -614,6 +686,17 @@ export default function RegisterScreen() {
                       onChange={set("firstName")}
                       placeholder="שם פרטי"
                       className={firstNameLocked ? readOnlyCls : inputCls}
+                      style={
+                        firstNameLocked
+                          ? getReadOnlyFieldStyle()
+                          : getEditableFieldStyle()
+                      }
+                      onFocus={
+                        firstNameLocked ? undefined : handleEditableFieldFocus
+                      }
+                      onBlur={
+                        firstNameLocked ? undefined : handleEditableFieldBlur
+                      }
                       readOnly={firstNameLocked}
                     />
                   </Field>
@@ -625,6 +708,17 @@ export default function RegisterScreen() {
                       onChange={set("lastName")}
                       placeholder="שם משפחה"
                       className={lastNameLocked ? readOnlyCls : inputCls}
+                      style={
+                        lastNameLocked
+                          ? getReadOnlyFieldStyle()
+                          : getEditableFieldStyle()
+                      }
+                      onFocus={
+                        lastNameLocked ? undefined : handleEditableFieldFocus
+                      }
+                      onBlur={
+                        lastNameLocked ? undefined : handleEditableFieldBlur
+                      }
                       readOnly={lastNameLocked}
                     />
                   </Field>
@@ -635,6 +729,17 @@ export default function RegisterScreen() {
                       value={form.dateOfBirth}
                       onChange={set("dateOfBirth")}
                       className={dateOfBirthLocked ? readOnlyCls : inputCls}
+                      style={
+                        dateOfBirthLocked
+                          ? getReadOnlyFieldStyle()
+                          : getEditableFieldStyle()
+                      }
+                      onFocus={
+                        dateOfBirthLocked ? undefined : handleEditableFieldFocus
+                      }
+                      onBlur={
+                        dateOfBirthLocked ? undefined : handleEditableFieldBlur
+                      }
                       disabled={dateOfBirthLocked}
                     />
                   </Field>
@@ -646,6 +751,17 @@ export default function RegisterScreen() {
                       onChange={set("cellPhone")}
                       placeholder="050-0000000"
                       className={cellPhoneLocked ? readOnlyCls : inputCls}
+                      style={
+                        cellPhoneLocked
+                          ? getReadOnlyFieldStyle()
+                          : getEditableFieldStyle()
+                      }
+                      onFocus={
+                        cellPhoneLocked ? undefined : handleEditableFieldFocus
+                      }
+                      onBlur={
+                        cellPhoneLocked ? undefined : handleEditableFieldBlur
+                      }
                       readOnly={cellPhoneLocked}
                     />
                   </Field>
@@ -656,43 +772,68 @@ export default function RegisterScreen() {
                         type="email"
                         value={form.email}
                         onChange={set("email")}
-                        onBlur={handleEmailBlur}
+                        onBlur={function (e) {
+                          if (!emailLocked) {
+                            handleEditableFieldBlur(e);
+                          }
+                          handleEmailBlur();
+                        }}
+                        onFocus={
+                          emailLocked ? undefined : handleEditableFieldFocus
+                        }
                         placeholder="example@email.com"
                         className={emailLocked ? readOnlyCls : inputCls}
+                        style={
+                          emailLocked
+                            ? getReadOnlyFieldStyle()
+                            : getEditableFieldStyle()
+                        }
                         readOnly={emailLocked}
                       />
 
                       {/* שלב OTP */}
                       <div className="mt-3 space-y-2">
-                        <button
+                        <AuthButton
                           type="button"
+                          variant="outline"
                           onClick={handleSendOtp}
                           disabled={otpLoading || !form.email || emailLocked}
-                          className="w-full rounded-xl border border-[#795548] py-2 text-sm text-[#795548] hover:bg-[#F5EDE8] disabled:opacity-50"
                         >
-                          {otpLoading ? "שולח קוד..." : otpSent ? "שלח קוד חדש" : "שלח קוד אימות למייל"}
-                        </button>
+                          {otpLoading
+                            ? "שולח קוד..."
+                            : otpSent
+                            ? "שלח קוד חדש"
+                            : "שלח קוד אימות למייל"}
+                        </AuthButton>
 
                         {otpSuccess && (
-                          <p className="text-sm text-green-600 text-right">{otpSuccess}</p>
+                          <p className="text-sm text-green-600 text-right">
+                            {otpSuccess}
+                          </p>
                         )}
                         {otpError && (
-                          <p className="text-sm text-red-600 text-right">{otpError}</p>
+                          <p className="text-sm text-red-600 text-right">
+                            {otpError}
+                          </p>
                         )}
 
                         {otpSent && (
-                          <div>
-                            <label className="mb-1 block text-sm text-[#5D4037]">קוד אימות</label>
+                          <Field label="קוד אימות">
                             <input
                               type="text"
                               value={otpCode}
-                              onChange={function (e) { setOtpCode(e.target.value); }}
-                              className="w-full rounded-xl border border-[#D7CCC8] px-4 py-2 text-right focus:border-[#795548] focus:outline-none"
+                              onChange={function (e) {
+                                setOtpCode(e.target.value);
+                              }}
+                              className={inputCls}
+                              style={getEditableFieldStyle()}
+                              onFocus={handleEditableFieldFocus}
+                              onBlur={handleEditableFieldBlur}
                               placeholder="הזן את הקוד שקיבלת במייל"
                               maxLength={6}
                               autoComplete="one-time-code"
                             />
-                          </div>
+                          </Field>
                         )}
                       </div>
                     </div>
@@ -700,25 +841,29 @@ export default function RegisterScreen() {
                 </div>
 
                 <div className="mt-6 flex justify-start">
-                  <button
-                    type="button"
-                    onClick={goToUserSection}
-                    className="px-6 py-2.5 rounded-xl bg-[#5D4037] text-white font-semibold hover:bg-[#4E342E] transition-all"
-                  >
+                  <AuthButton type="button" fullWidth={false} onClick={goToUserSection}>
                     המשך לשלב הבא
-                  </button>
+                  </AuthButton>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="border-b border-[#F5EBE4] bg-[#FDFAF8]">
+          <div
+            style={{
+              borderBottomWidth: 1,
+              borderBottomStyle: "solid",
+              borderBottomColor: palette.borderSoft,
+              backgroundColor: palette.surfaceMuted,
+            }}
+          >
             <button
               type="button"
               onClick={function () {
                 setActiveSection(2);
               }}
-              className="w-full text-right px-6 sm:px-8 py-4 font-bold text-[#5D4037] flex items-center justify-between"
+              className="w-full text-right px-6 sm:px-8 py-4 font-bold flex items-center justify-between"
+              style={{ color: palette.text }}
             >
               <span>פרטי כניסה למערכת</span>
               <span>{activeSection === 2 ? "▲" : "▼"}</span>
@@ -736,16 +881,25 @@ export default function RegisterScreen() {
                         placeholder="בחרו שם משתמש"
                         autoComplete="username"
                         className={inputCls}
+                        style={getEditableFieldStyle()}
+                        onFocus={handleEditableFieldFocus}
+                        onBlur={handleEditableFieldBlur}
                       />
 
                       {checkingUsername && (
-                        <p className="mt-1 text-xs text-[#8D6E63] text-right">
+                        <p
+                          className="mt-1 text-xs text-right"
+                          style={{ color: palette.mutedText }}
+                        >
                           בודק זמינות...
                         </p>
                       )}
 
                       {!checkingUsername && usernameSuggestionMessage && (
-                        <p className="mt-1 text-xs text-[#8D6E63] text-right">
+                        <p
+                          className="mt-1 text-xs text-right"
+                          style={{ color: palette.mutedText }}
+                        >
                           {usernameSuggestionMessage}
                         </p>
                       )}
@@ -768,14 +922,37 @@ export default function RegisterScreen() {
                     }}
                     infoPopup={
                       showPasswordInfo ? (
-                        <div className="absolute top-6 right-0 z-30 w-72 rounded-xl border border-[#E0D2C8] bg-white shadow-lg p-3 text-right">
-                          <div className="absolute -top-2 right-3 h-3 w-3 rotate-45 border-l border-t border-[#E0D2C8] bg-white" />
+                        <div
+                          className="absolute top-6 right-0 z-30 w-72 rounded-xl shadow-lg p-3 text-right"
+                          style={{
+                            borderWidth: 1,
+                            borderStyle: "solid",
+                            borderColor: palette.borderSoft,
+                            backgroundColor: palette.surface,
+                          }}
+                        >
+                          <div
+                            className="absolute -top-2 right-3 h-3 w-3 rotate-45"
+                            style={{
+                              borderLeftWidth: 1,
+                              borderTopWidth: 1,
+                              borderStyle: "solid",
+                              borderColor: palette.borderSoft,
+                              backgroundColor: palette.surface,
+                            }}
+                          />
 
-                          <p className="text-xs font-semibold text-[#5D4037] mb-2">
+                          <p
+                            className="text-xs font-semibold mb-2"
+                            style={{ color: palette.text }}
+                          >
                             הסיסמה חייבת לכלול:
                           </p>
 
-                          <ul className="text-xs text-[#6D4C41] space-y-1 leading-5">
+                          <ul
+                            className="text-xs space-y-1 leading-5"
+                            style={{ color: palette.text }}
+                          >
                             <li>• לפחות 8 תווים</li>
                             <li>• לפחות אות אנגלית גדולה אחת</li>
                             <li>• לפחות אות אנגלית קטנה אחת</li>
@@ -794,6 +971,9 @@ export default function RegisterScreen() {
                         placeholder="בחרי סיסמה"
                         autoComplete="new-password"
                         className={inputCls + " pl-10"}
+                        style={getEditableFieldStyle()}
+                        onFocus={handleEditableFieldFocus}
+                        onBlur={handleEditableFieldBlur}
                       />
                       <button
                         type="button"
@@ -802,7 +982,14 @@ export default function RegisterScreen() {
                             return !prev;
                           });
                         }}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1887F] hover:text-[#5D4037]"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors"
+                        style={{ color: palette.mutedText }}
+                        onMouseEnter={function (e) {
+                          e.currentTarget.style.color = palette.text;
+                        }}
+                        onMouseLeave={function (e) {
+                          e.currentTarget.style.color = palette.mutedText;
+                        }}
                       >
                         {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
@@ -818,6 +1005,9 @@ export default function RegisterScreen() {
                         placeholder="הזינו סיסמה שוב"
                         autoComplete="new-password"
                         className={inputCls + " pl-10"}
+                        style={getEditableFieldStyle()}
+                        onFocus={handleEditableFieldFocus}
+                        onBlur={handleEditableFieldBlur}
                       />
                       <button
                         type="button"
@@ -826,7 +1016,14 @@ export default function RegisterScreen() {
                             return !prev;
                           });
                         }}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1887F] hover:text-[#5D4037] transition-colors"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors"
+                        style={{ color: palette.mutedText }}
+                        onMouseEnter={function (e) {
+                          e.currentTarget.style.color = palette.text;
+                        }}
+                        onMouseLeave={function (e) {
+                          e.currentTarget.style.color = palette.mutedText;
+                        }}
                       >
                         {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
@@ -835,35 +1032,43 @@ export default function RegisterScreen() {
                 </div>
 
                 <div className="mt-6 flex justify-between gap-3">
-                  <button
+                  <AuthButton
                     type="button"
+                    variant="outline"
+                    fullWidth={false}
                     onClick={function () {
                       setActiveSection(1);
                     }}
-                    className="px-6 py-2.5 rounded-xl border-2 border-[#D7CCC8] text-[#795548] font-semibold hover:bg-[#F5EBE4] transition-all"
                   >
                     חזרה
-                  </button>
+                  </AuthButton>
 
-                  <button
+                  <AuthButton
                     type="button"
+                    fullWidth={false}
                     onClick={goToRanchSection}
-                    className="px-6 py-2.5 rounded-xl bg-[#5D4037] text-white font-semibold hover:bg-[#4E342E] transition-all"
                   >
                     המשך לשלב הבא
-                  </button>
+                  </AuthButton>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="border-b border-[#F5EBE4]">
+          <div
+            style={{
+              borderBottomWidth: 1,
+              borderBottomStyle: "solid",
+              borderBottomColor: palette.borderSoft,
+            }}
+          >
             <button
               type="button"
               onClick={function () {
                 setActiveSection(3);
               }}
-              className="w-full text-right px-6 sm:px-8 py-4 font-bold text-[#5D4037] flex items-center justify-between"
+              className="w-full text-right px-6 sm:px-8 py-4 font-bold flex items-center justify-between"
+              style={{ color: palette.text }}
             >
               <span>שיוך לחוות ותפקידים</span>
               <span>{activeSection === 3 ? "▲" : "▼"}</span>
@@ -871,7 +1076,10 @@ export default function RegisterScreen() {
 
             {activeSection === 3 && (
               <div className="p-6 sm:p-8 pb-12">
-                <p className="text-xs text-[#795548] text-right mb-4 leading-6">
+                <p
+                  className="text-xs text-right mb-4 leading-6"
+                  style={{ color: palette.primary }}
+                >
                   ניתן לבקש שיוך למספר חוות ותפקידים. כל זוג שייבחר יישמר ויועבר
                   לאישור.
                 </p>
@@ -898,7 +1106,9 @@ export default function RegisterScreen() {
 
                         <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <Field
-                            label={`חווה ${ranchRolePairs.length > 1 ? idx + 1 : ""}`}
+                            label={`חווה ${
+                              ranchRolePairs.length > 1 ? idx + 1 : ""
+                            }`}
                             required={idx === 0}
                           >
                             <div>
@@ -935,7 +1145,14 @@ export default function RegisterScreen() {
                               <button
                                 type="button"
                                 onClick={openCreateRanchModal}
-                                className="mt-2 text-xs text-[#795548] hover:text-[#4E342E] hover:underline transition-colors"
+                                className="mt-2 text-xs hover:underline transition-colors"
+                                style={{ color: palette.primary }}
+                                onMouseEnter={function (e) {
+                                  e.currentTarget.style.color = palette.heading;
+                                }}
+                                onMouseLeave={function (e) {
+                                  e.currentTarget.style.color = palette.primary;
+                                }}
                               >
                                 לא מצאתי את החווה שלי
                               </button>
@@ -943,7 +1160,9 @@ export default function RegisterScreen() {
                           </Field>
 
                           <Field
-                            label={`תפקיד ${ranchRolePairs.length > 1 ? idx + 1 : ""}`}
+                            label={`תפקיד ${
+                              ranchRolePairs.length > 1 ? idx + 1 : ""
+                            }`}
                             required={idx === 0}
                           >
                             <CustomDropdown
@@ -990,9 +1209,23 @@ export default function RegisterScreen() {
                         return [...prevPairs, { ranchId: "", roleId: "" }];
                       });
                     }}
-                    className="mt-3 flex items-center gap-1.5 text-sm text-[#795548] font-medium hover:text-[#4E342E] transition-colors"
+                    className="mt-3 flex items-center gap-1.5 text-sm font-medium transition-colors"
+                    style={{ color: palette.primary }}
+                    onMouseEnter={function (e) {
+                      e.currentTarget.style.color = palette.heading;
+                    }}
+                    onMouseLeave={function (e) {
+                      e.currentTarget.style.color = palette.primary;
+                    }}
                   >
-                    <span className="w-6 h-6 rounded-full border-2 border-[#795548] flex items-center justify-center text-base leading-none">
+                    <span
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-base leading-none"
+                      style={{
+                        borderWidth: 2,
+                        borderStyle: "solid",
+                        borderColor: palette.primary,
+                      }}
+                    >
                       +
                     </span>
                     הוספת חווה ותפקיד נוסף
@@ -1000,15 +1233,16 @@ export default function RegisterScreen() {
                 )}
 
                 <div className="mt-6 flex justify-start">
-                  <button
+                  <AuthButton
                     type="button"
+                    variant="outline"
+                    fullWidth={false}
                     onClick={function () {
                       setActiveSection(2);
                     }}
-                    className="px-6 py-2.5 rounded-xl border-2 border-[#D7CCC8] text-[#795548] font-semibold hover:bg-[#F5EBE4] transition-all"
                   >
                     חזרה
-                  </button>
+                  </AuthButton>
                 </div>
               </div>
             )}
@@ -1028,33 +1262,45 @@ export default function RegisterScreen() {
             )}
 
             <div className="bg-amber-50 border-r-4 border-amber-400 px-4 py-3 rounded-xl text-right">
-              <p className="text-xs text-[#5D4037]">
+              <p className="text-xs" style={{ color: palette.text }}>
                 הבקשה תועבר לאישור מנהל המערכת. לא תוכל להתחבר עד לאישור.
               </p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
-              <button
+              <AuthButton
                 type="submit"
-                disabled={loading || existingSystemUserFound || !otpCode}
-                className="flex-1 py-3 rounded-xl text-white font-bold text-base shadow-md hover:shadow-lg active:scale-[0.98] transition-all disabled:opacity-60 cursor-pointer"
+                fullWidth={false}
+                className="flex-1 shadow-md hover:shadow-lg active:scale-[0.98]"
                 style={{
-                  background:
-                    "linear-gradient(135deg, #795548 0%, #4E342E 100%)",
+                  paddingTop: "0.75rem",
+                  paddingBottom: "0.75rem",
+                  fontSize: "1rem",
+                  opacity:
+                    loading || existingSystemUserFound || !otpCode
+                      ? 0.6
+                      : undefined,
                 }}
+                disabled={loading || existingSystemUserFound || !otpCode}
               >
                 {loading ? "שולח בקשה..." : "שלח בקשת הרשמה"}
-              </button>
+              </AuthButton>
 
-              <button
+              <AuthButton
                 type="button"
+                variant="outline"
+                fullWidth={false}
+                className="sm:w-44 active:scale-[0.98]"
+                style={{
+                  paddingTop: "0.75rem",
+                  paddingBottom: "0.75rem",
+                }}
                 onClick={function () {
                   navigate("/login");
                 }}
-                className="sm:w-44 py-3 rounded-xl border-2 border-[#D7CCC8] text-[#795548] font-semibold hover:bg-[#F5EBE4] active:scale-[0.98] transition-all text-sm cursor-pointer"
               >
                 חזרה להתחברות
-              </button>
+              </AuthButton>
             </div>
           </div>
         </form>
@@ -1062,23 +1308,48 @@ export default function RegisterScreen() {
 
       {showRanchModal && (
         <div className="fixed inset-0 z-50 bg-black/35 flex items-center justify-center px-4">
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-[#E8D5C9] overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#F1E6DF]">
+          <div
+            className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden"
+            style={{
+              backgroundColor: palette.surface,
+              borderWidth: 1,
+              borderStyle: "solid",
+              borderColor: palette.borderSoft,
+            }}
+          >
+            <div
+              className="flex items-center justify-between px-6 py-4"
+              style={{
+                borderBottomWidth: 1,
+                borderBottomStyle: "solid",
+                borderBottomColor: palette.borderSoft,
+              }}
+            >
               <button
                 type="button"
                 onClick={closeCreateRanchModal}
-                className="text-[#8D6E63] hover:text-[#5D4037] transition-colors"
+                className="transition-colors"
+                style={{ color: palette.mutedText }}
+                onMouseEnter={function (e) {
+                  e.currentTarget.style.color = palette.text;
+                }}
+                onMouseLeave={function (e) {
+                  e.currentTarget.style.color = palette.mutedText;
+                }}
               >
                 <X size={18} />
               </button>
 
-              <h3 className="text-lg font-bold text-[#3F312B]">
+              <h3 className="text-lg font-bold" style={{ color: palette.heading }}>
                 בקשה להוספת חווה
               </h3>
             </div>
 
             <div className="p-6 space-y-4">
-              <p className="text-xs text-[#795548] text-right leading-6">
+              <p
+                className="text-xs text-right leading-6"
+                style={{ color: palette.primary }}
+              >
                 לא מצאת את החווה שלך? אפשר לשלוח בקשה להוספת חווה חדשה. הבקשה
                 תועבר לאישור מנהל המערכת.
               </p>
@@ -1090,6 +1361,9 @@ export default function RegisterScreen() {
                   onChange={setNewRanchField("ranchName")}
                   placeholder="הזיני שם חווה"
                   className={inputCls}
+                  style={getEditableFieldStyle()}
+                  onFocus={handleEditableFieldFocus}
+                  onBlur={handleEditableFieldBlur}
                 />
               </Field>
 
@@ -1100,6 +1374,9 @@ export default function RegisterScreen() {
                   onChange={setNewRanchField("contactEmail")}
                   placeholder="example@email.com"
                   className={inputCls}
+                  style={getEditableFieldStyle()}
+                  onFocus={handleEditableFieldFocus}
+                  onBlur={handleEditableFieldBlur}
                 />
               </Field>
 
@@ -1110,6 +1387,9 @@ export default function RegisterScreen() {
                   onChange={setNewRanchField("contactPhone")}
                   placeholder="050-0000000"
                   className={inputCls}
+                  style={getEditableFieldStyle()}
+                  onFocus={handleEditableFieldFocus}
+                  onBlur={handleEditableFieldBlur}
                 />
               </Field>
 
@@ -1120,6 +1400,9 @@ export default function RegisterScreen() {
                   onChange={setNewRanchField("websiteUrl")}
                   placeholder="https://example.com"
                   className={inputCls}
+                  style={getEditableFieldStyle()}
+                  onFocus={handleEditableFieldFocus}
+                  onBlur={handleEditableFieldBlur}
                 />
               </Field>
 
@@ -1130,34 +1413,45 @@ export default function RegisterScreen() {
               )}
 
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <button
+                <AuthButton
                   type="button"
+                  fullWidth={false}
+                  className="flex-1 shadow-md hover:shadow-lg active:scale-[0.98]"
+                  style={{
+                    paddingTop: "0.75rem",
+                    paddingBottom: "0.75rem",
+                    opacity: creatingRanchRequest ? 0.6 : undefined,
+                  }}
                   onClick={handleCreateRanchRequest}
                   disabled={creatingRanchRequest}
-                  className="flex-1 py-3 rounded-xl text-white font-bold text-sm shadow-md hover:shadow-lg active:scale-[0.98] transition-all disabled:opacity-60"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #795548 0%, #4E342E 100%)",
-                  }}
                 >
                   {creatingRanchRequest ? "שולח בקשה..." : "שלח בקשת חווה"}
-                </button>
+                </AuthButton>
 
-                <button
+                <AuthButton
                   type="button"
+                  variant="outline"
+                  fullWidth={false}
+                  className="sm:w-36"
+                  style={{
+                    paddingTop: "0.75rem",
+                    paddingBottom: "0.75rem",
+                    opacity: creatingRanchRequest ? 0.6 : undefined,
+                  }}
                   onClick={closeCreateRanchModal}
                   disabled={creatingRanchRequest}
-                  className="sm:w-36 py-3 rounded-xl border-2 border-[#D7CCC8] text-[#795548] font-semibold hover:bg-[#F5EBE4] transition-all disabled:opacity-60"
                 >
                   ביטול
-                </button>
+                </AuthButton>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      <p className="text-xs text-[#BCAAA4] mt-6">RideOn System &copy; 2026</p>
+      <p className="text-xs mt-6" style={{ color: palette.subtleText }}>
+        RideOn System &copy; 2026
+      </p>
     </div>
   );
 }

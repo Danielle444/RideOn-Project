@@ -2,6 +2,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { superUserForgotPassword, superUserResetPassword } from "../../services/authService";
+import { authTheme } from "../../../../shared/auth/theme/authTheme";
+import Field from "../../components/common/Field";
+import AuthButton from "../../components/common/AuthButton";
+
+const { palette } = authTheme;
 
 export default function SuperUserForgotPasswordScreen() {
   const navigate = useNavigate();
@@ -57,7 +62,9 @@ export default function SuperUserForgotPasswordScreen() {
     try {
       await superUserResetPassword(email.trim(), otpCode.trim(), newPassword);
       setSuccess(true);
-      setTimeout(function () { navigate("/login"); }, 3000);
+      setTimeout(function () {
+        navigate("/login");
+      }, 3000);
     } catch (err) {
       setErrorMessage(err?.response?.data || "הקוד אינו תקף או פג תוקפו. נסה שנית.");
     } finally {
@@ -67,13 +74,28 @@ export default function SuperUserForgotPasswordScreen() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F5EDE8]" dir="rtl">
-        <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg text-center">
-          <h2 className="mb-4 text-2xl font-bold text-[#4E342E]">הסיסמה אופסה בהצלחה</h2>
-          <p className="text-[#5D4037]">מועבר למסך הכניסה...</p>
+      <div
+        className="flex min-h-screen items-center justify-center"
+        style={{ backgroundColor: palette.background }}
+        dir="rtl"
+      >
+        <div
+          className="w-full max-w-md rounded-2xl p-8 shadow-lg text-center"
+          style={{ backgroundColor: palette.surface }}
+        >
+          <h2
+            className="mb-4 text-2xl font-bold"
+            style={{ color: palette.heading }}
+          >
+            הסיסמה אופסה בהצלחה
+          </h2>
+          <p style={{ color: palette.text }}>מועבר למסך הכניסה...</p>
           <span
-            onClick={function () { navigate("/login"); }}
-            className="cursor-pointer mt-4 block text-sm font-semibold text-[#795548] hover:underline"
+            onClick={function () {
+              navigate("/login");
+            }}
+            className="cursor-pointer mt-4 block text-sm font-semibold hover:underline"
+            style={{ color: palette.primary }}
           >
             לחץ כאן אם לא הועברת אוטומטית
           </span>
@@ -83,123 +105,213 @@ export default function SuperUserForgotPasswordScreen() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F5EDE8]" dir="rtl">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
-        <h2 className="mb-2 text-center text-2xl font-bold text-[#4E342E]">איפוס סיסמה — מנהל מערכת</h2>
-        <p className="mb-6 text-center text-sm font-semibold text-[#8B0000]">מצב מנהל מערכת</p>
+    <div
+      className="flex min-h-screen items-center justify-center"
+      style={{ backgroundColor: palette.background }}
+      dir="rtl"
+    >
+      <div
+        className="w-full max-w-md rounded-2xl p-8 shadow-lg"
+        style={{ backgroundColor: palette.surface }}
+      >
+        <h2
+          className="mb-2 text-center text-2xl font-bold"
+          style={{ color: palette.heading }}
+        >
+          איפוס סיסמה — מנהל מערכת
+        </h2>
+        <p
+          className="mb-6 text-center text-sm font-semibold"
+          style={{ color: palette.danger.text }}
+        >
+          מצב מנהל מערכת
+        </p>
 
         {step === 1 && (
           <form onSubmit={handleSendOtp} className="space-y-4">
-            <p className="text-sm text-[#8D6E63] text-center">
+            <p className="text-sm text-center" style={{ color: palette.mutedText }}>
               הזן את כתובת המייל שלך ונשלח אליך קוד לאיפוס הסיסמה.
             </p>
-            <div>
-              <label className="mb-1 block text-sm text-[#5D4037]">כתובת מייל</label>
+            <Field label="כתובת מייל">
               <input
                 type="email"
                 value={email}
-                onChange={function (e) { setEmail(e.target.value); }}
-                className="w-full rounded-xl border border-[#D7CCC8] px-4 py-2 text-right focus:border-[#795548] focus:outline-none"
+                onChange={function (e) {
+                  setEmail(e.target.value);
+                }}
+                className="w-full rounded-xl px-4 py-2 text-right focus:outline-none"
+                style={{
+                  borderWidth: 1,
+                  borderStyle: "solid",
+                  borderColor: palette.border,
+                }}
+                onFocus={function (e) {
+                  e.currentTarget.style.borderColor = palette.primary;
+                }}
+                onBlur={function (e) {
+                  e.currentTarget.style.borderColor = palette.border;
+                }}
                 placeholder="example@email.com"
               />
-            </div>
+            </Field>
 
             {errorMessage && (
-              <div className="rounded-xl bg-red-50 px-4 py-2 text-sm text-red-600">{errorMessage}</div>
+              <div className="rounded-xl bg-red-50 px-4 py-2 text-sm text-red-600">
+                {errorMessage}
+              </div>
             )}
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full rounded-xl bg-[#795548] py-2 text-white transition hover:bg-[#6D4C41] disabled:opacity-60"
-            >
+            <AuthButton type="submit" disabled={isLoading}>
               {isLoading ? "שולח..." : "שלח קוד לאיפוס"}
-            </button>
+            </AuthButton>
           </form>
         )}
 
         {step === 2 && (
           <form onSubmit={handleReset} className="space-y-4">
-            <p className="text-sm text-[#8D6E63] text-center">
+            <p className="text-sm text-center" style={{ color: palette.mutedText }}>
               קוד אימות נשלח ל-{email}. הזן אותו יחד עם הסיסמה החדשה.
             </p>
 
-            <div>
-              <label className="mb-1 block text-sm text-[#5D4037]">קוד אימות (6 ספרות)</label>
+            <Field label="קוד אימות (6 ספרות)">
               <input
                 type="text"
                 value={otpCode}
-                onChange={function (e) { setOtpCode(e.target.value); }}
+                onChange={function (e) {
+                  setOtpCode(e.target.value);
+                }}
                 maxLength={6}
-                className="w-full rounded-xl border border-[#D7CCC8] px-4 py-2 text-center tracking-widest text-lg focus:border-[#795548] focus:outline-none"
+                className="w-full rounded-xl px-4 py-2 text-center tracking-widest text-lg focus:outline-none"
+                style={{
+                  borderWidth: 1,
+                  borderStyle: "solid",
+                  borderColor: palette.border,
+                }}
+                onFocus={function (e) {
+                  e.currentTarget.style.borderColor = palette.primary;
+                }}
+                onBlur={function (e) {
+                  e.currentTarget.style.borderColor = palette.border;
+                }}
                 placeholder="123456"
               />
-            </div>
+            </Field>
 
-            <div>
-              <label className="mb-1 block text-sm text-[#5D4037]">סיסמה חדשה</label>
+            <Field label="סיסמה חדשה">
               <div className="relative">
                 <input
                   type={showNew ? "text" : "password"}
                   value={newPassword}
-                  onChange={function (e) { setNewPassword(e.target.value); }}
-                  className="w-full rounded-xl border border-[#D7CCC8] px-4 py-2 pl-11 text-right focus:border-[#795548] focus:outline-none"
+                  onChange={function (e) {
+                    setNewPassword(e.target.value);
+                  }}
+                  className="w-full rounded-xl px-4 py-2 pl-11 text-right focus:outline-none"
+                  style={{
+                    borderWidth: 1,
+                    borderStyle: "solid",
+                    borderColor: palette.border,
+                  }}
+                  onFocus={function (e) {
+                    e.currentTarget.style.borderColor = palette.primary;
+                  }}
+                  onBlur={function (e) {
+                    e.currentTarget.style.borderColor = palette.border;
+                  }}
                 />
                 <button
                   type="button"
-                  onClick={function () { setShowNew(function (p) { return !p; }); }}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8D6E63] hover:text-[#5D4037]"
+                  onClick={function () {
+                    setShowNew(function (p) {
+                      return !p;
+                    });
+                  }}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: palette.mutedText }}
+                  onMouseEnter={function (e) {
+                    e.currentTarget.style.color = palette.text;
+                  }}
+                  onMouseLeave={function (e) {
+                    e.currentTarget.style.color = palette.mutedText;
+                  }}
                 >
                   {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-            </div>
+            </Field>
 
-            <div>
-              <label className="mb-1 block text-sm text-[#5D4037]">אימות סיסמה</label>
+            <Field label="אימות סיסמה">
               <div className="relative">
                 <input
                   type={showConfirm ? "text" : "password"}
                   value={confirmPassword}
-                  onChange={function (e) { setConfirmPassword(e.target.value); }}
-                  className="w-full rounded-xl border border-[#D7CCC8] px-4 py-2 pl-11 text-right focus:border-[#795548] focus:outline-none"
+                  onChange={function (e) {
+                    setConfirmPassword(e.target.value);
+                  }}
+                  className="w-full rounded-xl px-4 py-2 pl-11 text-right focus:outline-none"
+                  style={{
+                    borderWidth: 1,
+                    borderStyle: "solid",
+                    borderColor: palette.border,
+                  }}
+                  onFocus={function (e) {
+                    e.currentTarget.style.borderColor = palette.primary;
+                  }}
+                  onBlur={function (e) {
+                    e.currentTarget.style.borderColor = palette.border;
+                  }}
                 />
                 <button
                   type="button"
-                  onClick={function () { setShowConfirm(function (p) { return !p; }); }}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8D6E63] hover:text-[#5D4037]"
+                  onClick={function () {
+                    setShowConfirm(function (p) {
+                      return !p;
+                    });
+                  }}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: palette.mutedText }}
+                  onMouseEnter={function (e) {
+                    e.currentTarget.style.color = palette.text;
+                  }}
+                  onMouseLeave={function (e) {
+                    e.currentTarget.style.color = palette.mutedText;
+                  }}
                 >
                   {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-            </div>
+            </Field>
 
             {errorMessage && (
-              <div className="rounded-xl bg-red-50 px-4 py-2 text-sm text-red-600">{errorMessage}</div>
+              <div className="rounded-xl bg-red-50 px-4 py-2 text-sm text-red-600">
+                {errorMessage}
+              </div>
             )}
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full rounded-xl bg-[#795548] py-2 text-white transition hover:bg-[#6D4C41] disabled:opacity-60"
-            >
+            <AuthButton type="submit" disabled={isLoading}>
               {isLoading ? "מאפס..." : "אפס סיסמה"}
-            </button>
+            </AuthButton>
 
             <button
               type="button"
-              onClick={function () { setStep(1); setErrorMessage(""); }}
-              className="w-full text-sm text-[#795548] hover:underline"
+              onClick={function () {
+                setStep(1);
+                setErrorMessage("");
+              }}
+              className="w-full text-sm hover:underline"
+              style={{ color: palette.primary }}
             >
               שלח קוד מחדש
             </button>
           </form>
         )}
 
-        <p className="mt-6 text-center text-sm text-[#6D4C41]">
+        <p className="mt-6 text-center text-sm" style={{ color: palette.text }}>
           <span
-            onClick={function () { navigate("/login"); }}
-            className="cursor-pointer font-semibold text-[#795548] hover:underline"
+            onClick={function () {
+              navigate("/login");
+            }}
+            className="cursor-pointer font-semibold hover:underline"
+            style={{ color: palette.primary }}
           >
             חזרה לכניסה
           </span>
