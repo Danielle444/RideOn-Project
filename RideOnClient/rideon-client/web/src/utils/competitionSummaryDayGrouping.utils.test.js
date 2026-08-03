@@ -7,7 +7,7 @@ import {
   groupDetailsByDay,
   filterItemsByDay,
   buildPaidTimeProductColumns,
-  getProductRequestCountForDay,
+  getProductSlotCountForDay,
   getCategoryCountLabel,
   getDetailRowCountField,
   computeDetailLevelTotals,
@@ -182,21 +182,55 @@ describe("groupDetailsByDay -- paid-time", () => {
 });
 
 describe("buildProductBreakdown / product identity", () => {
-  it("distinguishes products by productId, not by durationMinutes", () => {
-    // Same duration, different product -- must stay two separate entries. This is the guard
-    // against the ruled-out "threshold durationMinutes" approach.
+  it("counts two slots with five requests each as a product count of 2, not 10", () => {
+    var items = [
+      paidTimeRow({ productId: 10, productName: "מוצר א׳", requestCount: 5 }),
+      paidTimeRow({ productId: 10, productName: "מוצר א׳", requestCount: 5 }),
+    ];
+
+    var breakdown = buildProductBreakdown(items);
+
+    expect(breakdown).toEqual([
+      { productName: "מוצר א׳", slotCount: 2 },
+    ]);
+  });
+
+  it("counts multiple slots for one productName by row, not by summing requestCount", () => {
+    var items = [
+      paidTimeRow({ productName: "מוצר א׳", requestCount: 2 }),
+      paidTimeRow({ productName: "מוצר א׳", requestCount: 3 }),
+      paidTimeRow({ productName: "מוצר א׳", requestCount: 1 }),
+    ];
+
+    var breakdown = buildProductBreakdown(items);
+
+    expect(breakdown).toEqual([{ productName: "מוצר א׳", slotCount: 3 }]);
+  });
+
+  it("merges different productId values that share the same productName into one entry", () => {
+    var items = [
+      paidTimeRow({ productId: 10, productName: "מוצר א׳" }),
+      paidTimeRow({ productId: 11, productName: "מוצר א׳" }),
+    ];
+
+    var breakdown = buildProductBreakdown(items);
+
+    expect(breakdown).toEqual([{ productName: "מוצר א׳", slotCount: 2 }]);
+  });
+
+  it("keeps different productName values as separate entries, not by durationMinutes", () => {
+    // Same duration, different product name -- must stay two separate entries. Guards against
+    // the ruled-out "threshold durationMinutes" approach.
     var items = [
       paidTimeRow({
         productId: 10,
         productName: "מוצר א׳",
         durationMinutes: 20,
-        requestCount: 1,
       }),
       paidTimeRow({
         productId: 11,
         productName: "מוצר ב׳",
         durationMinutes: 20,
-        requestCount: 1,
       }),
     ];
 
@@ -204,47 +238,25 @@ describe("buildProductBreakdown / product identity", () => {
 
     expect(
       breakdown.map(function (p) {
-        return p.productId;
+        return p.productName;
       }),
-    ).toEqual([10, 11]);
-  });
-
-  it("sums the same product across several slots", () => {
-    var items = [
-      paidTimeRow({ productId: 10, requestCount: 2 }),
-      paidTimeRow({ productId: 10, requestCount: 3 }),
-      paidTimeRow({ productId: 10, requestCount: 1 }),
-    ];
-
-    var breakdown = buildProductBreakdown(items);
-
-    expect(breakdown).toEqual([
-      { productId: 10, productName: "פייד־טיים 20 דק׳", requestCount: 6 },
-    ]);
-  });
-
-  it("uses the row's actual productName as the label, not a synthesized short/long string", () => {
-    var breakdown = buildProductBreakdown([
-      paidTimeRow({ productId: 10, productName: "פייד־טיים בוקר" }),
-    ]);
-
-    expect(breakdown[0].productName).toBe("פייד־טיים בוקר");
+    ).toEqual(["מוצר א׳", "מוצר ב׳"]);
   });
 });
 
-describe("getProductRequestCountForDay", () => {
+describe("getProductSlotCountForDay", () => {
   it("returns 0 for a product that had no rows on that day", () => {
     var dayRollup = buildDayRollup("paid-time", "2026-08-03", [
-      paidTimeRow({ productId: 10, requestCount: 5 }),
+      paidTimeRow({ productName: "מוצר א׳" }),
     ]);
 
-    expect(getProductRequestCountForDay(dayRollup, 10)).toBe(5);
-    expect(getProductRequestCountForDay(dayRollup, 999)).toBe(0);
+    expect(getProductSlotCountForDay(dayRollup, "מוצר א׳")).toBe(1);
+    expect(getProductSlotCountForDay(dayRollup, "מוצר לא קיים")).toBe(0);
   });
 });
 
 describe("buildPaidTimeProductColumns", () => {
-  it("returns the distinct products across the whole category, sorted by productId", () => {
+  it("returns the distinct products across the whole category, identified by productName", () => {
     var items = [
       paidTimeRow({ productId: 20, productName: "ב׳" }),
       paidTimeRow({ productId: 10, productName: "א׳" }),
@@ -253,34 +265,48 @@ describe("buildPaidTimeProductColumns", () => {
 
     var columns = buildPaidTimeProductColumns(items);
 
-    expect(columns).toEqual([
-      { productId: 10, productName: "א׳" },
-      { productId: 20, productName: "ב׳" },
+    expect(columns).toEqual([{ productName: "ב׳" }, { productName: "א׳" }]);
+  });
+
+  it("merges different productId values that share the same productName into one column", () => {
+    var items = [
+      paidTimeRow({ productId: 10, productName: "מוצר א׳" }),
+      paidTimeRow({ productId: 11, productName: "מוצר א׳" }),
+    ];
+
+    expect(buildPaidTimeProductColumns(items)).toEqual([
+      { productName: "מוצר א׳" },
     ]);
   });
 
-  it("detects more than two distinct products so the caller can flag it instead of guessing", () => {
+  it("returns three or more distinct products and renders them without a blocking flag", () => {
     var items = [
-      paidTimeRow({ productId: 10 }),
-      paidTimeRow({ productId: 20 }),
-      paidTimeRow({ productId: 30 }),
+      paidTimeRow({ productId: 10, productName: "א׳" }),
+      paidTimeRow({ productId: 20, productName: "ב׳" }),
+      paidTimeRow({ productId: 30, productName: "ג׳" }),
     ];
 
-    expect(buildPaidTimeProductColumns(items).length).toBe(3);
+    var columns = buildPaidTimeProductColumns(items);
+
+    expect(columns).toEqual([
+      { productName: "א׳" },
+      { productName: "ב׳" },
+      { productName: "ג׳" },
+    ]);
   });
 
   it("does not synthesize a column for a product that never appears in the rows", () => {
     // Accepted limitation: there is no fixed per-competition product catalog to cross-join
     // against, so a configured-but-never-booked product simply has no column. This test locks
     // that behavior in rather than letting a future change silently invent a phantom column.
-    var items = [paidTimeRow({ productId: 10, productName: "א׳" })];
+    var items = [paidTimeRow({ productName: "א׳" })];
 
     var columns = buildPaidTimeProductColumns(items);
 
-    expect(columns).toEqual([{ productId: 10, productName: "א׳" }]);
+    expect(columns).toEqual([{ productName: "א׳" }]);
     expect(
       columns.some(function (c) {
-        return c.productId === 20;
+        return c.productName === "ב׳";
       }),
     ).toBe(false);
   });

@@ -45,31 +45,29 @@ function getDayGroupKey(type, item) {
 }
 
 /**
- * Per-product request-count breakdown for one day's paid-time rows. Products are identified by
- * productId (never by durationMinutes) and labeled with the row's own productName -- this module
- * never decides which product is "short" or "long".
+ * Per-product slot-count breakdown for one day's paid-time rows. Products are identified by
+ * productName (never by productId, never by durationMinutes) -- two rows with different
+ * productId but the same productName belong to the same product. The count is the number of
+ * slot rows for that product on that day, not a sum of requestCount.
  */
 function buildProductBreakdown(items) {
   var byProduct = {};
   var order = [];
 
   items.forEach(function (item) {
-    var productId = getValue(item, "productId", "ProductId", null);
-    var mapKey = String(productId);
+    var productName = getValue(item, "productName", "ProductName", "-");
+    var mapKey = String(productName);
 
     if (!byProduct[mapKey]) {
       byProduct[mapKey] = {
-        productId: productId,
-        productName: getValue(item, "productName", "ProductName", "-"),
-        requestCount: 0,
+        productName: productName,
+        slotCount: 0,
       };
 
       order.push(mapKey);
     }
 
-    byProduct[mapKey].requestCount += Number(
-      getValue(item, "requestCount", "RequestCount", 0),
-    );
+    byProduct[mapKey].slotCount += 1;
   });
 
   return order.map(function (mapKey) {
@@ -152,9 +150,10 @@ function filterItemsByDay(type, items, dayKey) {
 }
 
 /**
- * Distinct paid-time products across the whole category (not just one day), sorted by productId
- * for a stable column order. The sort is ordering only -- a lower productId never means "short",
- * a higher one never means "long"; the actual productName is always the rendered label.
+ * Distinct paid-time products across the whole category (not just one day), identified by
+ * productName and kept in first-seen order. Two rows with different productId but the same
+ * productName collapse into one column. There is no cap on the number of columns -- three or
+ * more distinct products render three or more columns normally.
  *
  * Known limitation (accepted, flag to Oren): columns are derived only from products that actually
  * appear somewhere in detailsItems. There is no fixed per-competition product catalog to
@@ -170,45 +169,40 @@ function buildPaidTimeProductColumns(items) {
   var order = [];
 
   list.forEach(function (item) {
-    var productId = getValue(item, "productId", "ProductId", null);
-    var mapKey = String(productId);
+    var productName = getValue(item, "productName", "ProductName", "-");
+    var mapKey = String(productName);
 
     if (!byProduct[mapKey]) {
       byProduct[mapKey] = {
-        productId: productId,
-        productName: getValue(item, "productName", "ProductName", "-"),
+        productName: productName,
       };
 
       order.push(mapKey);
     }
   });
 
-  return order
-    .map(function (mapKey) {
-      return byProduct[mapKey];
-    })
-    .sort(function (a, b) {
-      return Number(a.productId) - Number(b.productId);
-    });
+  return order.map(function (mapKey) {
+    return byProduct[mapKey];
+  });
 }
 
 /**
- * The request count for one product on one day's rollup, or 0 when that product had no rows that
- * day -- for any reason (no requests that day, or the row simply wasn't returned). Pulled out as
+ * The slot count for one product on one day's rollup, or 0 when that product had no rows that
+ * day -- for any reason (no slots that day, or the row simply wasn't returned). Pulled out as
  * its own function so the "missing product -> zero cell" behavior is directly unit-testable
  * without a DOM.
  */
-function getProductRequestCountForDay(dayRollup, productId) {
+function getProductSlotCountForDay(dayRollup, productName) {
   var breakdown =
     dayRollup && Array.isArray(dayRollup.productBreakdown)
       ? dayRollup.productBreakdown
       : [];
 
   var match = breakdown.find(function (entry) {
-    return String(entry.productId) === String(productId);
+    return String(entry.productName) === String(productName);
   });
 
-  return match ? match.requestCount : 0;
+  return match ? match.slotCount : 0;
 }
 
 /** The shared summary strip's leftmost label -- one fixed noun per category, at every level. */
@@ -314,7 +308,7 @@ export {
   groupDetailsByDay,
   filterItemsByDay,
   buildPaidTimeProductColumns,
-  getProductRequestCountForDay,
+  getProductSlotCountForDay,
   getCategoryCountLabel,
   getDetailRowCountField,
   computeDetailLevelTotals,

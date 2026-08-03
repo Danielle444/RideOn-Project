@@ -223,7 +223,6 @@ function SummaryPageContent(props) {
         selectedDay={page.selectedDay}
         selectedDayItems={page.selectedDayItems}
         paidTimeProductColumns={page.paidTimeProductColumns}
-        paidTimeProductCountExceeded={page.paidTimeProductCountExceeded}
         selectedDetailItem={page.selectedDetailItem}
         entryItems={page.entryItems}
         entriesLoading={page.entriesLoading}

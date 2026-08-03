@@ -2,7 +2,7 @@ import { ArrowRight, X } from "lucide-react";
 import {
   computeDetailLevelTotals,
   computeEntriesLevelTotals,
-  getProductRequestCountForDay,
+  getProductSlotCountForDay,
 } from "../../../utils/competitionSummaryDayGrouping.utils";
 
 function getValue(item, camelKey, pascalKey, fallback) {
@@ -542,7 +542,7 @@ function PaidTimeDayListTable(props) {
       onRowClick={props.onRowClick}
       renderRow={function (day) {
         var productCells = productColumns.map(function (product) {
-          return getProductRequestCountForDay(day, product.productId);
+          return getProductSlotCountForDay(day, product.productName);
         });
 
         return [formatDate(day.dayKey)]
@@ -701,18 +701,11 @@ export default function SummaryDetailsModal(props) {
           ) : null}
 
           {!isLoadingCurrentLevel && isDayListMode && type === "paid-time" ? (
-            props.paidTimeProductCountExceeded ? (
-              <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                זוהו יותר משני סוגי פייד־טיים בתחרות זו. יש לעדכן את הלוגיקה
-                לפני הצגת פירוט לפי יום.
-              </div>
-            ) : (
-              <PaidTimeDayListTable
-                items={dayGroups}
-                productColumns={props.paidTimeProductColumns}
-                onRowClick={props.onOpenDay}
-              />
-            )
+            <PaidTimeDayListTable
+              items={dayGroups}
+              productColumns={props.paidTimeProductColumns}
+              onRowClick={props.onOpenDay}
+            />
           ) : null}
 
           {!isLoadingCurrentLevel && isDayRowsMode ? (

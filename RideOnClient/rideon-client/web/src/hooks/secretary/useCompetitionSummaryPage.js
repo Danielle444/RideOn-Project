@@ -222,8 +222,6 @@ export default function useCompetitionSummaryPage(options) {
     [detailsItems, detailsModal],
   );
 
-  var paidTimeProductCountExceeded = paidTimeProductColumns.length > 2;
-
   useEffect(
     function () {
       loadSummary();
@@ -1309,7 +1307,6 @@ export default function useCompetitionSummaryPage(options) {
     selectedDay: selectedDay,
     selectedDayItems: selectedDayItems,
     paidTimeProductColumns: paidTimeProductColumns,
-    paidTimeProductCountExceeded: paidTimeProductCountExceeded,
     openDetailsDay: openDetailsDay,
     backToDayList: backToDayList,
 
