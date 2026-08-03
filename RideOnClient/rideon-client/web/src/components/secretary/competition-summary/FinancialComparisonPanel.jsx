@@ -1,5 +1,7 @@
 import { FINANCIAL_PROJECTION_COPY } from "./financialProjectionCopy";
-import { formatMoney } from "./financialFormat";
+import { formatMoney, formatMoneyRange } from "./financialFormat";
+import SummarySectionShell from "./SummarySectionShell";
+import SummaryFigureCard from "./SummaryFigureCard";
 
 // Tab 3 -- reliability scorecard. Judges the FORECAST, not the competition: an actual income
 // outside the projected band means the entry forecast was biased, which is a modelling fact, not
@@ -28,6 +30,36 @@ function verdictLabel(actual, lo, hi, copy) {
   };
 }
 
+// Signed gap to the nearest predicted-band edge, using the same floor/ceil tolerance as
+// verdictLabel so the delta card and the verdict card never disagree about which side of the
+// band actual sits on: within the band -> 0; above the upper bound -> actual - upper bound;
+// below the lower bound -> actual - lower bound.
+function computeDelta(actual, lo, hi) {
+  if (actual < Math.floor(lo)) {
+    return actual - lo;
+  }
+
+  if (actual > Math.ceil(hi)) {
+    return actual - hi;
+  }
+
+  return 0;
+}
+
+function formatSignedDelta(value) {
+  var rounded = Math.round(Number(value) || 0);
+
+  if (rounded > 0) {
+    return "+" + formatMoney(rounded);
+  }
+
+  if (rounded < 0) {
+    return "−" + formatMoney(Math.abs(rounded));
+  }
+
+  return formatMoney(0);
+}
+
 export default function FinancialComparisonPanel(props) {
   var copy = FINANCIAL_PROJECTION_COPY;
   var actual = props.actual;
@@ -47,24 +79,54 @@ export default function FinancialComparisonPanel(props) {
     copy,
   );
 
-  return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-bold text-[#3F312B]">{copy.comparisonTitle}</h3>
+  var delta = computeDelta(
+    actual.entryIncomeActual,
+    actual.entryIncomePredictedLo,
+    actual.entryIncomePredictedHi,
+  );
 
-      <div
-        className={
-          "rounded-2xl border px-6 py-5 text-right shadow-sm " + verdict.cardClass
-        }
-      >
-        <p className="text-lg font-black">{verdict.text}</p>
-        <p className="mt-2 text-sm leading-relaxed">
-          {copy.comparisonLine(
-            formatMoney(actual.entryIncomeActual),
-            formatMoney(actual.entryIncomePredictedLo),
-            formatMoney(actual.entryIncomePredictedHi),
-          )}
-        </p>
+  return (
+    <SummarySectionShell title={copy.comparisonTitle}>
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <SummaryFigureCard
+            title={copy.comparisonPredictedLabel}
+            value={formatMoneyRange(
+              actual.entryIncomePredictedLo,
+              actual.entryIncomePredictedHi,
+            )}
+          />
+
+          <SummaryFigureCard
+            title={copy.comparisonActualLabel}
+            value={formatMoney(actual.entryIncomeActual)}
+            colorClass="text-[#2E7D32]"
+          />
+
+          {/* Neutral by design (locked decision) -- the verdict card below stays the only
+              green/amber semantic indicator; the delta card is a plain figure, not a second
+              verdict. */}
+          <SummaryFigureCard
+            title={copy.comparisonDeltaLabel}
+            value={formatSignedDelta(delta)}
+          />
+        </div>
+
+        <div
+          className={
+            "rounded-2xl border px-6 py-5 text-right shadow-sm " + verdict.cardClass
+          }
+        >
+          <p className="text-lg font-black">{verdict.text}</p>
+          <p className="mt-2 text-sm leading-relaxed">
+            {copy.comparisonLine(
+              formatMoney(actual.entryIncomeActual),
+              formatMoney(actual.entryIncomePredictedLo),
+              formatMoney(actual.entryIncomePredictedHi),
+            )}
+          </p>
+        </div>
       </div>
-    </div>
+    </SummarySectionShell>
   );
 }
