@@ -1,4 +1,9 @@
 import { ArrowRight, X } from "lucide-react";
+import {
+  computeDetailLevelTotals,
+  computeEntriesLevelTotals,
+  getProductRequestCountForDay,
+} from "../../../utils/competitionSummaryDayGrouping.utils";
 
 function getValue(item, camelKey, pascalKey, fallback) {
   if (!item) {
@@ -160,8 +165,6 @@ function DetailsTable(props) {
           "סוג תא",
           "סוג שימוש",
           "הזמנות",
-          "סוסים",
-          "ציוד",
           "שולם",
           "לא שולם",
           "סה״כ צפוי",
@@ -176,8 +179,6 @@ function DetailsTable(props) {
             getValue(item, "productName", "ProductName", "-"),
             isForTack ? "תא ציוד" : "תא סוס",
             getValue(item, "bookingCount", "BookingCount", 0),
-            getValue(item, "horseCount", "HorseCount", 0),
-            getValue(item, "tackCount", "TackCount", 0),
             formatMoney(getValue(item, "paidAmount", "PaidAmount", 0)),
             formatMoney(getValue(item, "unpaidAmount", "UnpaidAmount", 0)),
             formatMoney(getValue(item, "expectedAmount", "ExpectedAmount", 0)),
@@ -455,29 +456,178 @@ function StatusBadge(props) {
   );
 }
 
+function SummaryTotalsStrip(props) {
+  return (
+    <div className="mb-4 grid grid-cols-2 gap-3 rounded-2xl border border-[#E3D7D0] bg-[#FBF7F4] px-5 py-4 text-sm sm:grid-cols-4">
+      <div>
+        <p className="text-xs font-bold text-[#8A7268]">{props.countLabel}</p>
+        <p className="mt-1 text-lg font-black text-[#3F312B]">
+          {props.countValue}
+        </p>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold text-[#8A7268]">שולם</p>
+        <p className="mt-1 text-lg font-black text-[#2E7D32]">
+          {formatMoney(props.paidAmount)}
+        </p>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold text-[#8A7268]">לא שולם</p>
+        <p className="mt-1 text-lg font-black text-[#C62828]">
+          {formatMoney(props.unpaidAmount)}
+        </p>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold text-[#8A7268]">סה״כ צפוי</p>
+        <p className="mt-1 text-lg font-black text-[#7B5A4D]">
+          {formatMoney(props.expectedAmount)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function ClassesDayListTable(props) {
+  var items = Array.isArray(props.items) ? props.items : [];
+
+  return (
+    <SummaryTable
+      headers={[
+        "יום",
+        "מס׳ מקצים",
+        "כניסות",
+        "קנסות",
+        "שולם",
+        "לא שולם",
+        "סה״כ צפוי",
+      ]}
+      items={items}
+      onRowClick={props.onRowClick}
+      renderRow={function (day) {
+        return [
+          formatDate(day.dayKey),
+          day.classCount,
+          day.entryCount,
+          day.fineCount,
+          formatMoney(day.paidAmount),
+          formatMoney(day.unpaidAmount),
+          formatMoney(day.expectedAmount),
+        ];
+      }}
+    />
+  );
+}
+
+function PaidTimeDayListTable(props) {
+  var items = Array.isArray(props.items) ? props.items : [];
+  var productColumns = Array.isArray(props.productColumns)
+    ? props.productColumns
+    : [];
+
+  var headers = ["יום"]
+    .concat(
+      productColumns.map(function (product) {
+        return product.productName + " · בקשות";
+      }),
+    )
+    .concat(["סה״כ בקשות", "שולם", "לא שולם", "סה״כ צפוי"]);
+
+  return (
+    <SummaryTable
+      headers={headers}
+      items={items}
+      onRowClick={props.onRowClick}
+      renderRow={function (day) {
+        var productCells = productColumns.map(function (product) {
+          return getProductRequestCountForDay(day, product.productId);
+        });
+
+        return [formatDate(day.dayKey)]
+          .concat(productCells)
+          .concat([
+            day.requestCount,
+            formatMoney(day.paidAmount),
+            formatMoney(day.unpaidAmount),
+            formatMoney(day.expectedAmount),
+          ]);
+      }}
+    />
+  );
+}
+
 export default function SummaryDetailsModal(props) {
   if (!props.modal) {
     return null;
   }
 
+  var type = props.modal.type;
+  var isDayTierType = type === "classes" || type === "paid-time";
   var isEntriesMode = !!props.selectedDetailItem;
+  var isDayRowsMode =
+    isDayTierType &&
+    !isEntriesMode &&
+    props.selectedDay !== null &&
+    props.selectedDay !== undefined;
+  var isDayListMode = isDayTierType && !isEntriesMode && !isDayRowsMode;
+
+  var detailsItems = Array.isArray(props.detailsItems) ? props.detailsItems : [];
+  var dayGroups = Array.isArray(props.detailsDayGroups)
+    ? props.detailsDayGroups
+    : [];
+  var selectedDayItems = Array.isArray(props.selectedDayItems)
+    ? props.selectedDayItems
+    : [];
+  var entryItems = Array.isArray(props.entryItems) ? props.entryItems : [];
+
+  // A single flag for "is the data behind whatever's currently visible still loading" -- day-list
+  // and day-rows both read off detailsItems (no separate fetch for selecting a day), so
+  // detailsLoading covers both; only entries mode has its own fetch/loading flag.
+  var isLoadingCurrentLevel = isEntriesMode
+    ? props.entriesLoading
+    : props.detailsLoading;
+
+  // Cash rows have no paid/unpaid/expected shape (they're a payment ledger, not a charge-status
+  // table) so the strip is not rendered for cash -- never invent that semantics for it.
+  var showStrip = type !== "cash";
+  var stripTotals = null;
+
+  if (showStrip && !isLoadingCurrentLevel) {
+    if (isEntriesMode) {
+      stripTotals = computeEntriesLevelTotals(type, entryItems);
+    } else if (isDayRowsMode) {
+      stripTotals = computeDetailLevelTotals(type, selectedDayItems);
+    } else {
+      stripTotals = computeDetailLevelTotals(type, detailsItems);
+    }
+  }
+
+  var headerTitle = props.modal.title;
+
+  if (isEntriesMode) {
+    headerTitle = getEntriesTitle(type, props.selectedDetailItem);
+  } else if (isDayRowsMode) {
+    headerTitle = props.modal.title + " · " + formatDate(props.selectedDay);
+  }
+
+  var subtitle = "לחצי על שורה כדי לראות פירוט פנימי";
+
+  if (isEntriesMode) {
+    subtitle = "פירוט הרשומות בתוך השורה שנבחרה";
+  } else if (isDayListMode) {
+    subtitle = "לחצי על יום כדי לראות את הפירוט שלו";
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
       <div className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-3xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-[#EFE5DF] px-6 py-5">
           <div>
-            <h2 className="text-xl font-black text-[#3F312B]">
-              {isEntriesMode
-                ? getEntriesTitle(props.modal.type, props.selectedDetailItem)
-                : props.modal.title}
-            </h2>
+            <h2 className="text-xl font-black text-[#3F312B]">{headerTitle}</h2>
 
-            <p className="mt-1 text-sm text-[#8A7268]">
-              {isEntriesMode
-                ? "פירוט הרשומות בתוך השורה שנבחרה"
-                : "לחצי על שורה כדי לראות פירוט פנימי"}
-            </p>
+            <p className="mt-1 text-sm text-[#8A7268]">{subtitle}</p>
           </div>
 
           <button
@@ -501,6 +651,17 @@ export default function SummaryDetailsModal(props) {
             </button>
           ) : null}
 
+          {isDayRowsMode ? (
+            <button
+              type="button"
+              onClick={props.onBackToDayList}
+              className="mb-4 flex items-center gap-2 rounded-2xl border border-[#E2D5CE] bg-white px-4 py-2 text-sm font-bold text-[#6D4C41] transition-colors hover:bg-[#FAF5F1]"
+            >
+              <ArrowRight size={16} />
+              חזרה לרשימת הימים
+            </button>
+          ) : null}
+
           {props.detailsError && !isEntriesMode ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {props.detailsError}
@@ -513,30 +674,65 @@ export default function SummaryDetailsModal(props) {
             </div>
           ) : null}
 
-          {props.detailsLoading && !isEntriesMode ? (
+          {isLoadingCurrentLevel && !isEntriesMode ? (
             <div className="rounded-2xl border border-[#E3D7D0] bg-[#FCFAF8] px-6 py-10 text-center text-[#7B5A4D]">
               טוען פירוט...
             </div>
           ) : null}
 
-          {props.entriesLoading && isEntriesMode ? (
+          {isLoadingCurrentLevel && isEntriesMode ? (
             <div className="rounded-2xl border border-[#E3D7D0] bg-[#FCFAF8] px-6 py-10 text-center text-[#7B5A4D]">
               טוען רשומות...
             </div>
           ) : null}
 
-          {!props.detailsLoading && !isEntriesMode ? (
-            <DetailsTable
-              type={props.modal.type}
-              items={props.detailsItems}
-              onRowClick={
-                props.modal.type === "cash" ? null : props.onDetailRowClick
-              }
+          {stripTotals ? (
+            <SummaryTotalsStrip
+              countLabel={stripTotals.countLabel}
+              countValue={stripTotals.countValue}
+              paidAmount={stripTotals.paidAmount}
+              unpaidAmount={stripTotals.unpaidAmount}
+              expectedAmount={stripTotals.expectedAmount}
             />
           ) : null}
 
-          {!props.entriesLoading && isEntriesMode ? (
-            <EntriesTable type={props.modal.type} items={props.entryItems} />
+          {!isLoadingCurrentLevel && isDayListMode && type === "classes" ? (
+            <ClassesDayListTable items={dayGroups} onRowClick={props.onOpenDay} />
+          ) : null}
+
+          {!isLoadingCurrentLevel && isDayListMode && type === "paid-time" ? (
+            props.paidTimeProductCountExceeded ? (
+              <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                זוהו יותר משני סוגי פייד־טיים בתחרות זו. יש לעדכן את הלוגיקה
+                לפני הצגת פירוט לפי יום.
+              </div>
+            ) : (
+              <PaidTimeDayListTable
+                items={dayGroups}
+                productColumns={props.paidTimeProductColumns}
+                onRowClick={props.onOpenDay}
+              />
+            )
+          ) : null}
+
+          {!isLoadingCurrentLevel && isDayRowsMode ? (
+            <DetailsTable
+              type={type}
+              items={selectedDayItems}
+              onRowClick={props.onDetailRowClick}
+            />
+          ) : null}
+
+          {!isLoadingCurrentLevel && !isEntriesMode && !isDayTierType ? (
+            <DetailsTable
+              type={type}
+              items={detailsItems}
+              onRowClick={type === "cash" ? null : props.onDetailRowClick}
+            />
+          ) : null}
+
+          {!isLoadingCurrentLevel && isEntriesMode ? (
+            <EntriesTable type={type} items={entryItems} />
           ) : null}
         </div>
       </div>
