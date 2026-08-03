@@ -561,6 +561,7 @@ export default function useCompetitionPaidTimePage(options) {
     // Reposition-to-empty only: a real swap onto an occupied slot isn't wired (the
     // assign SP just refuses it), so a reposition drag never targets an occupied cell.
     if (timeCell.assignment) {
+      onShowToast?.("error", "המשבצת כבר תפוסה");
       return;
     }
 

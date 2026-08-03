@@ -1,7 +1,17 @@
 import { useDroppable } from "@dnd-kit/core";
+import { getActiveOverClassName } from "./DroppableBox.utils";
 
 export default function DroppableBox(props) {
-  const { id, data, disabled, children, className, overClassName } = props;
+  const {
+    id,
+    data,
+    disabled,
+    children,
+    className,
+    overClassName,
+    blocked,
+    blockedOverClassName,
+  } = props;
 
   const { setNodeRef, isOver } = useDroppable({
     id: id,
@@ -9,13 +19,18 @@ export default function DroppableBox(props) {
     disabled: disabled,
   });
 
+  const activeOverClass = getActiveOverClassName({
+    isOver: isOver,
+    disabled: disabled,
+    blocked: blocked,
+    overClassName: overClassName,
+    blockedOverClassName: blockedOverClassName,
+  });
+
   return (
     <div
       ref={setNodeRef}
-      className={[
-        className || "",
-        isOver && !disabled ? overClassName || "" : "",
-      ].join(" ")}
+      className={[className || "", activeOverClass].join(" ")}
     >
       {children}
     </div>

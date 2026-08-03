@@ -333,4 +333,57 @@ describe("handleDragEnd", function () {
     // value rather than at a dragged request.
     expect(page.activeRequest).toBeNull();
   });
+
+  // ===== CAP-4: blocked occupied-target drops =====
+  it("blocks a drop onto an occupied cell: shows the reject toast and does not call assign", async function () {
+    var page = buildPage(onShowToast);
+
+    var event = {
+      active: {
+        data: { current: { request: { paidTimeRequestId: REQUEST_ID } } },
+      },
+      over: {
+        data: {
+          current: {
+            timeCell: {
+              slotId: SLOT_ID,
+              assignedOrder: ORDER,
+              assignment: { paidTimeRequestId: 555 },
+            },
+          },
+        },
+      },
+    };
+
+    await page.handleDragEnd(event);
+
+    expect(assignPaidTimeRequest).not.toHaveBeenCalled();
+    expect(onShowToast).toHaveBeenCalledTimes(1);
+    expect(onShowToast).toHaveBeenCalledWith("error", "המשבצת כבר תפוסה");
+  });
+
+  it("stays silent on a same-source/same-position no-op drop", async function () {
+    var page = buildPage(onShowToast);
+
+    var event = {
+      active: {
+        data: {
+          current: {
+            request: { paidTimeRequestId: REQUEST_ID },
+            sourceTimeCell: { slotId: SLOT_ID, assignedOrder: ORDER },
+          },
+        },
+      },
+      over: {
+        data: {
+          current: { timeCell: { slotId: SLOT_ID, assignedOrder: ORDER } },
+        },
+      },
+    };
+
+    await page.handleDragEnd(event);
+
+    expect(assignPaidTimeRequest).not.toHaveBeenCalled();
+    expect(onShowToast).not.toHaveBeenCalled();
+  });
 });

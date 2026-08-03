@@ -1,4 +1,5 @@
 import DraggableItem from "../../common/dnd/DraggableItem";
+import PaidTimeBookingLabel from "./PaidTimeBookingLabel";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -125,10 +126,6 @@ export default function PaidTimeRequestCard({ request, disabled }) {
   var horseId = request.horseId || request.HorseId;
   var coachId =
     request.coachFederationMemberId || request.CoachFederationMemberId;
-  var horseName =
-    request.barnName || request.BarnName || request.horseName || request.HorseName;
-  var riderName = request.riderName || request.RiderName;
-  var coachName = request.coachName || request.CoachName;
   var payerName = request.payerName || request.PayerName;
   var productName = request.productName || request.ProductName;
   var notes = request.notes || request.Notes;
@@ -159,8 +156,7 @@ export default function PaidTimeRequestCard({ request, disabled }) {
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1 overflow-hidden">
-          <p className="truncate text-sm font-bold text-[#3F312B]">{horseName}</p>
-          <p className="truncate text-xs text-[#7A655C]">רוכב/ת: {riderName}</p>
+          <PaidTimeBookingLabel item={request} lineClassName="truncate" />
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-1">
@@ -176,7 +172,6 @@ export default function PaidTimeRequestCard({ request, disabled }) {
       </div>
 
       <div className="mt-2 min-w-0 space-y-1 text-xs text-[#7A655C]">
-        <p className="truncate">מאמן/ת: {coachName || "לא צוין"}</p>
         <p className="truncate">משלם: {payerName}</p>
       </div>
 

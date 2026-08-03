@@ -24,19 +24,10 @@ import SecretaryCreateStallBookingModal from "../../components/secretary/stall-m
 import SecretaryUpdateStallBookingModal from "../../components/secretary/stall-map/SecretaryUpdateStallBookingModal";
 import StallAssignmentSidebar from "../../components/secretary/stall-map/StallAssignmentSidebar";
 import StallAssignmentRanchTabs from "../../components/secretary/stall-map/StallAssignmentRanchTabs";
+import StallBookingLabel from "../../components/secretary/stall-map/StallBookingLabel";
 import useCompetitionStallsPage from "../../hooks/secretary/useCompetitionStallsPage";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import { useUser } from "../../context/UserContext";
-
-function getDragTitle(item) {
-  if (!item) return "";
-
-  if (item.isForTack) {
-    return "תא ציוד #" + item.stallBookingId;
-  }
-
-  return item.barnName || item.horseName || "פריט לשיבוץ";
-}
 
 function formatPublishDate(value) {
   if (!value) return "";
@@ -120,7 +111,10 @@ export default function CompetitionStallsPage() {
       return assignment.stallNumber === cell.stallNumber;
     });
 
-    if (isOccupiedTarget) return;
+    if (isOccupiedTarget) {
+      setToast({ isOpen: true, type: "error", message: "התא כבר תפוס" });
+      return;
+    }
 
     await page.handleAssign(cell, item);
   }
@@ -340,8 +334,8 @@ export default function CompetitionStallsPage() {
 
               <DragOverlay>
                 {activeItem ? (
-                  <div className="rounded-xl border-2 border-[#795548] bg-[#F5EDE8] px-3 py-2 text-sm font-semibold text-[#3F312B] shadow-xl">
-                    {getDragTitle(activeItem)}
+                  <div className="flex flex-col items-center rounded-xl border-2 border-[#795548] bg-[#F5EDE8] px-3 py-2 shadow-xl">
+                    <StallBookingLabel item={activeItem} />
                   </div>
                 ) : null}
               </DragOverlay>

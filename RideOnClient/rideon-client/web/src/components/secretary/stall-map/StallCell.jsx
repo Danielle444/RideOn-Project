@@ -1,16 +1,7 @@
 import { DoorOpen, Package, X } from "lucide-react";
 import DroppableBox from "../../common/dnd/DroppableBox";
 import DraggableItem from "../../common/dnd/DraggableItem";
-
-function getAssignmentTitle(assignment) {
-  if (!assignment) return "";
-
-  if (assignment.isForTack) {
-    return "תא ציוד";
-  }
-
-  return assignment.barnName || assignment.horseName || "";
-}
+import StallBookingLabel from "./StallBookingLabel";
 
 export default function StallCell({ cell, assignment, onUnassign }) {
   const droppableId = `stall-${cell.col}-${cell.row}`;
@@ -45,6 +36,8 @@ export default function StallCell({ cell, assignment, onUnassign }) {
             : "border-red-200 bg-red-50",
       ].join(" ")}
       overClassName="scale-105 border-[#795548] bg-[#F5EDE8]"
+      blocked={isOccupied}
+      blockedOverClassName="scale-105 border-red-400 bg-red-50"
     >
       <span className="absolute right-1 top-0.5 text-[9px] font-bold text-[#8D6E63]">
         {cell.stallNumber}
@@ -66,13 +59,7 @@ export default function StallCell({ cell, assignment, onUnassign }) {
               )}
             </span>
 
-            <span className="max-w-full truncate text-center text-[10px] font-extrabold text-[#3F312B]">
-              {assignment.bookingRanchName || "חווה לא ידועה"}
-            </span>
-
-            <span className="mt-0.5 max-w-full truncate text-center text-[8px] font-semibold text-[#7B5A4D]">
-              {getAssignmentTitle(assignment)}
-            </span>
+            <StallBookingLabel item={assignment} />
           </DraggableItem>
 
           <button
