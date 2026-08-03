@@ -50,6 +50,11 @@ namespace RideOnServer.DAL
                     }
                 }
             }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule/race guard raised inside usp_insertpaidtimerequest.
+                throw new BL.ValidationException(ex.MessageText);
+            }
             catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
@@ -305,6 +310,12 @@ namespace RideOnServer.DAL
                     }
                 }
             }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule/race guard raised inside usp_bulkinsertpaidtimerequests
+                // (which loops usp_insertpaidtimerequest internally).
+                throw new BL.ValidationException(ex.MessageText);
+            }
             catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
@@ -549,6 +560,11 @@ namespace RideOnServer.DAL
                     }
                 }
             }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule/race guard raised inside usp_cancelpaidtimerequest.
+                throw new BL.ValidationException(ex.MessageText);
+            }
             catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
@@ -649,6 +665,11 @@ namespace RideOnServer.DAL
                         command.ExecuteNonQuery();
                     }
                 }
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule/race guard raised inside usp_updatepaidtimerequest.
+                throw new BL.ValidationException(ex.MessageText);
             }
             catch (NpgsqlException ex)
             {

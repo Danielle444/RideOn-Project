@@ -86,19 +86,29 @@ namespace RideOnServer.DAL
 
         public int InsertEntry(CreateEntryRequest request)
         {
-            using var connection = Connect("DefaultConnection");
-            connection.Open();
-
-            using var command = BuildInsertEntryCommand(request, connection);
-
-            object? result = command.ExecuteScalar();
-
-            if (result == null || result == DBNull.Value)
+            try
             {
-                throw new Exception("Failed to create entry");
-            }
+                using var connection = Connect("DefaultConnection");
+                connection.Open();
 
-            return Convert.ToInt32(result);
+                using var command = BuildInsertEntryCommand(request, connection);
+
+                object? result = command.ExecuteScalar();
+
+                if (result == null || result == DBNull.Value)
+                {
+                    throw new Exception("Failed to create entry");
+                }
+
+                return Convert.ToInt32(result);
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule/race guard raised inside usp_insertentry. Surface
+                // its exact message to the user; the controller maps
+                // ValidationException to 409 Conflict for this endpoint.
+                throw new BL.ValidationException(ex.MessageText);
+            }
         }
 
         public List<PaidTimeCandidateItem> GetPaidTimeCandidatesByRanch(int competitionId, int ranchId)

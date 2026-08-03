@@ -11,53 +11,61 @@ namespace RideOnServer.DAL
     {
         public static int CreateStallBooking(CreateStallBookingRequest request)
         {
-            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
-            conn.Open();
-
-            using NpgsqlCommand cmd = new NpgsqlCommand(
-                "SELECT usp_createstallbooking(" +
-                "@competitionId, " +
-                "@orderedBySystemUserId, " +
-                "@priceCatalogId, " +
-                "@notes::text, " +               
-                "@ranchId, " +
-                "@horseId, " +
-                "@startDate::date, " +         
-                "@endDate::date, " +              
-                "@isForTack, " +
-                "@payers::jsonb)",
-                conn);
-
-            cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
-            cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
-            cmd.Parameters.AddWithValue("@priceCatalogId", request.PriceCatalogId);
-
-            cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
-
-            cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
-            cmd.Parameters.AddWithValue("@horseId", request.HorseId);
-
-            cmd.Parameters.Add("@startDate", NpgsqlDbType.Date).Value = request.startDate.Date;
-            cmd.Parameters.Add("@endDate", NpgsqlDbType.Date).Value = request.endDate.Date;
-
-            cmd.Parameters.AddWithValue("@isForTack", request.IsForTack);
-
-            var jsonOptions = new JsonSerializerOptions
+            try
             {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            };
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
 
-            string payersJson = JsonSerializer.Serialize(request.Payers, jsonOptions);
-            cmd.Parameters.Add("@payers", NpgsqlDbType.Jsonb).Value = payersJson;
+                using NpgsqlCommand cmd = new NpgsqlCommand(
+                    "SELECT usp_createstallbooking(" +
+                    "@competitionId, " +
+                    "@orderedBySystemUserId, " +
+                    "@priceCatalogId, " +
+                    "@notes::text, " +
+                    "@ranchId, " +
+                    "@horseId, " +
+                    "@startDate::date, " +
+                    "@endDate::date, " +
+                    "@isForTack, " +
+                    "@payers::jsonb)",
+                    conn);
 
-            object? result = cmd.ExecuteScalar();
+                cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
+                cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
+                cmd.Parameters.AddWithValue("@priceCatalogId", request.PriceCatalogId);
 
-            if (result == null || result == DBNull.Value)
-            {
-                throw new Exception("Failed to create stall booking.");
+                cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
+
+                cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
+                cmd.Parameters.AddWithValue("@horseId", request.HorseId);
+
+                cmd.Parameters.Add("@startDate", NpgsqlDbType.Date).Value = request.startDate.Date;
+                cmd.Parameters.Add("@endDate", NpgsqlDbType.Date).Value = request.endDate.Date;
+
+                cmd.Parameters.AddWithValue("@isForTack", request.IsForTack);
+
+                var jsonOptions = new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                };
+
+                string payersJson = JsonSerializer.Serialize(request.Payers, jsonOptions);
+                cmd.Parameters.Add("@payers", NpgsqlDbType.Jsonb).Value = payersJson;
+
+                object? result = cmd.ExecuteScalar();
+
+                if (result == null || result == DBNull.Value)
+                {
+                    throw new Exception("Failed to create stall booking.");
+                }
+
+                return Convert.ToInt32(result);
             }
-
-            return Convert.ToInt32(result);
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule/race guard raised inside usp_createstallbooking.
+                throw new BL.ValidationException(ex.MessageText);
+            }
         }
 
 
@@ -228,48 +236,57 @@ namespace RideOnServer.DAL
 
         public static List<int> CreateTackStallBookings(CreateTackStallBookingsRequest request)
         {
-            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
-            conn.Open();
-
-            using NpgsqlCommand cmd = new NpgsqlCommand(
-                "SELECT * FROM usp_createtackstallbookings(" +
-                "@competitionId, " +
-                "@orderedBySystemUserId, " +
-                "@priceCatalogId, " +
-                "@notes::text, " +
-                "@ranchId, " +
-                "@startDate::date, " +
-                "@endDate::date, " +
-                "@quantity, " +
-                "@payers::jsonb)",
-                conn);
-
-            cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
-            cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
-            cmd.Parameters.AddWithValue("@priceCatalogId", request.PriceCatalogId);
-            cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
-            cmd.Parameters.Add("@startDate", NpgsqlDbType.Date).Value = request.StartDate.Date;
-            cmd.Parameters.Add("@endDate", NpgsqlDbType.Date).Value = request.EndDate.Date;
-            cmd.Parameters.AddWithValue("@quantity", request.Quantity);
-
-            var jsonOptions = new JsonSerializerOptions
+            try
             {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            };
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
 
-            string payersJson = JsonSerializer.Serialize(request.Payers, jsonOptions);
-            cmd.Parameters.Add("@payers", NpgsqlDbType.Jsonb).Value = payersJson;
+                using NpgsqlCommand cmd = new NpgsqlCommand(
+                    "SELECT * FROM usp_createtackstallbookings(" +
+                    "@competitionId, " +
+                    "@orderedBySystemUserId, " +
+                    "@priceCatalogId, " +
+                    "@notes::text, " +
+                    "@ranchId, " +
+                    "@startDate::date, " +
+                    "@endDate::date, " +
+                    "@quantity, " +
+                    "@payers::jsonb)",
+                    conn);
 
-            List<int> createdIds = new List<int>();
+                cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
+                cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
+                cmd.Parameters.AddWithValue("@priceCatalogId", request.PriceCatalogId);
+                cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
+                cmd.Parameters.Add("@startDate", NpgsqlDbType.Date).Value = request.StartDate.Date;
+                cmd.Parameters.Add("@endDate", NpgsqlDbType.Date).Value = request.EndDate.Date;
+                cmd.Parameters.AddWithValue("@quantity", request.Quantity);
 
-            using NpgsqlDataReader reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                createdIds.Add(Convert.ToInt32(reader["createdstallbookingid"]));
+                var jsonOptions = new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                };
+
+                string payersJson = JsonSerializer.Serialize(request.Payers, jsonOptions);
+                cmd.Parameters.Add("@payers", NpgsqlDbType.Jsonb).Value = payersJson;
+
+                List<int> createdIds = new List<int>();
+
+                using NpgsqlDataReader reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    createdIds.Add(Convert.ToInt32(reader["createdstallbookingid"]));
+                }
+
+                return createdIds;
             }
-
-            return createdIds;
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule/race guard raised inside usp_createtackstallbookings
+                // (which delegates into usp_createstallbooking internally).
+                throw new BL.ValidationException(ex.MessageText);
+            }
         }
 
         public static int CreateStallBookingCancelRequest(
@@ -277,25 +294,33 @@ namespace RideOnServer.DAL
             int ranchId
         )
         {
-            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
-            conn.Open();
-
-            using NpgsqlCommand cmd = new NpgsqlCommand(
-                "SELECT usp_createstallbookingcancelrequest(@stallBookingId, @ranchId)",
-                conn
-            );
-
-            cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
-            cmd.Parameters.AddWithValue("@ranchId", ranchId);
-
-            object? result = cmd.ExecuteScalar();
-
-            if (result == null || result == DBNull.Value)
+            try
             {
-                throw new Exception("Failed to create stall booking cancellation request.");
-            }
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
 
-            return Convert.ToInt32(result);
+                using NpgsqlCommand cmd = new NpgsqlCommand(
+                    "SELECT usp_createstallbookingcancelrequest(@stallBookingId, @ranchId)",
+                    conn
+                );
+
+                cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
+                cmd.Parameters.AddWithValue("@ranchId", ranchId);
+
+                object? result = cmd.ExecuteScalar();
+
+                if (result == null || result == DBNull.Value)
+                {
+                    throw new Exception("Failed to create stall booking cancellation request.");
+                }
+
+                return Convert.ToInt32(result);
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule/race guard raised inside usp_createstallbookingcancelrequest.
+                throw new BL.ValidationException(ex.MessageText);
+            }
         }
 
         public static int CreateStallBookingChangeRequest(
@@ -303,59 +328,67 @@ namespace RideOnServer.DAL
             int orderedBySystemUserId
         )
         {
-            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
-            conn.Open();
-
-            using NpgsqlCommand cmd = new NpgsqlCommand(
-                @"SELECT usp_createstallbookingchangerequest(
-                    @originalStallBookingId,
-                    @ranchId,
-                    @orderedBySystemUserId,
-                    @newStartDate::date,
-                    @newEndDate::date,
-                    @notes::text
-                )",
-                conn
-            );
-
-            cmd.Parameters.AddWithValue(
-                "@originalStallBookingId",
-                request.OriginalStallBookingId
-            );
-
-            cmd.Parameters.AddWithValue(
-                "@ranchId",
-                request.RanchId
-            );
-
-            cmd.Parameters.AddWithValue(
-                "@orderedBySystemUserId",
-                orderedBySystemUserId
-            );
-
-            cmd.Parameters.Add(
-                "@newStartDate",
-                NpgsqlDbType.Date
-            ).Value = request.NewStartDate.Date;
-
-            cmd.Parameters.Add(
-                "@newEndDate",
-                NpgsqlDbType.Date
-            ).Value = request.NewEndDate.Date;
-
-            cmd.Parameters.AddWithValue(
-                "@notes",
-                (object?)request.Notes ?? DBNull.Value
-            );
-
-            object? result = cmd.ExecuteScalar();
-
-            if (result == null || result == DBNull.Value)
+            try
             {
-                throw new Exception("Failed to create stall booking change request.");
-            }
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
 
-            return Convert.ToInt32(result);
+                using NpgsqlCommand cmd = new NpgsqlCommand(
+                    @"SELECT usp_createstallbookingchangerequest(
+                        @originalStallBookingId,
+                        @ranchId,
+                        @orderedBySystemUserId,
+                        @newStartDate::date,
+                        @newEndDate::date,
+                        @notes::text
+                    )",
+                    conn
+                );
+
+                cmd.Parameters.AddWithValue(
+                    "@originalStallBookingId",
+                    request.OriginalStallBookingId
+                );
+
+                cmd.Parameters.AddWithValue(
+                    "@ranchId",
+                    request.RanchId
+                );
+
+                cmd.Parameters.AddWithValue(
+                    "@orderedBySystemUserId",
+                    orderedBySystemUserId
+                );
+
+                cmd.Parameters.Add(
+                    "@newStartDate",
+                    NpgsqlDbType.Date
+                ).Value = request.NewStartDate.Date;
+
+                cmd.Parameters.Add(
+                    "@newEndDate",
+                    NpgsqlDbType.Date
+                ).Value = request.NewEndDate.Date;
+
+                cmd.Parameters.AddWithValue(
+                    "@notes",
+                    (object?)request.Notes ?? DBNull.Value
+                );
+
+                object? result = cmd.ExecuteScalar();
+
+                if (result == null || result == DBNull.Value)
+                {
+                    throw new Exception("Failed to create stall booking change request.");
+                }
+
+                return Convert.ToInt32(result);
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule/race guard raised inside usp_createstallbookingchangerequest.
+                throw new BL.ValidationException(ex.MessageText);
+            }
         }
 
         public static int CancelStallBookingByPayer(int stallBookingId, int payerPersonId)
