@@ -7,6 +7,7 @@ import {
   createSuperUser,
   getAllSuperUsers,
 } from "../../services/superUserService";
+import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function SuperUsersManagementPage() {
   const [rows, setRows] = useState([]);
@@ -38,7 +39,7 @@ export default function SuperUsersManagementPage() {
       setRows(response.data || []);
     } catch (err) {
       console.error("Failed loading super users:", err);
-      showToast("error", err.response?.data || "שגיאה בטעינת משתמשי המערכת");
+      showToast("error", getErrorMessage(err, "שגיאה בטעינת מנהלי המערכת"));
       setRows([]);
     } finally {
       setLoading(false);
@@ -82,7 +83,7 @@ export default function SuperUsersManagementPage() {
       }, 900);
     } catch (err) {
       console.error("Create super user failed:", err);
-      setCreateErrorMessage(err.response?.data || "שגיאה ביצירת משתמש המערכת");
+      setCreateErrorMessage(getErrorMessage(err, "שגיאה ביצירת משתמש המערכת"));
     } finally {
       setCreateLoading(false);
     }
@@ -95,10 +96,10 @@ export default function SuperUsersManagementPage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1 className="text-[2rem] font-bold text-[#3F312B]">
-                משתמשי מערכת
+                מנהלי מערכת
               </h1>
               <p className="mt-2 text-[0.98rem] text-[#8A746A]">
-                צפייה במשתמשי מערכת קיימים ויצירת משתמש חדש
+                צפייה במנהלי מערכת קיימים ויצירת משתמש חדש
               </p>
             </div>
 

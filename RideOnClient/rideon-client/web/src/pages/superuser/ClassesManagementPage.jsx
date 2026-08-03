@@ -11,6 +11,7 @@ import {
   deleteClassType,
   getAllFields,
 } from "../../services/superUserService";
+import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function ClassesManagementPage() {
   const [classTypes, setClassTypes] = useState([]);
@@ -44,7 +45,7 @@ export default function ClassesManagementPage() {
       setFields(res.data || []);
     } catch (err) {
       console.error(err);
-      showToast("error", err.response?.data || "שגיאה בטעינת ענפים");
+      showToast("error", getErrorMessage(err, "שגיאה בטעינת ענפים"));
     }
   }
 
@@ -55,7 +56,7 @@ export default function ClassesManagementPage() {
       setClassTypes(res.data || []);
     } catch (err) {
       console.error(err);
-      showToast("error", err.response?.data || "שגיאה בטעינת סוגי מקצים");
+      showToast("error", getErrorMessage(err, "שגיאה בטעינת סוגי מקצים"));
       setClassTypes([]);
     } finally {
       setLoading(false);
@@ -149,7 +150,7 @@ export default function ClassesManagementPage() {
       await loadClassTypes();
     } catch (err) {
       console.error(err);
-      setError(err.response?.data || "שגיאה בשמירת סוג המקצה");
+      setError(getErrorMessage(err, "שגיאה בשמירת סוג המקצה"));
     }
   }
 
@@ -167,7 +168,7 @@ export default function ClassesManagementPage() {
         } catch (err) {
           console.error(err);
           closeConfirmDialog();
-          showToast("error", err.response?.data || "שגיאה במחיקת סוג המקצה");
+          showToast("error", getErrorMessage(err, "שגיאה במחיקת סוג המקצה"));
         }
       },
     });

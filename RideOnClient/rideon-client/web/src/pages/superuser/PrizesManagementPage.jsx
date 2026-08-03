@@ -10,6 +10,7 @@ import {
   updatePrizeType,
   deletePrizeType,
 } from "../../services/superUserService";
+import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function PrizesManagementPage() {
   const [prizeTypes, setPrizeTypes] = useState([]);
@@ -41,7 +42,7 @@ export default function PrizesManagementPage() {
       setPrizeTypes(res.data || []);
     } catch (err) {
       console.error(err);
-      showToast("error", err.response?.data || "שגיאה בטעינת פרסים");
+      showToast("error", getErrorMessage(err, "שגיאה בטעינת פרסים"));
       setPrizeTypes([]);
     } finally {
       setLoading(false);
@@ -129,7 +130,7 @@ export default function PrizesManagementPage() {
       await loadPrizeTypes();
     } catch (err) {
       console.error(err);
-      setError(err.response?.data || "שגיאה בשמירת הפרס");
+      setError(getErrorMessage(err, "שגיאה בשמירת הפרס"));
     }
   }
 
@@ -147,7 +148,7 @@ export default function PrizesManagementPage() {
         } catch (err) {
           console.error(err);
           closeConfirmDialog();
-          showToast("error", err.response?.data || "שגיאה במחיקת סוג הפרס");
+          showToast("error", getErrorMessage(err, "שגיאה במחיקת סוג הפרס"));
         }
       },
     });

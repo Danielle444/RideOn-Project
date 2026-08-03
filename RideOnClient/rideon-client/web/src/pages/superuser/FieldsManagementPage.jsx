@@ -10,6 +10,7 @@ import {
   updateField,
   deleteField,
 } from "../../services/superUserService";
+import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function FieldsManagementPage() {
   const [fields, setFields] = useState([]);
@@ -44,7 +45,7 @@ export default function FieldsManagementPage() {
       setFields(res.data || []);
     } catch (err) {
       console.error(err);
-      showToast("error", err.response?.data || "שגיאה בטעינת ענפים");
+      showToast("error", getErrorMessage(err, "שגיאה בטעינת ענפים"));
       setFields([]);
     } finally {
       setLoading(false);
@@ -145,13 +146,7 @@ export default function FieldsManagementPage() {
     } catch (err) {
       console.error(err);
 
-      const errorMessage =
-        err.response?.data?.title ||
-        err.response?.data?.message ||
-        (typeof err.response?.data === "string" ? err.response.data : null) ||
-        "שגיאה בשמירת הענף";
-
-      setError(errorMessage);
+      setError(getErrorMessage(err, "שגיאה בשמירת הענף"));
     }
   }
 
@@ -172,7 +167,7 @@ export default function FieldsManagementPage() {
         } catch (err) {
           console.error(err);
           closeConfirmDialog();
-          showToast("error", err.response?.data || "שגיאה במחיקת הענף");
+          showToast("error", getErrorMessage(err, "שגיאה במחיקת הענף"));
         }
       },
     });
