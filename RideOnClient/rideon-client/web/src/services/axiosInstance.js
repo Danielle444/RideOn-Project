@@ -17,12 +17,27 @@ axiosInstance.interceptors.request.use(function (config) {
   return config;
 });
 
+const AUTH_LOGIN_URL_SUFFIXES = ["/SystemUsers/login", "/SuperUsers/login"];
+
+function isAuthLoginRequest(config) {
+  const url = config && config.url;
+
+  return (
+    typeof url === "string" &&
+    AUTH_LOGIN_URL_SUFFIXES.some((suffix) => url.endsWith(suffix))
+  );
+}
+
 axiosInstance.interceptors.response.use(
   function (response) {
     return response;
   },
   function (error) {
-    if (error.response && error.response.status === 401) {
+    if (
+      error.response &&
+      error.response.status === 401 &&
+      !isAuthLoginRequest(error.config)
+    ) {
       clearAuthStorage();
 
       window.location.href = "/login";
