@@ -36,7 +36,7 @@ export default function SuperUsersTable(props) {
         {!props.loading && rows.length === 0 && (
           <DataTableEmptyState
             colSpan={5}
-            message="עדיין לא קיימים משתמשי מערכת להצגה"
+            message="עדיין לא קיימים מנהלי מערכת להצגה"
           />
         )}
 

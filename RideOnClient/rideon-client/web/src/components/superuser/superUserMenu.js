@@ -11,7 +11,7 @@ import {
 
 const superUserMenu = [
   { key: "requests", label: "בקשות משתמשים וחוות", icon: Users },
-  { key: "super-users", label: "משתמשי מערכת", icon: UserCog },
+  { key: "super-users", label: "מנהלי מערכת", icon: UserCog },
   { key: "fields", label: "ענפים", icon: GitBranch },
   { key: "classes", label: "מקצים", icon: LayoutList },
   { key: "judges", label: "שופטים", icon: Gavel },
