@@ -30,6 +30,8 @@ import PaidTimeChatbotModal from "../../../../components/competitions/paidTimeCh
 import SmartBookingFab from "../../../../components/competitions/paidTimeChatbot/SmartBookingFab";
 
 import { evaluatePaidTimeBookingAvailability } from "../../../../utils/paidTimeBookingAvailability";
+import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
+import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
 
 // סדר קבוע לפתרון טאב פתיחה לא תקין/לא זמין ולבחירת טאב חלופי - ראו
 // resolveRequestedInitialTab ו-resolveFallbackTab.
@@ -59,82 +61,6 @@ function resolveFallbackTab(availability) {
   });
 
   return visibleTabKey || "classes";
-}
-
-var REGISTRATION_STEP_REASON_MESSAGES = {
-  NOT_CONFIGURED: "שלב זה עדיין לא הוגדר עבור התחרות.",
-  NOT_OPEN_YET: "ההרשמה לשלב זה עדיין לא נפתחה.",
-  MISSING_PRICE: "לא הוגדר מחיר פעיל עבור שלב זה.",
-  NEEDS_RELEVANT_ENTRY: "יש צורך בהרשמה פעילה למקצה לפני שניתן להמשיך בשלב זה.",
-  NEEDS_RELEVANT_STALL_BOOKING:
-    "יש צורך בהזמנת תא פעילה לפני שניתן להמשיך בשלב זה.",
-  STATUS_UNAVAILABLE: "לא ניתן לאמת כרגע את מצב ההרשמה עבור שלב זה.",
-};
-
-var REGISTRATION_STEP_ENDED_MESSAGE =
-  "התחרות הסתיימה, ולא ניתן עוד לבצע שינויים בשלב זה.";
-
-var REGISTRATION_STEP_LOADING_MESSAGE = "בודקת זמינות השלב...";
-
-function formatOpeningDate(value) {
-  if (!value) {
-    return "";
-  }
-
-  var parsedDate = new Date(value);
-
-  if (Number.isNaN(parsedDate.getTime())) {
-    return "";
-  }
-
-  return parsedDate.toLocaleDateString("he-IL", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-// הודעה גנרית ל"שלב לא זמין" - נשענת על reason keys קריאים למכונה בלבד
-// (ראה registrationStepAvailability.js), לא על טקסט עסקי כפול.
-function buildRegistrationStepNoticeMessage(stepAvailability, isStatusLoading) {
-  if (isStatusLoading) {
-    return REGISTRATION_STEP_LOADING_MESSAGE;
-  }
-
-  if (!stepAvailability) {
-    return REGISTRATION_STEP_REASON_MESSAGES.STATUS_UNAVAILABLE;
-  }
-
-  if (stepAvailability.isReadOnly) {
-    return REGISTRATION_STEP_ENDED_MESSAGE;
-  }
-
-  var reason = stepAvailability.unavailableReason;
-
-  if (reason === "NOT_OPEN_YET" && stepAvailability.openingDate) {
-    var formattedOpeningDate = formatOpeningDate(stepAvailability.openingDate);
-
-    if (formattedOpeningDate) {
-      return "פייד טיים ייפתח להרשמה בתאריך " + formattedOpeningDate + ".";
-    }
-  }
-
-  return (
-    REGISTRATION_STEP_REASON_MESSAGES[reason] ||
-    REGISTRATION_STEP_REASON_MESSAGES.STATUS_UNAVAILABLE
-  );
-}
-
-// PaidTimeSetupNotice.jsx לא מתאים כאן: הכותרת שלו נעולה לפייד טיים בלבד
-// ("התחרות עדיין לא מוכנה להזמנות פייד־טיים") וללא prop לכותרת חלופית -
-// שימוש בו עבור מקצים/תאים/נסורת יציג כותרת שגויה. זהו רכיב גנרי מינימלי,
-// בונה מחדש על אותם errorCard/errorText כבר קיימים במסך הזה.
-function RegistrationStepNotice(props) {
-  return (
-    <View style={styles.errorCard}>
-      <Text style={styles.errorText}>{props.message}</Text>
-    </View>
-  );
 }
 
 function RegistrationsTabs(props) {
@@ -450,6 +376,8 @@ export default function AdminCompetitionRegistrationsScreen(props) {
                   availability.classes,
                   isRegistrationStatusLoading,
                 )}
+                containerStyle={styles.errorCard}
+                textStyle={styles.errorText}
               />
             ) : null}
 
@@ -496,6 +424,8 @@ export default function AdminCompetitionRegistrationsScreen(props) {
                   availability.paidTimes,
                   isRegistrationStatusLoading,
                 )}
+                containerStyle={styles.errorCard}
+                textStyle={styles.errorText}
               />
             ) : null}
 
@@ -628,6 +558,8 @@ export default function AdminCompetitionRegistrationsScreen(props) {
                 availability.stalls,
                 isRegistrationStatusLoading,
               )}
+              containerStyle={styles.errorCard}
+              textStyle={styles.errorText}
             />
           )
         ) : null}
@@ -672,6 +604,8 @@ export default function AdminCompetitionRegistrationsScreen(props) {
                 availability.shavings,
                 isRegistrationStatusLoading,
               )}
+              containerStyle={styles.errorCard}
+              textStyle={styles.errorText}
             />
           )
         ) : null}
