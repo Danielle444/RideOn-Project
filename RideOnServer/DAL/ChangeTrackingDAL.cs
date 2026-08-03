@@ -198,6 +198,122 @@ namespace RideOnServer.DAL
             }
         }
 
+        // Named PostgreSQL argument notation (p_x := @x), not positional
+        // Dictionary/CreateCommandWithStoredProcedure binding - same builder-
+        // method pattern as ChangeEntryRequestDAL.BuildInsertChangeEntryRequestSecuredCommand,
+        // so command construction can be unit tested with a null connection,
+        // no DB access required.
+        //
+        // Calls the SECURED answer function only (usp_answerchangeentryrequestsecured,
+        // 221). The old 4-argument public.usp_answerchangeentryrequest (210) is
+        // deliberately left untouched and uncalled from here - see 210's and
+        // 221's own headers for why it stays deployed for now.
+        public static NpgsqlCommand BuildAnswerChangeEntryRequestSecuredCommand(
+            int requestId,
+            string answerStatus,
+            int answeredBySystemUserId,
+            int competitionId,
+            string? notes,
+            NpgsqlConnection? connection)
+        {
+            NpgsqlCommand command = new NpgsqlCommand(
+                @"
+                select public.usp_answerchangeentryrequestsecured(
+                    p_changeentryrequestid   := @requestId,
+                    p_answerstatus           := @answerStatus,
+                    p_answeredbysystemuserid := @answeredBySystemUserId,
+                    p_competitionid          := @competitionId,
+                    p_notes                  := @notes
+                );",
+                connection
+            );
+
+            command.Parameters.Add(
+                "@requestId",
+                NpgsqlDbType.Integer
+            ).Value = requestId;
+
+            command.Parameters.Add(
+                "@answerStatus",
+                NpgsqlDbType.Text
+            ).Value = answerStatus;
+
+            command.Parameters.Add(
+                "@answeredBySystemUserId",
+                NpgsqlDbType.Integer
+            ).Value = answeredBySystemUserId;
+
+            command.Parameters.Add(
+                "@competitionId",
+                NpgsqlDbType.Integer
+            ).Value = competitionId;
+
+            command.Parameters.Add(
+                "@notes",
+                NpgsqlDbType.Text
+            ).Value =
+                string.IsNullOrWhiteSpace(notes)
+                    ? DBNull.Value
+                    : notes;
+
+            return command;
+        }
+
+        // Same builder-method pattern as above, calling the SECURED product
+        // answer function only (usp_answerproductchangerequestsecured, 222).
+        // The old 4-argument public.usp_answerproductchangerequest (211) is
+        // deliberately left untouched and uncalled from here.
+        public static NpgsqlCommand BuildAnswerProductChangeRequestSecuredCommand(
+            int requestId,
+            string answerStatus,
+            int answeredBySystemUserId,
+            int competitionId,
+            string? notes,
+            NpgsqlConnection? connection)
+        {
+            NpgsqlCommand command = new NpgsqlCommand(
+                @"
+                select public.usp_answerproductchangerequestsecured(
+                    p_productchangerequestid := @requestId,
+                    p_answerstatus           := @answerStatus,
+                    p_answeredbysystemuserid := @answeredBySystemUserId,
+                    p_competitionid          := @competitionId,
+                    p_notes                  := @notes
+                );",
+                connection
+            );
+
+            command.Parameters.Add(
+                "@requestId",
+                NpgsqlDbType.Integer
+            ).Value = requestId;
+
+            command.Parameters.Add(
+                "@answerStatus",
+                NpgsqlDbType.Text
+            ).Value = answerStatus;
+
+            command.Parameters.Add(
+                "@answeredBySystemUserId",
+                NpgsqlDbType.Integer
+            ).Value = answeredBySystemUserId;
+
+            command.Parameters.Add(
+                "@competitionId",
+                NpgsqlDbType.Integer
+            ).Value = competitionId;
+
+            command.Parameters.Add(
+                "@notes",
+                NpgsqlDbType.Text
+            ).Value =
+                string.IsNullOrWhiteSpace(notes)
+                    ? DBNull.Value
+                    : notes;
+
+            return command;
+        }
+
         public int AnswerSecretaryChangeRequest(
             AnswerChangeRequestRequest request)
         {
@@ -210,63 +326,37 @@ namespace RideOnServer.DAL
                 {
                     connection.Open();
 
-                    string sql = "";
+                    NpgsqlCommand command;
 
                     if (request.RequestSource == "Entry")
                     {
-                        sql =
-                            @"
-                            select public.usp_answerchangeentryrequest(
-                                @requestId,
-                                @answerStatus,
-                                @answeredBySystemUserId,
-                                @notes
-                            );";
+                        command = BuildAnswerChangeEntryRequestSecuredCommand(
+                            request.RequestId,
+                            request.AnswerStatus,
+                            request.AnsweredBySystemUserId,
+                            request.CompetitionId,
+                            request.Notes,
+                            connection
+                        );
                     }
                     else if (request.RequestSource == "Product")
                     {
-                        sql =
-                            @"
-                            select public.usp_answerproductchangerequest(
-                                @requestId,
-                                @answerStatus,
-                                @answeredBySystemUserId,
-                                @notes
-                            );";
+                        command = BuildAnswerProductChangeRequestSecuredCommand(
+                            request.RequestId,
+                            request.AnswerStatus,
+                            request.AnsweredBySystemUserId,
+                            request.CompetitionId,
+                            request.Notes,
+                            connection
+                        );
                     }
                     else
                     {
                         throw new Exception("Invalid RequestSource");
                     }
 
-                    using (
-                        NpgsqlCommand command =
-                            new NpgsqlCommand(sql, connection)
-                    )
+                    using (command)
                     {
-                        command.Parameters.Add(
-                            "@requestId",
-                            NpgsqlDbType.Integer
-                        ).Value = request.RequestId;
-
-                        command.Parameters.Add(
-                            "@answerStatus",
-                            NpgsqlDbType.Text
-                        ).Value = request.AnswerStatus;
-
-                        command.Parameters.Add(
-                            "@answeredBySystemUserId",
-                            NpgsqlDbType.Integer
-                        ).Value = request.AnsweredBySystemUserId;
-
-                        command.Parameters.Add(
-                            "@notes",
-                            NpgsqlDbType.Text
-                        ).Value =
-                            string.IsNullOrWhiteSpace(request.Notes)
-                                ? DBNull.Value
-                                : request.Notes;
-
                         object? result = command.ExecuteScalar();
 
                         if (result == null || result == DBNull.Value)
