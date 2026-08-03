@@ -20,6 +20,12 @@
 --     (193/199 allocating credit to a charge already Paid via this proc) is
 --     not - see the Stage 1 audit for the full double-payment finding. Live
 --     data confirmed 1 paymentbatch with chargeowner='Federation' exists.
+--
+-- 2026-08-04: selected billcharge rows are now locked FOR UPDATE (ascending
+-- billchargeid) and re-validated before any amount is computed or any
+-- paymentbatch/payment row is inserted, closing a race where a concurrent
+-- cancellation or federation allocation could be silently overwritten back
+-- to Paid.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_createcompetitionpayerpayment(p_competitionid integer, p_payerpersonid integer, p_enteredbysystemuserid integer, p_chargeowner text, p_invoicenumber text, p_selectedcharges jsonb, p_paymentmethods jsonb, p_notes text DEFAULT NULL::text)
@@ -132,6 +138,35 @@ begin
         from temp_selected_payment_charges
     ) then
         raise exception 'No valid charges were selected';
+    end if;
+
+    -- Lock every selected billcharge row, ascending billchargeid order,
+    -- before computing any amount or making any further decision. This
+    -- never locks federationexternalcredit, so it introduces no charge-then-
+    -- credit ordering against 193/199/the future allocation-release helper.
+    perform 1
+    from public.billcharge bc
+    inner join temp_selected_payment_charges selected
+        on selected.billchargeid = bc.billchargeid
+    order by bc.billchargeid
+    for update of bc;
+
+    -- Re-verify eligibility from the now-locked, authoritative rows. Any
+    -- charge that changed state since the initial unlocked discovery aborts
+    -- the whole payment atomically - never silently skipped, since
+    -- totalamount is one aggregate figure for the whole selected set.
+    if exists (
+        select 1
+        from public.billcharge bc
+        inner join temp_selected_payment_charges selected
+            on selected.billchargeid = bc.billchargeid
+        where bc.competitionid <> p_competitionid
+           or bc.paidbypersonid <> p_payerpersonid
+           or bc.chargeowner <> p_chargeowner
+           or bc.chargestatus <> 'Open'
+           or bc.paymentbatchid is not null
+    ) then
+        raise exception 'One or more selected charges are no longer eligible for payment';
     end if;
 
     select
