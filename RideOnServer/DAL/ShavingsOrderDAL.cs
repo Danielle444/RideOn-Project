@@ -237,40 +237,48 @@ namespace RideOnServer.DAL
         // column-name convention — it is left on the raw NpgsqlCommand to keep the explicit typing.
         public static int CreateShavingsOrder(CreateShavingsOrderRequest request)
         {
-            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
-            conn.Open();
-
-            using NpgsqlCommand cmd = new NpgsqlCommand(
-                @"SELECT usp_createshavingsorder(
-                    @competitionId,
-                    @orderedBySystemUserId,
-                    @priceCatalogId,
-                    @ranchId,
-                    @notes,
-                    @requestedDeliveryTime,
-                    @stalls::jsonb
-                )",
-                conn
-            );
-
-            cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
-            cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
-            cmd.Parameters.AddWithValue("@priceCatalogId", request.PriceCatalogId);
-            cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
-            cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@requestedDeliveryTime", NpgsqlDbType.Timestamp, request.RequestedDeliveryTime);
-
-            string stallsJson = JsonSerializer.Serialize(request.Stalls);
-            cmd.Parameters.AddWithValue("@stalls", NpgsqlDbType.Jsonb, stallsJson);
-
-            object? result = cmd.ExecuteScalar();
-
-            if (result == null || result == DBNull.Value)
+            try
             {
-                throw new Exception("Failed to create shavings order.");
-            }
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
 
-            return Convert.ToInt32(result);
+                using NpgsqlCommand cmd = new NpgsqlCommand(
+                    @"SELECT usp_createshavingsorder(
+                        @competitionId,
+                        @orderedBySystemUserId,
+                        @priceCatalogId,
+                        @ranchId,
+                        @notes,
+                        @requestedDeliveryTime,
+                        @stalls::jsonb
+                    )",
+                    conn
+                );
+
+                cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
+                cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
+                cmd.Parameters.AddWithValue("@priceCatalogId", request.PriceCatalogId);
+                cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
+                cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@requestedDeliveryTime", NpgsqlDbType.Timestamp, request.RequestedDeliveryTime);
+
+                string stallsJson = JsonSerializer.Serialize(request.Stalls);
+                cmd.Parameters.AddWithValue("@stalls", NpgsqlDbType.Jsonb, stallsJson);
+
+                object? result = cmd.ExecuteScalar();
+
+                if (result == null || result == DBNull.Value)
+                {
+                    throw new Exception("Failed to create shavings order.");
+                }
+
+                return Convert.ToInt32(result);
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule/race guard raised inside usp_createshavingsorder.
+                throw new BL.ValidationException(ex.MessageText);
+            }
         }
 
         public static List<ShavingsAvailableStallItem> GetStallBookingsForShavings(int competitionId, int ranchId)
