@@ -8,6 +8,7 @@ declare
     v_itemprice numeric(10,2);
     v_catalog_ranchid integer;
     v_totalbags integer := 0;
+    v_competitionenddate date;
 
     v_stall jsonb;
     v_stallbookingid integer;
@@ -36,6 +37,15 @@ begin
        or jsonb_typeof(p_stalls) <> 'array'
        or jsonb_array_length(p_stalls) = 0 then
         raise exception 'At least one stall is required';
+    end if;
+
+    select c.competitionenddate
+    into v_competitionenddate
+    from public.competition c
+    where c.competitionid = p_competitionid;
+
+    if (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate then
+        raise exception 'Competition has already ended' using errcode = 'RN001';
     end if;
 
     select
