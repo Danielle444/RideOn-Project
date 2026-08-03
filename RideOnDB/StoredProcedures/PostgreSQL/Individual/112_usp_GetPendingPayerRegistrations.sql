@@ -16,13 +16,13 @@ BEGIN
     RETURN QUERY
     SELECT DISTINCT ON (p.personid)
         p.personid,
-        p.firstname,
-        p.lastname,
-        p.email,
-        p.cellphone,
-        su.username,
+        p.firstname::text,
+        p.lastname::text,
+        p.email::text,
+        p.cellphone::text,
+        su.username::text,
         r.ranchid,
-        r.ranchname,
+        r.ranchname::text,
         prr.roleid,
         rt.createdat
     FROM public.person p
