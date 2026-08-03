@@ -9,7 +9,8 @@ import {
   View,
 } from "react-native";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
@@ -21,8 +22,10 @@ import { useActiveRole } from "../../../../context/ActiveRoleContext";
 import { useCompetition } from "../../../../context/CompetitionContext";
 
 import useAdminCompetitionPaidTimesList from "../../../../hooks/useAdminCompetitionPaidTimesList";
+import useRegistrationStepStatus from "../../../../hooks/useRegistrationStepStatus";
 
 import { cancelPaidTimeRequest } from "../../../../services/paidTimeRequestsService";
+import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
 
 import PaidTimeListItemCard from "../../../../components/competitions/adminPaidTimes/PaidTimeListItemCard";
 import PaidTimeScheduleView from "../../../../components/competitions/adminPaidTimes/PaidTimeScheduleView";
@@ -30,6 +33,7 @@ import PaidTimeEditModal from "../../../../components/competitions/adminPaidTime
 import AddPaidTimeButton from "../../../../components/competitions/adminPaidTimes/AddPaidTimeButton";
 import SlotScheduleModal from "../../../../components/competitions/adminPaidTimes/SlotScheduleModal";
 import PublishedSlotsModal from "../../../../components/competitions/adminPaidTimes/PublishedSlotsModal";
+import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
 
 import styles from "../../../../styles/adminCompetitionPaidTimesStyles";
 
@@ -45,6 +49,38 @@ export default function AdminCompetitionPaidTimesScreen(props) {
     activeCompetition: activeCompetition,
   });
 
+  var registrationStepStatus = useRegistrationStepStatus({
+    competitionId: activeCompetition?.competitionId,
+    ranchId: activeRole?.ranchId,
+    enabled: true,
+  });
+
+  var availability = registrationStepStatus.availability;
+  var isRegistrationStatusLoading = registrationStepStatus.loading;
+  var registrationStatusError = registrationStepStatus.error;
+  var reloadRegistrationStepStatus = registrationStepStatus.reload;
+
+  // Same dedup pattern proven in Stage 3: useFocusEffect also fires once on
+  // initial mount (already focused), on top of the hook's own internal
+  // mount/param-change effect - without this guard that's a duplicate
+  // fetch. A genuine re-focus with the SAME reload identity still refreshes
+  // exactly once.
+  var lastTriggeredReloadRef = useRef(null);
+
+  useFocusEffect(
+    useCallback(
+      function () {
+        if (lastTriggeredReloadRef.current !== reloadRegistrationStepStatus) {
+          lastTriggeredReloadRef.current = reloadRegistrationStepStatus;
+          return;
+        }
+
+        reloadRegistrationStepStatus();
+      },
+      [reloadRegistrationStepStatus],
+    ),
+  );
+
   var [showFilters, setShowFilters] = useState(false);
   var [editingItem, setEditingItem] = useState(null);
   var [cancellingId, setCancellingId] = useState(null);
@@ -52,6 +88,20 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   var [expandedIds, setExpandedIds] = useState({});
   var [viewingSlotId, setViewingSlotId] = useState(null);
   var [publishedSlotsOpen, setPublishedSlotsOpen] = useState(false);
+
+  // Force-closes an already-open edit modal the moment Paid Time becomes
+  // disabled or read-only - a still-open modal must not remain a live
+  // mutation path just because it was opened before eligibility changed.
+  // PaidTimeEditModal is conditionally MOUNTED (via editingItem), not gated
+  // by its own visible prop, so resetting editingItem fully unmounts it.
+  useEffect(
+    function () {
+      if (!availability.paidTimes.isEnabled && editingItem) {
+        setEditingItem(null);
+      }
+    },
+    [availability.paidTimes.isEnabled, editingItem],
+  );
 
   function handleViewSlotSchedule(slotId) {
     setViewingSlotId(slotId);
@@ -95,6 +145,10 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   }
 
   function openEdit(item) {
+    if (!availability.paidTimes.isEnabled) {
+      return;
+    }
+
     setEditingItem(item);
   }
 
@@ -103,6 +157,10 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   }
 
   function confirmCancel(item) {
+    if (!availability.paidTimes.isEnabled) {
+      return;
+    }
+
     var withinDay = item.hoursUntilStart != null && item.hoursUntilStart <= 24;
     var title = withinDay
       ? "ביטול בתוך 24 שעות - חיוב מלא"
@@ -129,6 +187,10 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   }
 
   async function handleCancel(item) {
+    if (!availability.paidTimes.isEnabled) {
+      return;
+    }
+
     try {
       setCancellingId(item.paidTimeRequestId);
       await cancelPaidTimeRequest({
@@ -358,6 +420,19 @@ export default function AdminCompetitionPaidTimesScreen(props) {
           />
         }
       >
+        {registrationStatusError ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{registrationStatusError}</Text>
+
+            <Pressable
+              style={styles.primaryButton}
+              onPress={reloadRegistrationStepStatus}
+            >
+              <Text style={styles.primaryButtonText}>נסה שוב</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         <View style={styles.summaryCard}>
           <Text style={styles.cardTitle}>הפייד טיימים שלי</Text>
           <Text style={styles.helperText}>
@@ -383,10 +458,21 @@ export default function AdminCompetitionPaidTimesScreen(props) {
           </View>
         </View>
 
-        <AddPaidTimeButton
-          navigation={props.navigation}
-          competitionId={activeCompetition?.competitionId}
-        />
+        {availability.paidTimes.isEnabled ? (
+          <AddPaidTimeButton
+            navigation={props.navigation}
+            competitionId={activeCompetition?.competitionId}
+          />
+        ) : (
+          <RegistrationStepNotice
+            message={buildRegistrationStepNoticeMessage(
+              availability.paidTimes,
+              isRegistrationStatusLoading,
+            )}
+            containerStyle={styles.errorCard}
+            textStyle={styles.errorText}
+          />
+        )}
 
         <Pressable
           onPress={function () {

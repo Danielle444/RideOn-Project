@@ -9,7 +9,8 @@ import {
   Alert,
 } from "react-native";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
@@ -21,6 +22,7 @@ import { useActiveRole } from "../../../../context/ActiveRoleContext";
 import { useCompetition } from "../../../../context/CompetitionContext";
 
 import useAdminCompetitionEntriesList from "../../../../hooks/useAdminCompetitionEntriesList";
+import useRegistrationStepStatus from "../../../../hooks/useRegistrationStepStatus";
 
 import styles from "../../../../styles/adminCompetitionClassesStyles";
 
@@ -34,7 +36,10 @@ import EntriesViewModal from "../../../../components/competitions/EntriesViewMod
 
 import DuplicateEntriesModal from "../../../../components/competitions/DuplicateEntriesModal";
 
+import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
+
 import { createChangeEntryRequest } from "../../../../services/entriesService";
+import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
 
 export default function AdminCompetitionClassesScreen(props) {
   var activeRoleContext = useActiveRole();
@@ -50,6 +55,38 @@ export default function AdminCompetitionClassesScreen(props) {
     activeCompetition: activeCompetition,
   });
 
+  var registrationStepStatus = useRegistrationStepStatus({
+    competitionId: activeCompetition?.competitionId,
+    ranchId: activeRole?.ranchId,
+    enabled: true,
+  });
+
+  var availability = registrationStepStatus.availability;
+  var isRegistrationStatusLoading = registrationStepStatus.loading;
+  var registrationStatusError = registrationStepStatus.error;
+  var reloadRegistrationStepStatus = registrationStepStatus.reload;
+
+  // Same dedup pattern proven in Stage 3: useFocusEffect also fires once on
+  // initial mount (already focused), on top of the hook's own internal
+  // mount/param-change effect - without this guard that's a duplicate
+  // fetch. A genuine re-focus with the SAME reload identity still refreshes
+  // exactly once.
+  var lastTriggeredReloadRef = useRef(null);
+
+  useFocusEffect(
+    useCallback(
+      function () {
+        if (lastTriggeredReloadRef.current !== reloadRegistrationStepStatus) {
+          lastTriggeredReloadRef.current = reloadRegistrationStepStatus;
+          return;
+        }
+
+        reloadRegistrationStepStatus();
+      },
+      [reloadRegistrationStepStatus],
+    ),
+  );
+
   var [showFilters, setShowFilters] = useState(false);
 
   var [showCreateModal, setShowCreateModal] = useState(false);
@@ -61,6 +98,33 @@ export default function AdminCompetitionClassesScreen(props) {
   var [entriesViewFocusClass, setEntriesViewFocusClass] = useState(null);
 
   var [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+
+  // Force-closes an already-open create/edit/duplicate modal the moment
+  // Classes becomes disabled or read-only (e.g. the competition ends) - a
+  // still-open modal must not remain a live mutation path just because it
+  // was opened before eligibility changed.
+  useEffect(
+    function () {
+      if (availability.classes.isEnabled) {
+        return;
+      }
+
+      if (showCreateModal) {
+        setShowCreateModal(false);
+        setEditingItem(null);
+      }
+
+      if (duplicateModalOpen) {
+        setDuplicateModalOpen(false);
+      }
+    },
+    [availability.classes.isEnabled, showCreateModal, duplicateModalOpen],
+  );
+
+  function handleMutationSuccess() {
+    entries.handleRefresh();
+    reloadRegistrationStepStatus();
+  }
 
   function handleViewAllEntries() {
     setEntriesViewFocusClass(null);
@@ -89,12 +153,20 @@ export default function AdminCompetitionClassesScreen(props) {
   }
 
   function handleEditEntry(item) {
+    if (!availability.classes.isEnabled) {
+      return;
+    }
+
     setEditingItem(item);
 
     setShowCreateModal(true);
   }
 
   function handleCancelEntry(item) {
+    if (!availability.classes.isEnabled) {
+      return;
+    }
+
     Alert.alert("ביטול הרשמה", "האם לשלוח בקשת ביטול למזכירה?", [
       {
         text: "לא",
@@ -106,6 +178,10 @@ export default function AdminCompetitionClassesScreen(props) {
         style: "destructive",
 
         onPress: async function () {
+          if (!availability.classes.isEnabled) {
+            return;
+          }
+
           try {
             await createChangeEntryRequest({
               competitionId: activeCompetition?.competitionId,
@@ -118,6 +194,7 @@ export default function AdminCompetitionClassesScreen(props) {
             });
 
             await entries.handleRefresh();
+            reloadRegistrationStepStatus();
 
             Alert.alert("נשלח", "בקשת הביטול נשלחה למזכירה");
           } catch (error) {
@@ -320,6 +397,30 @@ export default function AdminCompetitionClassesScreen(props) {
           />
         }
       >
+        {registrationStatusError ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{registrationStatusError}</Text>
+
+            <Button
+              variant="outline"
+              label="נסה שוב"
+              onPress={reloadRegistrationStepStatus}
+              style={{ marginTop: 8 }}
+            />
+          </View>
+        ) : null}
+
+        {!availability.classes.isEnabled ? (
+          <RegistrationStepNotice
+            message={buildRegistrationStepNoticeMessage(
+              availability.classes,
+              isRegistrationStatusLoading,
+            )}
+            containerStyle={styles.errorCard}
+            textStyle={styles.errorText}
+          />
+        ) : null}
+
         <View style={styles.summaryCard}>
           <Text style={styles.cardTitle}>ההרשמות שלי למקצים</Text>
 
@@ -383,7 +484,12 @@ export default function AdminCompetitionClassesScreen(props) {
         <Button
           variant="solid"
           label="+ הוסף הרשמה למקצה"
+          disabled={!availability.classes.isEnabled}
           onPress={function () {
+            if (!availability.classes.isEnabled) {
+              return;
+            }
+
             setShowCreateModal(true);
           }}
         />
@@ -391,7 +497,12 @@ export default function AdminCompetitionClassesScreen(props) {
         <Button
           variant="outline"
           label="שכפל הרשמות מתחרות קודמת"
+          disabled={!availability.classes.isEnabled}
           onPress={function () {
+            if (!availability.classes.isEnabled) {
+              return;
+            }
+
             setDuplicateModalOpen(true);
           }}
           style={{ marginTop: 10, marginBottom: 12 }}
@@ -405,14 +516,14 @@ export default function AdminCompetitionClassesScreen(props) {
         />
 
         <CompetitionEntryCreateModal
-          visible={showCreateModal}
+          visible={showCreateModal && availability.classes.isEnabled}
           editItem={editingItem}
           onClose={function () {
             setShowCreateModal(false);
 
             setEditingItem(null);
           }}
-          onCreated={entries.handleRefresh}
+          onCreated={handleMutationSuccess}
         />
 
         <EntriesViewModal
@@ -424,13 +535,13 @@ export default function AdminCompetitionClassesScreen(props) {
         />
 
         <DuplicateEntriesModal
-          isOpen={duplicateModalOpen}
+          isOpen={duplicateModalOpen && availability.classes.isEnabled}
           activeCompetitionId={activeCompetition?.competitionId}
           ranchId={activeRole?.ranchId}
           onClose={function () {
             setDuplicateModalOpen(false);
           }}
-          onDuplicated={entries.handleRefresh}
+          onDuplicated={handleMutationSuccess}
         />
 
         <Text style={styles.resultsText}>

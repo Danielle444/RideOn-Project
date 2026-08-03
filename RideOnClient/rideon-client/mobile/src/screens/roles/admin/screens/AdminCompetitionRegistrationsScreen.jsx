@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
@@ -20,6 +21,7 @@ import { useCompetition } from "../../../../context/CompetitionContext";
 import useAdminCompetitionRegistrations from "../../../../hooks/useAdminCompetitionRegistrations";
 import useAdminCompetitionPaidTimes from "../../../../hooks/useAdminCompetitionPaidTimes";
 import useAdminCompetitionStallBookings from "../../../../hooks/useAdminCompetitionStallBookings";
+import useRegistrationStepStatus from "../../../../hooks/useRegistrationStepStatus";
 
 import CompetitionShavingsTab from "../../../../components/competitionRegistrations/CompetitionShavingsTab";
 import useAdminCompetitionShavings from "../../../../hooks/useAdminCompetitionShavings";
@@ -28,96 +30,89 @@ import PaidTimeChatbotModal from "../../../../components/competitions/paidTimeCh
 import SmartBookingFab from "../../../../components/competitions/paidTimeChatbot/SmartBookingFab";
 
 import { evaluatePaidTimeBookingAvailability } from "../../../../utils/paidTimeBookingAvailability";
+import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
+import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
+
+// סדר קבוע לפתרון טאב פתיחה לא תקין/לא זמין ולבחירת טאב חלופי - ראו
+// resolveRequestedInitialTab ו-resolveFallbackTab.
+var REGISTRATION_STEP_TAB_ORDER = ["classes", "paidTimes", "stalls", "shavings"];
+
+function resolveRequestedInitialTab(value) {
+  return REGISTRATION_STEP_TAB_ORDER.indexOf(value) !== -1 ? value : "classes";
+}
+
+// טאב פתיחה לא תקין, או טאב שהוסתר (כרגע רק פייד טיים יכול להיות מוסתר),
+// חייב ליפול לטאב הראשון שגם גלוי וגם שמיש. אם התחרות הסתיימה ואף טאב אינו
+// שמיש, נופלים לטאב הגלוי הראשון (מקצים תמיד גלוי) כדי שהמסך תמיד ינחת על
+// טאב אמיתי ולא יישאר תקוע על טאב מוסתר.
+function resolveFallbackTab(availability) {
+  var usableTabKey = REGISTRATION_STEP_TAB_ORDER.find(function (key) {
+    var stepAvailability = availability[key];
+    return stepAvailability && stepAvailability.isVisible && stepAvailability.isEnabled;
+  });
+
+  if (usableTabKey) {
+    return usableTabKey;
+  }
+
+  var visibleTabKey = REGISTRATION_STEP_TAB_ORDER.find(function (key) {
+    var stepAvailability = availability[key];
+    return stepAvailability && stepAvailability.isVisible;
+  });
+
+  return visibleTabKey || "classes";
+}
 
 function RegistrationsTabs(props) {
+  var availability = props.availability;
+
+  function renderTabButton(key, label) {
+    var stepAvailability = availability[key];
+
+    if (!stepAvailability || !stepAvailability.isVisible) {
+      return null;
+    }
+
+    var isActive = props.activeTab === key;
+    var isDisabled = !stepAvailability.isEnabled;
+
+    return (
+      <Pressable
+        key={key}
+        style={[
+          isDisabled ? styles.tabButtonDisabled : styles.tabButton,
+          isActive ? styles.tabButtonActive : null,
+        ]}
+        onPress={function () {
+          props.onChangeTab(key);
+        }}
+      >
+        <Text
+          numberOfLines={RTL_LABEL_NUMBER_OF_LINES}
+          style={[
+            isDisabled ? styles.tabButtonTextDisabled : styles.tabButtonText,
+            isActive ? styles.tabButtonTextActive : null,
+          ]}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    );
+  }
+
   return (
     <View style={styles.tabsWrapper}>
-      <Pressable
-        style={[
-          styles.tabButton,
-          props.activeTab === "classes" ? styles.tabButtonActive : null,
-        ]}
-        onPress={function () {
-          props.onChangeTab("classes");
-        }}
-      >
-        <Text
-          numberOfLines={RTL_LABEL_NUMBER_OF_LINES}
-          style={[
-            styles.tabButtonText,
-            props.activeTab === "classes" ? styles.tabButtonTextActive : null,
-          ]}
-        >
-          מקצים
-        </Text>
-      </Pressable>
-
-      <Pressable
-        style={[
-          styles.tabButton,
-          props.activeTab === "paidTimes" ? styles.tabButtonActive : null,
-        ]}
-        onPress={function () {
-          props.onChangeTab("paidTimes");
-        }}
-      >
-        <Text
-          numberOfLines={RTL_LABEL_NUMBER_OF_LINES}
-          style={[
-            styles.tabButtonText,
-            props.activeTab === "paidTimes" ? styles.tabButtonTextActive : null,
-          ]}
-        >
-          פייד טיימים
-        </Text>
-      </Pressable>
-
-      <Pressable
-        style={[
-          styles.tabButton,
-          props.activeTab === "stalls" ? styles.tabButtonActive : null,
-        ]}
-        onPress={function () {
-          props.onChangeTab("stalls");
-        }}
-      >
-        <Text
-          numberOfLines={RTL_LABEL_NUMBER_OF_LINES}
-          style={[
-            styles.tabButtonText,
-            props.activeTab === "stalls" ? styles.tabButtonTextActive : null,
-          ]}
-        >
-          תאים
-        </Text>
-      </Pressable>
-
-      <Pressable
-        style={[
-          styles.tabButton,
-          props.activeTab === "shavings" ? styles.tabButtonActive : null,
-        ]}
-        onPress={function () {
-          props.onChangeTab("shavings");
-        }}
-      >
-        <Text
-          numberOfLines={RTL_LABEL_NUMBER_OF_LINES}
-          style={[
-            styles.tabButtonText,
-            props.activeTab === "shavings" ? styles.tabButtonTextActive : null,
-          ]}
-        >
-          נסורת
-        </Text>
-      </Pressable>
+      {renderTabButton("classes", "מקצים")}
+      {renderTabButton("paidTimes", "פייד טיימים")}
+      {renderTabButton("stalls", "תאים")}
+      {renderTabButton("shavings", "נסורת")}
     </View>
   );
 }
 
 export default function AdminCompetitionRegistrationsScreen(props) {
   var routeParams = props.route?.params || {};
-  var initialTab = routeParams.initialTab === "paidTimes" ? "paidTimes" : "classes";
+  var initialTab = resolveRequestedInitialTab(routeParams.initialTab);
   var shouldAutoOpenChatbot = !!routeParams.openSmartBooking;
 
   var [activeTab, setActiveTab] = useState(initialTab);
@@ -143,6 +138,55 @@ export default function AdminCompetitionRegistrationsScreen(props) {
     props.route?.params?.competitionId ||
     activeCompetition?.competitionId ||
     null;
+
+  var registrationStepStatus = useRegistrationStepStatus({
+    competitionId: competitionId,
+    ranchId: activeRole?.ranchId,
+    enabled: true,
+  });
+
+  var availability = registrationStepStatus.availability;
+  var isRegistrationStatusLoading = registrationStepStatus.loading;
+  var registrationStatusError = registrationStepStatus.error;
+  var reloadRegistrationStepStatus = registrationStepStatus.reload;
+
+  // טאב פתיחה שגוי, או טאב שהתגלה כמוסתר אחרי שהסטטוס האמיתי נטען (כרגע רק
+  // פייד טיים יכול להיות מוסתר), עוברים לטאב חלופי. לא מזיזים טאב שרק
+  // disabled (לא visible=false) - למשתמשת מותר לבחור טאב חסום כדי לראות את
+  // ההסבר, ראו RegistrationStepNotice.
+  useEffect(
+    function () {
+      var currentTabAvailability = availability[activeTab];
+
+      if (!currentTabAvailability || !currentTabAvailability.isVisible) {
+        setActiveTab(resolveFallbackTab(availability));
+      }
+    },
+    [availability, activeTab],
+  );
+
+  // useFocusEffect also fires once immediately on initial mount (the screen
+  // is already focused by then), on top of the hook's own internal
+  // mount/param-change effect - without this guard that's a duplicate fetch
+  // every time reloadRegistrationStepStatus gets a new identity (mount, or a
+  // competitionId/ranchId change). This ref remembers the last reload
+  // identity already triggered elsewhere; a genuine re-focus (returning from
+  // a child screen with the SAME identity) still calls reload exactly once.
+  var lastTriggeredReloadRef = useRef(null);
+
+  useFocusEffect(
+    useCallback(
+      function () {
+        if (lastTriggeredReloadRef.current !== reloadRegistrationStepStatus) {
+          lastTriggeredReloadRef.current = reloadRegistrationStepStatus;
+          return;
+        }
+
+        reloadRegistrationStepStatus();
+      },
+      [reloadRegistrationStepStatus],
+    ),
+  );
 
   var registration = useAdminCompetitionRegistrations({
     user: user,
@@ -193,21 +237,53 @@ export default function AdminCompetitionRegistrationsScreen(props) {
         return;
       }
 
-      if (!isPaidTimeDataReady) {
+      if (!isPaidTimeDataReady || isRegistrationStatusLoading) {
+        // Wait for the registration-step status to settle too, not just this
+        // screen's own paid-time data - otherwise the one-shot "handled" flag
+        // below could be consumed on the fail-closed default (isEnabled always
+        // false while loading), permanently missing the deep-link auto-open
+        // once the real status confirms it's actually eligible.
         return;
       }
 
       autoOpenHandledRef.current = true;
 
-      if (paidTimeAvailability.canBookBulk) {
+      if (availability.paidTimes.isEnabled && paidTimeAvailability.canBookBulk) {
         setIsChatbotOpen(true);
       }
     },
-    [shouldAutoOpenChatbot, isPaidTimeDataReady, paidTimeAvailability.canBookBulk],
+    [
+      shouldAutoOpenChatbot,
+      isPaidTimeDataReady,
+      isRegistrationStatusLoading,
+      availability.paidTimes.isEnabled,
+      paidTimeAvailability.canBookBulk,
+    ],
+  );
+
+  // Force-closes an already-open chatbot/review flow the moment Paid Time
+  // becomes disabled or read-only (e.g. the competition ends, or the status
+  // reloads with different data) - a still-open modal must not remain a live
+  // mutation path just because it was opened before eligibility changed.
+  useEffect(
+    function () {
+      if (availability.paidTimes.isEnabled) {
+        return;
+      }
+
+      if (isChatbotOpen) {
+        setIsChatbotOpen(false);
+      }
+
+      if (paidTime.isReviewOpen) {
+        paidTime.handleBackToEdit();
+      }
+    },
+    [availability.paidTimes.isEnabled, isChatbotOpen, paidTime.isReviewOpen, paidTime.handleBackToEdit],
   );
 
   function handleOpenSmartBooking() {
-    if (!paidTimeAvailability.canBookBulk) {
+    if (!availability.paidTimes.isEnabled || !paidTimeAvailability.canBookBulk) {
       return;
     }
 
@@ -273,205 +349,270 @@ export default function AdminCompetitionRegistrationsScreen(props) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.screenContent}
       >
-        <RegistrationsTabs activeTab={activeTab} onChangeTab={setActiveTab} />
+        {registrationStatusError ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{registrationStatusError}</Text>
 
-        {activeTab === "classes" ? (
-          <CompetitionRegistrationsClassesTab
-            loading={registration.loading}
-            screenError={registration.screenError}
-            classes={registration.classes}
-            horses={registration.horses}
-            horsesLoading={registration.horsesLoading}
-            onSearchHorses={registration.loadHorsesForPicker}
-            riders={registration.riders}
-            trainers={registration.trainers}
-            payers={registration.payers}
-            selectedClass={registration.selectedClass}
-            selectedHorse={registration.selectedHorse}
-            selectedRider={registration.selectedRider}
-            selectedTrainer={registration.selectedTrainer}
-            selectedPayer={registration.selectedPayer}
-            prizeRecipientName={registration.prizeRecipientName}
-            setPrizeRecipientName={registration.setPrizeRecipientName}
-            setSelectedClass={registration.setSelectedClass}
-            setSelectedHorse={registration.setSelectedHorse}
-            setSelectedRider={registration.setSelectedRider}
-            setSelectedTrainer={registration.setSelectedTrainer}
-            setSelectedPayer={registration.setSelectedPayer}
-            locks={registration.locks}
-            onToggleLock={registration.handleToggleLock}
-            formatClassLabel={registration.formatClassLabel}
-            formatHorseLabel={registration.formatHorseLabel}
-            formatMemberLabel={registration.formatMemberLabel}
-            formatPayerLabel={registration.formatPayerLabel}
-            canSubmit={registration.canSubmit}
-            isSaving={registration.isSaving}
-            onSubmit={registration.handleCreateEntry}
-          />
+            <Pressable
+              style={styles.primaryButton}
+              onPress={reloadRegistrationStepStatus}
+            >
+              <Text style={styles.primaryButtonText}>נסה שוב</Text>
+            </Pressable>
+          </View>
         ) : null}
 
-        {activeTab === "paidTimes" ? (
-          <CompetitionPaidTimeTab
-            loading={paidTime.loading}
-            screenError={paidTime.screenError}
-            priceCatalogItems={paidTime.priceCatalogItems}
-            requestableSlots={paidTime.requestableSlots}
-            riders={paidTime.riders}
-            horses={paidTime.horses}
-            trainers={paidTime.trainers}
-            payers={paidTime.payers}
-            selectedPriceCatalog={paidTime.selectedPriceCatalog}
-            selectedRequestedSlot={paidTime.selectedRequestedSlot}
-            selectedRider={paidTime.selectedRider}
-            selectedHorse={paidTime.selectedHorse}
-            selectedTrainer={paidTime.selectedTrainer}
-            selectedPayer={paidTime.selectedPayer}
-            notes={paidTime.notes}
-            setSelectedPriceCatalog={paidTime.setSelectedPriceCatalog}
-            setSelectedRequestedSlot={paidTime.setSelectedRequestedSlot}
-            setSelectedRider={paidTime.setSelectedRider}
-            setSelectedHorse={paidTime.setSelectedHorse}
-            setSelectedTrainer={paidTime.setSelectedTrainer}
-            setSelectedPayer={paidTime.setSelectedPayer}
-            setNotes={paidTime.setNotes}
-            locks={paidTime.locks}
-            onToggleLock={paidTime.handleToggleLock}
-            formatRequestedSlotLabel={paidTime.formatRequestedSlotLabel}
-            formatMemberLabel={paidTime.formatMemberLabel}
-            formatHorseLabel={paidTime.formatHorseLabel}
-            formatPayerLabel={paidTime.formatPayerLabel}
-            canSubmit={paidTime.canSubmit}
-            isSaving={paidTime.isSaving}
-            fieldErrors={paidTime.fieldErrors}
-            formError={paidTime.formError}
-            scrollRequest={paidTime.scrollRequest}
-            onScrollToOffset={handleScrollToOffset}
-            onContinueToReview={paidTime.handleContinueToReview}
-            isReviewOpen={paidTime.isReviewOpen}
-            reviewModel={paidTime.reviewModel}
-            submitError={paidTime.submitError}
-            onBackToEdit={paidTime.handleBackToEdit}
-            onConfirmSubmit={paidTime.handleConfirmSubmit}
-            isSuccessOpen={paidTime.isSuccessOpen}
-            successSnapshot={paidTime.successSnapshot}
-            onAddAnother={handleAddAnotherPaidTime}
-            onFinish={handleFinishPaidTime}
-            availability={paidTimeAvailability}
-          />
+        <RegistrationsTabs
+          activeTab={activeTab}
+          onChangeTab={setActiveTab}
+          availability={availability}
+        />
+
+        {activeTab === "classes" ? (
+          <>
+            {!availability.classes.isEnabled ? (
+              <RegistrationStepNotice
+                message={buildRegistrationStepNoticeMessage(
+                  availability.classes,
+                  isRegistrationStatusLoading,
+                )}
+                containerStyle={styles.errorCard}
+                textStyle={styles.errorText}
+              />
+            ) : null}
+
+            <CompetitionRegistrationsClassesTab
+              loading={registration.loading}
+              screenError={registration.screenError}
+              classes={registration.classes}
+              horses={registration.horses}
+              horsesLoading={registration.horsesLoading}
+              onSearchHorses={registration.loadHorsesForPicker}
+              riders={registration.riders}
+              trainers={registration.trainers}
+              payers={registration.payers}
+              selectedClass={registration.selectedClass}
+              selectedHorse={registration.selectedHorse}
+              selectedRider={registration.selectedRider}
+              selectedTrainer={registration.selectedTrainer}
+              selectedPayer={registration.selectedPayer}
+              prizeRecipientName={registration.prizeRecipientName}
+              setPrizeRecipientName={registration.setPrizeRecipientName}
+              setSelectedClass={registration.setSelectedClass}
+              setSelectedHorse={registration.setSelectedHorse}
+              setSelectedRider={registration.setSelectedRider}
+              setSelectedTrainer={registration.setSelectedTrainer}
+              setSelectedPayer={registration.setSelectedPayer}
+              locks={registration.locks}
+              onToggleLock={registration.handleToggleLock}
+              formatClassLabel={registration.formatClassLabel}
+              formatHorseLabel={registration.formatHorseLabel}
+              formatMemberLabel={registration.formatMemberLabel}
+              formatPayerLabel={registration.formatPayerLabel}
+              canSubmit={registration.canSubmit && availability.classes.isEnabled}
+              isSaving={registration.isSaving}
+              onSubmit={registration.handleCreateEntry}
+            />
+          </>
+        ) : null}
+
+        {activeTab === "paidTimes" && availability.paidTimes.isVisible ? (
+          <>
+            {!availability.paidTimes.isEnabled ? (
+              <RegistrationStepNotice
+                message={buildRegistrationStepNoticeMessage(
+                  availability.paidTimes,
+                  isRegistrationStatusLoading,
+                )}
+                containerStyle={styles.errorCard}
+                textStyle={styles.errorText}
+              />
+            ) : null}
+
+            <CompetitionPaidTimeTab
+              loading={paidTime.loading}
+              screenError={paidTime.screenError}
+              priceCatalogItems={paidTime.priceCatalogItems}
+              requestableSlots={paidTime.requestableSlots}
+              riders={paidTime.riders}
+              horses={paidTime.horses}
+              trainers={paidTime.trainers}
+              payers={paidTime.payers}
+              selectedPriceCatalog={paidTime.selectedPriceCatalog}
+              selectedRequestedSlot={paidTime.selectedRequestedSlot}
+              selectedRider={paidTime.selectedRider}
+              selectedHorse={paidTime.selectedHorse}
+              selectedTrainer={paidTime.selectedTrainer}
+              selectedPayer={paidTime.selectedPayer}
+              notes={paidTime.notes}
+              setSelectedPriceCatalog={paidTime.setSelectedPriceCatalog}
+              setSelectedRequestedSlot={paidTime.setSelectedRequestedSlot}
+              setSelectedRider={paidTime.setSelectedRider}
+              setSelectedHorse={paidTime.setSelectedHorse}
+              setSelectedTrainer={paidTime.setSelectedTrainer}
+              setSelectedPayer={paidTime.setSelectedPayer}
+              setNotes={paidTime.setNotes}
+              locks={paidTime.locks}
+              onToggleLock={paidTime.handleToggleLock}
+              formatRequestedSlotLabel={paidTime.formatRequestedSlotLabel}
+              formatMemberLabel={paidTime.formatMemberLabel}
+              formatHorseLabel={paidTime.formatHorseLabel}
+              formatPayerLabel={paidTime.formatPayerLabel}
+              canSubmit={paidTime.canSubmit && availability.paidTimes.isEnabled}
+              isSaving={paidTime.isSaving}
+              fieldErrors={paidTime.fieldErrors}
+              formError={paidTime.formError}
+              scrollRequest={paidTime.scrollRequest}
+              onScrollToOffset={handleScrollToOffset}
+              onContinueToReview={paidTime.handleContinueToReview}
+              isReviewOpen={paidTime.isReviewOpen && availability.paidTimes.isEnabled}
+              reviewModel={paidTime.reviewModel}
+              submitError={paidTime.submitError}
+              onBackToEdit={paidTime.handleBackToEdit}
+              onConfirmSubmit={paidTime.handleConfirmSubmit}
+              isSuccessOpen={paidTime.isSuccessOpen}
+              successSnapshot={paidTime.successSnapshot}
+              onAddAnother={handleAddAnotherPaidTime}
+              onFinish={handleFinishPaidTime}
+              availability={paidTimeAvailability}
+            />
+          </>
         ) : null}
 
         {activeTab === "stalls" ? (
-          <CompetitionStallBookingsTab
-            mode={stallBookings.mode}
-            loading={stallBookings.loading}
-            screenError={stallBookings.screenError}
-            horseStallTypeOptions={stallBookings.horseStallTypeOptions}
-            tackStallTypeOptions={stallBookings.tackStallTypeOptions}
-            selectedHorseToAdd={stallBookings.selectedHorseToAdd}
-            setSelectedHorseToAdd={stallBookings.setSelectedHorseToAdd}
-            selectedHorseStallType={stallBookings.selectedHorseStallType}
-            setSelectedHorseStallType={stallBookings.setSelectedHorseStallType}
-            minCompetitionDate={
-              activeCompetition?.competitionStartDate ||
-              activeCompetition?.CompetitionStartDate ||
-              ""
-            }
-            maxCompetitionDate={
-              activeCompetition?.competitionEndDate ||
-              activeCompetition?.CompetitionEndDate ||
-              ""
-            }
-            startDate={stallBookings.startDate}
-            setstartDate={stallBookings.setstartDate}
-            endDate={stallBookings.endDate}
-            setendDate={stallBookings.setendDate}
-            notes={stallBookings.notes}
-            setNotes={stallBookings.setNotes}
-            selectedHorseBookings={stallBookings.selectedHorseBookings}
-            availableHorseOptions={stallBookings.availableHorseOptions}
-            allEligibleHorsesAlreadyBooked={
-              stallBookings.allEligibleHorsesAlreadyBooked
-            }
-            hasAnyHorseStallBookingsForCompetition={
-              stallBookings.hasAnyHorseStallBookingsForCompetition
-            }
-            getAvailablePayersForHorse={
-              stallBookings.getAvailablePayersForHorse
-            }
-            handleRemoveHorseBooking={stallBookings.handleRemoveHorseBooking}
-            toggleHorsePayerSelection={stallBookings.toggleHorsePayerSelection}
-            expandedHorseEditorId={stallBookings.expandedHorseEditorId}
-            toggleHorseEditor={stallBookings.toggleHorseEditor}
-            selectedTackStallType={stallBookings.selectedTackStallType}
-            setSelectedTackStallType={stallBookings.setSelectedTackStallType}
-            tackQuantity={stallBookings.tackQuantity}
-            setTackQuantity={stallBookings.setTackQuantity}
-            tackSplitMode={stallBookings.tackSplitMode}
-            setTackSplitMode={stallBookings.setTackSplitMode}
-            selectedTackPayers={stallBookings.selectedTackPayers}
-            toggleTackPayerSelection={stallBookings.toggleTackPayerSelection}
-            tackNotes={stallBookings.tackNotes}
-            setTackNotes={stallBookings.setTackNotes}
-            tackStartDate={stallBookings.tackStartDate}
-            setTackStartDate={stallBookings.setTackStartDate}
-            tackEndDate={stallBookings.tackEndDate}
-            setTackEndDate={stallBookings.setTackEndDate}
-            tackPricingSummary={stallBookings.tackPricingSummary}
-            allSelectedHorsePayers={stallBookings.allSelectedHorsePayers}
-            allHorseStallTypes={stallBookings.allHorseStallTypes}
-            handleCreateHorseStallBookings={
-              stallBookings.handleCreateHorseStallBookings
-            }
-            handleOpenTackMode={stallBookings.handleOpenTackMode}
-            handleBackToHorseMode={stallBookings.handleBackToHorseMode}
-            handleSubmitTackDraft={stallBookings.handleSubmitTackDraft}
-            isSaving={stallBookings.isSaving}
-            formatHorseLabel={stallBookings.formatHorseLabel}
-            formatPayerLabel={stallBookings.formatPayerLabel}
-            formatStallTypeLabel={stallBookings.formatStallTypeLabel}
-            bookedHorseNamesSummary={stallBookings.bookedHorseNamesSummary}
-            existingTackBookingsCount={stallBookings.existingTackBookingsCount}
-          />
+          availability.stalls.isEnabled ? (
+            <CompetitionStallBookingsTab
+              mode={stallBookings.mode}
+              loading={stallBookings.loading}
+              screenError={stallBookings.screenError}
+              horseStallTypeOptions={stallBookings.horseStallTypeOptions}
+              tackStallTypeOptions={stallBookings.tackStallTypeOptions}
+              selectedHorseToAdd={stallBookings.selectedHorseToAdd}
+              setSelectedHorseToAdd={stallBookings.setSelectedHorseToAdd}
+              selectedHorseStallType={stallBookings.selectedHorseStallType}
+              setSelectedHorseStallType={stallBookings.setSelectedHorseStallType}
+              minCompetitionDate={
+                activeCompetition?.competitionStartDate ||
+                activeCompetition?.CompetitionStartDate ||
+                ""
+              }
+              maxCompetitionDate={
+                activeCompetition?.competitionEndDate ||
+                activeCompetition?.CompetitionEndDate ||
+                ""
+              }
+              startDate={stallBookings.startDate}
+              setstartDate={stallBookings.setstartDate}
+              endDate={stallBookings.endDate}
+              setendDate={stallBookings.setendDate}
+              notes={stallBookings.notes}
+              setNotes={stallBookings.setNotes}
+              selectedHorseBookings={stallBookings.selectedHorseBookings}
+              availableHorseOptions={stallBookings.availableHorseOptions}
+              allEligibleHorsesAlreadyBooked={
+                stallBookings.allEligibleHorsesAlreadyBooked
+              }
+              hasAnyHorseStallBookingsForCompetition={
+                stallBookings.hasAnyHorseStallBookingsForCompetition
+              }
+              getAvailablePayersForHorse={
+                stallBookings.getAvailablePayersForHorse
+              }
+              handleRemoveHorseBooking={stallBookings.handleRemoveHorseBooking}
+              toggleHorsePayerSelection={stallBookings.toggleHorsePayerSelection}
+              expandedHorseEditorId={stallBookings.expandedHorseEditorId}
+              toggleHorseEditor={stallBookings.toggleHorseEditor}
+              selectedTackStallType={stallBookings.selectedTackStallType}
+              setSelectedTackStallType={stallBookings.setSelectedTackStallType}
+              tackQuantity={stallBookings.tackQuantity}
+              setTackQuantity={stallBookings.setTackQuantity}
+              tackSplitMode={stallBookings.tackSplitMode}
+              setTackSplitMode={stallBookings.setTackSplitMode}
+              selectedTackPayers={stallBookings.selectedTackPayers}
+              toggleTackPayerSelection={stallBookings.toggleTackPayerSelection}
+              tackNotes={stallBookings.tackNotes}
+              setTackNotes={stallBookings.setTackNotes}
+              tackStartDate={stallBookings.tackStartDate}
+              setTackStartDate={stallBookings.setTackStartDate}
+              tackEndDate={stallBookings.tackEndDate}
+              setTackEndDate={stallBookings.setTackEndDate}
+              tackPricingSummary={stallBookings.tackPricingSummary}
+              allSelectedHorsePayers={stallBookings.allSelectedHorsePayers}
+              allHorseStallTypes={stallBookings.allHorseStallTypes}
+              handleCreateHorseStallBookings={
+                stallBookings.handleCreateHorseStallBookings
+              }
+              handleOpenTackMode={stallBookings.handleOpenTackMode}
+              handleBackToHorseMode={stallBookings.handleBackToHorseMode}
+              handleSubmitTackDraft={stallBookings.handleSubmitTackDraft}
+              isSaving={stallBookings.isSaving}
+              formatHorseLabel={stallBookings.formatHorseLabel}
+              formatPayerLabel={stallBookings.formatPayerLabel}
+              formatStallTypeLabel={stallBookings.formatStallTypeLabel}
+              bookedHorseNamesSummary={stallBookings.bookedHorseNamesSummary}
+              existingTackBookingsCount={stallBookings.existingTackBookingsCount}
+            />
+          ) : (
+            <RegistrationStepNotice
+              message={buildRegistrationStepNoticeMessage(
+                availability.stalls,
+                isRegistrationStatusLoading,
+              )}
+              containerStyle={styles.errorCard}
+              textStyle={styles.errorText}
+            />
+          )
         ) : null}
 
         {activeTab === "shavings" ? (
-          <CompetitionShavingsTab
-            loading={shavings.loading}
-            screenError={shavings.screenError}
-            availableStalls={shavings.availableStalls}
-            existingOrders={shavings.existingOrders}
-            priceCatalogItems={shavings.priceCatalogItems}
-            selectedPriceCatalog={shavings.selectedPriceCatalog}
-            setSelectedPriceCatalog={shavings.setSelectedPriceCatalog}
-            deliveryMode={shavings.deliveryMode}
-            setDeliveryMode={shavings.setDeliveryMode}
-            deliveryDate={shavings.deliveryDate}
-            setDeliveryDate={shavings.setDeliveryDate}
-            deliveryTime={shavings.deliveryTime}
-            setDeliveryTime={shavings.setDeliveryTime}
-            quantityMode={shavings.quantityMode}
-            setQuantityMode={shavings.setQuantityMode}
-            equalBagQuantity={shavings.equalBagQuantity}
-            setEqualBagQuantity={shavings.setEqualBagQuantity}
-            selectedStalls={shavings.selectedStalls}
-            selectedStallIds={shavings.selectedStallIds}
-            toggleStallSelection={shavings.toggleStallSelection}
-            setStallBagQuantity={shavings.setStallBagQuantity}
-            notes={shavings.notes}
-            setNotes={shavings.setNotes}
-            totalBags={shavings.totalBags}
-            totalPrice={shavings.totalPrice}
-            getStallPrice={shavings.getStallPrice}
-            isSaving={shavings.isSaving}
-            onSubmit={shavings.handleCreateShavingsOrder}
-            formatStallLabel={shavings.formatStallLabel}
-            formatPriceCatalogLabel={shavings.formatPriceCatalogLabel}
-          />
+          availability.shavings.isEnabled ? (
+            <CompetitionShavingsTab
+              loading={shavings.loading}
+              screenError={shavings.screenError}
+              availableStalls={shavings.availableStalls}
+              existingOrders={shavings.existingOrders}
+              priceCatalogItems={shavings.priceCatalogItems}
+              selectedPriceCatalog={shavings.selectedPriceCatalog}
+              setSelectedPriceCatalog={shavings.setSelectedPriceCatalog}
+              deliveryMode={shavings.deliveryMode}
+              setDeliveryMode={shavings.setDeliveryMode}
+              deliveryDate={shavings.deliveryDate}
+              setDeliveryDate={shavings.setDeliveryDate}
+              deliveryTime={shavings.deliveryTime}
+              setDeliveryTime={shavings.setDeliveryTime}
+              quantityMode={shavings.quantityMode}
+              setQuantityMode={shavings.setQuantityMode}
+              equalBagQuantity={shavings.equalBagQuantity}
+              setEqualBagQuantity={shavings.setEqualBagQuantity}
+              selectedStalls={shavings.selectedStalls}
+              selectedStallIds={shavings.selectedStallIds}
+              toggleStallSelection={shavings.toggleStallSelection}
+              setStallBagQuantity={shavings.setStallBagQuantity}
+              notes={shavings.notes}
+              setNotes={shavings.setNotes}
+              totalBags={shavings.totalBags}
+              totalPrice={shavings.totalPrice}
+              getStallPrice={shavings.getStallPrice}
+              isSaving={shavings.isSaving}
+              onSubmit={shavings.handleCreateShavingsOrder}
+              formatStallLabel={shavings.formatStallLabel}
+              formatPriceCatalogLabel={shavings.formatPriceCatalogLabel}
+            />
+          ) : (
+            <RegistrationStepNotice
+              message={buildRegistrationStepNoticeMessage(
+                availability.shavings,
+                isRegistrationStatusLoading,
+              )}
+              containerStyle={styles.errorCard}
+              textStyle={styles.errorText}
+            />
+          )
         ) : null}
       </ScrollView>
 
       <PaidTimeChatbotModal
-        visible={isChatbotOpen}
+        visible={isChatbotOpen && availability.paidTimes.isEnabled}
         ranchId={activeRole?.ranchId}
         competitionId={competitionId}
         roleId={activeRole?.roleId}
@@ -485,7 +626,9 @@ export default function AdminCompetitionRegistrationsScreen(props) {
         הכפתור הצף מוסתר כשאין הגדרות פייד טיים, כדי שלא יהיה כפתור שלא
         עושה כלום. ההסבר עצמו מוצג בתוך הטאב דרך PaidTimeSetupNotice.
       */}
-      {activeTab === "paidTimes" && paidTimeAvailability.canBookBulk ? (
+      {activeTab === "paidTimes" &&
+      availability.paidTimes.isEnabled &&
+      paidTimeAvailability.canBookBulk ? (
         <SmartBookingFab onConfirm={handleOpenSmartBooking} />
       ) : null}
     </View>
