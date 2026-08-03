@@ -1,6 +1,7 @@
 import { Info, X } from "lucide-react";
 import DroppableBox from "../../common/dnd/DroppableBox";
 import DraggableItem from "../../common/dnd/DraggableItem";
+import PaidTimeBookingLabel from "./PaidTimeBookingLabel";
 
 export default function PaidTimeScheduleCell({
   timeCell,
@@ -13,23 +14,8 @@ export default function PaidTimeScheduleCell({
     ? assignment.paidTimeRequestId || assignment.PaidTimeRequestId
     : null;
 
-  var horseName = assignment
-    ? assignment.barnName ||
-      assignment.BarnName ||
-      assignment.horseName ||
-      assignment.HorseName
-    : "";
-
-  var riderName = assignment
-    ? assignment.riderName || assignment.RiderName
-    : "";
-
   var coachName = assignment
     ? assignment.coachName || assignment.CoachName
-    : "";
-
-  var productName = assignment
-    ? assignment.productName || assignment.ProductName
     : "";
 
   var isCoachMatch = assignment && selectedCoach && coachName === selectedCoach;
@@ -45,6 +31,8 @@ export default function PaidTimeScheduleCell({
         isCoachMatch ? "ring-2 ring-[#7B5A4D] bg-[#F5EDE8]" : "",
       ].join(" ")}
       overClassName="bg-[#F5EDE8] ring-2 ring-[#795548]"
+      blocked={!!assignment}
+      blockedOverClassName="bg-red-50 ring-2 ring-red-400"
     >
       {onOpenDetails ? (
         <button
@@ -65,22 +53,15 @@ export default function PaidTimeScheduleCell({
           <DraggableItem
             id={"paid-time-cell-booking-" + requestId}
             data={{ assignment: assignment, sourceTimeCell: timeCell }}
-            className="cursor-grab active:cursor-grabbing"
+            className="w-full flex-1 cursor-grab active:cursor-grabbing"
           >
-            <p className="text-sm font-bold text-[#3F312B]">{horseName}</p>
-
-            <p className="text-xs text-[#7A655C]">
-              {riderName} {productName ? "• " + productName : ""}
-            </p>
-
-            <p className="mt-0.5 text-xs font-medium text-[#7B5A4D]">
-              מאמן/ת: {coachName || "לא צוין"}
-            </p>
+            <PaidTimeBookingLabel item={assignment} />
           </DraggableItem>
 
           <button
             type="button"
-            onClick={function () {
+            onClick={function (e) {
+              e.stopPropagation();
               onUnassign(requestId);
             }}
             className="flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-red-500 hover:bg-red-200"

@@ -699,7 +699,7 @@ export default function CompetitionPaidTimePage() {
                       return (
                         <div
                           key={timeCell.slotId + "-" + timeCell.assignedOrder}
-                          className="grid grid-cols-[88px_1fr] border-b border-[#F3EAE4] last:border-b-0"
+                          className="grid grid-cols-[88px_1fr] border-b border-[#E6DCD5] last:border-b-0"
                         >
                           <div className="flex items-center justify-center bg-[#FAF5F1] text-sm font-bold text-[#7B5A4D]">
                             {timeCell.label}
