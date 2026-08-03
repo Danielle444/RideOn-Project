@@ -219,13 +219,20 @@ function SummaryPageContent(props) {
         detailsItems={page.detailsItems}
         detailsLoading={page.detailsLoading}
         detailsError={page.detailsError}
+        detailsDayGroups={page.detailsDayGroups}
+        selectedDay={page.selectedDay}
+        selectedDayItems={page.selectedDayItems}
+        paidTimeProductColumns={page.paidTimeProductColumns}
+        paidTimeProductCountExceeded={page.paidTimeProductCountExceeded}
         selectedDetailItem={page.selectedDetailItem}
         entryItems={page.entryItems}
         entriesLoading={page.entriesLoading}
         entriesError={page.entriesError}
         onClose={page.closeDetailsModal}
         onDetailRowClick={page.openEntriesForDetail}
+        onOpenDay={page.openDetailsDay}
         onBackToDetails={page.backToDetailsList}
+        onBackToDayList={page.backToDayList}
       />
 
       <SummaryPaymentsBreakdownModal

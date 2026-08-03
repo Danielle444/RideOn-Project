@@ -13,6 +13,11 @@ import {
 } from "../../utils/financialProjection.utils";
 import { isRegistrationClosed } from "../../utils/classesView.utils";
 import {
+  groupDetailsByDay,
+  filterItemsByDay,
+  buildPaidTimeProductColumns,
+} from "../../utils/competitionSummaryDayGrouping.utils";
+import {
   getCompetitionSummary,
   getCompetitionSummaryClassDetails,
   getCompetitionSummaryClassEntries,
@@ -159,6 +164,8 @@ export default function useCompetitionSummaryPage(options) {
   var [detailsLoading, setDetailsLoading] = useState(false);
   var [detailsError, setDetailsError] = useState("");
 
+  var [selectedDay, setSelectedDay] = useState(null);
+
   var [selectedDetailItem, setSelectedDetailItem] = useState(null);
   var [entryItems, setEntryItems] = useState([]);
   var [entriesLoading, setEntriesLoading] = useState(false);
@@ -178,6 +185,44 @@ export default function useCompetitionSummaryPage(options) {
   var [cashDeskSaving, setCashDeskSaving] = useState(false);
   var [cashDeskError, setCashDeskError] = useState("");
   var [cashDeskSuccess, setCashDeskSuccess] = useState("");
+
+  // Day tier (classes/paid-time only). Pure client-side derivation over detailsItems -- no fetch.
+  // The arithmetic itself lives in competitionSummaryDayGrouping.utils.js so it is unit-testable
+  // without a DOM; this hook only wires the memo dependencies and exposes the results.
+  var detailsDayGroups = useMemo(
+    function () {
+      if (!detailsModal) {
+        return [];
+      }
+
+      return groupDetailsByDay(detailsModal.type, detailsItems);
+    },
+    [detailsItems, detailsModal],
+  );
+
+  var selectedDayItems = useMemo(
+    function () {
+      if (!detailsModal || selectedDay === null) {
+        return [];
+      }
+
+      return filterItemsByDay(detailsModal.type, detailsItems, selectedDay);
+    },
+    [detailsItems, detailsModal, selectedDay],
+  );
+
+  var paidTimeProductColumns = useMemo(
+    function () {
+      if (!detailsModal || detailsModal.type !== "paid-time") {
+        return [];
+      }
+
+      return buildPaidTimeProductColumns(detailsItems);
+    },
+    [detailsItems, detailsModal],
+  );
+
+  var paidTimeProductCountExceeded = paidTimeProductColumns.length > 2;
 
   useEffect(
     function () {
@@ -747,6 +792,7 @@ export default function useCompetitionSummaryPage(options) {
       setSelectedDetailItem(null);
       setEntryItems([]);
       setEntriesError("");
+      setSelectedDay(null);
 
       setDetailsModal({
         type: type,
@@ -939,12 +985,34 @@ export default function useCompetitionSummaryPage(options) {
     setSelectedDetailItem(null);
     setEntryItems([]);
     setEntriesError("");
+    setSelectedDay(null);
   }
 
   function backToDetailsList() {
     setSelectedDetailItem(null);
     setEntryItems([]);
     setEntriesError("");
+  }
+
+  function openDetailsDay(dayRollup) {
+    if (!dayRollup) {
+      return;
+    }
+
+    // Defensively clear entries state too -- structurally this handler is only reachable from
+    // the day-list, where entries state should already be empty, but this keeps the invariant
+    // explicit rather than relying on that reachability argument staying true forever.
+    setSelectedDetailItem(null);
+    setEntryItems([]);
+    setEntriesError("");
+    setSelectedDay(dayRollup.dayKey);
+  }
+
+  function backToDayList() {
+    setSelectedDetailItem(null);
+    setEntryItems([]);
+    setEntriesError("");
+    setSelectedDay(null);
   }
 
   async function openEntriesForDetail(item) {
@@ -1236,6 +1304,14 @@ export default function useCompetitionSummaryPage(options) {
     detailsItems: detailsItems,
     detailsLoading: detailsLoading,
     detailsError: detailsError,
+
+    detailsDayGroups: detailsDayGroups,
+    selectedDay: selectedDay,
+    selectedDayItems: selectedDayItems,
+    paidTimeProductColumns: paidTimeProductColumns,
+    paidTimeProductCountExceeded: paidTimeProductCountExceeded,
+    openDetailsDay: openDetailsDay,
+    backToDayList: backToDayList,
 
     selectedDetailItem: selectedDetailItem,
     entryItems: entryItems,
