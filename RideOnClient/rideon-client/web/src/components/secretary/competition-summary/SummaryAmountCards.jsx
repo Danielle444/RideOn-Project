@@ -1,37 +1,7 @@
+import SummaryFigureCard from "./SummaryFigureCard";
+
 function formatMoney(value) {
   return "₪" + Number(value || 0).toLocaleString("he-IL");
-}
-
-function AmountCard(props) {
-  var colorClass = props.colorClass || "text-[#7B5A4D]";
-  var clickableClass = props.onClick
-    ? "cursor-pointer transition-colors hover:bg-[#FCF8F5]"
-    : "";
-
-  return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      disabled={!props.onClick}
-      className={
-        "min-w-0 rounded-2xl border border-[#E3D7D0] bg-white px-6 py-5 text-right shadow-sm disabled:cursor-default " +
-        clickableClass
-      }
-    >
-      <p className="text-sm font-bold text-[#6D4C41]">{props.title}</p>
-
-      <p
-        className={
-          "mt-3 break-words text-2xl font-black tabular-nums lg:text-3xl " +
-          colorClass
-        }
-      >
-        {props.isMoney === false
-          ? Number(props.amount || 0).toLocaleString("he-IL")
-          : formatMoney(props.amount)}
-      </p>
-    </button>
-  );
 }
 
 export default function SummaryAmountCards(props) {
@@ -46,31 +16,30 @@ export default function SummaryAmountCards(props) {
       }
     >
       {showQuantity ? (
-        <AmountCard
+        <SummaryFigureCard
           title="כמות"
-          amount={props.quantity || 0}
+          value={Number(props.quantity || 0).toLocaleString("he-IL")}
           colorClass="text-[#3F312B]"
-          isMoney={false}
         />
       ) : null}
 
-      <AmountCard
+      <SummaryFigureCard
         title="סה״כ הכנסות צפויות"
-        amount={totals.expectedAmount || totals.ExpectedAmount}
+        value={formatMoney(totals.expectedAmount || totals.ExpectedAmount)}
         colorClass="text-[#7B5A4D]"
         onClick={props.onExpectedAmountClick}
       />
 
-      <AmountCard
+      <SummaryFigureCard
         title="שולם בפועל"
-        amount={totals.paidAmount || totals.PaidAmount}
+        value={formatMoney(totals.paidAmount || totals.PaidAmount)}
         colorClass="text-[#2E7D32]"
         onClick={props.onPaidAmountClick}
       />
 
-      <AmountCard
+      <SummaryFigureCard
         title="לא שולם"
-        amount={totals.unpaidAmount || totals.UnpaidAmount}
+        value={formatMoney(totals.unpaidAmount || totals.UnpaidAmount)}
         colorClass="text-[#C62828]"
       />
     </div>

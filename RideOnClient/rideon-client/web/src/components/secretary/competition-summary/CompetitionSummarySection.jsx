@@ -8,6 +8,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import SummaryAmountCards from "./SummaryAmountCards";
+import SummarySectionShell from "./SummarySectionShell";
 
 function formatMoney(value) {
   return "₪" + Number(value || 0).toLocaleString("he-IL");
@@ -134,63 +135,66 @@ export default function CompetitionSummarySection(props) {
     event.target.value = "";
   }
 
-  return (
-    <section className="rounded-[28px] border border-[#E6DCD5] bg-white p-8 shadow-sm">
-      <div className="mb-7 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_260px_220px]">
+  var hasActions =
+    props.actionType === "cash" ||
+    props.actionType === "invoice" ||
+    !!props.secondaryActionLabel;
+
+  var actions = hasActions ? (
+    <>
+      {props.actionType === "cash" ? (
+        <button
+          type="button"
+          onClick={props.onActionClick}
+          className="flex h-16 items-center justify-center gap-3 rounded-2xl bg-[#8B5E4C] px-6 text-lg font-bold text-white transition-colors hover:bg-[#765041]"
+        >
+          <WalletCards size={22} />
+          קופה
+        </button>
+      ) : null}
+
+      {props.actionType === "invoice" ? (
         <div>
-          <h2 className="text-3xl font-black text-[#3F312B]">{props.title}</h2>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileChange}
+            className="hidden"
+          />
 
-          {props.description ? (
-            <p className="mt-2 text-sm text-[#8A7268]">{props.description}</p>
-          ) : null}
-        </div>
-
-        {props.actionType === "cash" ? (
           <button
             type="button"
-            onClick={props.onActionClick}
-            className="flex h-16 items-center justify-center gap-3 rounded-2xl bg-[#8B5E4C] px-6 text-lg font-bold text-white transition-colors hover:bg-[#765041]"
-          >
-            <WalletCards size={22} />
-            קופה
-          </button>
-        ) : null}
-
-        {props.actionType === "invoice" ? (
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-
-            <button
-              type="button"
-              onClick={openFilePicker}
-              disabled={props.actionLoading}
-              className="flex h-16 w-full items-center justify-center gap-3 rounded-2xl bg-[#8B5E4C] px-6 text-lg font-bold text-white transition-colors hover:bg-[#765041] disabled:cursor-not-allowed disabled:opacity-60"
-              title="ייבוא אקסל תשלומי התאחדות"
-            >
-              <Upload size={22} />
-              {props.actionLoading ? "מעלה..." : "העלאת חשבוניות"}
-            </button>
-          </div>
-        ) : null}
-
-        {props.secondaryActionLabel ? (
-          <button
-            type="button"
-            onClick={props.onSecondaryActionClick}
+            onClick={openFilePicker}
             disabled={props.actionLoading}
-            className="flex h-16 items-center justify-center gap-3 rounded-2xl border border-[#8B5E4C] bg-white px-6 text-lg font-bold text-[#6D4C41] transition-colors hover:bg-[#FCF8F5] disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex h-16 w-full items-center justify-center gap-3 rounded-2xl bg-[#8B5E4C] px-6 text-lg font-bold text-white transition-colors hover:bg-[#765041] disabled:cursor-not-allowed disabled:opacity-60"
+            title="ייבוא אקסל תשלומי התאחדות"
           >
-            {props.secondaryActionLabel}
+            <Upload size={22} />
+            {props.actionLoading ? "מעלה..." : "העלאת חשבוניות"}
           </button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
+      {props.secondaryActionLabel ? (
+        <button
+          type="button"
+          onClick={props.onSecondaryActionClick}
+          disabled={props.actionLoading}
+          className="flex h-16 items-center justify-center gap-3 rounded-2xl border border-[#8B5E4C] bg-white px-6 text-lg font-bold text-[#6D4C41] transition-colors hover:bg-[#FCF8F5] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {props.secondaryActionLabel}
+        </button>
+      ) : null}
+    </>
+  ) : null;
+
+  return (
+    <SummarySectionShell
+      title={props.title}
+      description={props.description}
+      actions={actions}
+    >
       {props.actionError ? (
         <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
           {props.actionError}
@@ -295,6 +299,6 @@ export default function CompetitionSummarySection(props) {
           </table>
         </div>
       ) : null}
-    </section>
+    </SummarySectionShell>
   );
 }

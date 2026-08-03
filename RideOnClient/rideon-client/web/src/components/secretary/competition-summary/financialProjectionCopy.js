@@ -121,6 +121,12 @@ var FINANCIAL_PROJECTION_COPY = {
   comparisonWithinBand: "תחזית ההכנסות התאמתה",
   comparisonBelowBand: "תחזית ההכנסות הייתה גבוהה מדי",
   comparisonAboveBand: "תחזית ההכנסות הייתה נמוכה מדי",
+
+  // Comparison tab figure-card labels (CAP-3).
+  comparisonPredictedLabel: "טווח הכנסה צפוי",
+  comparisonActualLabel: "הכנסה בפועל",
+  comparisonDeltaLabel: "פער מהטווח",
+
   comparisonLine: function (actual, lo, hi) {
     return (
       "הכנסה ממקצים בפועל " + actual + " מול תחזית של " + lo + " עד " + hi
