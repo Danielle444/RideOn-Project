@@ -1,15 +1,15 @@
 import { useState } from "react";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import DataTableShell from "../../common/table/DataTableShell";
 import DataTableEmptyState from "../../common/table/DataTableEmptyState";
 import DataTableLoadingState from "../../common/table/DataTableLoadingState";
-import TableActionButton from "../../common/table/TableActionButton";
 import {
   CLASSES_VIEW_PLANNING,
   CLASSES_VIEW_ACTUALS,
   isColumnVisible,
 } from "../../../utils/classesView.utils";
-import { SCHEDULE_COPY, PLANNED_VS_ACTUAL_COPY } from "./classesViewCopy";
+import { compareClassToPrediction } from "../../../utils/plannedVsActual.utils";
+import { SCHEDULE_COPY, ACTUAL_ENTRIES_TOOLTIP_COPY } from "./classesViewCopy";
 
 function formatMoney(value) {
   if (value === null || value === undefined || value === "") {
@@ -147,36 +147,6 @@ function renderScheduleCell(cell) {
   );
 }
 
-// Actual against forecast, for one class. Renders nothing when the class has no prediction --
-// same convention as the תחזית כניסות column beside it.
-function renderPlannedVsActualCell(comparison) {
-  if (!comparison) {
-    return null;
-  }
-
-  var toneClass = comparison.isWithinBand
-    ? "bg-[#EEF8F0] text-[#2F6B3B]"
-    : "bg-[#FDF1EC] text-[#8A4A32]";
-
-  var label = comparison.isWithinBand
-    ? PLANNED_VS_ACTUAL_COPY.withinBand
-    : comparison.isBelowBand
-      ? PLANNED_VS_ACTUAL_COPY.belowBand
-      : PLANNED_VS_ACTUAL_COPY.aboveBand;
-
-  var difference = Math.round(comparison.difference);
-  var sign = difference > 0 ? "+" : "";
-
-  return (
-    <div className="flex flex-col gap-1">
-      <span className={"w-fit rounded-full px-2 py-0.5 text-xs font-semibold " + toneClass}>
-        {sign + difference}
-      </span>
-      <span className="text-xs text-[#8D6E63]">{label}</span>
-    </div>
-  );
-}
-
 export default function SecretaryClassesOverviewTable(props) {
   var items = Array.isArray(props.items) ? props.items : [];
   var [predictionViewMode, setPredictionViewMode] = useState("value");
@@ -202,19 +172,22 @@ export default function SecretaryClassesOverviewTable(props) {
     return true;
   }
 
-  var showScheduleColumns = showColumn("schedule");
+  // The predicted and live schedule cells used to share one flag. Actuals keeps only the
+  // live cell -- the forecast is over, so the predicted-schedule cell retires with the rest
+  // of the forecast columns (CAP-1).
+  var showLiveSchedule = showColumn("schedule");
+  var showPredictedSchedule = showLiveSchedule && activeView === CLASSES_VIEW_PLANNING;
 
   // Counted rather than hardcoded: the old fixed 13/14/16 had to be hand-edited on every
-  // column change, and a stale colSpan silently breaks the empty and loading rows.
+  // column change, and a stale colSpan silently breaks the empty and loading rows. The two
+  // schedule cells are counted directly via their own booleans rather than through this list,
+  // since they no longer show/hide together.
   var VISIBLE_COLUMN_KEYS = [
-    "schedule",
-    "schedule",
     "orderInDay",
     "className",
     "status",
     "entries",
     "predictedEntries",
-    "plannedVsActual",
     "pattern",
     "judges",
     "arena",
@@ -225,7 +198,10 @@ export default function SecretaryClassesOverviewTable(props) {
     "actions",
   ];
 
-  var columnCount = VISIBLE_COLUMN_KEYS.filter(showColumn).length;
+  var columnCount =
+    (showPredictedSchedule ? 1 : 0) +
+    (showLiveSchedule ? 1 : 0) +
+    VISIBLE_COLUMN_KEYS.filter(showColumn).length;
 
   return (
     <section className="rounded-3xl border border-[#EFE5DF] bg-[#FFFDFB] p-4 shadow-sm">
@@ -238,11 +214,11 @@ export default function SecretaryClassesOverviewTable(props) {
       <DataTableShell>
         <thead className="bg-[#FAF5F1] text-sm text-[#6B574F]">
           <tr>
-            {showScheduleColumns ? (
+            {showPredictedSchedule ? (
               <th className="px-4 py-3">{SCHEDULE_COPY.planning.columnHeader}</th>
             ) : null}
 
-            {showScheduleColumns ? (
+            {showLiveSchedule ? (
               <th className="px-4 py-3">{SCHEDULE_COPY.actuals.columnHeader}</th>
             ) : null}
 
@@ -251,9 +227,6 @@ export default function SecretaryClassesOverviewTable(props) {
             {showColumn("status") ? <th className="px-4 py-3">סטטוס</th> : null}
             {showColumn("entries") ? (
               <th className="px-4 py-3">כניסות בפועל</th>
-            ) : null}
-            {showColumn("plannedVsActual") ? (
-              <th className="px-4 py-3">{PLANNED_VS_ACTUAL_COPY.columnHeader}</th>
             ) : null}
             {showColumn("predictedEntries") ? (
             <th className="px-4 py-3">
@@ -327,22 +300,35 @@ export default function SecretaryClassesOverviewTable(props) {
                   ? props.getClassStatus(item)
                   : { key: "empty", label: "אין כניסות" };
 
-                var schedule = showScheduleColumns && props.getScheduleForClass
+                var schedule = showLiveSchedule && props.getScheduleForClass
                   ? props.getScheduleForClass(item)
                   : null;
+
+                // Colors the actual number in actuals only -- driven by the same band math
+                // as the (now-parked) planned-vs-actual diagnostic. Null in planning/financial
+                // and for any class with no prediction, which renders neutral (CAP-2).
+                var actualsComparison =
+                  activeView === CLASSES_VIEW_ACTUALS
+                    ? compareClassToPrediction(
+                        classEntriesCount,
+                        props.getPredictionForClass
+                          ? props.getPredictionForClass(item)
+                          : null,
+                      )
+                    : null;
 
                 return (
                   <tr
                     key={getClassId(item)}
                     className="border-t border-[#F1E7E1] text-sm text-[#4A3A34]"
                   >
-                    {showScheduleColumns ? (
+                    {showPredictedSchedule ? (
                       <td className="px-4 py-3">
                         {renderScheduleCell(schedule ? schedule.predicted : null)}
                       </td>
                     ) : null}
 
-                    {showScheduleColumns ? (
+                    {showLiveSchedule ? (
                       <td className="px-4 py-3">
                         {renderScheduleCell(schedule ? schedule.live : null)}
                       </td>
@@ -389,7 +375,26 @@ export default function SecretaryClassesOverviewTable(props) {
                     {showColumn("entries") ? (
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-1">
-                          <span className="font-bold text-[#3F312B]">
+                          <span
+                            className={
+                              actualsComparison
+                                ? "w-fit rounded-full px-2 py-0.5 text-xs font-semibold " +
+                                  (actualsComparison.isWithinBand
+                                    ? "bg-[#EEF8F0] text-[#2F6B3B]"
+                                    : getTierClass("yellow"))
+                                : "font-bold text-[#3F312B]"
+                            }
+                            title={
+                              actualsComparison
+                                ? (actualsComparison.isWithinBand
+                                    ? ACTUAL_ENTRIES_TOOLTIP_COPY.withinBand
+                                    : ACTUAL_ENTRIES_TOOLTIP_COPY.outsideBand)(
+                                    Math.round(actualsComparison.minPredicted),
+                                    Math.round(actualsComparison.maxPredicted),
+                                  )
+                                : undefined
+                            }
+                          >
                             {classEntriesCount}
                           </span>
 
@@ -397,16 +402,6 @@ export default function SecretaryClassesOverviewTable(props) {
                             {groupEntriesCount} במס׳ זה
                           </span>
                         </div>
-                      </td>
-                    ) : null}
-
-                    {showColumn("plannedVsActual") ? (
-                      <td className="px-4 py-3">
-                        {renderPlannedVsActualCell(
-                          props.getPlannedVsActualForClass
-                            ? props.getPlannedVsActualForClass(item)
-                            : null,
-                        )}
                       </td>
                     ) : null}
 
@@ -485,40 +480,48 @@ export default function SecretaryClassesOverviewTable(props) {
                     ) : null}
 
                     <td className="px-4 py-3">
+                      {/* Three equal squares, mirroring CompetitionsTable.jsx:298 (CAP-4) --
+                          the view button keeps its handler but drops its wide label for an
+                          ArrowLeft icon with the label on hover via title. */}
                       <div className="flex flex-wrap justify-end gap-2">
-                        <TableActionButton
-                          icon={<Eye size={15} />}
-                          label="צפייה בכניסות"
-                          title="צפייה בכניסות של מקצה זה"
+                        <button
+                          type="button"
                           onClick={function () {
                             props.onOpenClassEntries(item);
                           }}
-                        />
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#BCAAA4] bg-white text-[#5D4037] shadow-sm transition-colors hover:bg-[#F8F5F2]"
+                          title="צפייה בכניסות"
+                        >
+                          <ArrowLeft size={17} />
+                        </button>
 
-                        <TableActionButton
-                          icon={<Pencil size={15} />}
-                          iconOnly
-                          title="עריכת מקצה"
+                        <button
+                          type="button"
                           onClick={function () {
                             if (props.onEditClass) {
                               props.onEditClass(item);
                             }
                           }}
                           disabled={!props.onEditClass}
-                        />
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#DDD1CA] bg-white text-[#6B574F] shadow-sm transition-colors hover:bg-[#F8F5F2] disabled:cursor-not-allowed disabled:opacity-50"
+                          title="עריכת מקצה"
+                        >
+                          <Pencil size={17} />
+                        </button>
 
-                        <TableActionButton
-                          icon={<Trash2 size={15} />}
-                          iconOnly
-                          title="מחיקת מקצה"
-                          variant="danger"
+                        <button
+                          type="button"
                           onClick={function () {
                             if (props.onDeleteClass) {
                               props.onDeleteClass(item);
                             }
                           }}
                           disabled={!props.onDeleteClass}
-                        />
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#E4C1C1] bg-white text-[#A54848] shadow-sm transition-colors hover:bg-[#FFF6F6] disabled:cursor-not-allowed disabled:opacity-50"
+                          title="מחיקת מקצה"
+                        >
+                          <Trash2 size={17} />
+                        </button>
                       </div>
                     </td>
                   </tr>

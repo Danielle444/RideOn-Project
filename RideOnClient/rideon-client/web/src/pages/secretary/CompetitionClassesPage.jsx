@@ -6,12 +6,10 @@ import TableActionButton from "../../components/common/table/TableActionButton";
 import SecretaryClassesOverviewTable from "../../components/secretary/classes/SecretaryClassesOverviewTable";
 import SecretaryClassesViewTabs from "../../components/secretary/classes/SecretaryClassesViewTabs";
 import ScheduleDayNotices from "../../components/secretary/classes/ScheduleDayNotices";
-import PlannedVsActualPanel from "../../components/secretary/classes/PlannedVsActualPanel";
 import DayRecommendationsPanel from "../../components/secretary/classes/DayRecommendationsPanel";
 import RegistrationWindowPanel from "../../components/secretary/classes/RegistrationWindowPanel";
 import PlanningForecastCards from "../../components/secretary/classes/PlanningForecastCards";
 import {
-  CLASSES_VIEW_ACTUALS,
   CLASSES_VIEW_FINANCIAL,
   CLASSES_VIEW_PLANNING,
 } from "../../utils/classesView.utils";
@@ -239,10 +237,6 @@ export default function CompetitionClassesPage() {
               />
             )}
 
-            {page.activeView === CLASSES_VIEW_ACTUALS ? (
-              <PlannedVsActualPanel summary={page.plannedVsActualSummary} />
-            ) : null}
-
             {/* Only meaningful while registration is open, which is also the only time the
                 analysis returns isOpen -- the panel hides itself otherwise. */}
             {page.activeView !== CLASSES_VIEW_FINANCIAL ? (
@@ -457,7 +451,6 @@ export default function CompetitionClassesPage() {
               getScheduleForClass={page.getScheduleForClass}
               activeView={page.activeView}
               isReiningField={page.isReiningField}
-              getPlannedVsActualForClass={page.getPlannedVsActualForClass}
             />
           </>
         ) : (
