@@ -3,24 +3,51 @@
 -- ============================================================================
 -- RECOVERED FROM LIVE SUPABASE (project sxplumrexbolpwqacpiz), 2026-08-03.
 -- First tracked definition of this function in the repository. Reproduced
--- verbatim via pg_get_functiondef; no behavioral change of any kind was made.
+-- verbatim via pg_get_functiondef; no behavioral change of any kind was made
+-- at that time.
 --
 -- Part of the 2026-08-03 federation-payment Stage 1 recovery (SP files
--- 191-217). KNOWN ISSUES documented in that audit, NOT fixed here:
---   - Unlike usp_allocatefederationcredittocharge (193), the driving cursor
---     over candidate billcharge rows has NO `FOR UPDATE` lock - two
---     concurrent calls (from different credits, or racing 193) can each read
---     the same "missing amount" snapshot and both insert allocations before
---     either commits a chargestatus update, over-allocating past the charge's
---     face value.
+-- 191-217). KNOWN ISSUES documented in that audit:
 --   - No creditstatus guard at all - only availableamount > 0 is checked,
 --     unlike 193's explicit Cancelled/Refunded/ClosedManually/
---     TransferredToNextCompetition blocklist.
+--     TransferredToNextCompetition blocklist. NOT fixed in this slice -
+--     out of scope (concurrency-only change, no eligibility change).
 --   - Candidate charges exclude Cancelled/Replaced/Rejected/PendingApproval
 --     but NOT 'Paid' - combined with usp_createcompetitionpayerpayment (200),
 --     which can pay a Federation charge via a normal paymentbatch, this is
 --     the same double-payment gap as 193: "missing amount" here is computed
 --     purely from federationcreditallocation, never from paymentbatchid.
+--     NOT fixed in this slice - out of scope.
+--
+-- Concurrency fix (prerequisite for the entry-cancellation federation-
+-- release feature): the candidate-billcharge cursor was previously a plain,
+-- unlocked snapshot query - a concurrent cancellation
+-- (usp_secretarydeleteentry / usp_answerchangeentryrequest[secured]'s Rule 1
+-- release) could commit chargestatus='Cancelled' and delete a charge's
+-- allocations while this proc was mid-loop over a stale snapshot of that
+-- same charge, letting it insert a fresh allocation against an already-
+-- cancelled charge and even flip it back to 'Paid'. Fixed with a two-phase
+-- pattern: the candidate query still runs unlocked (phase 1, UNCHANGED from
+-- the recovered live body - it only decides what to TRY, in what order),
+-- but each candidate's billcharge row is now locked FOR UPDATE and its
+-- chargestatus/amounttopay/covered-amount re-read fresh (phase 2) before
+-- any decision is made or any write happens. A charge that became
+-- Cancelled/Replaced/Rejected/PendingApproval, or whose remaining amount
+-- dropped to zero, while waiting for the lock is skipped via the same
+-- `continue` idiom already used for a non-positive allocation amount - no
+-- new error path, no change to the matching algorithm, eligibility
+-- criteria, FIFO order, amount math, messages, or credit-status calculation
+-- at the end of the proc (all byte-identical to the recovered live body).
+-- Lock order remains credit (already locked above the loop, unchanged) then
+-- charge (now locked inside the loop, new), matching
+-- usp_allocatefederationcredittocharge (193). Candidates are still visited
+-- in ascending billchargeid order (unchanged ORDER BY), so multiple charges
+-- locked within one call of this proc are always acquired in a fixed,
+-- consistent order, preventing a lock-order deadlock against a second
+-- concurrent call of this same proc. Signature and RETURNS TABLE shape are
+-- unchanged; the DAL (CompetitionPaymentDAL.ApproveFederationMatchingSuggestion)
+-- reads the four return columns strictly by name, so no caller change is
+-- required.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_approvefederationmatchingsuggestion(p_competitionid integer, p_federationexternalcreditid integer, p_paidbypersonid integer, p_amount numeric, p_allocatedbysystemuserid integer, p_notes text DEFAULT NULL::text)
@@ -35,6 +62,9 @@ declare
     v_total_allocated numeric := 0;
 
     v_charge record;
+    v_charge_status_fresh character varying;
+    v_charge_amount_fresh numeric;
+    v_charge_covered_fresh numeric;
     v_charge_missing numeric;
     v_charge_covered_after numeric;
 begin
@@ -100,7 +130,34 @@ begin
     loop
         exit when v_remaining_to_allocate <= 0;
 
-        v_charge_missing := v_charge.missingamount;
+        -- Lock the authoritative billcharge row before deciding anything.
+        -- Charge locked AFTER the credit (already locked above), preserving
+        -- credit-then-charge order, matching usp_allocatefederationcredittocharge (193).
+        select bc2.chargestatus, bc2.amounttopay
+        into v_charge_status_fresh, v_charge_amount_fresh
+        from public.billcharge bc2
+        where bc2.billchargeid = v_charge.billchargeid
+        for update;
+
+        -- Skip a candidate that became ineligible while waiting for the lock.
+        if v_charge_status_fresh in ('Cancelled', 'Replaced', 'Rejected', 'PendingApproval') then
+            continue;
+        end if;
+
+        -- Recompute covered/remaining from fresh, locked allocation data -
+        -- another concurrent allocation could have landed between the
+        -- candidate scan and this lock.
+        select coalesce(sum(fca.allocatedamount), 0)
+        into v_charge_covered_fresh
+        from public.federationcreditallocation fca
+        where fca.billchargeid = v_charge.billchargeid;
+
+        v_charge_missing := v_charge_amount_fresh - v_charge_covered_fresh;
+
+        if v_charge_missing <= 0 then
+            continue;
+        end if;
+
         v_allocate_amount := least(v_remaining_to_allocate, v_charge_missing);
 
         if v_allocate_amount <= 0 then
@@ -128,9 +185,9 @@ begin
             coalesce(p_notes, 'אישור הצעת התאמה אוטומטית')
         );
 
-        v_charge_covered_after := v_charge.coveredamount + v_allocate_amount;
+        v_charge_covered_after := v_charge_covered_fresh + v_allocate_amount;
 
-        if v_charge_covered_after >= v_charge.amounttopay then
+        if v_charge_covered_after >= v_charge_amount_fresh then
             update public.billcharge
             set
                 chargestatus = 'Paid',
