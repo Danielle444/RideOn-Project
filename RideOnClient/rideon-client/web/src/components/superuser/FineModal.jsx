@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import FormModal from "../common/form/FormModal";
+import FormField from "../common/form/FormField";
+import TextInput from "../common/form/TextInput";
+import Select from "../common/form/Select";
 
 var triggerModeOptions = [
   {
@@ -97,167 +100,109 @@ export default function FineModal(props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-xl rounded-[28px] border border-[#E6DCD5] bg-white shadow-lg overflow-hidden">
-        <div className="flex items-center justify-between border-b border-[#EFE5DF] px-6 py-5">
-          <h2 className="text-2xl font-bold text-[#3F312B]">
-            עריכת מדיניות קנס
-          </h2>
+    <FormModal
+      isOpen={props.isOpen}
+      onClose={props.onClose}
+      onSubmit={handleSubmit}
+      title="עריכת מדיניות קנס"
+      error={props.error}
+      maxWidthClassName="max-w-xl"
+      submitLabel="שמירת מדיניות"
+    >
+      <div className="space-y-5">
+        <FormField label="סוג קנס">
+          <div className="rounded-xl border border-[#E0D5CF] bg-[#F8F5F3] px-4 py-3 text-[#5D4037]">
+            {getFineReasonLabel(props.initialValue?.fineReason)}
+          </div>
+        </FormField>
 
-          <button
-            type="button"
-            onClick={props.onClose}
-            className="rounded-full p-2 text-[#7E675E] hover:bg-[#F6F1EE] transition-colors"
+        <FormField label="טריגר">
+          <Select
+            value={triggerMode}
+            onChange={function (e) {
+              setTriggerMode(e.target.value);
+            }}
           >
-            <X size={18} />
-          </button>
-        </div>
+            {triggerModeOptions.map(function (option) {
+              return (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              );
+            })}
+          </Select>
+        </FormField>
 
-        <form onSubmit={handleSubmit} className="px-6 py-6">
-          <div className="space-y-5">
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                סוג קנס
-              </label>
-
-              <div className="rounded-xl border border-[#E0D5CF] bg-[#F8F5F3] px-4 py-3 text-[#5D4037]">
-                {getFineReasonLabel(props.initialValue?.fineReason)}
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                טריגר
-              </label>
-
-              <select
-                value={triggerMode}
-                onChange={function (e) {
-                  setTriggerMode(e.target.value);
-                }}
-                className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-              >
-                {triggerModeOptions.map(function (option) {
-                  return (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-
-            {triggerMode !== "None" ? (
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                  אירוע התחלה
-                </label>
-
-                <select
-                  value={startEvent}
-                  onChange={function (e) {
-                    setStartEvent(e.target.value);
-                  }}
-                  className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-                >
-                  <option value="">בחרי אירוע</option>
-
-                  {eventOptions.map(function (option) {
-                    return (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-            ) : null}
-
-            {triggerMode === "Between" ? (
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                  אירוע סיום
-                </label>
-
-                <select
-                  value={endEvent}
-                  onChange={function (e) {
-                    setEndEvent(e.target.value);
-                  }}
-                  className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-                >
-                  <option value="">בחרי אירוע</option>
-
-                  {eventOptions.map(function (option) {
-                    return (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-            ) : null}
-
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                סכום קנס
-                <span className="text-red-500 mr-0.5">*</span>
-              </label>
-
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={fineAmount}
-                onChange={function (e) {
-                  setFineAmount(e.target.value);
-                }}
-                className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-                required
-              />
-            </div>
-
-            <label className="flex items-center gap-3 rounded-2xl border border-[#E8DDD6] bg-[#FAF7F5] px-4 py-3">
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={function (e) {
-                  setIsActive(e.target.checked);
-                }}
-                className="h-4 w-4"
-              />
-
-              <span className="text-sm font-medium text-[#5D4037]">
-                מדיניות פעילה
-              </span>
-            </label>
-
-            {props.error ? (
-              <div className="rounded-2xl border border-[#E7BABA] bg-[#FDF4F4] px-4 py-3 text-sm text-[#A54848]">
-                {props.error}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="mt-8 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={props.onClose}
-              className="rounded-xl border border-[#D8CBC3] bg-white px-5 py-2.5 font-semibold text-[#5D4037] hover:bg-[#F8F5F2] transition-colors"
+        {triggerMode !== "None" ? (
+          <FormField label="אירוע התחלה">
+            <Select
+              value={startEvent}
+              onChange={function (e) {
+                setStartEvent(e.target.value);
+              }}
             >
-              ביטול
-            </button>
+              <option value="">בחרי אירוע</option>
 
-            <button
-              type="submit"
-              className="rounded-xl bg-[#8B6352] px-5 py-2.5 font-semibold text-white shadow-sm hover:bg-[#7A5547] transition-colors"
+              {eventOptions.map(function (option) {
+                return (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                );
+              })}
+            </Select>
+          </FormField>
+        ) : null}
+
+        {triggerMode === "Between" ? (
+          <FormField label="אירוע סיום">
+            <Select
+              value={endEvent}
+              onChange={function (e) {
+                setEndEvent(e.target.value);
+              }}
             >
-              שמירת מדיניות
-            </button>
-          </div>
-        </form>
+              <option value="">בחרי אירוע</option>
+
+              {eventOptions.map(function (option) {
+                return (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                );
+              })}
+            </Select>
+          </FormField>
+        ) : null}
+
+        <FormField label="סכום קנס" required>
+          <TextInput
+            type="number"
+            min="0"
+            step="0.01"
+            value={fineAmount}
+            onChange={function (e) {
+              setFineAmount(e.target.value);
+            }}
+            required
+          />
+        </FormField>
+
+        <label className="flex items-center gap-3 rounded-2xl border border-[#E8DDD6] bg-[#FAF7F5] px-4 py-3">
+          <input
+            type="checkbox"
+            checked={isActive}
+            onChange={function (e) {
+              setIsActive(e.target.checked);
+            }}
+            className="h-4 w-4"
+          />
+
+          <span className="text-sm font-medium text-[#5D4037]">
+            מדיניות פעילה
+          </span>
+        </label>
       </div>
-    </div>
+    </FormModal>
   );
 }

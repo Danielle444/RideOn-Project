@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import FormModal from "./form/FormModal";
+import FormField from "./form/FormField";
+import TextInput from "./form/TextInput";
 
 // Required-field rules for the judge form. Mirrors the declarative array used by
 // ClassInCompetitionModal / PaidTimeSlotInCompetitionModal so a new mandatory
@@ -176,162 +178,84 @@ export default function JudgeModal(props) {
   const isEdit = !!props.initialJudge;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-3xl rounded-[28px] border border-[#E6DCD5] bg-white shadow-lg overflow-hidden">
-        <div className="flex items-center justify-between border-b border-[#EFE5DF] px-6 py-5">
-          <h2 className="text-2xl font-bold text-[#3F312B]">
-            {isEdit ? "עריכת שופט" : "הוספת שופט"}
-          </h2>
+    <FormModal
+      isOpen={props.isOpen}
+      onClose={props.onClose}
+      onSubmit={handleSubmit}
+      title={isEdit ? "עריכת שופט" : "הוספת שופט"}
+      error={props.error}
+      maxWidthClassName="max-w-3xl"
+    >
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <FormField label="שם פרטי בעברית" required error={fieldErrors.firstNameHebrew}>
+          <TextInput
+            type="text"
+            value={form.firstNameHebrew}
+            onChange={(e) => updateField("firstNameHebrew", e.target.value)}
+          />
+        </FormField>
 
-          <button
-            type="button"
-            onClick={props.onClose}
-            className="rounded-full p-2 text-[#7E675E] hover:bg-[#F6F1EE] transition-colors"
-            title="סגירה"
-          >
-            <X size={18} />
-          </button>
+        <FormField label="שם משפחה בעברית" required error={fieldErrors.lastNameHebrew}>
+          <TextInput
+            type="text"
+            value={form.lastNameHebrew}
+            onChange={(e) => updateField("lastNameHebrew", e.target.value)}
+          />
+        </FormField>
+
+        <FormField label="שם פרטי באנגלית">
+          <TextInput
+            type="text"
+            value={form.firstNameEnglish}
+            onChange={(e) => updateField("firstNameEnglish", e.target.value)}
+          />
+        </FormField>
+
+        <FormField label="שם משפחה באנגלית">
+          <TextInput
+            type="text"
+            value={form.lastNameEnglish}
+            onChange={(e) => updateField("lastNameEnglish", e.target.value)}
+          />
+        </FormField>
+
+        <div className="md:col-span-2">
+          <FormField label="מדינה">
+            <TextInput
+              type="text"
+              value={form.country}
+              onChange={(e) => updateField("country", e.target.value)}
+            />
+          </FormField>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-6">
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                שם פרטי בעברית
-                <span className="text-red-500 mr-0.5">*</span>
-              </label>
-              <input
-                type="text"
-                value={form.firstNameHebrew}
-                onChange={(e) => updateField("firstNameHebrew", e.target.value)}
-                className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-              />
+        <div className="md:col-span-2">
+          <FormField label="ענפים" required error={fieldErrors.fieldIds}>
+            <div className="rounded-2xl border border-[#E6DCD5] bg-[#FBF8F6] p-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {(props.fields || []).map(function (field) {
+                  const isChecked = selectedFieldIds.includes(field.fieldId);
 
-              {fieldErrors.firstNameHebrew ? (
-                <div className="mt-1.5 text-right text-xs text-red-600">
-                  {fieldErrors.firstNameHebrew}
-                </div>
-              ) : null}
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                שם משפחה בעברית
-                <span className="text-red-500 mr-0.5">*</span>
-              </label>
-              <input
-                type="text"
-                value={form.lastNameHebrew}
-                onChange={(e) => updateField("lastNameHebrew", e.target.value)}
-                className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-              />
-
-              {fieldErrors.lastNameHebrew ? (
-                <div className="mt-1.5 text-right text-xs text-red-600">
-                  {fieldErrors.lastNameHebrew}
-                </div>
-              ) : null}
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                שם פרטי באנגלית
-              </label>
-              <input
-                type="text"
-                value={form.firstNameEnglish}
-                onChange={(e) =>
-                  updateField("firstNameEnglish", e.target.value)
-                }
-                className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                שם משפחה באנגלית
-              </label>
-              <input
-                type="text"
-                value={form.lastNameEnglish}
-                onChange={(e) => updateField("lastNameEnglish", e.target.value)}
-                className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                מדינה
-              </label>
-              <input
-                type="text"
-                value={form.country}
-                onChange={(e) => updateField("country", e.target.value)}
-                className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="mb-3 block text-sm font-semibold text-[#5D4037]">
-                ענפים
-                <span className="text-red-500 mr-0.5">*</span>
-              </label>
-
-              <div className="rounded-2xl border border-[#E6DCD5] bg-[#FBF8F6] p-4">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {(props.fields || []).map(function (field) {
-                    const isChecked = selectedFieldIds.includes(field.fieldId);
-
-                    return (
-                      <label
-                        key={field.fieldId}
-                        className="flex items-center gap-3 rounded-xl border border-[#E8DDD6] bg-white px-4 py-3 text-[#3F312B] cursor-pointer hover:bg-[#FCFAF8]"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleField(field.fieldId)}
-                          className="h-4 w-4 accent-[#8B6352]"
-                        />
-                        <span>{field.fieldName}</span>
-                      </label>
-                    );
-                  })}
-                </div>
+                  return (
+                    <label
+                      key={field.fieldId}
+                      className="flex items-center gap-3 rounded-xl border border-[#E8DDD6] bg-white px-4 py-3 text-[#3F312B] cursor-pointer hover:bg-[#FCFAF8]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleField(field.fieldId)}
+                        className="h-4 w-4 accent-[#8B6352]"
+                      />
+                      <span>{field.fieldName}</span>
+                    </label>
+                  );
+                })}
               </div>
-
-              {fieldErrors.fieldIds ? (
-                <div className="mt-1.5 text-right text-xs text-red-600">
-                  {fieldErrors.fieldIds}
-                </div>
-              ) : null}
             </div>
-          </div>
-
-          {props.error ? (
-            <div className="mt-5 rounded-2xl border border-[#E7BABA] bg-[#FDF4F4] px-4 py-3 text-sm text-[#A54848]">
-              {props.error}
-            </div>
-          ) : null}
-
-          <div className="mt-8 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={props.onClose}
-              className="rounded-xl border border-[#D8CBC3] bg-white px-5 py-2.5 font-semibold text-[#5D4037] hover:bg-[#F8F5F2] transition-colors"
-            >
-              ביטול
-            </button>
-
-            <button
-              type="submit"
-              className="rounded-xl bg-[#8B6352] px-5 py-2.5 font-semibold text-white shadow-sm hover:bg-[#7A5547] transition-colors"
-            >
-              שמירה
-            </button>
-          </div>
-        </form>
+          </FormField>
+        </div>
       </div>
-    </div>
+    </FormModal>
   );
 }

@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
+import FormModal from "../common/form/FormModal";
+import FormField from "../common/form/FormField";
+import TextInput from "../common/form/TextInput";
+import Select from "../common/form/Select";
+import Textarea from "../common/form/Textarea";
+import ErrorBox from "../common/form/ErrorBox";
 
 export default function ReiningPatternModal(props) {
   var allManeuvers = Array.isArray(props.allManeuvers) ? props.allManeuvers : [];
@@ -217,31 +223,21 @@ export default function ReiningPatternModal(props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-6">
-      <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] border border-[#E6DCD5] bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-[#EFE5DF] px-6 py-5">
-          <h2 className="text-2xl font-bold text-[#3F312B]">
-            {isEdit ? "עריכת מסלול ריינינג" : "הוספת מסלול ריינינג"}
-          </h2>
-
-          <button
-            type="button"
-            onClick={props.onClose}
-            className="rounded-full p-2 text-[#7E675E] transition-colors hover:bg-[#F6F1EE]"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="overflow-y-auto px-6 py-6">
+    <FormModal
+      isOpen={props.isOpen}
+      onClose={props.onClose}
+      onSubmit={handleSubmit}
+      title={isEdit ? "עריכת מסלול ריינינג" : "הוספת מסלול ריינינג"}
+      error={props.error}
+      maxWidthClassName="max-w-6xl"
+      scrollableBody
+      isSaving={props.saving}
+      submitLabel={props.saving ? "שומר..." : "שמירת מסלול"}
+    >
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
             <div className="space-y-5">
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                  מספר מסלול
-                  <span className="text-red-500 mr-0.5">*</span>
-                </label>
-                <input
+              <FormField label="מספר מסלול" required>
+                <TextInput
                   type="number"
                   min="1"
                   required
@@ -249,31 +245,28 @@ export default function ReiningPatternModal(props) {
                   onChange={function (e) {
                     setPatternNumber(e.target.value);
                   }}
-                  className="h-12 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
                 />
-              </div>
+              </FormField>
 
               <div className="rounded-2xl border border-[#E6DCD5] bg-[#FBF8F6] p-4">
-                <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                  שיוך מנברה קיימת
-                </label>
-
-                <select
-                  value={selectedManeuverId}
-                  onChange={function (e) {
-                    setSelectedManeuverId(e.target.value);
-                  }}
-                  className="h-11 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-                >
-                  <option value="">בחרי מנברה</option>
-                  {availableManeuvers.map(function (maneuver) {
-                    return (
-                      <option key={maneuver.maneuverId} value={maneuver.maneuverId}>
-                        {maneuver.maneuverName} - {maneuver.maneuverDescription}
-                      </option>
-                    );
-                  })}
-                </select>
+                <FormField label="שיוך מנברה קיימת">
+                  <Select
+                    value={selectedManeuverId}
+                    onChange={function (e) {
+                      setSelectedManeuverId(e.target.value);
+                    }}
+                    heightClassName="h-11"
+                  >
+                    <option value="">בחרי מנברה</option>
+                    {availableManeuvers.map(function (maneuver) {
+                      return (
+                        <option key={maneuver.maneuverId} value={maneuver.maneuverId}>
+                          {maneuver.maneuverName} - {maneuver.maneuverDescription}
+                        </option>
+                      );
+                    })}
+                  </Select>
+                </FormField>
 
                 <button
                   type="button"
@@ -306,25 +299,19 @@ export default function ReiningPatternModal(props) {
 
                 {inlineManeuverOpen ? (
                   <div className="mt-4 space-y-3">
-                    <div>
-                      <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                        קיצור מנברה
-                      </label>
-                      <input
+                    <FormField label="קיצור מנברה">
+                      <TextInput
                         type="text"
                         value={inlineManeuverForm.maneuverName}
                         onChange={function (e) {
                           handleInlineManeuverChange("maneuverName", e.target.value);
                         }}
-                        className="h-11 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
+                        heightClassName="h-11"
                       />
-                    </div>
+                    </FormField>
 
-                    <div>
-                      <label className="mb-2 block text-sm font-semibold text-[#5D4037]">
-                        תיאור מנברה
-                      </label>
-                      <textarea
+                    <FormField label="תיאור מנברה">
+                      <Textarea
                         rows={3}
                         value={inlineManeuverForm.maneuverDescription}
                         onChange={function (e) {
@@ -333,14 +320,11 @@ export default function ReiningPatternModal(props) {
                             e.target.value,
                           );
                         }}
-                        className="w-full rounded-xl border border-[#D8CBC3] bg-white px-4 py-3 text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
                       />
-                    </div>
+                    </FormField>
 
                     {inlineManeuverError ? (
-                      <div className="rounded-2xl border border-[#E7BABA] bg-[#FDF4F4] px-4 py-3 text-sm text-[#A54848]">
-                        {inlineManeuverError}
-                      </div>
+                      <ErrorBox>{inlineManeuverError}</ErrorBox>
                     ) : null}
 
                     <button
@@ -429,32 +413,6 @@ export default function ReiningPatternModal(props) {
               )}
             </div>
           </div>
-
-          {props.error ? (
-            <div className="mt-5 rounded-2xl border border-[#E7BABA] bg-[#FDF4F4] px-4 py-3 text-sm text-[#A54848]">
-              {props.error}
-            </div>
-          ) : null}
-
-          <div className="mt-8 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={props.onClose}
-              className="rounded-xl border border-[#D8CBC3] bg-white px-5 py-2.5 font-semibold text-[#5D4037] transition-colors hover:bg-[#F8F5F2]"
-            >
-              ביטול
-            </button>
-
-            <button
-              type="submit"
-              disabled={props.saving}
-              className="rounded-xl bg-[#8B6352] px-5 py-2.5 font-semibold text-white shadow-sm transition-colors hover:bg-[#7A5547] disabled:opacity-70"
-            >
-              {props.saving ? "שומר..." : "שמירת מסלול"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    </FormModal>
   );
 }
