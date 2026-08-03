@@ -95,15 +95,15 @@ function resolveDefaultClassesView(competition, now) {
 
 // Which views each column appears in.
 //
-// ONLY the four financial columns move out of planning and actuals -- every non-financial
-// column appears in BOTH of those. The schedule is in both for that reason: it forecasts
-// before the competition and answers "when and where is every class" during it. Advice
-// retires, arithmetic does not, so day two of a three-day competition still gets a finish
-// time long after the recommendations have stopped being useful.
-//
-// The financial view is a lens rather than a time phase, and its column list is exhaustive
-// by definition -- so the schedule is absent from it. Identity columns (order, name) are
-// everywhere because a row with neither cannot be read.
+// Financial columns live only in the financial view -- it is a lens rather than a time
+// phase, and its column list is exhaustive by definition. In the two time-phase views,
+// advice retires but arithmetic stays: the live schedule and real counts (entries) remain in
+// actuals, while the predicted schedule, predicted entries, and the planned-vs-actual
+// comparison retire once the forecast is over. (This map still lists "schedule" as
+// PLANNING_AND_ACTUALS -- the predicted-vs-live split within that one logical column is
+// resolved in the table component, so the live cell keeps showing in actuals even though the
+// predicted cell does not.) Identity columns (order, name) are everywhere because a row with
+// neither cannot be read.
 var PLANNING_AND_ACTUALS = [CLASSES_VIEW_PLANNING, CLASSES_VIEW_ACTUALS];
 var EVERY_VIEW = [CLASSES_VIEW_FINANCIAL, CLASSES_VIEW_PLANNING, CLASSES_VIEW_ACTUALS];
 
@@ -118,15 +118,16 @@ var COLUMN_VIEWS = {
 
   status: PLANNING_AND_ACTUALS,
   entries: PLANNING_AND_ACTUALS,
-  predictedEntries: PLANNING_AND_ACTUALS,
+  predictedEntries: [CLASSES_VIEW_PLANNING],
   pattern: PLANNING_AND_ACTUALS,
   judges: PLANNING_AND_ACTUALS,
   arena: PLANNING_AND_ACTUALS,
   startTime: PLANNING_AND_ACTUALS,
   schedule: PLANNING_AND_ACTUALS,
 
-  // The diagnostic only exists once there are real entries to diagnose against.
-  plannedVsActual: [CLASSES_VIEW_ACTUALS],
+  // Parked (CAP-5): the aggregate diagnostic retires from every view, but the code stays --
+  // compareClassToPrediction is still load-bearing for the per-class color in actuals.
+  plannedVsActual: [],
 };
 
 function isColumnVisible(columnKey, viewKey) {

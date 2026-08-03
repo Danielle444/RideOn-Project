@@ -140,6 +140,18 @@ var PLANNED_VS_ACTUAL_COPY = {
   },
 };
 
+// Hover tooltip on the colored actual-entries number in actuals (CAP-2). Approved by Oren
+// 2026-08-03: an in-band number is green and still shows this tooltip with its predicted
+// range -- only the color differs from out-of-band. No prediction -> no tooltip at all.
+var ACTUAL_ENTRIES_TOOLTIP_COPY = {
+  withinBand: function (min, max) {
+    return "בתוך טווח החזוי · " + min + "–" + max;
+  },
+  outsideBand: function (min, max) {
+    return "מחוץ לטווח החזוי · " + min + "–" + max;
+  },
+};
+
 // Advice about things the app does not track (judge rotations, worker shifts). Suggestion
 // voice throughout -- these are always forward-looking, never a statement of fact.
 var DAY_RECOMMENDATIONS_COPY = {
@@ -254,6 +266,7 @@ export {
   CLASSES_VIEW_TABS_COPY,
   SCHEDULE_COPY,
   PLANNED_VS_ACTUAL_COPY,
+  ACTUAL_ENTRIES_TOOLTIP_COPY,
   DAY_RECOMMENDATIONS_COPY,
   REGISTRATION_WINDOW_COPY,
   PLANNING_FORECAST_COPY,
