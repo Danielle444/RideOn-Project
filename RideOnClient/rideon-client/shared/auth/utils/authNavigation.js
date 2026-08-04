@@ -1,3 +1,5 @@
+import { isRoleSupportedOnWeb, getWebSupportedRoleOptions } from "./platformRoles";
+
 function getPostLoginRoute(user, activeRole) {
   if (!user) {
     return "/login";
@@ -12,14 +14,21 @@ function getPostLoginRoute(user, activeRole) {
     : [];
 
   if (activeRole) {
-    return "/competitions";
+    return isRoleSupportedOnWeb(activeRole.roleName)
+      ? "/competitions"
+      : "/select-ranch";
   }
 
   if (approvedRolesAndRanches.length === 0) {
     return "/login";
   }
 
-  if (approvedRolesAndRanches.length === 1) {
+  var webSupportedRoles = getWebSupportedRoleOptions(approvedRolesAndRanches);
+
+  if (
+    approvedRolesAndRanches.length === 1 &&
+    webSupportedRoles.length === 1
+  ) {
     return "/competitions";
   }
 

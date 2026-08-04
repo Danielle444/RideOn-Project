@@ -16,6 +16,7 @@ import {
   clearAuthStorage,
 } from "../services/storageService";
 import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
+import { isRoleSupportedOnWeb } from "../../../shared/auth/utils/platformRoles";
 import { useUser } from "./UserContext";
 import { useActiveRole } from "./ActiveRoleContext";
 
@@ -101,7 +102,10 @@ export function AuthProvider({ children }) {
 
       let nextActiveRole = null;
 
-      if (data.approvedRolesAndRanches.length === 1) {
+      if (
+        data.approvedRolesAndRanches.length === 1 &&
+        isRoleSupportedOnWeb(data.approvedRolesAndRanches[0].roleName)
+      ) {
         nextActiveRole = data.approvedRolesAndRanches[0];
         setActiveRoleAndPersist(nextActiveRole);
       } else {
