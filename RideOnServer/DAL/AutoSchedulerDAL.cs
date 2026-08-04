@@ -168,6 +168,11 @@ namespace RideOnServer.DAL
                     }
                 }
             }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule/race guard raised inside usp_applyautoschedulev2.
+                throw new BL.ValidationException(ex.MessageText);
+            }
             catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");

@@ -428,6 +428,35 @@ begin
             entrystatus = 'Active'
         where entryid = v_newentryid;
 
+        -- Deterministic Federation lookup for the entry being replaced:
+        -- zero charges -> no call, one charge -> call the helper once, more
+        -- than one -> raise. No LIMIT 1, no loop, no silent pick - same
+        -- pattern as the cancellation branch above. The earlier blanket
+        -- paid guard (lower(p_answerstatus)='rejected' or v_iscancelled=false)
+        -- already aborted this whole request if any charge - Organizer or
+        -- Federation - was Paid, so a charge found here can only be Open (or
+        -- an unreachable terminal status); calling the helper can therefore
+        -- never block a legitimate replacement.
+        select
+            array_agg(bc.billchargeid order by bc.billchargeid),
+            count(*)
+        into
+            v_federation_billchargeids,
+            v_federation_count
+        from public.billcharge bc
+        where bc.sourcetype = 'Entry'
+          and bc.sourceid = v_originalentryid
+          and bc.chargeowner = 'Federation'
+          and bc.categorykey = 'classes';
+
+        if v_federation_count > 1 then
+            raise exception 'Multiple Federation entry charges found for entry %', v_originalentryid;
+        end if;
+
+        if v_federation_count = 1 then
+            perform public.usp_releasefederationallocationsforcharge(v_federation_billchargeids[1]);
+        end if;
+
         update public.billcharge
         set
             chargestatus = 'Replaced',
