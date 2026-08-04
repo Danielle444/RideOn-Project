@@ -8,7 +8,23 @@ import {
 import { getCompetitionInvitationDetails } from "../services/competitionService";
 import { getRealHorsesByRanch } from "../services/horsesService";
 import { getManagedPayers } from "../services/payerService";
-import { createEntry } from "../services/entriesService";
+import {
+  createEntry,
+  getCompetitionEntriesView,
+} from "../services/entriesService";
+import { findDuplicateActiveEntry } from "../utils/entryDuplicateMatch";
+
+var DUPLICATE_ENTRY_CONFIRM_MESSAGE =
+  "הרוכב והסוס כבר רשומים למקצה זה. להוסיף בכל זאת?";
+var DUPLICATE_ENTRY_CONFIRM_LABEL = "הוסף בכל זאת";
+var DUPLICATE_ENTRY_CANCEL_LABEL = "ביטול";
+
+// Reused verbatim (not new copy) from this same hook's loadScreenData catch
+// below, and from useRegistrationStepStatus.js's own
+// GENERIC_LOAD_ERROR_MESSAGE - the established repo-wide phrasing for "a
+// fetch inside the registration flow failed," which is exactly what
+// checkForDuplicateAndConfirm's GET can hit.
+var GENERIC_FETCH_ERROR_MESSAGE = "אירעה שגיאה בטעינת נתוני ההרשמה";
 
 function normalizeClassItem(item) {
   if (!item) {
@@ -157,6 +173,13 @@ export default function useAdminCompetitionRegistrations(params) {
   var activeRole = params.activeRole;
   var competitionId = params.competitionId;
 
+  // CAP-2: the entry currently being replaced by an edit (a change request),
+  // so the duplicate check does not flag an edit against itself. Undefined/
+  // null for both create surfaces (inline + the two create-mode modal call
+  // sites) - only CompetitionEntryCreateModal's edit mode passes a real id.
+  var excludeEntryId =
+    params.excludeEntryId !== undefined ? params.excludeEntryId : null;
+
   var [classes, setClasses] = useState([]);
   var [horses, setHorses] = useState([]);
   var [riders, setRiders] = useState([]);
@@ -189,6 +212,17 @@ export default function useAdminCompetitionRegistrations(params) {
   var horsesRequestIdRef = useRef(0);
 
   var [lastCreatedEntry, setLastCreatedEntry] = useState(null);
+
+  // CAP-1: transient "just created" confirmation, and how many entries this
+  // hook instance has created in the current mount ("session"). Only ever
+  // set by a create call (suppressSuccess !== true) - see handleCreateEntry.
+  var [justCreated, setJustCreated] = useState(false);
+  var [createdCount, setCreatedCount] = useState(0);
+
+  function resetCreationSummary() {
+    setJustCreated(false);
+    setCreatedCount(0);
+  }
 
   useEffect(
     function () {
@@ -430,11 +464,95 @@ export default function useAdminCompetitionRegistrations(params) {
     return "";
   }
 
-  async function handleCreateEntry() {
+  // CAP-2 soft duplicate guard. Fetches the competition's entry list and
+  // warns (Alert confirm/cancel) when the exact class+horse+rider triple
+  // already has an Active entry - never blocks outright ON A FOUND
+  // duplicate (cancel/confirm is the user's own choice). A fetch or
+  // normalization FAILURE is a different case: since we could not verify
+  // one way or the other, we must not treat "unknown" as "no duplicate" -
+  // this stops the submit (returns false, same shape as "user cancelled"),
+  // shows the same generic load-error copy this hook already uses
+  // (GENERIC_FETCH_ERROR_MESSAGE, reused verbatim from loadScreenData below
+  // rather than inventing new copy), and performs no createEntry call. No
+  // form state is touched on this path, so all selections are preserved for
+  // a retry.
+  async function checkForDuplicateAndConfirm() {
+    var duplicate;
+
+    try {
+      var response = await getCompetitionEntriesView(
+        competitionId,
+        activeRole.ranchId,
+      );
+
+      var entries = Array.isArray(response?.data) ? response.data : [];
+
+      duplicate = findDuplicateActiveEntry(entries, {
+        classInCompId: selectedClass.classInCompId,
+        horseId: selectedHorse.horseId,
+        riderFederationMemberId: selectedRider.federationMemberId,
+        excludeEntryId: excludeEntryId,
+      });
+    } catch (error) {
+      Alert.alert("שגיאה", GENERIC_FETCH_ERROR_MESSAGE);
+      return false;
+    }
+
+    if (!duplicate) {
+      return true;
+    }
+
+    return await new Promise(function (resolve) {
+      Alert.alert(DUPLICATE_ENTRY_CONFIRM_MESSAGE, undefined, [
+        {
+          text: DUPLICATE_ENTRY_CANCEL_LABEL,
+          style: "cancel",
+          onPress: function () {
+            resolve(false);
+          },
+        },
+        {
+          text: DUPLICATE_ENTRY_CONFIRM_LABEL,
+          onPress: function () {
+            resolve(true);
+          },
+        },
+      ], {
+        cancelable: true,
+        onDismiss: function () {
+          resolve(false);
+        },
+      });
+    });
+  }
+
+  // options.suppressSuccess: true for CompetitionEntryCreateModal's edit
+  // flow (which still creates a real new entry, but the change-request step
+  // around it is what should be user-visible, not this hook's own success
+  // banner/tally - see CAP-1). Safe to leave undefined/omitted for the two
+  // plain-create call sites (inline surface's onSubmit prop passes this
+  // function directly to a Pressable's onPress, so the first argument may
+  // be a GestureResponderEvent rather than an options object - that object
+  // has no truthy `.suppressSuccess`, so it behaves exactly like "not
+  // suppressed", which is the correct default for that surface).
+  async function handleCreateEntry(options) {
+    var suppressSuccess = !!(options && options.suppressSuccess);
+
     var validationMessage = validateForm();
 
     if (validationMessage) {
       Alert.alert("שגיאה", validationMessage);
+      return null;
+    }
+
+    // Clear any confirmation left over from a previous submit before this
+    // new attempt runs, so a failed/duplicate-cancelled resubmit doesn't
+    // keep showing a stale "success" banner.
+    setJustCreated(false);
+
+    var shouldProceed = await checkForDuplicateAndConfirm();
+
+    if (!shouldProceed) {
       return null;
     }
 
@@ -459,6 +577,14 @@ export default function useAdminCompetitionRegistrations(params) {
       setLastCreatedEntry(response.data);
 
       resetUnlockedFields();
+
+      if (!suppressSuccess) {
+        setCreatedCount(function (prevCount) {
+          return prevCount + 1;
+        });
+
+        setJustCreated(true);
+      }
 
       return response.data;
     } catch (error) {
@@ -533,5 +659,9 @@ export default function useAdminCompetitionRegistrations(params) {
     formatPayerLabel,
 
     lastCreatedEntry,
+
+    justCreated,
+    createdCount,
+    resetCreationSummary,
   };
 }

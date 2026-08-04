@@ -1,18 +1,18 @@
-// Shared "step unavailable" Hebrew reason-mapping, extracted so the three
-// standalone management screens (Classes / Stalls-Shavings / Paid Times)
-// reuse ONE mapping instead of each carrying an independent copy.
-//
-// AdminCompetitionRegistrationsScreen.jsx keeps its own inline copy of this
-// exact logic (approved in Stage 3, out of scope to touch here) - the two
-// copies must stay textually identical if either is ever revised.
+// Shared "step unavailable" Hebrew reason-mapping. This is the single copy -
+// AdminCompetitionRegistrationsScreen.jsx does NOT keep its own inline copy
+// (an earlier version of this comment claimed it did; that was already
+// stale by the time of the CAP-4 audit - the screen imports and calls
+// buildRegistrationStepNoticeMessage below directly, same as the three
+// standalone management screens (Classes / Stalls-Shavings / Paid Times)).
 
 var REGISTRATION_STEP_REASON_MESSAGES = {
   NOT_CONFIGURED: "שלב זה עדיין לא הוגדר עבור התחרות.",
   NOT_OPEN_YET: "ההרשמה לשלב זה עדיין לא נפתחה.",
   MISSING_PRICE: "לא הוגדר מחיר פעיל עבור שלב זה.",
-  NEEDS_RELEVANT_ENTRY: "יש צורך בהרשמה פעילה למקצה לפני שניתן להמשיך בשלב זה.",
+  NEEDS_RELEVANT_ENTRY:
+    'יש צורך בהרשמה פעילה למקצה לפני הזמנת תא. אפשר להוסיף הרשמה בלשונית "מקצים".',
   NEEDS_RELEVANT_STALL_BOOKING:
-    "יש צורך בהזמנת תא פעילה לפני שניתן להמשיך בשלב זה.",
+    'יש צורך בהזמנת תא פעילה לפני הזמנת נסורת. אפשר להוסיף תא בלשונית "תאים".',
   STATUS_UNAVAILABLE: "לא ניתן לאמת כרגע את מצב ההרשמה עבור שלב זה.",
 };
 

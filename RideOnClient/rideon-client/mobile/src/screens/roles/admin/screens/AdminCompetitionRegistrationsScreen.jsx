@@ -9,7 +9,6 @@ import CompetitionPaidTimeTab from "../../../../components/competitions/Competit
 import CompetitionStallBookingsTab from "../../../../components/competitionRegistrations/CompetitionStallBookingsTab";
 
 import styles from "../../../../styles/adminCompetitionRegistrationsStyles";
-import { RTL_LABEL_NUMBER_OF_LINES } from "../../../../styles/rtlLabelStyle";
 
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import { getAdminCompetitionMenuItems } from "../../../../navigation/competitionMenuConfigs";
@@ -64,6 +63,13 @@ function resolveFallbackTab(availability) {
   return visibleTabKey || "classes";
 }
 
+// CAP-6: this tab strip's label needs up to two lines ("פייד טיימים" was
+// clipping to one). Deliberately a LOCAL constant, not a change to the
+// shared RTL_LABEL_NUMBER_OF_LINES (which stays 1 for Button.jsx and every
+// other consumer) - centering still comes from styles.tabButtonText's own
+// rtlLabelStyle spread, unaffected by the line count.
+var TAB_LABEL_NUMBER_OF_LINES = 2;
+
 function RegistrationsTabs(props) {
   var availability = props.availability;
 
@@ -89,7 +95,7 @@ function RegistrationsTabs(props) {
         }}
       >
         <Text
-          numberOfLines={RTL_LABEL_NUMBER_OF_LINES}
+          numberOfLines={TAB_LABEL_NUMBER_OF_LINES}
           style={[
             isDisabled ? styles.tabButtonTextDisabled : styles.tabButtonText,
             isActive ? styles.tabButtonTextActive : null,
@@ -194,6 +200,41 @@ export default function AdminCompetitionRegistrationsScreen(props) {
     activeRole: activeRole,
     competitionId: competitionId,
   });
+
+  // CAP-1: this inline surface has no modal onClose - "dismissed and later
+  // reopened" here means leaving this screen via navigation and coming back.
+  // AppNavigator is one flat native-stack (no unmountOnBlur), so navigating
+  // to a sibling competition screen (e.g. tapping "מקצים" in the menu) PUSHES
+  // it on top and leaves this screen mounted-but-blurred underneath;
+  // navigating back to "AdminCompetitionRegistrations" then POPS back to
+  // that SAME still-mounted instance rather than remounting it - so without
+  // this, a stale success banner/tally from before the user left would still
+  // be showing on return. useFocusEffect's cleanup fires exactly on that
+  // blur (leaving), which is the smallest existing lifecycle signal for
+  // this surface's "dismiss" - and does NOT fire on local activeTab
+  // switches (those are plain state, not a navigation focus/blur event), so
+  // an in-progress create session survives switching between classes/
+  // paidTimes/stalls/shavings. The callback is registered with a stable
+  // (empty-deps) identity and reads the always-current reset function via a
+  // ref, so it isn't torn down and re-armed by the very re-renders that
+  // creating an entry causes (which would otherwise fire the "leaving"
+  // cleanup while the user is still on this screen, mid-session).
+  var resetCreationSummaryRef = useRef(registration.resetCreationSummary);
+
+  useEffect(
+    function () {
+      resetCreationSummaryRef.current = registration.resetCreationSummary;
+    },
+    [registration.resetCreationSummary],
+  );
+
+  useFocusEffect(
+    useCallback(function () {
+      return function () {
+        resetCreationSummaryRef.current();
+      };
+    }, []),
+  );
 
   var paidTime = useAdminCompetitionPaidTimes({
     user: user,
@@ -420,6 +461,8 @@ export default function AdminCompetitionRegistrationsScreen(props) {
               canSubmit={registration.canSubmit && availability.classes.isEnabled}
               isSaving={registration.isSaving}
               onSubmit={registration.handleCreateEntry}
+              justCreated={registration.justCreated}
+              createdCount={registration.createdCount}
             />
           </>
         ) : null}
@@ -563,6 +606,20 @@ export default function AdminCompetitionRegistrationsScreen(props) {
               )}
               containerStyle={styles.errorCard}
               textStyle={styles.errorText}
+              ctaLabel={
+                availability.stalls.unavailableReason ===
+                "NEEDS_RELEVANT_ENTRY"
+                  ? "מעבר להוספת הרשמה"
+                  : null
+              }
+              onCtaPress={
+                availability.stalls.unavailableReason ===
+                "NEEDS_RELEVANT_ENTRY"
+                  ? function () {
+                      setActiveTab("classes");
+                    }
+                  : null
+              }
             />
           )
         ) : null}
@@ -611,6 +668,20 @@ export default function AdminCompetitionRegistrationsScreen(props) {
               )}
               containerStyle={styles.errorCard}
               textStyle={styles.errorText}
+              ctaLabel={
+                availability.shavings.unavailableReason ===
+                "NEEDS_RELEVANT_STALL_BOOKING"
+                  ? "מעבר להזמנת תא"
+                  : null
+              }
+              onCtaPress={
+                availability.shavings.unavailableReason ===
+                "NEEDS_RELEVANT_STALL_BOOKING"
+                  ? function () {
+                      setActiveTab("stalls");
+                    }
+                  : null
+              }
             />
           )
         ) : null}
