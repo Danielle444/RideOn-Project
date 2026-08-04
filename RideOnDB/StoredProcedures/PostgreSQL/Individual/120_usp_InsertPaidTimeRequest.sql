@@ -1,124 +1,158 @@
-CREATE OR REPLACE FUNCTION usp_InsertPaidTimeRequest(
-    p_OrderedBySystemUserId    INTEGER,
-    p_RanchId                  INTEGER,
-    p_HorseId                  INTEGER,
-    p_RiderFederationMemberId  INTEGER,
-    p_CoachFederationMemberId  INTEGER,
-    p_PaidByPersonId           INTEGER,
-    p_PriceCatalogId           INTEGER,
-    p_RequestedCompSlotId      INTEGER,
-    p_Notes                    TEXT DEFAULT NULL
-)
-RETURNS INTEGER
-LANGUAGE plpgsql AS $$
-DECLARE
-    v_billid INT;
-    v_srequestid INT;
-    v_paidtimerequestid INT;
-    v_amounttopay NUMERIC(10,2);
-    v_catalog_ranchid INT;
-    v_horse_ranchid INT;
-    v_competitionid INT;
-BEGIN
-    SELECT
+-- 120_usp_InsertPaidTimeRequest.sql
+--
+-- REPOSITORY RECOVERY (2026-08-04): this file was stale relative to the live
+-- production definition of public.usp_insertpaidtimerequest. The body below
+-- is captured verbatim from live via pg_get_functiondef -- not hand-edited --
+-- per this project's rule that a proc body must never be reconstructed from
+-- behavior alone.
+--
+-- What changed versus the previous repository copy (informational only --
+-- live was already running this exact logic, so no production behavior is
+-- altered by this recovery):
+--   - parameter order/types now match live exactly (live order is
+--     p_pricecatalogid, p_requestedcompslotid, p_orderedbysystemuserid,
+--     p_ranchid, p_horseid, p_riderfederationmemberid,
+--     p_coachfederationmemberid, p_paidbypersonid, p_notes; p_notes is
+--     CHARACTER VARYING, not TEXT, and has no DEFAULT)
+--   - added horse-ranch validation (v_horse_ranchid <> p_ranchid)
+--   - coach validation is optional (only enforced when
+--     p_coachfederationmemberid IS NOT NULL); the previous repository copy
+--     required a coach unconditionally
+--   - financial write is the Phase 8 billcharge-based path: inserts a
+--     billcharge row (categorykey='paid-time', chargeowner='Organizer',
+--     sourcetype='PaidTimeRequest') and calls usp_recalculatebillamount,
+--     instead of the previous repository copy's legacy direct
+--     `UPDATE bill SET amounttopay = amounttopay + v_amounttopay`
+--
+-- Confirmed compatible with all current callers: both
+-- PaidTimeRequestDAL.CreatePaidTimeRequest (C#) and
+-- usp_bulkinsertpaidtimerequests (SQL) invoke this function using fully
+-- named arguments for every parameter, so the corrected parameter order
+-- does not affect either caller.
+--
+-- STATUS: this recovery is a repository-text-only sync. It does not change
+-- live behavior (live already ran this exact body) and does NOT add any
+-- competition-ended guard -- that remains a separate, not-yet-approved slice.
+
+CREATE OR REPLACE FUNCTION public.usp_insertpaidtimerequest(p_pricecatalogid integer, p_requestedcompslotid integer, p_orderedbysystemuserid integer, p_ranchid integer, p_horseid integer, p_riderfederationmemberid integer, p_coachfederationmemberid integer, p_paidbypersonid integer, p_notes character varying)
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$
+declare
+    v_billid integer;
+    v_srequestid integer;
+    v_paidtimerequestid integer;
+    v_amounttopay numeric(10,2);
+    v_catalog_ranchid integer;
+    v_horse_ranchid integer;
+    v_competitionid integer;
+begin
+    select
         pc.itemprice,
         pc.ranchid
-    INTO
+    into
         v_amounttopay,
         v_catalog_ranchid
-    FROM pricecatalog pc
-    WHERE pc.pricecatalogid = p_pricecatalogid
-      AND pc.isactive = true;
+    from public.pricecatalog pc
+    where pc.pricecatalogid = p_pricecatalogid
+      and pc.isactive = true;
 
-    IF v_amounttopay IS NULL THEN
-        RAISE EXCEPTION 'Price catalog item not found or inactive';
-    END IF;
+    if v_amounttopay is null then
+        raise exception 'Price catalog item not found or inactive';
+    end if;
 
-    IF v_catalog_ranchid <> p_ranchid THEN
-        RAISE EXCEPTION 'Price catalog item does not belong to this ranch';
-    END IF;
+    if v_catalog_ranchid <> p_ranchid then
+        raise exception 'Price catalog item does not belong to this ranch';
+    end if;
 
-    SELECT pts.competitionid
-    INTO v_competitionid
-    FROM paidtimeslotincompetition pts
-    WHERE pts.paidtimeslotincompid = p_requestedcompslotid;
+    select pts.competitionid
+    into v_competitionid
+    from public.paidtimeslotincompetition pts
+    where pts.paidtimeslotincompid = p_requestedcompslotid;
 
-    IF v_competitionid IS NULL THEN
-        RAISE EXCEPTION 'Requested paid time slot not found';
-    END IF;
+    if v_competitionid is null then
+        raise exception 'Requested paid time slot not found';
+    end if;
 
-    SELECT h.ranchid
-    INTO v_horse_ranchid
-    FROM horse h
-    WHERE h.horseid = p_horseid;
+    select h.ranchid
+    into v_horse_ranchid
+    from public.horse h
+    where h.horseid = p_horseid;
 
-    IF v_horse_ranchid IS NULL THEN
-        RAISE EXCEPTION 'Horse not found';
-    END IF;
+    if v_horse_ranchid is null then
+        raise exception 'Horse not found';
+    end if;
 
-    IF NOT EXISTS (
-        SELECT 1
-        FROM servicerequest sr
-        INNER JOIN entry e
-            ON e.entryid = sr.srequestid
-        INNER JOIN classincompetition cic
-            ON cic.classincompid = e.classincompid
-        WHERE sr.horseid = p_horseid
-          AND cic.competitionid = v_competitionid
-    ) THEN
-        RAISE EXCEPTION 'Horse is not registered to the competition through entries';
-    END IF;
+    if v_horse_ranchid <> p_ranchid then
+        raise exception 'Horse does not belong to your ranch';
+    end if;
 
-    IF NOT EXISTS (
-        SELECT 1
-        FROM federationmember fm
-        WHERE fm.federationmemberid = p_riderfederationmemberid
-    ) THEN
-        RAISE EXCEPTION 'Rider not found';
-    END IF;
+    if not exists (
+        select 1
+        from public.servicerequest sr
+        inner join public.entry e
+            on e.entryid = sr.srequestid
+        inner join public.classincompetition cic
+            on cic.classincompid = e.classincompid
+        where sr.horseid = p_horseid
+          and cic.competitionid = v_competitionid
+    ) then
+        raise exception 'Horse is not registered to the competition through entries';
+    end if;
 
-    IF NOT EXISTS (
-        SELECT 1
-        FROM federationmember fm
-        WHERE fm.federationmemberid = p_coachfederationmemberid
-    ) THEN
-        RAISE EXCEPTION 'Coach not found';
-    END IF;
+    if not exists (
+        select 1
+        from public.federationmember fm
+        where fm.federationmemberid = p_riderfederationmemberid
+    ) then
+        raise exception 'Rider not found';
+    end if;
 
-    IF NOT EXISTS (
-        SELECT 1
-        FROM person p
-        WHERE p.personid = p_paidbypersonid
-    ) THEN
-        RAISE EXCEPTION 'Payer not found';
-    END IF;
+    if p_coachfederationmemberid is not null
+       and not exists (
+            select 1
+            from public.federationmember fm
+            where fm.federationmemberid = p_coachfederationmemberid
+       ) then
+        raise exception 'Coach not found';
+    end if;
 
-    v_billid := usp_getorcreateopenbillforpayerandcompetition(
+    if not exists (
+        select 1
+        from public.person p
+        where p.personid = p_paidbypersonid
+    ) then
+        raise exception 'Payer not found';
+    end if;
+
+    v_billid := public.usp_getorcreateopenbillforpayerandcompetition(
         p_paidbypersonid,
         v_competitionid
     );
 
-    INSERT INTO servicerequest (
+    insert into public.servicerequest
+    (
         orderedbysystemuserid,
         horseid,
         riderfederationmemberid,
         coachfederationmemberid,
         billid,
-        paymentid,
         srequestdatetime
     )
-    VALUES (
+    values
+    (
         p_orderedbysystemuserid,
         p_horseid,
         p_riderfederationmemberid,
         p_coachfederationmemberid,
         v_billid,
-        NULL,
         now()
     )
-    RETURNING srequestid INTO v_srequestid;
+    returning srequestid
+    into v_srequestid;
 
-    INSERT INTO paidtimerequest (
+    insert into public.paidtimerequest
+    (
         paidtimerequestid,
         pricecatalogid,
         requestedcompslotid,
@@ -127,21 +161,50 @@ BEGIN
         status,
         notes
     )
-    VALUES (
+    values
+    (
         v_srequestid,
         p_pricecatalogid,
         p_requestedcompslotid,
-        NULL,
-        NULL,
+        null,
+        null,
         'Pending',
         p_notes
     )
-    RETURNING paidtimerequestid INTO v_paidtimerequestid;
+    returning paidtimerequestid
+    into v_paidtimerequestid;
 
-    UPDATE bill
-    SET amounttopay = amounttopay + v_amounttopay
-    WHERE billid = v_billid;
+    insert into public.billcharge
+    (
+        billid,
+        competitionid,
+        paidbypersonid,
+        chargeowner,
+        categorykey,
+        sourcetype,
+        sourceid,
+        amounttopay,
+        chargestatus,
+        paymentbatchid,
+        createdat
+    )
+    values
+    (
+        v_billid,
+        v_competitionid,
+        p_paidbypersonid,
+        'Organizer',
+        'paid-time',
+        'PaidTimeRequest',
+        v_paidtimerequestid,
+        v_amounttopay,
+        'Open',
+        null,
+        now()
+    );
 
-    RETURN v_paidtimerequestid;
-END;
-$$;
+    perform public.usp_recalculatebillamount(v_billid);
+
+    return v_paidtimerequestid;
+end;
+$function$;
