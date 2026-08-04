@@ -14,6 +14,7 @@ declare
     v_previous_slotid integer;
     v_existing_name text;
     v_slot_start_ts timestamp with time zone;
+    v_competitionenddate date;
 begin
     if p_assignedorder is null or p_assignedorder <= 0 then
         raise exception 'Invalid assigned order';
@@ -35,6 +36,15 @@ begin
 
     if v_request_competitionid is null then
         raise exception 'Paid time request not found for this ranch';
+    end if;
+
+    select c.competitionenddate
+    into v_competitionenddate
+    from public.competition c
+    where c.competitionid = v_request_competitionid;
+
+    if (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate then
+        raise exception 'Competition has already ended' using errcode = 'RN001';
     end if;
 
     -- נעילת-ייעוץ ברמת התחרות: מסדרת בין כל נתיבי-השיבוץ (אוטומטי וידני)

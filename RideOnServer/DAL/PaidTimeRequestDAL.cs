@@ -172,6 +172,11 @@ namespace RideOnServer.DAL
                     }
                 }
             }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule/race guard raised inside usp_assignpaidtimerequest.
+                throw new BL.ValidationException(ex.MessageText);
+            }
             catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
