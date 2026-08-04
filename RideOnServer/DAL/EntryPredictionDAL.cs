@@ -26,24 +26,7 @@ namespace RideOnServer.DAL
                             return null;
                         }
 
-                        return new EntryPredictionFeatureInputs
-                        {
-                            ClassInCompId = Convert.ToInt32(reader["ClassInCompId"]),
-                            CompetitionId = Convert.ToInt32(reader["CompetitionId"]),
-                            ClassDateTime = Convert.ToDateTime(reader["ClassDateTime"]),
-                            OrderInDay = reader["OrderInDay"] == DBNull.Value ? null : Convert.ToInt16(reader["OrderInDay"]),
-                            TotalCost = Convert.ToDecimal(reader["TotalCost"]),
-                            ClassTypeId = Convert.ToInt16(reader["ClassTypeId"]),
-                            ClassName = reader["ClassName"] == DBNull.Value ? string.Empty : reader["ClassName"].ToString() ?? string.Empty,
-                            FieldId = Convert.ToInt16(reader["FieldId"]),
-                            FieldName = reader["FieldName"] == DBNull.Value ? string.Empty : reader["FieldName"].ToString() ?? string.Empty,
-                            ClassesPerCompetition = Convert.ToInt32(reader["ClassesPerCompetition"]),
-                            FieldAvgPastEntries = reader["FieldAvgPastEntries"] == DBNull.Value ? null : Convert.ToDecimal(reader["FieldAvgPastEntries"]),
-                            ClassNameAvgPastEntries = reader["ClassNameAvgPastEntries"] == DBNull.Value ? null : Convert.ToDecimal(reader["ClassNameAvgPastEntries"]),
-                            PrizeShovarAmount = Convert.ToDecimal(reader["PrizeShovarAmount"]),
-                            PrizeJackpotPostedAmount = Convert.ToDecimal(reader["PrizeJackpotPostedAmount"]),
-                            PrizeAddedMoneyAmount = Convert.ToDecimal(reader["PrizeAddedMoneyAmount"])
-                        };
+                        return MapFeatureInputs(reader);
                     }
                 }
             }
@@ -51,6 +34,70 @@ namespace RideOnServer.DAL
             {
                 throw new Exception($"Database error: {ex.Message}");
             }
+        }
+
+        // Competition-scoped batched sibling of GetFeatureInputs, backing
+        // usp_GetEntryPredictionFeatureInputsByCompetitionId (repo file 224). Returns the same row
+        // shape as GetFeatureInputs, one row per class in the competition, in one round trip --
+        // used by PredictionService.RecomputeCompetition instead of N per-class GetFeatureInputs
+        // calls. Live equivalence-verified 2026-08-04 against GetFeatureInputs called once per
+        // class for competitions 78/3/44 (see repo file 224's header comment).
+        public List<EntryPredictionFeatureInputs> GetFeatureInputsByCompetitionId(int competitionId)
+        {
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@CompetitionId", competitionId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    List<EntryPredictionFeatureInputs> list = new List<EntryPredictionFeatureInputs>();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetEntryPredictionFeatureInputsByCompetitionId", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(MapFeatureInputs(reader));
+                        }
+                    }
+
+                    return list;
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        // Shared row mapper for GetFeatureInputs and GetFeatureInputsByCompetitionId -- both
+        // procs return the identical 15-column shape, so the mapping (including null handling)
+        // lives once here instead of being duplicated per caller.
+        private static EntryPredictionFeatureInputs MapFeatureInputs(NpgsqlDataReader reader)
+        {
+            return new EntryPredictionFeatureInputs
+            {
+                ClassInCompId = Convert.ToInt32(reader["ClassInCompId"]),
+                CompetitionId = Convert.ToInt32(reader["CompetitionId"]),
+                ClassDateTime = Convert.ToDateTime(reader["ClassDateTime"]),
+                OrderInDay = reader["OrderInDay"] == DBNull.Value ? null : Convert.ToInt16(reader["OrderInDay"]),
+                TotalCost = Convert.ToDecimal(reader["TotalCost"]),
+                ClassTypeId = Convert.ToInt16(reader["ClassTypeId"]),
+                ClassName = reader["ClassName"] == DBNull.Value ? string.Empty : reader["ClassName"].ToString() ?? string.Empty,
+                FieldId = Convert.ToInt16(reader["FieldId"]),
+                FieldName = reader["FieldName"] == DBNull.Value ? string.Empty : reader["FieldName"].ToString() ?? string.Empty,
+                ClassesPerCompetition = Convert.ToInt32(reader["ClassesPerCompetition"]),
+                FieldAvgPastEntries = reader["FieldAvgPastEntries"] == DBNull.Value ? null : Convert.ToDecimal(reader["FieldAvgPastEntries"]),
+                ClassNameAvgPastEntries = reader["ClassNameAvgPastEntries"] == DBNull.Value ? null : Convert.ToDecimal(reader["ClassNameAvgPastEntries"]),
+                PrizeShovarAmount = Convert.ToDecimal(reader["PrizeShovarAmount"]),
+                PrizeJackpotPostedAmount = Convert.ToDecimal(reader["PrizeJackpotPostedAmount"]),
+                PrizeAddedMoneyAmount = Convert.ToDecimal(reader["PrizeAddedMoneyAmount"])
+            };
         }
 
         public ActiveModelParameters GetActiveModelParameters()
