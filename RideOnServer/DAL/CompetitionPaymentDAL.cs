@@ -746,6 +746,7 @@ namespace RideOnServer.DAL
         }
 
         public List<FederationCreditAllocationItem> GetFederationCreditAllocations(
+            int competitionId,
             int federationExternalCreditId)
         {
             List<FederationCreditAllocationItem> items =
@@ -761,13 +762,19 @@ namespace RideOnServer.DAL
                         NpgsqlCommand command = new NpgsqlCommand(
                             @"
                     select *
-                    from public.usp_getfederationcreditallocations(
+                    from public.usp_getfederationcreditallocationssecured(
+                        @competitionId,
                         @federationExternalCreditId
                     );",
                             connection
                         )
                     )
                     {
+                        command.Parameters.Add(
+                            "@competitionId",
+                            NpgsqlDbType.Integer
+                        ).Value = competitionId;
+
                         command.Parameters.Add(
                             "@federationExternalCreditId",
                             NpgsqlDbType.Integer
