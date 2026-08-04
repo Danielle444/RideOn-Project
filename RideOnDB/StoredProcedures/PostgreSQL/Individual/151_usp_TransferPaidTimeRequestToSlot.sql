@@ -41,6 +41,7 @@ DECLARE
     v_target_ispublished  boolean;
     v_new_assignedstart   timestamptz;
     v_new_order           integer;
+    v_competitionenddate  date;
 BEGIN
     SELECT
         ptr.status,
@@ -62,6 +63,17 @@ BEGIN
 
     IF v_request_compid IS NULL THEN
         RAISE EXCEPTION 'Paid time request not found';
+    END IF;
+
+    IF p_newslotincompid IS NOT NULL THEN
+        SELECT c.competitionenddate
+        INTO v_competitionenddate
+        FROM public.competition c
+        WHERE c.competitionid = v_request_compid;
+
+        IF (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate THEN
+            RAISE EXCEPTION 'Competition has already ended' USING ERRCODE = 'RN001';
+        END IF;
     END IF;
 
     -- נעילת-ייעוץ ברמת התחרות (מזהה-התחרות קבוע, נקרא לעיל לפני הנעילה).

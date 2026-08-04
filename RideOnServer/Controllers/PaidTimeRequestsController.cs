@@ -837,6 +837,10 @@ namespace RideOnServer.Controllers
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
+            catch (ValidationException ex)
+            {
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in TransferPaidTimeRequestToSlot: {ex.Message}");
