@@ -12,12 +12,6 @@
 --     unlike 193's explicit Cancelled/Refunded/ClosedManually/
 --     TransferredToNextCompetition blocklist. NOT fixed in this slice -
 --     out of scope (concurrency-only change, no eligibility change).
---   - Candidate charges exclude Cancelled/Replaced/Rejected/PendingApproval
---     but NOT 'Paid' - combined with usp_createcompetitionpayerpayment (200),
---     which can pay a Federation charge via a normal paymentbatch, this is
---     the same double-payment gap as 193: "missing amount" here is computed
---     purely from federationcreditallocation, never from paymentbatchid.
---     NOT fixed in this slice - out of scope.
 --
 -- Concurrency fix (prerequisite for the entry-cancellation federation-
 -- release feature): the candidate-billcharge cursor was previously a plain,
@@ -49,6 +43,22 @@
 -- reads the four return columns strictly by name, so no caller change is
 -- required.
 -- ============================================================================
+-- 2026-08-05: closes the double-payment gap flagged above - a Federation
+-- charge already paid through a payment batch (billcharge.paymentbatchid is
+-- not null) is now skipped, never allocated to, mirroring the guard already
+-- deployed in usp_allocatefederationcredittocharge (193). Read under the
+-- SAME phase-2 FOR UPDATE lock that already re-reads chargestatus/
+-- amounttopay (no new query, no new lock), and skipped via the identical
+-- `continue` idiom already used for a charge that went ineligible while
+-- waiting for its lock - not a raised error. This is a deliberate departure
+-- from 193's hard-fail behavior: 193 is a single targeted allocation the
+-- secretary explicitly chose, so failing loudly is correct there; this proc
+-- is a bulk FIFO best-effort spend across many charges, and already treats
+-- any other stale/ineligible candidate as silently skippable - a
+-- paymentbatch-backed charge is just one more such case. The phase-1
+-- unlocked candidate query is deliberately left untouched, same as every
+-- other eligibility recheck added by the concurrency fix above.
+-- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_approvefederationmatchingsuggestion(p_competitionid integer, p_federationexternalcreditid integer, p_paidbypersonid integer, p_amount numeric, p_allocatedbysystemuserid integer, p_notes text DEFAULT NULL::text)
  RETURNS TABLE(approvedamount numeric, allocationscount integer, remainingcreditamount numeric, message text)
@@ -64,6 +74,7 @@ declare
     v_charge record;
     v_charge_status_fresh character varying;
     v_charge_amount_fresh numeric;
+    v_charge_paymentbatchid_fresh integer;
     v_charge_covered_fresh numeric;
     v_charge_missing numeric;
     v_charge_covered_after numeric;
@@ -133,14 +144,20 @@ begin
         -- Lock the authoritative billcharge row before deciding anything.
         -- Charge locked AFTER the credit (already locked above), preserving
         -- credit-then-charge order, matching usp_allocatefederationcredittocharge (193).
-        select bc2.chargestatus, bc2.amounttopay
-        into v_charge_status_fresh, v_charge_amount_fresh
+        select bc2.chargestatus, bc2.amounttopay, bc2.paymentbatchid
+        into v_charge_status_fresh, v_charge_amount_fresh, v_charge_paymentbatchid_fresh
         from public.billcharge bc2
         where bc2.billchargeid = v_charge.billchargeid
         for update;
 
         -- Skip a candidate that became ineligible while waiting for the lock.
         if v_charge_status_fresh in ('Cancelled', 'Replaced', 'Rejected', 'PendingApproval') then
+            continue;
+        end if;
+
+        -- Skip a charge already paid through a genuine payment batch - never
+        -- allocate Federation credit on top of a real recorded payment.
+        if v_charge_paymentbatchid_fresh is not null then
             continue;
         end if;
 
