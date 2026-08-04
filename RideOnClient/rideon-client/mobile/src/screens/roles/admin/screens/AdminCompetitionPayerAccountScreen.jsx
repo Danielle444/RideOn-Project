@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -24,6 +24,10 @@ import { useActiveRole } from "../../../../context/ActiveRoleContext";
 import { useCompetition } from "../../../../context/CompetitionContext";
 
 import useAdminCompetitionPayerAccount from "../../../../hooks/useAdminCompetitionPayerAccount";
+
+import useRegistrationStepStatus from "../../../../hooks/useRegistrationStepStatus";
+
+import { canEditPaidTimeRow } from "../../../../utils/paidTimeEditAvailability";
 
 import styles from "../../../../styles/adminCompetitionPayerAccountStyles";
 
@@ -189,6 +193,14 @@ export default function AdminCompetitionPayerAccountScreen(props) {
     routeCompetition: routeCompetition,
   });
 
+  var registrationStepStatus = useRegistrationStepStatus({
+    competitionId: activeCompetition?.competitionId,
+    ranchId: activeRole?.ranchId,
+    enabled: true,
+  });
+
+  var paidTimesAvailability = registrationStepStatus.availability.paidTimes;
+
   var payer = account.payer || routePayer;
 
   var summary = account.summary || {};
@@ -210,6 +222,19 @@ export default function AdminCompetitionPayerAccountScreen(props) {
   var [editPaidTimeItem, setEditPaidTimeItem] = useState(null);
 
   var [editStallItem, setEditStallItem] = useState(null);
+
+  // Force-closes an already-open Paid Time edit modal the moment the step
+  // becomes disabled (competition end is the case that matters here) - same
+  // pattern as AdminCompetitionPaidTimesScreen. Only the edit modal is
+  // affected; cancellation has no equivalent gate and is untouched.
+  useEffect(
+    function () {
+      if (!paidTimesAvailability.isEnabled && editPaidTimeItem) {
+        setEditPaidTimeItem(null);
+      }
+    },
+    [paidTimesAvailability.isEnabled, editPaidTimeItem],
+  );
 
   var lockedPayerPersonId = payer
     ? payer.personId || payer.PersonId || null
@@ -1072,9 +1097,11 @@ export default function AdminCompetitionPayerAccountScreen(props) {
           {renderActions(
             "paidTime:" + item.paidTimeRequestId,
             isLocked,
-            function () {
-              setEditPaidTimeItem(item);
-            },
+            canEditPaidTimeRow(item, paidTimesAvailability)
+              ? function () {
+                  setEditPaidTimeItem(item);
+                }
+              : null,
             function () {
               confirmCancelPaidTime(item);
             },
