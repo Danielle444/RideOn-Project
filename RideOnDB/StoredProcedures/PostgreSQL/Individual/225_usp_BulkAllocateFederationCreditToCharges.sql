@@ -32,14 +32,29 @@
 --     can swallow a nested failure and nothing partial can survive.
 --
 -- usp_allocatefederationcredittocharge (193) remains the single-charge write
--- primitive - this function never duplicates its INSERT/UPDATE logic, it
--- only calls it once per selected charge, in ascending billchargeid order,
+-- primitive - this function never duplicates its INSERT/UPDATE logic. It
+-- calls it once per selected charge, in ascending billchargeid order,
 -- passing the exact authoritative remaining amount this function computed
--- under the same lock 193 itself would otherwise have taken.
+-- under the same lock 193 itself would otherwise have taken - since
+-- 2026-08-06 that per-charge call goes through the competition-scoped
+-- secured wrapper (226), see the note below, rather than calling 193
+-- directly.
 --
 -- Duplicate billChargeIds are treated as an invalid request (not silently
 -- de-duplicated) - the current UI never generates duplicates, so a duplicate
 -- id indicates a client bug worth surfacing, not a harmless case to absorb.
+--
+-- 2026-08-06: the per-charge delegation below now calls
+-- usp_allocatefederationcredittochargesecured (226) instead of calling
+-- usp_allocatefederationcredittocharge (193) directly. 226 is a thin,
+-- competition-scoped wrapper that re-confirms (under lock) that the credit
+-- and the charge both belong to p_competitionid before delegating the actual
+-- write to 193 unchanged - closing a cross-competition authorization gap
+-- that existed on the legacy direct single-charge endpoint. This function's
+-- own external signature, temp-table behavior, full-set validation,
+-- duplicate-id guard, lock order, remaining-amount calculation, and
+-- all-or-nothing rollback behavior are all unchanged by this - the only
+-- thing that changed is which function performs the final per-charge write.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_bulkallocatefederationcredittocharges(
@@ -265,12 +280,14 @@ begin
     end if;
 
     -- All charges locked and validated, full required total confirmed
-    -- coverable - now perform the actual allocations. usp_allocatefederation-
-    -- credittocharge (193) remains the single-charge write primitive; no
-    -- INSERT/UPDATE logic is duplicated here. No exception handler wraps
-    -- this loop, so a failure from any nested call propagates and rolls
-    -- back every write already made in this transaction, including earlier
-    -- successful iterations of this same loop.
+    -- coverable - now perform the actual allocations via the competition-
+    -- scoped secured wrapper (226), which re-confirms the credit and charge
+    -- both belong to p_competitionid before delegating to usp_allocate-
+    -- federationcredittocharge (193), the single-charge write primitive; no
+    -- INSERT/UPDATE logic is duplicated here or in 226. No exception handler
+    -- wraps this loop, so a failure from any nested call propagates and
+    -- rolls back every write already made in this transaction, including
+    -- earlier successful iterations of this same loop.
     for v_charge_row in
         select t.billchargeid, t.remainingamount
         from temp_bulk_federation_allocation_charges t
@@ -288,7 +305,8 @@ begin
             v_alloc_billchargestatus,
             v_alloc_creditavailable,
             v_alloc_creditstatus
-        from public.usp_allocatefederationcredittocharge(
+        from public.usp_allocatefederationcredittochargesecured(
+            p_competitionid,
             p_federationexternalcreditid,
             v_charge_row.billchargeid,
             v_charge_row.remainingamount,
