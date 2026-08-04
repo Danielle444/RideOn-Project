@@ -46,8 +46,42 @@
 -- deployed and a repository-wide plus live dependency check proves it has no
 -- remaining callers.
 -- ============================================================================
+-- 2026-08-04: first caller integration for the Federation allocation-release
+-- helper (public.usp_releasefederationallocationsforcharge, 223), scoped to
+-- an approved cancellation (lower(p_answerstatus)='approved' and
+-- v_iscancelled=true) only. Rejected requests and non-cancellation change
+-- requests are unaffected - their existing paid guard and behavior are
+-- preserved exactly.
+--
+-- The secured request lookup now takes FOR UPDATE OF cer, the transaction's
+-- level-1 lock: two concurrent answers to the same request now serialize
+-- there, so a second answer always observes the first's committed status
+-- (Approved/Rejected) instead of a stale Pending snapshot.
+--
+-- Cancellation now splits on Rule 1 vs Rule 2, using
+-- (v_requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date < v_competitionstartdate
+-- (previously an implicit-timezone v_requestdatetime::date comparison):
+--   Rule 1 (before competition start) - locks every Organizer classes/Entry
+--     charge for the entry (ascending billchargeid, no uniqueness constraint
+--     guarantees exactly one), blocks on a Paid Organizer charge exactly as
+--     before, then resolves Federation classes/Entry charges deterministically
+--     (0 -> no call, 1 -> call the helper once, >1 -> raise and roll back -
+--     never LIMIT 1, never a loop, never a silent pick), before the existing
+--     charge-cancellation/fine logic runs.
+--   Rule 2 (on/after competition start) - unchanged from the prior
+--     "full charge kept" behavior: no helper call, no charge cancellation,
+--     allocations and credit amounts untouched.
+--
+-- Lock order: changeentryrequest -> Organizer billcharge(s) -> [inside the
+-- single helper call] federationexternalcredit(s) -> Federation billcharge ->
+-- federationcreditallocation. Matches usp_createcompetitionpayerpayment's
+-- (200) own multi-row ascending lock convention for the Organizer step; the
+-- Federation step enters the helper's already-proven lock order at most once
+-- per call, so no cross-call credit-lock ordering question can arise within
+-- a single execution of this function.
+-- ============================================================================
 
-CREATE FUNCTION public.usp_answerchangeentryrequestsecured(
+CREATE OR REPLACE FUNCTION public.usp_answerchangeentryrequestsecured(
     p_changeentryrequestid   integer,
     p_answerstatus           text,
     p_answeredbysystemuserid integer,
@@ -75,6 +109,10 @@ declare
 
     v_fine_billid integer;
     v_fine_payerpersonid integer;
+
+    v_is_rule1 boolean;
+    v_federation_billchargeids integer[];
+    v_federation_count integer;
 begin
     if p_changeentryrequestid is null or p_changeentryrequestid <= 0 then
         raise exception 'Invalid change entry request id';
@@ -119,7 +157,8 @@ begin
     inner join public.competition c
         on c.competitionid = cic.competitionid
     where cer.changeentryrequestid = p_changeentryrequestid
-      and cic.competitionid = p_competitionid;
+      and cic.competitionid = p_competitionid
+    for update of cer;
 
     if v_originalentryid is null then
         raise exception 'Change entry request not found';
@@ -129,14 +168,16 @@ begin
         raise exception 'Only pending change entry requests can be answered';
     end if;
 
-    if exists (
-        select 1
-        from public.billcharge bc
-        where bc.sourcetype = 'Entry'
-          and bc.sourceid = v_originalentryid
-          and bc.chargestatus = 'Paid'
-    ) then
-        raise exception 'Cannot answer change request for a paid entry';
+    if lower(p_answerstatus) = 'rejected' or v_iscancelled = false then
+        if exists (
+            select 1
+            from public.billcharge bc
+            where bc.sourcetype = 'Entry'
+              and bc.sourceid = v_originalentryid
+              and bc.chargestatus = 'Paid'
+        ) then
+            raise exception 'Cannot answer change request for a paid entry';
+        end if;
     end if;
 
     v_effectivefineid := v_fineid;
@@ -227,94 +268,147 @@ begin
 
     if v_iscancelled = true then
 
+        v_is_rule1 := ((v_requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date < v_competitionstartdate);
+
         update public.entry
         set
             entrystatus =
                 case
-                    when v_requestdatetime::date >= v_competitionstartdate
-                        then 'CancelledAfterStart'
-                    else 'Cancelled'
+                    when v_is_rule1 then 'Cancelled'
+                    else 'CancelledAfterStart'
                 end,
             cancelledat = now(),
             cancelledbychangerequestid = p_changeentryrequestid,
             draworder = null
         where entryid = v_originalentryid;
 
-        if v_effectivefineamount is not null and v_effectivefineamount > 0 then
-            update public.billcharge
-            set
-                chargestatus = 'Cancelled',
-                cancelledat = now(),
-                notes = coalesce(notes, '') || ' | Approved entry cancellation request ' || p_changeentryrequestid
-            where sourcetype = 'Entry'
-              and sourceid = v_originalentryid
-              and chargestatus = 'Open'
-              and paymentbatchid is null;
+        if v_is_rule1 then
 
-            select
-                sr.billid,
-                b.paidbypersonid
-            into
-                v_fine_billid,
-                v_fine_payerpersonid
-            from public.servicerequest sr
-            inner join public.bill b
-                on b.billid = sr.billid
-            where sr.srequestid = v_originalentryid
-            limit 1;
+            -- Level 2 lock: every Organizer classes/Entry charge for this
+            -- entry (no uniqueness constraint guarantees exactly one),
+            -- ascending billchargeid, matching
+            -- usp_createcompetitionpayerpayment's (200) own multi-row
+            -- ascending lock convention.
+            perform 1
+            from public.billcharge bc
+            where bc.sourcetype = 'Entry'
+              and bc.sourceid = v_originalentryid
+              and bc.chargeowner = 'Organizer'
+            order by bc.billchargeid
+            for update of bc;
 
-            if v_fine_billid is null then
-                raise exception 'Could not find bill for original entry';
+            if exists (
+                select 1
+                from public.billcharge bc
+                where bc.sourcetype = 'Entry'
+                  and bc.sourceid = v_originalentryid
+                  and bc.chargeowner = 'Organizer'
+                  and bc.chargestatus = 'Paid'
+            ) then
+                raise exception 'Cannot answer change request for a paid entry';
             end if;
 
-            insert into public.billcharge
-            (
-                billid,
-                competitionid,
-                paidbypersonid,
-                chargeowner,
-                categorykey,
-                sourcetype,
-                sourceid,
-                amounttopay,
-                chargestatus,
-                paymentbatchid,
-                createdat,
-                notes
-            )
-            values
-            (
-                v_fine_billid,
-                v_competitionid,
-                v_fine_payerpersonid,
-                'Organizer',
-                'classes',
-                'Fine',
-                p_changeentryrequestid,
-                v_effectivefineamount,
-                'Open',
-                null,
-                now(),
-                'Entry cancellation fine. FineId=' || coalesce(v_effectivefineid::text, '-')
-            );
+            -- Deterministic Federation lookup: zero charges -> no call, one
+            -- charge -> call the helper once, more than one -> raise. No
+            -- LIMIT 1, no loop, no silent pick.
+            select
+                array_agg(bc.billchargeid order by bc.billchargeid),
+                count(*)
+            into
+                v_federation_billchargeids,
+                v_federation_count
+            from public.billcharge bc
+            where bc.sourcetype = 'Entry'
+              and bc.sourceid = v_originalentryid
+              and bc.chargeowner = 'Federation'
+              and bc.categorykey = 'classes';
 
-        elsif v_requestdatetime::date <= v_registrationenddate then
-            update public.billcharge
-            set
-                chargestatus = 'Cancelled',
-                cancelledat = now(),
-                notes = coalesce(notes, '') || ' | Approved entry cancellation before registration end ' || p_changeentryrequestid
-            where sourcetype = 'Entry'
-              and sourceid = v_originalentryid
-              and chargestatus = 'Open'
-              and paymentbatchid is null;
+            if v_federation_count > 1 then
+                raise exception 'Multiple Federation entry charges found for entry %', v_originalentryid;
+            end if;
+
+            if v_federation_count = 1 then
+                perform public.usp_releasefederationallocationsforcharge(v_federation_billchargeids[1]);
+            end if;
+
+            if v_effectivefineamount is not null and v_effectivefineamount > 0 then
+                update public.billcharge
+                set
+                    chargestatus = 'Cancelled',
+                    cancelledat = now(),
+                    notes = coalesce(notes, '') || ' | Approved entry cancellation request ' || p_changeentryrequestid
+                where sourcetype = 'Entry'
+                  and sourceid = v_originalentryid
+                  and chargestatus in ('Open', 'Paid')
+                  and paymentbatchid is null;
+
+                select
+                    sr.billid,
+                    b.paidbypersonid
+                into
+                    v_fine_billid,
+                    v_fine_payerpersonid
+                from public.servicerequest sr
+                inner join public.bill b
+                    on b.billid = sr.billid
+                where sr.srequestid = v_originalentryid
+                limit 1;
+
+                if v_fine_billid is null then
+                    raise exception 'Could not find bill for original entry';
+                end if;
+
+                insert into public.billcharge
+                (
+                    billid,
+                    competitionid,
+                    paidbypersonid,
+                    chargeowner,
+                    categorykey,
+                    sourcetype,
+                    sourceid,
+                    amounttopay,
+                    chargestatus,
+                    paymentbatchid,
+                    createdat,
+                    notes
+                )
+                values
+                (
+                    v_fine_billid,
+                    v_competitionid,
+                    v_fine_payerpersonid,
+                    'Organizer',
+                    'classes',
+                    'Fine',
+                    p_changeentryrequestid,
+                    v_effectivefineamount,
+                    'Open',
+                    null,
+                    now(),
+                    'Entry cancellation fine. FineId=' || coalesce(v_effectivefineid::text, '-')
+                );
+
+            else
+                update public.billcharge
+                set
+                    chargestatus = 'Cancelled',
+                    cancelledat = now(),
+                    notes = coalesce(notes, '') || ' | Approved entry cancellation ' || p_changeentryrequestid
+                where sourcetype = 'Entry'
+                  and sourceid = v_originalentryid
+                  and chargestatus in ('Open', 'Paid')
+                  and paymentbatchid is null;
+            end if;
 
         else
+
             update public.billcharge
             set notes = coalesce(notes, '') || ' | Approved entry cancellation after competition start - full charge kept ' || p_changeentryrequestid
             where sourcetype = 'Entry'
               and sourceid = v_originalentryid
               and chargestatus = 'Open';
+
         end if;
 
     else
