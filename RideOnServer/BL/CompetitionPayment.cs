@@ -872,6 +872,55 @@ namespace RideOnServer.BL
             );
         }
 
+        public static List<BulkAllocateFederationCreditResultItem> BulkAllocateFederationCreditToCharges(
+    BulkAllocateFederationCreditRequest request,
+    int allocatedBySystemUserId)
+        {
+            ValidateCompetitionAndRanch(
+                request.CompetitionId,
+                request.RanchId
+            );
+
+            if (request.FederationExternalCreditId <= 0)
+            {
+                throw new Exception("Invalid FederationExternalCreditId");
+            }
+
+            if (request.BillChargeIds == null || request.BillChargeIds.Count == 0)
+            {
+                throw new Exception("At least one BillChargeId is required");
+            }
+
+            foreach (int billChargeId in request.BillChargeIds)
+            {
+                if (billChargeId <= 0)
+                {
+                    throw new Exception("Invalid BillChargeId");
+                }
+            }
+
+            if (request.BillChargeIds.Distinct().Count() != request.BillChargeIds.Count)
+            {
+                throw new Exception("Duplicate BillChargeIds are not allowed");
+            }
+
+            if (allocatedBySystemUserId <= 0)
+            {
+                throw new Exception("Invalid allocated by system user id");
+            }
+
+            request.Notes = NormalizeOptionalText(
+                request.Notes
+            );
+
+            CompetitionPaymentDAL dal = new CompetitionPaymentDAL();
+
+            return dal.BulkAllocateFederationCreditToCharges(
+                request,
+                allocatedBySystemUserId
+            );
+        }
+
         private static string NormalizeForFingerprint(
             string? value)
         {

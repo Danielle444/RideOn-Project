@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  allocateFederationCreditToCharge,
+  bulkAllocateFederationCreditToCharges,
   createCompetitionPayment,
   createFederationExternalCredit,
   getCompetitionPayerAccountSummary,
@@ -869,56 +869,65 @@ export default function useCompetitionPaymentsPage(options) {
       return;
     }
 
+    var billChargeIds = selectedFederationCharges.map(function (charge) {
+      return getValue(charge, "billChargeId", "BillChargeId", 0);
+    });
+
     try {
       setFederationApplyLoading(true);
       setFederationApplyError("");
       setFederationApplySuccess("");
 
-      for (var i = 0; i < selectedFederationCharges.length; i++) {
-        if (remainingCredit <= 0) {
-          break;
-        }
+      var allocationSucceeded = false;
 
-        var charge = selectedFederationCharges[i];
-
-        var billChargeId = getValue(charge, "billChargeId", "BillChargeId", 0);
-
-        var missingAmount = Number(
-          getValue(charge, "missingAmount", "MissingAmount", 0),
-        );
-
-        if (!billChargeId || missingAmount <= 0) {
-          continue;
-        }
-
-        var amountToAllocate = Math.min(remainingCredit, missingAmount);
-
-        await allocateFederationCreditToCharge({
+      try {
+        // One atomic request covers every selected charge in full, or the
+        // whole request fails and nothing is written - see
+        // usp_bulkallocatefederationcredittocharges (225). No per-charge
+        // amount is sent; the server derives every remaining amount itself.
+        await bulkAllocateFederationCreditToCharges({
           competitionId: Number(competitionId),
           ranchId: Number(ranchId),
           federationExternalCreditId: creditId,
-          billChargeId: billChargeId,
-          allocatedAmount: amountToAllocate,
+          billChargeIds: billChargeIds,
           notes: "שיוך כיסוי התאחדות דרך מסך תשלומים",
         });
 
-        remainingCredit = remainingCredit - amountToAllocate;
+        allocationSucceeded = true;
+      } catch (allocationError) {
+        console.error(allocationError);
+        setFederationApplyError(
+          getErrorMessage(allocationError, "שגיאה בשיוך כיסוי התאחדות"),
+        );
       }
 
-      setFederationApplySuccess("כיסוי ההתאחדות שויך בהצלחה");
-      setSelectedChargeIds([]);
-      setSelectedFederationCredit(null);
-      setFederationApplyModalOpen(false);
-      setFederationApplyError("");
-      setManualCreditOpen(false);
-      resetManualCreditForm();
+      if (allocationSucceeded) {
+        setFederationApplySuccess("כיסוי ההתאחדות שויך בהצלחה");
+        setSelectedChargeIds([]);
+        setSelectedFederationCredit(null);
+        setFederationApplyModalOpen(false);
+        setManualCreditOpen(false);
+        resetManualCreditForm();
 
-      await reloadSelectedPayerData(payerPersonId);
-    } catch (error) {
-      console.error(error);
-      setFederationApplyError(
-        getErrorMessage(error, "שגיאה בשיוך כיסוי התאחדות"),
-      );
+        // A refresh failure here must not turn a real success into a
+        // reported failure - it is only logged, never surfaced as an error.
+        try {
+          await reloadSelectedPayerData(payerPersonId);
+        } catch (refreshError) {
+          console.error(refreshError);
+        }
+      } else {
+        // The bulk request failed and wrote nothing. The modal stays open
+        // so the secretary can see the error and adjust the selection, but
+        // the federation charges list is still refreshed so a stale
+        // missing-amount figure (e.g. a charge someone else already
+        // covered) is never the reason a retry fails again silently.
+        try {
+          await loadFederationCoverageData(payerPersonId);
+        } catch (refreshError) {
+          console.error(refreshError);
+        }
+      }
     } finally {
       setFederationApplyLoading(false);
     }

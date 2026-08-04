@@ -389,6 +389,52 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("federation/credits/bulk-allocate")]
+        public IActionResult BulkAllocateFederationCreditToCharges(
+            [FromBody] BulkAllocateFederationCreditRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                ValidateHostSecretaryCompetitionAccess(
+                    request.CompetitionId,
+                    request.RanchId
+                );
+
+                int personId =
+                    UserAccessValidator.GetPersonIdFromClaims(User);
+
+                List<BulkAllocateFederationCreditResultItem> response =
+                    CompetitionPayment.BulkAllocateFederationCreditToCharges(
+                        request,
+                        personId
+                    );
+
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ex.Message
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error in BulkAllocateFederationCreditToCharges: {ex.Message}"
+                );
+
+                return BadRequest(
+                    ex.Message
+                );
+            }
+        }
+
         [HttpGet("federation/credits/{federationExternalCreditId}/allocations")]
         public IActionResult GetFederationCreditAllocations(
             int federationExternalCreditId,

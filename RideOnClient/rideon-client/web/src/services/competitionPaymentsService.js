@@ -187,6 +187,14 @@ function allocateFederationCreditToCharge(data) {
   );
 }
 
+function bulkAllocateFederationCreditToCharges(data) {
+  return axios.post(
+    `${API}/CompetitionPayments/federation/credits/bulk-allocate`,
+    data,
+    getAuthHeaders(),
+  );
+}
+
 function getFederationCreditAllocations(
   competitionId,
   ranchId,
@@ -258,6 +266,7 @@ export {
   searchFederationExternalCredits,
   createFederationExternalCredit,
   allocateFederationCreditToCharge,
+  bulkAllocateFederationCreditToCharges,
   getFederationCreditAllocations,
   importFederationCreditsFromExcel,
   getFederationMatchingSuggestions,
