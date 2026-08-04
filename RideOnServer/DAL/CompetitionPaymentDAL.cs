@@ -1478,6 +1478,89 @@ namespace RideOnServer.DAL
             }
         }
 
+        public List<BulkAllocateFederationCreditResultItem> BulkAllocateFederationCreditToCharges(
+            BulkAllocateFederationCreditRequest request,
+            int allocatedBySystemUserId)
+        {
+            List<BulkAllocateFederationCreditResultItem> items =
+                new List<BulkAllocateFederationCreditResultItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (
+                        NpgsqlCommand command = new NpgsqlCommand(
+                            @"
+                    select *
+                    from public.usp_bulkallocatefederationcredittocharges(
+                        @competitionId,
+                        @federationExternalCreditId,
+                        @billChargeIds,
+                        @allocatedBySystemUserId,
+                        @notes
+                    );",
+                            connection
+                        )
+                    )
+                    {
+                        command.Parameters.Add(
+                            "@competitionId",
+                            NpgsqlDbType.Integer
+                        ).Value = request.CompetitionId;
+
+                        command.Parameters.Add(
+                            "@federationExternalCreditId",
+                            NpgsqlDbType.Integer
+                        ).Value = request.FederationExternalCreditId;
+
+                        command.Parameters.Add(
+                            "@billChargeIds",
+                            NpgsqlDbType.Array | NpgsqlDbType.Integer
+                        ).Value = request.BillChargeIds.ToArray();
+
+                        command.Parameters.Add(
+                            "@allocatedBySystemUserId",
+                            NpgsqlDbType.Integer
+                        ).Value = allocatedBySystemUserId;
+
+                        command.Parameters.Add(
+                            "@notes",
+                            NpgsqlDbType.Text
+                        ).Value =
+                            request.Notes == null
+                                ? DBNull.Value
+                                : request.Notes;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                items.Add(
+                                    new BulkAllocateFederationCreditResultItem
+                                    {
+                                        BillChargeId = GetInt(reader, "billchargeid"),
+                                        AllocatedAmount = GetDecimal(reader, "allocatedamount"),
+                                        BillChargeStatus = GetString(reader, "billchargestatus"),
+                                        CreditAvailableAmount = GetDecimal(reader, "creditavailableamount"),
+                                        CreditStatus = GetString(reader, "creditstatus")
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                return items;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
         private static int GetInt(
             NpgsqlDataReader reader,
             string columnName)
