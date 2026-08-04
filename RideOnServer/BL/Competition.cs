@@ -22,9 +22,8 @@ namespace RideOnServer.BL
         public string? StallMapUrl { get; set; }
         public string? FieldName { get; set; }
 
-        // True when the payer has paid into this competition (entries, paid-time,
-        // or product requests). Only populated by the payer-board query; defaults
-        // to false for every other competition source.
+        // Payer-board only: true when the payer has paid into this competition
+        // (defaults false for every other competition source).
         public bool HasParticipated { get; set; }
 
         internal static List<Competition> GetCompetitionsByHostRanch(CompetitionFiltersRequest filters)
@@ -207,15 +206,10 @@ namespace RideOnServer.BL
                 .ToList();
         }
 
-        // Payer-board visibility (decisions locked with Oren 2026-07-31):
-        // - Drafts are never shown, even a competition the payer was part of that
-        //   later reverted to draft (the was-active-now-draft edge case).
-        // - Enrolled (paid into it): shown regardless of ranch. A cancelled one
-        //   lingers for one month past its end date so the payer isn't left
-        //   wondering where it went, then drops out of view.
-        // - Not enrolled: only FUTURE competitions at the selected ranch, so the
-        //   payer can see what's coming. Current/active/finished/cancelled they
-        //   never joined stay hidden.
+        // Payer-board visibility:
+        // - Drafts: never shown (incl. a competition reverted from active to draft).
+        // - Enrolled: shown regardless of ranch; a cancelled one lingers 30 days past its end date.
+        // - Not enrolled: only future competitions at the selected ranch.
         private const int CancelledVisibilityDays = 30;
 
         private static bool IsVisibleOnPayerBoard(Competition item, DateTime today)
