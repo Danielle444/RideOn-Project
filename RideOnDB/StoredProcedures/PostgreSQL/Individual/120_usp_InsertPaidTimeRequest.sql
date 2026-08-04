@@ -30,9 +30,21 @@
 -- named arguments for every parameter, so the corrected parameter order
 -- does not affect either caller.
 --
--- STATUS: this recovery is a repository-text-only sync. It does not change
--- live behavior (live already ran this exact body) and does NOT add any
--- competition-ended guard -- that remains a separate, not-yet-approved slice.
+-- STATUS: the recovery above was a repository-text-only sync (no behavior
+-- change; live already ran that exact body).
+--
+-- COMPETITION-ENDED GUARD (2026-08-04): a new, additive-only guard has since
+-- been added on top of the recovered body -- one new declaration
+-- (v_competitionenddate) and one new lookup+check, placed immediately after
+-- the existing requested-slot-not-found validation and before every other
+-- validation/insert/billing statement. It blocks creation of a new Paid Time
+-- request once (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date is
+-- past the competition's end date (the final competition day itself remains
+-- allowed), raising SQLSTATE RN001 with the message
+-- 'Competition has already ended'. This also blocks
+-- public.usp_bulkinsertpaidtimerequests for free, since it calls this
+-- function once per item inside a single transaction. No other statement in
+-- this file was changed.
 
 CREATE OR REPLACE FUNCTION public.usp_insertpaidtimerequest(p_pricecatalogid integer, p_requestedcompslotid integer, p_orderedbysystemuserid integer, p_ranchid integer, p_horseid integer, p_riderfederationmemberid integer, p_coachfederationmemberid integer, p_paidbypersonid integer, p_notes character varying)
  RETURNS integer
@@ -46,6 +58,7 @@ declare
     v_catalog_ranchid integer;
     v_horse_ranchid integer;
     v_competitionid integer;
+    v_competitionenddate date;
 begin
     select
         pc.itemprice,
@@ -72,6 +85,15 @@ begin
 
     if v_competitionid is null then
         raise exception 'Requested paid time slot not found';
+    end if;
+
+    select c.competitionenddate
+    into v_competitionenddate
+    from public.competition c
+    where c.competitionid = v_competitionid;
+
+    if (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate then
+        raise exception 'Competition has already ended' using errcode = 'RN001';
     end if;
 
     select h.ranchid
