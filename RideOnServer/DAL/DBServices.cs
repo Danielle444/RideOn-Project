@@ -1,13 +1,22 @@
 using Microsoft.Extensions.Configuration;
 using Npgsql;
 using NpgsqlTypes;
+using System.Collections.Concurrent;
 using System.Data;
+using System.Threading;
 
 namespace RideOnServer.DAL
 {
     public class DBServices
     {
-        protected NpgsqlConnection Connect(string conStr)
+        // Connection-string values only ever come from env vars in every environment this app
+        // runs in (Render, local dev, tests) and are set before the process serves requests, so
+        // resolving once per key and caching is safe. A failed resolution is cached too (Lazy<T>
+        // does not retry after a factory exception) — a process with missing/invalid DB
+        // configuration can't serve correctly anyway, so this fails fast until restart.
+        private static readonly ConcurrentDictionary<string, Lazy<string>> _connectionStringCache = new();
+
+        private static string ResolveConnectionString(string conStr)
         {
             IConfigurationRoot configuration = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetCurrentDirectory())
@@ -17,7 +26,30 @@ namespace RideOnServer.DAL
                 .AddEnvironmentVariables()
                 .Build();
 
-            string cStr = configuration.GetConnectionString(conStr)!;
+            try
+            {
+                string? value = configuration.GetConnectionString(conStr);
+
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    throw new InvalidOperationException($"Connection string '{conStr}' is not configured.");
+                }
+
+                return value;
+            }
+            finally
+            {
+                (configuration as IDisposable)?.Dispose();
+            }
+        }
+
+        protected NpgsqlConnection Connect(string conStr)
+        {
+            string cStr = _connectionStringCache
+                .GetOrAdd(conStr, key => new Lazy<string>(
+                    () => ResolveConnectionString(key),
+                    LazyThreadSafetyMode.ExecutionAndPublication))
+                .Value;
 
             return new NpgsqlConnection(cStr);
         }
