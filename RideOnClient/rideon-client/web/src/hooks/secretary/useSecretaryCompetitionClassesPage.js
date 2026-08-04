@@ -241,6 +241,48 @@ function validateDrawOrderDraft(items) {
   return "";
 }
 
+function getClassJudgeIds(item) {
+  if (Array.isArray(item.judgeIds)) {
+    return item.judgeIds;
+  }
+
+  if (Array.isArray(item.JudgeIds)) {
+    return item.JudgeIds;
+  }
+
+  return [];
+}
+
+// Same derivation proven in useCompetitionFormPage.js: the "general competition
+// judges" pool is the union of judge IDs already assigned to the competition's
+// own classes (there is no persisted competition-level judges list on the
+// server -- see usp_GetCompetitionById). First-seen order; a numeric id and its
+// string form (12 vs "12") collapse to a single logical judge id.
+export function deriveJudgeIdsFromClasses(classesList) {
+  var items = Array.isArray(classesList) ? classesList : [];
+  var seenIds = {};
+  var judgeIds = [];
+
+  items.forEach(function (item) {
+    getClassJudgeIds(item).forEach(function (judgeId) {
+      if (judgeId === null || judgeId === undefined || judgeId === "") {
+        return;
+      }
+
+      var key = String(judgeId);
+
+      if (seenIds[key]) {
+        return;
+      }
+
+      seenIds[key] = true;
+      judgeIds.push(judgeId);
+    });
+  });
+
+  return judgeIds;
+}
+
 export default function useSecretaryCompetitionClassesPage(options) {
   var competitionId = options.competitionId;
   var ranchId = options.ranchId;
@@ -560,14 +602,9 @@ export default function useSecretaryCompetitionClassesPage(options) {
 
   var selectedCompetitionJudgeIds = useMemo(
     function () {
-      if (!competitionDetails) return [];
-      var ids =
-        competitionDetails.competitionJudgeIds ||
-        competitionDetails.CompetitionJudgeIds ||
-        [];
-      return Array.isArray(ids) ? ids : [];
+      return deriveJudgeIdsFromClasses(classes);
     },
-    [competitionDetails],
+    [classes],
   );
 
   async function loadPageData() {
