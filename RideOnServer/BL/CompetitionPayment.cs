@@ -307,6 +307,7 @@ namespace RideOnServer.BL
             CompetitionPaymentDAL dal = new CompetitionPaymentDAL();
 
             return dal.GetFederationCreditAllocations(
+                competitionId,
                 federationExternalCreditId
             );
         }
