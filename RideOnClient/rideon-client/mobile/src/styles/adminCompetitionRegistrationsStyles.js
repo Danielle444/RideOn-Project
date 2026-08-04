@@ -180,14 +180,47 @@ var styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 
+  // CAP-3: a real desaturated grey fill, not just opacity on the brown -
+  // must match Button.jsx's own disabledSolid/labelDisabledSolid tokens
+  // (#C9BEB4 / #8A7A6E) so the two submit-button surfaces read consistently.
   primaryButtonDisabled: {
-    opacity: 0.6,
+    backgroundColor: "#C9BEB4",
   },
 
   primaryButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
+  },
+
+  primaryButtonTextDisabled: {
+    color: "#8A7A6E",
+  },
+
+  // CAP-1: transient post-create confirmation + running session tally,
+  // shared by all three create surfaces through CompetitionRegistrationsClassesTab.
+  successBanner: {
+    backgroundColor: "#E8F5E9",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#BFE3C2",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    gap: 4,
+  },
+
+  successText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#2E6B32",
+    textAlign: "center",
+  },
+
+  successTallyText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#4F7A52",
+    textAlign: "center",
   },
 
   tabsWrapper: {

@@ -426,6 +426,18 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
             )}
             containerStyle={styles.errorWrap}
             textStyle={styles.errorText}
+            ctaLabel={
+              availability.stalls.unavailableReason === "NEEDS_RELEVANT_ENTRY"
+                ? "מעבר להוספת הרשמה"
+                : null
+            }
+            onCtaPress={
+              availability.stalls.unavailableReason === "NEEDS_RELEVANT_ENTRY"
+                ? function () {
+                    props.navigation.navigate("AdminCompetitionRegistrations");
+                  }
+                : null
+            }
           />
         ) : null}
 
@@ -437,6 +449,18 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
             )}
             containerStyle={styles.errorWrap}
             textStyle={styles.errorText}
+            ctaLabel={
+              availability.shavings.unavailableReason ===
+              "NEEDS_RELEVANT_STALL_BOOKING"
+                ? "מעבר להזמנת תא"
+                : null
+            }
+            onCtaPress={
+              availability.shavings.unavailableReason ===
+              "NEEDS_RELEVANT_STALL_BOOKING"
+                ? handleOpenCreateStallModal
+                : null
+            }
           />
         ) : null}
 

@@ -22,15 +22,33 @@ import {
 //   textStyle  תוספת סגנון לתווית - לא יכול לדרוס את כלל ה-RTL
 //   loading    שמור בלבד. לא ממומש (אין ספינר) - השם תפוס כדי שאפשר
 //              יהיה להוסיף וריאנט טעינה בעתיד בלי שינוי שובר.
+//
+// מצב disabled (CAP-3): משפחת אפור נטרלית אחת בלבד לשני הוריאנטים - לא
+// opacity על הצבע הרגיל. solid מושבת לעולם לא ייראה "חזק" יותר מ-outline
+// פעיל (רקע אפור מרוכך + טקסט אפור-חום מרוכך, לעומת הלבן+חום החד של outline
+// הפעיל). אותם טוקנים בדיוק (#C9BEB4 / #8A7A6E) חוזרים גם בכפתור השליחה
+// המקומי ב-CompetitionRegistrationsClassesTab.jsx לעקביות בין שתי המשטחים.
 
 var BROWN = "#7B5A4D";
 var WHITE = "#FFFFFF";
 var ICON_SIZE = 18;
 
+var DISABLED_BG_SOLID = "#C9BEB4";
+var DISABLED_TEXT_SOLID = "#8A7A6E";
+var DISABLED_BG_OUTLINE = "#F0E5DC";
+var DISABLED_BORDER_OUTLINE = "#C9BEB4";
+var DISABLED_TEXT_OUTLINE = "#A79185";
+
 export default function Button(props) {
   var isOutline = props.variant === "outline";
   var isDisabled = !!props.disabled;
-  var labelColor = isOutline ? BROWN : WHITE;
+  var labelColor = isDisabled
+    ? isOutline
+      ? DISABLED_TEXT_OUTLINE
+      : DISABLED_TEXT_SOLID
+    : isOutline
+      ? BROWN
+      : WHITE;
 
   function renderIcon() {
     if (!props.icon) return null;
@@ -49,7 +67,7 @@ export default function Button(props) {
       style={[
         styles.base,
         isOutline ? styles.outline : styles.solid,
-        isDisabled ? styles.disabled : null,
+        isDisabled ? (isOutline ? styles.disabledOutline : styles.disabledSolid) : null,
         props.style,
       ]}
     >
@@ -60,6 +78,11 @@ export default function Button(props) {
         style={[
           styles.label,
           isOutline ? styles.labelOutline : styles.labelSolid,
+          isDisabled
+            ? isOutline
+              ? styles.labelDisabledOutline
+              : styles.labelDisabledSolid
+            : null,
           props.textStyle,
           rtlLabelStyle,
         ]}
@@ -91,8 +114,13 @@ var styles = StyleSheet.create({
     borderColor: BROWN,
   },
 
-  disabled: {
-    opacity: 0.6,
+  disabledSolid: {
+    backgroundColor: DISABLED_BG_SOLID,
+  },
+
+  disabledOutline: {
+    backgroundColor: DISABLED_BG_OUTLINE,
+    borderColor: DISABLED_BORDER_OUTLINE,
   },
 
   label: {
@@ -106,5 +134,13 @@ var styles = StyleSheet.create({
 
   labelOutline: {
     color: BROWN,
+  },
+
+  labelDisabledSolid: {
+    color: DISABLED_TEXT_SOLID,
+  },
+
+  labelDisabledOutline: {
+    color: DISABLED_TEXT_OUTLINE,
   },
 });

@@ -7,7 +7,7 @@ import {
   View,
 } from "react-native";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { Ionicons } from "@expo/vector-icons";
 
@@ -36,17 +36,22 @@ export default function CompetitionEntryCreateModal(props) {
 
   var activeCompetition = competitionContext.activeCompetition;
 
-  var registrations = useAdminCompetitionRegistrations({
-    user: user,
-    activeRole: activeRole,
-    competitionId: activeCompetition?.competitionId,
-  });
-
   var editItem = props.editItem || null;
 
   var isEditMode = !!editItem;
 
   var lockedPayerPersonId = props.lockedPayerPersonId || null;
+
+  // CAP-2: edit mode excludes the entry being replaced from the duplicate
+  // check (it's about to be superseded by the new one, so matching against
+  // itself would always false-flag). Both create-mode call sites of this
+  // component pass no editItem, so this stays null for them.
+  var registrations = useAdminCompetitionRegistrations({
+    user: user,
+    activeRole: activeRole,
+    competitionId: activeCompetition?.competitionId,
+    excludeEntryId: editItem ? editItem.entryId : null,
+  });
 
   useEffect(
     function () {
@@ -135,10 +140,34 @@ export default function CompetitionEntryCreateModal(props) {
     ],
   );
 
+  // CAP-1: the create/tally state is per-modal-instance (each call site owns
+  // its own useAdminCompetitionRegistrations), so it survives across a
+  // single open session by design. It must NOT survive a close - resets the
+  // moment the modal is dismissed, so reopening it later (for another create
+  // or a different edit) always starts from a clean confirmation/tally.
+  var wasVisibleRef = useRef(props.visible);
+
+  useEffect(
+    function () {
+      var wasVisible = wasVisibleRef.current;
+      wasVisibleRef.current = props.visible;
+
+      if (wasVisible && !props.visible) {
+        registrations.resetCreationSummary();
+      }
+    },
+    [props.visible],
+  );
+
   async function handleSubmit() {
     try {
       if (isEditMode) {
-        var newEntry = await registrations.handleCreateEntry();
+        // The success banner/tally are create-only (CAP-1) - handleCreateEntry
+        // still creates a real replacement entry here, but suppressSuccess
+        // keeps that internal to the change-request flow below.
+        var newEntry = await registrations.handleCreateEntry({
+          suppressSuccess: true,
+        });
 
         if (!newEntry?.entryId) {
           return;
@@ -165,11 +194,17 @@ export default function CompetitionEntryCreateModal(props) {
         await props.onCreated();
       }
 
-      if (typeof props.onClose === "function") {
+      // CAP-1: create mode stays open (so the confirmation/tally above and
+      // repeat creates are possible) - only edit mode, which is a one-shot
+      // change request, closes the modal on success.
+      if (isEditMode && typeof props.onClose === "function") {
         props.onClose();
       }
     } catch (error) {
-      console.log(error);
+      // Change-request failures (the edit-mode branch above) previously
+      // only reached console.log here, with no Alert - that pre-existing
+      // silent-failure behavior is unchanged; only the redundant log call
+      // itself was removed (see audit finding C).
     }
   }
 
@@ -230,6 +265,8 @@ export default function CompetitionEntryCreateModal(props) {
             isSaving={registrations.isSaving}
             submitButtonText={isEditMode ? "שלח בקשת שינוי" : "הוסף הרשמה"}
             onSubmit={handleSubmit}
+            justCreated={registrations.justCreated}
+            createdCount={registrations.createdCount}
           />
         </ScrollView>
       </SafeAreaView>
