@@ -26,6 +26,20 @@
 -- paymentbatch/payment row is inserted, closing a race where a concurrent
 -- cancellation or federation allocation could be silently overwritten back
 -- to Paid.
+--
+-- 2026-08-05: after the post-lock re-validation, every selected billcharge is
+-- now also rejected if it has any row in federationcreditallocation - the
+-- table has no status/isactive column, so a row's mere existence is the
+-- active-allocation signal (usp_releasefederationallocationsforcharge/223
+-- deletes the row on release). This closes the specific double-coverage path
+-- documented above (2026-08-03 note): a Federation billcharge that already
+-- carries a partial or full active allocation can no longer also be paid
+-- through this proc, for either chargeowner value - not just 'Federation'.
+-- This is a block, not an automatic release: no federationcreditallocation
+-- row is touched, and usp_releasefederationallocationsforcharge (223) is
+-- deliberately not called from here, to avoid introducing a charge-then-
+-- credit lock ordering against 193/199/223/225's own credit-then-charge
+-- convention. Releasing coverage remains a separate, explicit action.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_createcompetitionpayerpayment(p_competitionid integer, p_payerpersonid integer, p_enteredbysystemuserid integer, p_chargeowner text, p_invoicenumber text, p_selectedcharges jsonb, p_paymentmethods jsonb, p_notes text DEFAULT NULL::text)
@@ -167,6 +181,25 @@ begin
            or bc.paymentbatchid is not null
     ) then
         raise exception 'One or more selected charges are no longer eligible for payment';
+    end if;
+
+    -- Authoritative, owner-agnostic double-coverage guard: a selected charge
+    -- with any existing federationcreditallocation row (partial or full,
+    -- regardless of chargeowner) cannot be paid through this proc. No status
+    -- predicate is needed - the table has no such column, and a row's
+    -- existence is the only "active allocation" signal. This never touches
+    -- federationexternalcredit and never calls 223, so it introduces no new
+    -- lock beyond the billcharge lock already held above.
+    if exists (
+        select 1
+        from temp_selected_payment_charges selected
+        where exists (
+            select 1
+            from public.federationcreditallocation fca
+            where fca.billchargeid = selected.billchargeid
+        )
+    ) then
+        raise exception 'One or more selected charges still have an active Federation credit allocation and cannot be paid until it is released';
     end if;
 
     select
