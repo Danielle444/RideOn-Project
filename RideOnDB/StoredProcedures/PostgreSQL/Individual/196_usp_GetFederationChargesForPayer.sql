@@ -11,6 +11,16 @@
 -- that "coveredamount" is computed purely from federationcreditallocation
 -- (see 193/199 for the double-payment finding).
 -- ============================================================================
+-- 2026-08-05: a billcharge with paymentbatchid is not null is now treated as
+-- already covered - missingamount is forced to 0 and coveragestatus to
+-- 'מכוסה', regardless of its own amounttopay/allocation math. Mirrors the
+-- guards already deployed in usp_allocatefederationcredittocharge (193),
+-- usp_getfederationmatchingsuggestions (198), and
+-- usp_approvefederationmatchingsuggestion (199): a genuine payment batch
+-- means the charge is already covered by real money, never by Federation
+-- credit. chargeamount and coveredamount are deliberately left unchanged.
+-- Read-only proc; no mutation path exists here.
+-- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_getfederationchargesforpayer(p_competitionid integer, p_paidbypersonid integer)
  RETURNS TABLE(billchargeid integer, billid integer, competitionid integer, paidbypersonid integer, payerfullname text, entryid integer, classincompid integer, classname text, classdatetime timestamp with time zone, riderfederationmemberid integer, riderfullname text, horseid integer, horsename text, chargeamount numeric, coveredamount numeric, missingamount numeric, chargestatus character varying, coveragestatus text)
@@ -53,9 +63,13 @@ begin
 
         bc.amounttopay as chargeamount,
         coalesce(ca.coveredamount, 0) as coveredamount,
-        (bc.amounttopay - coalesce(ca.coveredamount, 0)) as missingamount,
+        case
+            when bc.paymentbatchid is not null then 0
+            else bc.amounttopay - coalesce(ca.coveredamount, 0)
+        end as missingamount,
         bc.chargestatus,
         case
+            when bc.paymentbatchid is not null then 'מכוסה'
             when coalesce(ca.coveredamount, 0) >= bc.amounttopay then 'מכוסה'
             when coalesce(ca.coveredamount, 0) > 0 then 'כיסוי חלקי'
             else 'חסר'
