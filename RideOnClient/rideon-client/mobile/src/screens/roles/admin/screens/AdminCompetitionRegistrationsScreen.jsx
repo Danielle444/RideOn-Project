@@ -30,6 +30,7 @@ import PaidTimeChatbotModal from "../../../../components/competitions/paidTimeCh
 import SmartBookingFab from "../../../../components/competitions/paidTimeChatbot/SmartBookingFab";
 
 import { evaluatePaidTimeBookingAvailability } from "../../../../utils/paidTimeBookingAvailability";
+import { BULK_PAID_TIME_ENTRY_ENABLED } from "../../../../utils/paidTimeBulkEntryFlag";
 import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
 import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
 
@@ -205,7 +206,6 @@ export default function AdminCompetitionRegistrationsScreen(props) {
     user: user,
     activeRole: activeRole,
     competitionId: competitionId,
-    activeCompetition: activeCompetition,
     isActiveTab: activeTab === "stalls",
   });
 
@@ -248,7 +248,11 @@ export default function AdminCompetitionRegistrationsScreen(props) {
 
       autoOpenHandledRef.current = true;
 
-      if (availability.paidTimes.isEnabled && paidTimeAvailability.canBookBulk) {
+      if (
+        BULK_PAID_TIME_ENTRY_ENABLED &&
+        availability.paidTimes.isEnabled &&
+        paidTimeAvailability.canBookBulk
+      ) {
         setIsChatbotOpen(true);
       }
     },
@@ -283,7 +287,11 @@ export default function AdminCompetitionRegistrationsScreen(props) {
   );
 
   function handleOpenSmartBooking() {
-    if (!availability.paidTimes.isEnabled || !paidTimeAvailability.canBookBulk) {
+    if (
+      !BULK_PAID_TIME_ENTRY_ENABLED ||
+      !availability.paidTimes.isEnabled ||
+      !paidTimeAvailability.canBookBulk
+    ) {
       return;
     }
 
@@ -491,15 +499,10 @@ export default function AdminCompetitionRegistrationsScreen(props) {
               setSelectedHorseToAdd={stallBookings.setSelectedHorseToAdd}
               selectedHorseStallType={stallBookings.selectedHorseStallType}
               setSelectedHorseStallType={stallBookings.setSelectedHorseStallType}
-              minCompetitionDate={
-                activeCompetition?.competitionStartDate ||
-                activeCompetition?.CompetitionStartDate ||
-                ""
-              }
-              maxCompetitionDate={
-                activeCompetition?.competitionEndDate ||
-                activeCompetition?.CompetitionEndDate ||
-                ""
+              minCompetitionDate={stallBookings.minCompetitionDate}
+              maxCompetitionDate={stallBookings.maxCompetitionDate}
+              highlightedCompetitionRange={
+                stallBookings.highlightedCompetitionRange
               }
               startDate={stallBookings.startDate}
               setstartDate={stallBookings.setstartDate}
@@ -580,6 +583,8 @@ export default function AdminCompetitionRegistrationsScreen(props) {
               setDeliveryDate={shavings.setDeliveryDate}
               deliveryTime={shavings.deliveryTime}
               setDeliveryTime={shavings.setDeliveryTime}
+              earliestDeliveryDate={shavings.earliestDeliveryDate}
+              isNowDeliveryAvailable={shavings.isNowDeliveryAvailable}
               quantityMode={shavings.quantityMode}
               setQuantityMode={shavings.setQuantityMode}
               equalBagQuantity={shavings.equalBagQuantity}
@@ -628,6 +633,7 @@ export default function AdminCompetitionRegistrationsScreen(props) {
       */}
       {activeTab === "paidTimes" &&
       availability.paidTimes.isEnabled &&
+      BULK_PAID_TIME_ENTRY_ENABLED &&
       paidTimeAvailability.canBookBulk ? (
         <SmartBookingFab onConfirm={handleOpenSmartBooking} />
       ) : null}

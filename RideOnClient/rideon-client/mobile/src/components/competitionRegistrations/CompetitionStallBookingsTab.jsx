@@ -44,6 +44,7 @@ export default function CompetitionStallBookingsTab(props) {
         tackPricingSummary={props.tackPricingSummary}
         minCompetitionDate={props.minCompetitionDate}
         maxCompetitionDate={props.maxCompetitionDate}
+        highlightedCompetitionRange={props.highlightedCompetitionRange}
         allSelectedHorsePayers={props.allSelectedHorsePayers}
         allTackTypes={props.allTackTypes}
         existingTackBookingsCount={props.existingTackBookingsCount}
@@ -63,6 +64,7 @@ export default function CompetitionStallBookingsTab(props) {
       setSelectedHorseStallType={props.setSelectedHorseStallType}
       minCompetitionDate={props.minCompetitionDate}
       maxCompetitionDate={props.maxCompetitionDate}
+      highlightedCompetitionRange={props.highlightedCompetitionRange}
       startDate={props.startDate}
       setstartDate={props.setstartDate}
       endDate={props.endDate}

@@ -156,7 +156,25 @@ export default function useAdminTackStallBookings(params) {
     function () {
       if (allTackTypes.length === 1) {
         setSelectedTackStallType(allTackTypes[0]);
-      } else if (
+        return;
+      }
+
+      if (allTackTypes.length > 1 && !selectedTackStallType) {
+        var matchedHorseStallType = selectedHorseStallType
+          ? allTackTypes.find(function (item) {
+              return (
+                item.priceCatalogId === selectedHorseStallType.priceCatalogId
+              );
+            })
+          : null;
+
+        if (matchedHorseStallType) {
+          setSelectedTackStallType(matchedHorseStallType);
+          return;
+        }
+      }
+
+      if (
         selectedTackStallType &&
         !allTackTypes.some(function (item) {
           return item.priceCatalogId === selectedTackStallType.priceCatalogId;
@@ -165,7 +183,7 @@ export default function useAdminTackStallBookings(params) {
         setSelectedTackStallType(null);
       }
     },
-    [allTackTypes, selectedTackStallType],
+    [allTackTypes, selectedTackStallType, selectedHorseStallType],
   );
 
   function toggleTackPayerSelection(payerItem) {

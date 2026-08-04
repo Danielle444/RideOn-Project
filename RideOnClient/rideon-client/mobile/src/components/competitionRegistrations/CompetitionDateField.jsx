@@ -103,6 +103,32 @@ function isDateAfter(a, b) {
   );
 }
 
+function isDateInRange(date, rangeStart, rangeEnd) {
+  if (!date || !rangeStart || !rangeEnd) {
+    return false;
+  }
+
+  var time = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  ).getTime();
+
+  var startTime = new Date(
+    rangeStart.getFullYear(),
+    rangeStart.getMonth(),
+    rangeStart.getDate(),
+  ).getTime();
+
+  var endTime = new Date(
+    rangeEnd.getFullYear(),
+    rangeEnd.getMonth(),
+    rangeEnd.getDate(),
+  ).getTime();
+
+  return time >= startTime && time <= endTime;
+}
+
 function buildCalendarCells(monthDate) {
   var year = monthDate.getFullYear();
   var month = monthDate.getMonth();
@@ -171,6 +197,7 @@ export default function CompetitionDateField(props) {
   var onChange = props.onChange;
   var minimumDate = props.minimumDate;
   var maximumDate = props.maximumDate;
+  var highlightedRange = props.highlightedRange;
   var mode = props.mode || "date";
 
   var [visible, setVisible] = useState(false);
@@ -194,6 +221,20 @@ export default function CompetitionDateField(props) {
       return parseDateString(maximumDate);
     },
     [maximumDate],
+  );
+
+  var highlightStartObj = useMemo(
+    function () {
+      return parseDateString(highlightedRange && highlightedRange.start);
+    },
+    [highlightedRange && highlightedRange.start],
+  );
+
+  var highlightEndObj = useMemo(
+    function () {
+      return parseDateString(highlightedRange && highlightedRange.end);
+    },
+    [highlightedRange && highlightedRange.end],
   );
 
   var [currentMonth, setCurrentMonth] = useState(
@@ -276,12 +317,18 @@ export default function CompetitionDateField(props) {
     return false;
   }
 
+  function isHighlighted(date) {
+    return isDateInRange(date, highlightStartObj, highlightEndObj);
+  }
+
+  var hasHighlightedRange = !!(highlightStartObj && highlightEndObj);
+
   function getDisplayValue() {
     if (mode === "time") {
-      return value ? formatTimeForDisplay(value) : "בחרי שעה";
+      return value ? formatTimeForDisplay(value) : "בחירת שעה";
     }
 
-    return value ? formatDateForDisplay(value) : "בחרי תאריך";
+    return value ? formatDateForDisplay(value) : "בחירת תאריך";
   }
 
   return (
@@ -327,6 +374,31 @@ export default function CompetitionDateField(props) {
             >
               {label}
             </Text>
+
+            {mode === "date" && hasHighlightedRange ? (
+              <View
+                style={{
+                  flexDirection: "row-reverse",
+                  alignItems: "center",
+                  gap: 6,
+                  marginBottom: 12,
+                }}
+              >
+                <View
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: 4,
+                    backgroundColor: "#F3E7DF",
+                    borderWidth: 1,
+                    borderColor: "#C9A98D",
+                  }}
+                />
+                <Text style={{ fontSize: 12, color: "#7B5A4D" }}>
+                  ימי התחרות
+                </Text>
+              </View>
+            ) : null}
 
             {mode === "date" ? (
               <>
@@ -404,6 +476,8 @@ export default function CompetitionDateField(props) {
                           {row.map(function (date, colIndex) {
                             var disabled = isDisabled(date);
                             var selected = isSameDay(date, selectedDate);
+                            var highlighted =
+                              !disabled && !selected && isHighlighted(date);
 
                             return (
                               <Pressable
@@ -430,7 +504,11 @@ export default function CompetitionDateField(props) {
                                     alignItems: "center",
                                     backgroundColor: selected
                                       ? "#7B5A4D"
-                                      : "transparent",
+                                      : highlighted
+                                        ? "#F3E7DF"
+                                        : "transparent",
+                                    borderWidth: highlighted ? 1 : 0,
+                                    borderColor: "#C9A98D",
                                   }}
                                 >
                                   <Text

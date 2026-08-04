@@ -97,6 +97,8 @@ export default function ShavingsOrderModal(props) {
             setDeliveryDate={shavings.setDeliveryDate}
             deliveryTime={shavings.deliveryTime}
             setDeliveryTime={shavings.setDeliveryTime}
+            earliestDeliveryDate={shavings.earliestDeliveryDate}
+            isNowDeliveryAvailable={shavings.isNowDeliveryAvailable}
             quantityMode={shavings.quantityMode}
             setQuantityMode={shavings.setQuantityMode}
             equalBagQuantity={shavings.equalBagQuantity}

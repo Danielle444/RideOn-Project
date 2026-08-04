@@ -31,6 +31,19 @@ export default function CompetitionTackStallFormCard(props) {
     amountPerPayer: 0,
   };
 
+  var isDateRangeInvalid =
+    !!props.tackStartDate &&
+    !!props.tackEndDate &&
+    props.tackEndDate < props.tackStartDate;
+
+  function handleSubmitPress() {
+    if (isDateRangeInvalid) {
+      return;
+    }
+
+    props.onSubmit();
+  }
+
   return (
     <View style={styles.formCard}>
       <Text style={styles.cardTitle}>הזמנת תאי ציוד</Text>
@@ -115,6 +128,7 @@ export default function CompetitionTackStallFormCard(props) {
         onChange={props.setTackStartDate}
         minimumDate={props.minCompetitionDate}
         maximumDate={props.maxCompetitionDate}
+        highlightedRange={props.highlightedCompetitionRange}
       />
 
       <CompetitionDateField
@@ -123,7 +137,14 @@ export default function CompetitionTackStallFormCard(props) {
         onChange={props.setTackEndDate}
         minimumDate={props.minCompetitionDate}
         maximumDate={props.maxCompetitionDate}
+        highlightedRange={props.highlightedCompetitionRange}
       />
+
+      {isDateRangeInvalid ? (
+        <Text style={styles.errorText}>
+          תאריך יציאה לא יכול להיות לפני תאריך כניסה
+        </Text>
+      ) : null}
 
       <View style={styles.fieldBlock}>
         <Text style={styles.fieldLabel}>כמות תאי ציוד</Text>
@@ -171,7 +192,7 @@ export default function CompetitionTackStallFormCard(props) {
 
       <CompetitionRegistrationDropdown
         label="אופן חלוקת תשלום"
-        placeholder="בחרי אופן חלוקה"
+        placeholder="בחירת אופן חלוקה"
         searchPlaceholder="חיפוש אופן חלוקה"
         items={splitModeItems}
         selectedItem={selectedSplitModeItem}
@@ -245,15 +266,17 @@ export default function CompetitionTackStallFormCard(props) {
           style={[
             styles.primaryButton,
             { flex: 1 },
-            props.isSaving ? styles.primaryButtonDisabled : null,
+            props.isSaving || isDateRangeInvalid
+              ? styles.primaryButtonDisabled
+              : null,
           ]}
-          onPress={props.onSubmit}
-          disabled={props.isSaving}
+          onPress={handleSubmitPress}
+          disabled={props.isSaving || isDateRangeInvalid}
         >
           {props.isSaving ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.primaryButtonText}>שמרי תאי ציוד</Text>
+            <Text style={styles.primaryButtonText}>שמירת תאי ציוד</Text>
           )}
         </Pressable>
       </View>
