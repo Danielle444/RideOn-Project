@@ -17,8 +17,10 @@ function SectionButton(props) {
       style={[
         styles.optionButton,
         props.active ? styles.optionButtonActive : null,
+        props.disabled ? { opacity: 0.5 } : null,
       ]}
-      onPress={props.onPress}
+      onPress={props.disabled ? undefined : props.onPress}
+      disabled={props.disabled}
     >
       <Text
         style={[
@@ -89,6 +91,7 @@ export default function CompetitionShavingsTab(props) {
         <View style={styles.twoButtonsRow}>
           <SectionButton
             active={props.deliveryMode === "now"}
+            disabled={!props.isNowDeliveryAvailable}
             onPress={function () {
               props.setDeliveryMode("now");
             }}
@@ -106,12 +109,19 @@ export default function CompetitionShavingsTab(props) {
           </SectionButton>
         </View>
 
+        {!props.isNowDeliveryAvailable ? (
+          <Text style={styles.helperText}>
+            אספקה כעת אינה זמינה - התאים שנבחרו עדיין לא בטווח האספקה שלהם
+          </Text>
+        ) : null}
+
         {props.deliveryMode === "later" ? (
           <View style={styles.dateTimeFieldsColumn}>
             <CompetitionDateField
               label="תאריך אספקה"
               value={props.deliveryDate}
               onChange={props.setDeliveryDate}
+              minimumDate={props.earliestDeliveryDate}
             />
 
             <CompetitionDateField
@@ -125,7 +135,7 @@ export default function CompetitionShavingsTab(props) {
       </View>
 
       <View style={styles.dropdownBlock}>
-        <Text style={styles.fieldLabel}>בחר סוסים</Text>
+        <Text style={styles.fieldLabel}>בחירת סוסים</Text>
 
         {props.availableStalls.length === 0 ? (
           <Text style={styles.helperText}>

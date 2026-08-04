@@ -1,5 +1,6 @@
 import React from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import Button from "../ui/Button";
 import styles from "../../styles/adminCompetitionPaidTimesStyles";
 
 function buildPayersSummary(selectedPayers, formatPayerLabel) {
@@ -53,32 +54,36 @@ export default function CompetitionHorsePayersEditor(props) {
           gap: 10,
         }}
       >
-        <Text style={styles.fieldLabel}>{formatHorseLabel(horse)}</Text>
+        <Text
+          style={[styles.fieldLabel, { flexShrink: 1 }]}
+          numberOfLines={1}
+        >
+          {formatHorseLabel(horse)}
+        </Text>
 
         <View
           style={{
             flexDirection: "row-reverse",
-            gap: 12,
+            gap: 8,
             alignItems: "center",
+            flexShrink: 0,
           }}
         >
-          <Pressable
+          <Button
+            label={isExpanded ? "סגירה" : "עריכה"}
+            variant="outline"
             onPress={function () {
               onToggleEditor(horse.horseId);
             }}
-          >
-            <Text style={styles.clearText}>
-              {isExpanded ? "סגירה" : "עריכה"}
-            </Text>
-          </Pressable>
+          />
 
-          <Pressable
+          <Button
+            label="הסר"
+            variant="outline"
             onPress={function () {
               onRemoveHorse(horse.horseId);
             }}
-          >
-            <Text style={styles.clearText}>הסר</Text>
-          </Pressable>
+          />
         </View>
       </View>
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import CompetitionRegistrationDropdown from "./CompetitionRegistrationDropdown";
@@ -6,7 +6,13 @@ import {
   buildSlotSummary,
   buildTypeSummary,
   getFieldSection,
+  getHebrewDateLabel,
+  formatDisplayTime,
 } from "../../utils/paidTimeRequestForm";
+import {
+  getUniqueOrderedValues,
+  getBucketLabel,
+} from "../../utils/paidTimeSlotCascade";
 import styles from "../../styles/adminCompetitionPaidTimesStyles";
 
 var SLOT_EXPLANATION =
@@ -72,6 +78,145 @@ export default function CompetitionPaidTimeFormCard(props) {
     ? props.priceCatalogItems
     : [];
 
+  var requestableSlots = Array.isArray(props.requestableSlots)
+    ? props.requestableSlots
+    : [];
+
+  var [cascadeDate, setCascadeDate] = useState(null);
+  var [cascadeTimeOfDay, setCascadeTimeOfDay] = useState(null);
+  var [cascadeArenaName, setCascadeArenaName] = useState(null);
+
+  // מיישרים את שלבי המדרג עם הסלוט שנבחר בפועל - כשנפתחת נעילה משלב קודם,
+  // כשמתחילים בקשה נוספת (איפוס), וכשמגיעים לטופס עם ערך כבר קיים.
+  useEffect(
+    function () {
+      var selected = props.selectedRequestedSlot;
+
+      setCascadeDate(selected ? selected.slotDate || null : null);
+      setCascadeTimeOfDay(selected ? selected.timeOfDay || null : null);
+      setCascadeArenaName(
+        selected && selected.arenaName !== undefined
+          ? selected.arenaName
+          : null,
+      );
+    },
+    [props.selectedRequestedSlot],
+  );
+
+  var slotDateOptions = useMemo(
+    function () {
+      return getUniqueOrderedValues(requestableSlots, function (item) {
+        return item.slotDate;
+      });
+    },
+    [requestableSlots],
+  );
+
+  var slotsForSelectedDate = useMemo(
+    function () {
+      if (cascadeDate === null) {
+        return [];
+      }
+
+      return requestableSlots.filter(function (item) {
+        return item.slotDate === cascadeDate;
+      });
+    },
+    [requestableSlots, cascadeDate],
+  );
+
+  var timeOfDayOptionsForDate = useMemo(
+    function () {
+      return getUniqueOrderedValues(slotsForSelectedDate, function (item) {
+        return item.timeOfDay;
+      });
+    },
+    [slotsForSelectedDate],
+  );
+
+  var needsTimeOfDayStep = !(
+    timeOfDayOptionsForDate.length === 0 ||
+    (timeOfDayOptionsForDate.length === 1 && timeOfDayOptionsForDate[0] === "")
+  );
+
+  var isTimeOfDayResolved = !needsTimeOfDayStep || cascadeTimeOfDay !== null;
+
+  var slotsForSelectedDateAndTime = useMemo(
+    function () {
+      if (!isTimeOfDayResolved) {
+        return [];
+      }
+
+      if (!needsTimeOfDayStep) {
+        return slotsForSelectedDate;
+      }
+
+      return slotsForSelectedDate.filter(function (item) {
+        return (item.timeOfDay || "") === cascadeTimeOfDay;
+      });
+    },
+    [
+      slotsForSelectedDate,
+      needsTimeOfDayStep,
+      isTimeOfDayResolved,
+      cascadeTimeOfDay,
+    ],
+  );
+
+  var arenaNameOptions = useMemo(
+    function () {
+      return getUniqueOrderedValues(
+        slotsForSelectedDateAndTime,
+        function (item) {
+          return item.arenaName;
+        },
+      );
+    },
+    [slotsForSelectedDateAndTime],
+  );
+
+  var slotsForFullSelection = useMemo(
+    function () {
+      if (cascadeArenaName === null) {
+        return [];
+      }
+
+      return slotsForSelectedDateAndTime.filter(function (item) {
+        return (item.arenaName || "") === cascadeArenaName;
+      });
+    },
+    [slotsForSelectedDateAndTime, cascadeArenaName],
+  );
+
+  var needsFinalDisambiguation = slotsForFullSelection.length > 1;
+
+  // רזולוציה אוטומטית: ברגע שהמדרג מוביל לסלוט יחיד, זה הסלוט שנבחר בפועל.
+  // אם המדרג עדיין לא חד-משמעי (0 או יותר מ-1 אחרי הבחירה המלאה), לא נשלח
+  // סלוט לא ודאי - השדה נשאר ריק עד לבחירה נוספת בשלב הניקוי הסופי.
+  useEffect(
+    function () {
+      if (needsFinalDisambiguation) {
+        return;
+      }
+
+      var resolvedSlot =
+        slotsForFullSelection.length === 1 ? slotsForFullSelection[0] : null;
+
+      var currentSlotId = props.selectedRequestedSlot
+        ? props.selectedRequestedSlot.paidTimeSlotInCompId
+        : null;
+
+      var resolvedSlotId = resolvedSlot
+        ? resolvedSlot.paidTimeSlotInCompId
+        : null;
+
+      if (currentSlotId !== resolvedSlotId) {
+        props.setSelectedRequestedSlot(resolvedSlot);
+      }
+    },
+    [slotsForFullSelection, needsFinalDisambiguation, props.selectedRequestedSlot],
+  );
+
   // גלילה לסקשן הראשון שנכשל בוולידציה. המדידה נעשית עם onLayout הרגיל של
   // React Native - בלי ספרייה נוספת. אם משום מה אין מידע מדידה, פשוט לא
   // גוללים, והשגיאות עדיין מוצגות מתחת לשדות.
@@ -131,21 +276,100 @@ export default function CompetitionPaidTimeFormCard(props) {
         </View>
 
         <CompetitionRegistrationDropdown
-          label="סלוט מבוקש"
-          placeholder="בחרי סלוט מבוקש"
-          searchPlaceholder="חיפוש סלוט"
-          items={props.requestableSlots}
-          selectedItem={props.selectedRequestedSlot}
+          label="תאריך מבוקש"
+          placeholder="בחירת תאריך מבוקש"
+          searchPlaceholder="חיפוש תאריך"
+          items={slotDateOptions}
+          selectedItem={cascadeDate}
           getItemId={function (item) {
-            return item.paidTimeSlotInCompId;
+            return item;
           }}
-          getItemLabel={props.formatRequestedSlotLabel}
-          onSelect={props.setSelectedRequestedSlot}
+          getItemLabel={function (item) {
+            return getHebrewDateLabel(item);
+          }}
+          onSelect={function (item) {
+            setCascadeDate(item);
+            setCascadeTimeOfDay(null);
+            setCascadeArenaName(null);
+          }}
           isLocked={props.locks.requestedSlot}
           onToggleLock={function () {
             props.onToggleLock("requestedSlot");
           }}
         />
+
+        {cascadeDate !== null && needsTimeOfDayStep ? (
+          <CompetitionRegistrationDropdown
+            label="חלק יום"
+            placeholder="בחירת חלק יום"
+            searchPlaceholder="חיפוש חלק יום"
+            items={timeOfDayOptionsForDate}
+            selectedItem={cascadeTimeOfDay}
+            getItemId={function (item) {
+              return item;
+            }}
+            getItemLabel={function (item) {
+              return getBucketLabel(item, "ללא הגדרת חלק יום");
+            }}
+            onSelect={function (item) {
+              setCascadeTimeOfDay(item);
+              setCascadeArenaName(null);
+            }}
+            isLocked={props.locks.requestedSlot}
+            onToggleLock={function () {
+              props.onToggleLock("requestedSlot");
+            }}
+          />
+        ) : null}
+
+        {cascadeDate !== null && isTimeOfDayResolved ? (
+          <CompetitionRegistrationDropdown
+            label="מגרש"
+            placeholder="בחירת מגרש"
+            searchPlaceholder="חיפוש מגרש"
+            items={arenaNameOptions}
+            selectedItem={cascadeArenaName}
+            getItemId={function (item) {
+              return item;
+            }}
+            getItemLabel={function (item) {
+              return getBucketLabel(item, "ללא מגרש מוגדר");
+            }}
+            onSelect={function (item) {
+              setCascadeArenaName(item);
+            }}
+            isLocked={props.locks.requestedSlot}
+            onToggleLock={function () {
+              props.onToggleLock("requestedSlot");
+            }}
+          />
+        ) : null}
+
+        {needsFinalDisambiguation ? (
+          <CompetitionRegistrationDropdown
+            label="שעת התחלה מדויקת"
+            placeholder="בחירת שעה"
+            searchPlaceholder="חיפוש שעה"
+            items={slotsForFullSelection}
+            selectedItem={props.selectedRequestedSlot}
+            getItemId={function (item) {
+              return item.paidTimeSlotInCompId;
+            }}
+            getItemLabel={function (item) {
+              return [
+                formatDisplayTime(item.startTime),
+                formatDisplayTime(item.endTime),
+              ]
+                .filter(Boolean)
+                .join(" - ");
+            }}
+            onSelect={props.setSelectedRequestedSlot}
+            isLocked={props.locks.requestedSlot}
+            onToggleLock={function () {
+              props.onToggleLock("requestedSlot");
+            }}
+          />
+        ) : null}
 
         <FieldError message={fieldErrors.requestedSlot} />
 
@@ -255,6 +479,27 @@ export default function CompetitionPaidTimeFormCard(props) {
 
         <View style={styles.fieldBlock}>
           <CompetitionRegistrationDropdown
+            label="מאמן"
+            placeholder="בחרי מאמן"
+            searchPlaceholder="חיפוש מאמן"
+            items={props.trainers}
+            selectedItem={props.selectedTrainer}
+            getItemId={function (item) {
+              return item.federationMemberId;
+            }}
+            getItemLabel={props.formatMemberLabel}
+            onSelect={props.setSelectedTrainer}
+            isLocked={props.locks.coach}
+            onToggleLock={function () {
+              props.onToggleLock("coach");
+            }}
+          />
+
+          <FieldError message={fieldErrors.coach} />
+        </View>
+
+        <View style={styles.fieldBlock}>
+          <CompetitionRegistrationDropdown
             label="סוס"
             placeholder="בחרי סוס"
             searchPlaceholder="חיפוש סוס"
@@ -293,27 +538,6 @@ export default function CompetitionPaidTimeFormCard(props) {
           />
 
           <FieldError message={fieldErrors.rider} />
-        </View>
-
-        <View style={styles.fieldBlock}>
-          <CompetitionRegistrationDropdown
-            label="מאמן"
-            placeholder="בחרי מאמן"
-            searchPlaceholder="חיפוש מאמן"
-            items={props.trainers}
-            selectedItem={props.selectedTrainer}
-            getItemId={function (item) {
-              return item.federationMemberId;
-            }}
-            getItemLabel={props.formatMemberLabel}
-            onSelect={props.setSelectedTrainer}
-            isLocked={props.locks.coach}
-            onToggleLock={function () {
-              props.onToggleLock("coach");
-            }}
-          />
-
-          <FieldError message={fieldErrors.coach} />
         </View>
 
         <View style={styles.fieldBlock}>

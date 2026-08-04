@@ -16,14 +16,25 @@ export default function CompetitionStallBookingFormCard(props) {
     Array.isArray(props.horseStallTypeOptions) &&
     props.horseStallTypeOptions.length === 1;
 
+  var isDateRangeInvalid =
+    !!props.startDate && !!props.endDate && props.endDate < props.startDate;
+
+  function handleSubmitPress() {
+    if (isDateRangeInvalid) {
+      return;
+    }
+
+    props.onSubmit();
+  }
+
   return (
     <View style={styles.formCard}>
       <Text style={styles.cardTitle}>הזמנת תאי סוסים</Text>
 
       <View style={styles.helperCard}>
         <Text style={styles.helperText}>
-          בחרי סוג תא, תאריכים וסוסים. המשלמים ייבחרו אוטומטית לפי מי שמשלם על
-          המקצים של כל סוס, ואפשר לערוך אם צריך.
+          לפי המשלמים המוגדרים לכל סוס בשלב המקצים, במידת הצורך ניתן לערוך את
+          המשלמים על כל תא.
         </Text>
       </View>
 
@@ -45,7 +56,7 @@ export default function CompetitionStallBookingFormCard(props) {
       ) : (
         <CompetitionRegistrationDropdown
           label="סוג תא"
-          placeholder="בחרי סוג תא"
+          placeholder="בחירת סוג תא"
           searchPlaceholder="חיפוש סוג תא"
           items={props.horseStallTypeOptions}
           selectedItem={props.selectedHorseStallType}
@@ -63,6 +74,7 @@ export default function CompetitionStallBookingFormCard(props) {
         onChange={props.setstartDate}
         minimumDate={props.minCompetitionDate}
         maximumDate={props.maxCompetitionDate}
+        highlightedRange={props.highlightedCompetitionRange}
       />
 
       <CompetitionDateField
@@ -71,7 +83,14 @@ export default function CompetitionStallBookingFormCard(props) {
         onChange={props.setendDate}
         minimumDate={props.minCompetitionDate}
         maximumDate={props.maxCompetitionDate}
+        highlightedRange={props.highlightedCompetitionRange}
       />
+
+      {isDateRangeInvalid ? (
+        <Text style={styles.errorText}>
+          תאריך יציאה לא יכול להיות לפני תאריך כניסה
+        </Text>
+      ) : null}
 
       {props.allEligibleHorsesAlreadyBooked ? (
         <View style={styles.helperCard}>
@@ -82,7 +101,7 @@ export default function CompetitionStallBookingFormCard(props) {
       ) : (
         <CompetitionRegistrationDropdown
           label="הוספת סוס"
-          placeholder="בחרי סוס"
+          placeholder="בחירת סוס"
           searchPlaceholder="חיפוש סוס"
           items={props.availableHorseOptions}
           selectedItem={props.selectedHorseToAdd}
@@ -144,22 +163,29 @@ export default function CompetitionStallBookingFormCard(props) {
       <Pressable
         style={[
           styles.primaryButton,
-          props.isSaving ? styles.primaryButtonDisabled : null,
+          props.isSaving || isDateRangeInvalid
+            ? styles.primaryButtonDisabled
+            : null,
         ]}
-        onPress={props.onSubmit}
-        disabled={props.isSaving}
+        onPress={handleSubmitPress}
+        disabled={props.isSaving || isDateRangeInvalid}
       >
         {props.isSaving ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.primaryButtonText}>שמרי תאי סוסים</Text>
+          <Text style={styles.primaryButtonText}>שמירת תאי סוסים</Text>
         )}
       </Pressable>
 
       {props.hasAnyHorseStallBookingsForCompetition ? (
         <Pressable
-          style={[styles.primaryButton, { backgroundColor: "#5E7A74" }]}
+          style={[
+            styles.primaryButton,
+            { backgroundColor: "#5E7A74" },
+            props.isSaving ? styles.primaryButtonDisabled : null,
+          ]}
           onPress={props.onOpenTackMode}
+          disabled={props.isSaving}
         >
           <Text style={styles.primaryButtonText}>מעבר להזמנת תאי ציוד</Text>
         </Pressable>

@@ -119,6 +119,50 @@ function extractShavingsPriceItems(invitationResponse) {
   return result;
 }
 
+function parseDateOnlyString(dateString) {
+  if (!dateString) {
+    return null;
+  }
+
+  var parts = String(dateString).split("-");
+
+  if (parts.length !== 3) {
+    return null;
+  }
+
+  var year = Number(parts[0]);
+  var month = Number(parts[1]) - 1;
+  var day = Number(parts[2]);
+
+  var date = new Date(year, month, day);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date;
+}
+
+function formatDateOnlyString(date) {
+  var year = date.getFullYear();
+  var month = String(date.getMonth() + 1).padStart(2, "0");
+  var day = String(date.getDate()).padStart(2, "0");
+
+  return year + "-" + month + "-" + day;
+}
+
+function addDaysToDateString(dateString, days) {
+  var date = parseDateOnlyString(dateString);
+
+  if (!date) {
+    return "";
+  }
+
+  date.setDate(date.getDate() + days);
+
+  return formatDateOnlyString(date);
+}
+
 function formatNowForInput() {
   var now = new Date();
   var year = now.getFullYear();
@@ -276,6 +320,7 @@ export default function useAdminCompetitionShavings(params) {
           stallBookingId: matchedStall.stallBookingId,
           horseName: matchedStall.horseName,
           payerNames: matchedStall.payerNames,
+          startDate: matchedStall.startDate,
           bagQuantity: "",
         },
       ]);
@@ -317,6 +362,7 @@ export default function useAdminCompetitionShavings(params) {
           stallBookingId: stall.stallBookingId,
           horseName: stall.horseName,
           payerNames: stall.payerNames,
+          startDate: stall.startDate,
           bagQuantity: "",
         },
       ]);
@@ -390,6 +436,38 @@ export default function useAdminCompetitionShavings(params) {
     [totalBags, selectedPriceCatalog],
   );
 
+  // CAP-7: "אספקה כעת" זמינה רק אם לפחות תא נבחר כבר בטווח שלו (תאריך
+  // הכניסה שלו פחות יום) - העוגן הוא התא עם תאריך הכניסה המוקדם ביותר
+  // מבין הנבחרים, כי הוא זה שנכנס לטווח ראשון.
+  var earliestDeliveryDate = useMemo(
+    function () {
+      var startDates = selectedStalls
+        .map(function (item) {
+          return item.startDate;
+        })
+        .filter(Boolean)
+        .sort();
+
+      if (startDates.length === 0) {
+        return "";
+      }
+
+      return addDaysToDateString(startDates[0], -1);
+    },
+    [selectedStalls],
+  );
+
+  var isNowDeliveryAvailable = useMemo(
+    function () {
+      if (!earliestDeliveryDate) {
+        return true;
+      }
+
+      return formatDateOnlyString(new Date()) >= earliestDeliveryDate;
+    },
+    [earliestDeliveryDate],
+  );
+
   function getRequestedDeliveryTime() {
     if (deliveryMode === "now") {
       var nowValue = formatNowForInput();
@@ -410,6 +488,10 @@ export default function useAdminCompetitionShavings(params) {
 
     if (deliveryMode === "later" && (!deliveryDate || !deliveryTime)) {
       return "יש לבחור תאריך ושעה לאספקה";
+    }
+
+    if (deliveryMode === "now" && !isNowDeliveryAvailable) {
+      return "אספקה כעת אינה זמינה עבור התאים שנבחרו";
     }
 
     if (quantityMode === "equal") {
@@ -538,6 +620,8 @@ export default function useAdminCompetitionShavings(params) {
     setDeliveryDate: setDeliveryDate,
     deliveryTime: deliveryTime,
     setDeliveryTime: setDeliveryTime,
+    earliestDeliveryDate: earliestDeliveryDate,
+    isNowDeliveryAvailable: isNowDeliveryAvailable,
 
     quantityMode: quantityMode,
     setQuantityMode: setQuantityMode,

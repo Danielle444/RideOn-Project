@@ -108,6 +108,64 @@ function normalizeDateString(value) {
   return text;
 }
 
+function parseDateOnlyString(dateString) {
+  if (!dateString) {
+    return null;
+  }
+
+  var parts = String(dateString).split("-");
+
+  if (parts.length !== 3) {
+    return null;
+  }
+
+  var year = Number(parts[0]);
+  var month = Number(parts[1]) - 1;
+  var day = Number(parts[2]);
+
+  var date = new Date(year, month, day);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date;
+}
+
+function addDaysToDateString(dateString, days) {
+  var date = parseDateOnlyString(dateString);
+
+  if (!date) {
+    return "";
+  }
+
+  date.setDate(date.getDate() + days);
+
+  return formatDateForInput(date);
+}
+
+function normalizeCompetitionSummary(item) {
+  if (!item) {
+    return {
+      competitionStartDate: "",
+      competitionEndDate: "",
+      registrationEndDate: "",
+    };
+  }
+
+  return {
+    competitionStartDate: normalizeDateString(
+      item.competitionStartDate || item.CompetitionStartDate,
+    ),
+    competitionEndDate: normalizeDateString(
+      item.competitionEndDate || item.CompetitionEndDate,
+    ),
+    registrationEndDate: normalizeDateString(
+      item.registrationEndDate || item.RegistrationEndDate,
+    ),
+  };
+}
+
 function normalizeBoolean(value) {
   if (typeof value === "boolean") {
     return value;
@@ -325,7 +383,12 @@ export default function useAdminCompetitionStallBookings(params) {
   var user = params.user;
   var activeRole = params.activeRole;
   var competitionId = params.competitionId;
-  var activeCompetition = params.activeCompetition;
+
+  var [competitionSummary, setCompetitionSummary] = useState({
+    competitionStartDate: "",
+    competitionEndDate: "",
+    registrationEndDate: "",
+  });
 
   var [horses, setHorses] = useState([]);
   var [horsePayers, setHorsePayers] = useState([]);
@@ -354,28 +417,18 @@ export default function useAdminCompetitionStallBookings(params) {
 
   useEffect(
     function () {
-      if (!activeCompetition) {
-        return;
-      }
-
-      var defaultStart =
-        activeCompetition.competitionStartDate ||
-        activeCompetition.CompetitionStartDate ||
-        "";
-      var defaultEnd =
-        activeCompetition.competitionEndDate ||
-        activeCompetition.CompetitionEndDate ||
-        "";
+      var defaultStart = competitionSummary.competitionStartDate;
+      var defaultEnd = competitionSummary.competitionEndDate;
 
       if (!startDate && defaultStart) {
-        setstartDate(formatDateForInput(defaultStart));
+        setstartDate(defaultStart);
       }
 
       if (!endDate && defaultEnd) {
-        setendDate(formatDateForInput(defaultEnd));
+        setendDate(defaultEnd);
       }
     },
-    [activeCompetition],
+    [competitionSummary, startDate, endDate],
   );
 
   var loadData = useCallback(
@@ -408,6 +461,10 @@ export default function useAdminCompetitionStallBookings(params) {
         var horsePayersResponse = results[2];
         var managedPayersResponse = results[3];
         var existingBookingsResponse = results[4];
+
+        setCompetitionSummary(
+          normalizeCompetitionSummary(invitationResponse?.data?.competition),
+        );
 
         var sections =
           getServicePriceSectionsFromInvitation(invitationResponse);
@@ -533,12 +590,21 @@ export default function useAdminCompetitionStallBookings(params) {
     reloadStallBookings: loadData,
   });
 
-  function handleOpenTackMode() {
+  async function handleOpenTackMode() {
     if (!horseHook.hasAnyHorseStallBookingsForCompetition) {
       return;
     }
 
-    setMode("tack");
+    if (horseHook.selectedHorseBookings.length === 0) {
+      setMode("tack");
+      return;
+    }
+
+    var success = await horseHook.handleCreateHorseStallBookings();
+
+    if (success) {
+      setMode("tack");
+    }
   }
 
   function handleBackToHorseMode() {
@@ -580,6 +646,34 @@ export default function useAdminCompetitionStallBookings(params) {
     [existingStallBookings],
   );
 
+  // CAP-1: כניסה מוגבלת מסיום ההרשמה (לא רשאים להזמין תא לפני שההרשמה
+  // נסגרת), יציאה עם מרווח נוסף של יומיים אחרי סוף התחרות לפירוק.
+  var minCompetitionDate = competitionSummary.registrationEndDate;
+  var maxCompetitionDate = addDaysToDateString(
+    competitionSummary.competitionEndDate,
+    2,
+  );
+
+  var highlightedCompetitionRange = useMemo(
+    function () {
+      if (
+        !competitionSummary.competitionStartDate ||
+        !competitionSummary.competitionEndDate
+      ) {
+        return null;
+      }
+
+      return {
+        start: competitionSummary.competitionStartDate,
+        end: competitionSummary.competitionEndDate,
+      };
+    },
+    [
+      competitionSummary.competitionStartDate,
+      competitionSummary.competitionEndDate,
+    ],
+  );
+
   return {
     mode: mode,
     loading: loading,
@@ -597,6 +691,10 @@ export default function useAdminCompetitionStallBookings(params) {
     setendDate: setendDate,
     notes: notes,
     setNotes: setNotes,
+
+    minCompetitionDate: minCompetitionDate,
+    maxCompetitionDate: maxCompetitionDate,
+    highlightedCompetitionRange: highlightedCompetitionRange,
 
     selectedHorseToAdd: horseHook.selectedHorseToAdd,
     setSelectedHorseToAdd: horseHook.setSelectedHorseToAdd,

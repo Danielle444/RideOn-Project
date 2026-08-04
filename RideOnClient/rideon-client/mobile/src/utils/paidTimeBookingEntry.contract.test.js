@@ -42,7 +42,8 @@ describe("a single shared guard", () => {
     );
 
     expect(handler).toBeTruthy();
-    expect(handler[1]).toContain("if (!paidTimeAvailability.canBookBulk)");
+    expect(handler[1]).toContain("BULK_PAID_TIME_ENTRY_ENABLED");
+    expect(handler[1]).toContain("paidTimeAvailability.canBookBulk");
     expect(handler[1]).toContain("return;");
   });
 
@@ -55,7 +56,8 @@ describe("a single shared guard", () => {
 
   it("auto-open waits for loaded data and then checks the guard", () => {
     expect(screen).toContain("isPaidTimeDataReady");
-    expect(screen).toContain("if (paidTimeAvailability.canBookBulk)");
+    expect(screen).toContain("BULK_PAID_TIME_ENTRY_ENABLED");
+    expect(screen).toContain("paidTimeAvailability.canBookBulk");
   });
 });
 

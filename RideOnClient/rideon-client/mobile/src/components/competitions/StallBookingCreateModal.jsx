@@ -21,28 +21,6 @@ import CompetitionStallBookingsTab from "../competitionRegistrations/Competition
 
 import styles from "../../styles/adminCompetitionStallsStyles";
 
-function normalizeDateForInput(value) {
-  if (!value) {
-    return "";
-  }
-
-  var text = String(value).trim();
-
-  if (!text) {
-    return "";
-  }
-
-  if (text.includes("T")) {
-    return text.split("T")[0];
-  }
-
-  if (text.length >= 10) {
-    return text.slice(0, 10);
-  }
-
-  return text;
-}
-
 export default function StallBookingCreateModal(props) {
   var userContext = useUser();
   var activeRoleContext = useActiveRole();
@@ -55,21 +33,10 @@ export default function StallBookingCreateModal(props) {
   var competitionId =
     props.competitionId || activeCompetition?.competitionId || null;
 
-  var minCompetitionDate = normalizeDateForInput(
-    activeCompetition?.competitionStartDate ||
-      activeCompetition?.CompetitionStartDate,
-  );
-
-  var maxCompetitionDate = normalizeDateForInput(
-    activeCompetition?.competitionEndDate ||
-      activeCompetition?.CompetitionEndDate,
-  );
-
   var stallBookings = useAdminCompetitionStallBookings({
     user: user,
     activeRole: activeRole,
     competitionId: competitionId,
-    activeCompetition: activeCompetition,
     isActiveTab: props.visible,
   });
 
@@ -133,8 +100,11 @@ export default function StallBookingCreateModal(props) {
             tackStallTypeOptions={stallBookings.tackStallTypeOptions}
             selectedHorseStallType={stallBookings.selectedHorseStallType}
             setSelectedHorseStallType={stallBookings.setSelectedHorseStallType}
-            minCompetitionDate={minCompetitionDate}
-            maxCompetitionDate={maxCompetitionDate}
+            minCompetitionDate={stallBookings.minCompetitionDate}
+            maxCompetitionDate={stallBookings.maxCompetitionDate}
+            highlightedCompetitionRange={
+              stallBookings.highlightedCompetitionRange
+            }
             startDate={stallBookings.startDate}
             setstartDate={stallBookings.setstartDate}
             endDate={stallBookings.endDate}
