@@ -21,6 +21,22 @@
 --   - Candidate credits are selected purely on availableamount > 0,
 --     regardless of creditstatus (including NeedsReview).
 -- ============================================================================
+-- 2026-08-05: missingfederationamount (and everything derived from it -
+-- suggestedallocatedamount, the amount component of matchscore, and the
+-- amount text of matchreason) now treats a billcharge with paymentbatchid
+-- is not null as contributing zero missing amount, regardless of its own
+-- amounttopay/allocation math. Mirrors the guards already deployed in
+-- usp_allocatefederationcredittocharge (193) and
+-- usp_approvefederationmatchingsuggestion (199): a genuine payment batch
+-- means the charge is already covered by real money, never by Federation
+-- credit. totalfederationamount and coveredfederationamount are
+-- deliberately left unchanged - neither is read by any current caller, and
+-- redefining them was not required to close this gap. A payer whose only
+-- Federation charges are all paymentbatch-backed now falls out of the
+-- existing `having ... > 0` filter entirely, exactly like a payer who is
+-- already fully covered by Federation credit does today - no new
+-- mechanism, same one. Read-only proc; no mutation path exists here.
+-- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_getfederationmatchingsuggestions(p_competitionid integer)
  RETURNS TABLE(federationexternalcreditid integer, competitionid integer, sourcetype text, externalreference text, externalname text, externalclubname text, externalidnumber text, originalamount numeric, usedamount numeric, availableamount numeric, creditstatus text, paidbypersonid integer, payerfullname text, totalfederationamount numeric, coveredfederationamount numeric, missingfederationamount numeric, suggestedallocatedamount numeric, matchscore integer, confidencelevel text, matchreason text)
@@ -48,7 +64,12 @@ begin
             coalesce(sum(bc.amounttopay), 0) as totalfederationamount,
             coalesce(sum(coalesce(ca.coveredamount, 0)), 0) as coveredfederationamount,
             coalesce(
-                sum(bc.amounttopay - coalesce(ca.coveredamount, 0)),
+                sum(
+                    case
+                        when bc.paymentbatchid is not null then 0
+                        else bc.amounttopay - coalesce(ca.coveredamount, 0)
+                    end
+                ),
                 0
             ) as missingfederationamount
         from public.billcharge bc
@@ -72,7 +93,12 @@ begin
             p.firstname,
             p.lastname
         having coalesce(
-            sum(bc.amounttopay - coalesce(ca.coveredamount, 0)),
+            sum(
+                case
+                    when bc.paymentbatchid is not null then 0
+                    else bc.amounttopay - coalesce(ca.coveredamount, 0)
+                end
+            ),
             0
         ) > 0
     ),
