@@ -54,14 +54,18 @@ export default function ClassesInCompetitionSection(props) {
       <div className="min-w-[1500px]">
         <div className="grid grid-cols-[0.55fr_1.4fr_1fr_1fr_1.3fr_1.3fr_1fr_1fr_0.9fr] gap-3 bg-[#FAF7F5] px-6 py-4 text-center text-sm font-bold text-[#4E342E]">
           <div>מס׳</div>
-          <div>שם מקצה</div>
+          <div className="sticky right-0 z-20 bg-[#FAF7F5] shadow-[-6px_0_10px_-10px_rgba(0,0,0,0.35)]">
+            שם מקצה
+          </div>
           <div>מגרש</div>
           <div>מסלול</div>
           <div>שופטים</div>
           <div>פרסים</div>
           <div>עלות מארגן</div>
           <div>עלות התאחדות</div>
-          <div>פעולות</div>
+          <div className="sticky left-0 z-20 bg-[#FAF7F5] shadow-[6px_0_10px_-10px_rgba(0,0,0,0.35)]">
+            פעולות
+          </div>
         </div>
 
         {items.map(function (item, index) {
@@ -77,7 +81,9 @@ export default function ClassesInCompetitionSection(props) {
                 {item.orderInDay ?? index + 1}
               </div>
 
-              <div className="font-semibold">{item.className || "-"}</div>
+              <div className="sticky right-0 z-10 bg-inherit font-semibold shadow-[-6px_0_10px_-10px_rgba(0,0,0,0.35)]">
+                {item.className || "-"}
+              </div>
 
               <div>{item.arenaName || "-"}</div>
 
@@ -99,7 +105,7 @@ export default function ClassesInCompetitionSection(props) {
 
               <div>{formatMoney(item.federationCost)}</div>
 
-              <div className="flex items-center justify-center gap-3">
+              <div className="sticky left-0 z-10 flex items-center justify-center gap-3 bg-inherit shadow-[6px_0_10px_-10px_rgba(0,0,0,0.35)]">
                 <button
                   type="button"
                   onClick={function () {
