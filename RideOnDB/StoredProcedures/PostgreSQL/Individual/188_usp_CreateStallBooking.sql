@@ -65,6 +65,7 @@ declare
     v_horseincompetition integer;
     v_overlappingexists integer;
     v_staydays integer;
+    v_competitionenddate date;
 begin
     if p_competitionid is null or p_competitionid <= 0 then
         raise exception 'Invalid competition id';
@@ -94,6 +95,15 @@ begin
 
     if v_staydays <= 0 then
         raise exception 'Invalid stay days';
+    end if;
+
+    select c.competitionenddate
+    into v_competitionenddate
+    from public.competition c
+    where c.competitionid = p_competitionid;
+
+    if (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate then
+        raise exception 'Competition has already ended' using errcode = 'RN001';
     end if;
 
     if p_isfortack = false then
