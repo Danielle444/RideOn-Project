@@ -58,10 +58,22 @@ DECLARE
     -- הטענה המבנית ש-UPDATE נוגע רק בחברי התוכנית.
     v_published_before TEXT;
     v_published_after  TEXT;
+    v_competitionenddate DATE;
 BEGIN
     -- ===== בדיקת ארגומנטים =====
     IF p_competitionid IS NULL OR p_appliedbypersonid IS NULL THEN
         RAISE EXCEPTION 'invalid apply arguments';
+    END IF;
+
+    -- מועד סיום התחרות: נבדק ללא תנאי, גם כשקבוצת-הכתיבה ריקה - Apply על תחרות
+    -- שהסתיימה נחסם תמיד, ולא רק כשיש בפועל מה לכתוב.
+    SELECT c.competitionenddate
+    INTO v_competitionenddate
+    FROM public.competition c
+    WHERE c.competitionid = p_competitionid;
+
+    IF (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate THEN
+        RAISE EXCEPTION 'Competition has already ended' USING ERRCODE = 'RN001';
     END IF;
 
     IF p_plan IS NULL OR jsonb_typeof(p_plan->'items') <> 'array' THEN
