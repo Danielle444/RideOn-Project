@@ -37,6 +37,7 @@ DECLARE
     v_current_competition INTEGER;
     v_new_slot_competition INTEGER;
     v_notes_provided     BOOLEAN := (p_Notes IS NOT NULL);
+    v_competitionenddate  DATE;
 BEGIN
     SELECT
         sr.orderedbysystemuserid,
@@ -81,6 +82,13 @@ BEGIN
         RAISE EXCEPTION 'Cannot edit a paid request via this endpoint';
     END IF;
 
+    -- מועד סיום התחרות (מזהה-התחרות קבוע, נגזר פעם אחת כאן; NOT NULL בסכמה).
+    -- נקרא לשני הענפים למטה - הבדיקה עצמה נשארת ממוקדת-ענף (לא בדיקה גורפת).
+    SELECT c.competitionenddate
+    INTO v_competitionenddate
+    FROM public.competition c
+    WHERE c.competitionid = v_current_competition;
+
     -- נעילת-ייעוץ ברמת התחרות (מזהה-התחרות קבוע, נקרא לעיל לפני הנעילה).
     PERFORM pg_advisory_xact_lock(1734, v_current_competition);
 
@@ -88,6 +96,10 @@ BEGIN
 
     -- שינוי סוג פייד-טיים (מחיר) - רק >24h.
     IF p_PriceCatalogId IS NOT NULL AND p_PriceCatalogId <> v_current_pcid THEN
+        IF (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate THEN
+            RAISE EXCEPTION 'Competition has already ended' USING ERRCODE = 'RN001';
+        END IF;
+
         IF v_hours <= 24 THEN
             RAISE EXCEPTION 'Cannot change price catalog within 24 hours of start time';
         END IF;
@@ -118,6 +130,10 @@ BEGIN
 
     -- שינוי סלוט מבוקש - חייב להיות מאותה תחרות.
     IF p_RequestedCompSlotId IS NOT NULL AND p_RequestedCompSlotId <> v_current_slotid THEN
+        IF (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate THEN
+            RAISE EXCEPTION 'Competition has already ended' USING ERRCODE = 'RN001';
+        END IF;
+
         SELECT competitionid
         INTO v_new_slot_competition
         FROM paidtimeslotincompetition
