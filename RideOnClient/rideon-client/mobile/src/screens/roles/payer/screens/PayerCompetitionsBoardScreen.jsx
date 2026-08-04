@@ -18,9 +18,8 @@ import { canPayerEnterCompetition } from "../../../../../../shared/auth/utils/co
 import { sortCompetitionsByStatusAndDate } from "../../../../../../shared/auth/utils/competitions/competitionSorting";
 import { MOBILE_COMPETITION_STATUS_ORDER } from "../../../../config/competitionStatusOrder";
 
-// Relevance order for the payer board: competitions the payer is enrolled in
-// (highest relevance) come first, then everything else. Each group keeps the
-// standard status + date ordering. `hasParticipated` is set by the backend.
+// Enrolled competitions first (highest relevance), then the rest; each group
+// keeps the standard status + date order.
 function sortPayerCompetitionsByRelevance(items) {
   var source = Array.isArray(items) ? items : [];
 

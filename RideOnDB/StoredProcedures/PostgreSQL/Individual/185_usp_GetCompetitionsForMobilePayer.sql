@@ -1,25 +1,12 @@
--- usp_getcompetitionsformobilepayer — mobile payer competition board
+-- usp_getcompetitionsformobilepayer — mobile payer competition board.
 --
--- Two overloads exist live ON PURPOSE (deploy safety, 2026-07-31):
---
---   (personid_param integer)            -- ORIGINAL, kept for backward-compat.
---       Returned ONLY competitions the payer paid into (entries / paid-time /
---       product requests), across all ranches, every status. The currently
---       deployed backend calls this 1-arg version, so it stays until the
---       ranch+participation change below ships and Render redeploys, then it
---       can be retired.
---
---   (p_ranchid integer, p_personid integer)  -- NEW. Adds ranch-scoped discovery
---       plus a HasParticipated flag so the backend can build the payer board:
---         * the selected ranch's competitions (so future ones the payer has NOT
---           joined can be shown), UNION
---         * every competition the payer participated in, ANY ranch (history).
---       HasParticipated drives the C# visibility matrix and enrolled-first sort
---       (BL/Competition.cs -> IsVisibleOnPayerBoard). Drafts / non-enrolled
---       non-future / stale cancelled are filtered in C#, not here.
---
--- Adding the 2-arg version was a NEW overload (different arity), so CREATE OR
--- REPLACE did not touch the 1-arg one — zero breakage window for the live app.
+-- Two overloads live intentionally (deploy safety):
+--   (personid_param)          -- original; participated competitions only.
+--   (p_ranchid, p_personid)   -- current; ranch discovery + cross-ranch history
+--                                + HasParticipated flag.
+-- The 1-arg version is kept so the deployed backend keeps working; retire it
+-- after the ranch+participation change ships and Render redeploys. Visibility
+-- rules (drafts hidden, etc.) are applied in C#, not here.
 
 -- === Overload 1: original (unchanged, backward-compat) ======================
 CREATE OR REPLACE FUNCTION public.usp_getcompetitionsformobilepayer(personid_param integer)

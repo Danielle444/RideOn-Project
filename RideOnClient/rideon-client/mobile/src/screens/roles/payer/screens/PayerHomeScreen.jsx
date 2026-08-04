@@ -21,7 +21,7 @@ import { getMobilePayerCompetitionsBoard } from "../../../../services/competitio
 import { canPayerEnterCompetition } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
 import { useCompetition } from "../../../../context/CompetitionContext";
 
-// Effective competition statuses (Hebrew) as returned by the backend.
+// Effective statuses (Hebrew) as returned by the backend.
 var STATUS_FUTURE = "עתידית";
 var STATUS_ACTIVE = "פעילה";
 var STATUS_CURRENT = "כעת";
@@ -46,10 +46,8 @@ function daysBetween(fromDate, toDate) {
   return Math.round((toDate.getTime() - fromDate.getTime()) / 86400000);
 }
 
-// Home teaser selection (locked with Oren 2026-07-31): only the most relevant
-// handful — competitions the payer is enrolled in that are still live
-// (active/current/upcoming) or finished within the last week, plus ranch
-// competitions coming up within the next month even if not yet enrolled.
+// Home teaser: enrolled competitions that are still live or finished within the
+// last week, plus ranch competitions starting within the next month.
 function selectHomeCompetitions(items) {
   var source = Array.isArray(items) ? items : [];
   var today = startOfDay(new Date());

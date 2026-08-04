@@ -213,8 +213,7 @@ namespace RideOnServer.DAL
 
         public List<Competition> GetCompetitionsForMobilePayer(int ranchId, int personId)
         {
-            // Positional binding: order must match the proc signature
-            // usp_getcompetitionsformobilepayer(p_ranchid, p_personid).
+            // Positional binding — order must match usp_getcompetitionsformobilepayer(p_ranchid, p_personid).
             Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
                 { "@RanchId", ranchId },
