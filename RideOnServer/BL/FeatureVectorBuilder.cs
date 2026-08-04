@@ -40,10 +40,26 @@ namespace RideOnServer.BL
                 throw new Exception("ClassInCompId not found");
             }
 
+            return Build(inputs, modelParameters);
+        }
+
+        // Overload for callers that already hold a fetched EntryPredictionFeatureInputs row (the
+        // competition-batched recompute path in PredictionService.RecomputeCompetition, which
+        // fetches all of a competition's rows in one call via
+        // EntryPredictionDAL.GetFeatureInputsByCompetitionId instead of once per class). Contains
+        // the exact same feature-assembly logic the classIncompId overload above uses after its
+        // own fetch -- one implementation, not two, so it can never drift between the two paths.
+        public static PredictionFeatureVector Build(EntryPredictionFeatureInputs inputs, ActiveModelParameters modelParameters)
+        {
+            if (modelParameters.Parameters.Count == 0)
+            {
+                throw new Exception("No active model version found");
+            }
+
             if (inputs.FieldAvgPastEntries is null)
             {
                 throw new PredictionUnavailableException(
-                    $"No completed-competition history for field '{inputs.FieldName}' (classincompid {classIncompId}) — " +
+                    $"No completed-competition history for field '{inputs.FieldName}' (classincompid {inputs.ClassInCompId}) — " +
                     "field_avg_past_entries cannot be computed, prediction refused.");
             }
 
@@ -79,7 +95,7 @@ namespace RideOnServer.BL
             }
 
             return new PredictionFeatureVector(
-                classIncompId,
+                inputs.ClassInCompId,
                 modelParameters.ModelVersionId,
                 modelParameters.Intercept,
                 modelParameters.Rmse,
