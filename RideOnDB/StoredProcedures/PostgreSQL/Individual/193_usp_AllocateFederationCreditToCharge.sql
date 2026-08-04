@@ -7,15 +7,6 @@
 --
 -- Part of the 2026-08-03 federation-payment Stage 1 recovery (SP files
 -- 191-217). KNOWN ISSUES documented in that audit, NOT fixed here:
---   - Accepts a billcharge already chargestatus='Paid' (only rejects statuses
---     outside ('Open','Paid')), and computes "remaining to cover" purely from
---     SUM(federationcreditallocation.allocatedamount) - it never checks
---     paymentbatchid/payment. Combined with usp_createcompetitionpayerpayment
---     (which can pay a Federation charge via a normal paymentbatch), a charge
---     can be closed twice: once by organizer payment, once by credit
---     allocation. Confirmed structurally live-reachable; not yet observed to
---     have actually double-covered the same billchargeid (see the audit's
---     anomaly-check section).
 --   - Credit status guard excludes Cancelled/Refunded/ClosedManually/
 --     TransferredToNextCompetition but not NeedsReview - a credit flagged for
 --     manual review can still be spent.
@@ -23,6 +14,19 @@
 -- The row locking here (SELECT ... FOR UPDATE on both the credit and the
 -- charge) is real and correct - see usp_approvefederationmatchingsuggestion
 -- (199) for the batch-allocation sibling that lacks this lock.
+-- ============================================================================
+-- 2026-08-04: rejects allocation attempts against a billcharge that already
+-- has a real, recorded payment (billcharge.paymentbatchid is not null),
+-- regardless of chargestatus. usp_createcompetitionpayerpayment (200) is the
+-- only writer of paymentbatchid; it only ever sets it once, atomically with
+-- chargestatus='Paid', for the charge's full amounttopay, and no live proc
+-- ever clears it - so "not null" is an unconditional signal of a genuine
+-- already-covered payment. Closes the double-coverage gap previously noted
+-- here: a Federation charge already paid through a payment batch could
+-- previously still receive a federation credit allocation on top of it. The
+-- guard runs under the billcharge's existing FOR UPDATE lock, before any
+-- allocation insert, credit-balance update, or charge-status change; no new
+-- lock, no change to the existing credit-before-charge lock order.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_allocatefederationcredittocharge(p_federationexternalcreditid integer, p_billchargeid integer, p_allocatedamount numeric, p_allocatedbysystemuserid integer, p_notes text DEFAULT NULL::text)
@@ -41,6 +45,7 @@ declare
     v_billcharge_amount numeric;
     v_billcharge_sourcetype character varying;
     v_billcharge_sourceid integer;
+    v_billcharge_paymentbatchid integer;
 
     v_already_allocated_to_charge numeric;
     v_remaining_charge_amount numeric;
@@ -110,14 +115,16 @@ begin
         bc.chargestatus,
         bc.amounttopay,
         bc.sourcetype,
-        bc.sourceid
+        bc.sourceid,
+        bc.paymentbatchid
     into
         v_billcharge_competitionid,
         v_billcharge_owner,
         v_billcharge_status,
         v_billcharge_amount,
         v_billcharge_sourcetype,
-        v_billcharge_sourceid
+        v_billcharge_sourceid,
+        v_billcharge_paymentbatchid
     from public.billcharge bc
     where bc.billchargeid = p_billchargeid
     for update;
@@ -140,6 +147,11 @@ begin
         raise exception 'Bill charge % cannot be allocated because its status is %',
             p_billchargeid,
             v_billcharge_status;
+    end if;
+
+    if v_billcharge_paymentbatchid is not null then
+        raise exception 'Bill charge % is already paid through a payment batch and cannot receive a federation credit allocation',
+            p_billchargeid;
     end if;
 
     select coalesce(sum(fca.allocatedamount), 0)
