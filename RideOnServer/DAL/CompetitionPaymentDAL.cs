@@ -669,7 +669,8 @@ namespace RideOnServer.DAL
                         NpgsqlCommand command = new NpgsqlCommand(
                             @"
                     select *
-                    from public.usp_allocatefederationcredittocharge(
+                    from public.usp_allocatefederationcredittochargesecured(
+                        @competitionId,
                         @federationExternalCreditId,
                         @billChargeId,
                         @allocatedAmount,
@@ -680,6 +681,11 @@ namespace RideOnServer.DAL
                         )
                     )
                     {
+                        command.Parameters.Add(
+                            "@competitionId",
+                            NpgsqlDbType.Integer
+                        ).Value = request.CompetitionId;
+
                         command.Parameters.Add(
                             "@federationExternalCreditId",
                             NpgsqlDbType.Integer
