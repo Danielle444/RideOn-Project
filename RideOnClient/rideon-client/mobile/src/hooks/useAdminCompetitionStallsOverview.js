@@ -16,6 +16,11 @@ import {
   getStallMapPublishStatus,
 } from "../services/stallMapService";
 
+import {
+  extractServerStallTotal,
+  resolveStallAmount,
+} from "../utils/stallBookingAmounts";
+
 function normalizeAssignedPrice(item) {
   if (!item) return null;
   return {
@@ -164,6 +169,12 @@ function normalizeBooking(item) {
     compoundId: item.compoundId || item.CompoundId || item.compoundid || null,
 
     stallId: item.stallId || item.StallId || item.stallid || null,
+
+    // CAP-6: the server-computed stall-charge total for this booking, kept
+    // null when the field is absent (as opposed to 0) so cards() below can
+    // tell "no server total, fall back to a client recompute" apart from
+    // "server total is legitimately 0."
+    serverStallAmount: extractServerStallTotal(item),
 
     priceCatalogId:
       Number(
@@ -556,8 +567,14 @@ export default function useAdminCompetitionStallsOverview(params) {
           ? Number(priceRow.assignedPrice || 0)
           : Number(booking.itemPrice || 0);
 
-        var stallAmount =
-          Number(numberOfDays || 1) * effectivePerDayPrice;
+        // CAP-6: the server total wins whenever it is present (including a
+        // legitimate 0) - the numberOfDays × price recompute is only a
+        // fallback for a booking whose row never carried a server total.
+        var stallAmount = resolveStallAmount({
+          serverStallAmount: booking.serverStallAmount,
+          numberOfDays: numberOfDays,
+          effectivePerDayPrice: effectivePerDayPrice,
+        });
 
         var shavingsTotalAmount = relatedOrders.reduce(function (sum, order) {
           return sum + Number(order.amountForThisStall || 0);

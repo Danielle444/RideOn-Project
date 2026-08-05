@@ -462,8 +462,17 @@ export default function CompetitionDateField(props) {
                     marginBottom: 16,
                   }}
                 >
-                  <Pressable onPress={goToNextMonth}>
-                    <Text style={{ fontSize: 24, color: "#7B5A4D" }}>‹</Text>
+                  {/* CAP-2: row is row-reverse, so the FIRST child renders on
+                      the right and the LAST child renders on the left. Right
+                      = previous/earlier month with a "›" glyph; left = next/
+                      later month with a "‹" glyph - matches RTL reading order
+                      (earlier month toward the right, later month toward the
+                      left), the reverse of the previous (LTR-style) wiring. */}
+                  <Pressable
+                    onPress={goToPreviousMonth}
+                    accessibilityLabel="חודש קודם"
+                  >
+                    <Text style={{ fontSize: 24, color: "#7B5A4D" }}>›</Text>
                   </Pressable>
 
                   <Text
@@ -478,8 +487,11 @@ export default function CompetitionDateField(props) {
                       currentMonth.getFullYear()}
                   </Text>
 
-                  <Pressable onPress={goToPreviousMonth}>
-                    <Text style={{ fontSize: 24, color: "#7B5A4D" }}>›</Text>
+                  <Pressable
+                    onPress={goToNextMonth}
+                    accessibilityLabel="חודש הבא"
+                  >
+                    <Text style={{ fontSize: 24, color: "#7B5A4D" }}>‹</Text>
                   </Pressable>
                 </View>
 

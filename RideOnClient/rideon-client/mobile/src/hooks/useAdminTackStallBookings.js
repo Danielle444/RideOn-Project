@@ -5,6 +5,7 @@ import {
   resolveEffectiveTackPayers,
   isTackPayerSelectionLocked,
 } from "../utils/tackPayerLock";
+import { calculateTackPreviewTotal } from "../utils/tackStallPreviewPricing";
 
 function uniqByPersonId(items) {
   var map = {};
@@ -235,7 +236,12 @@ export default function useAdminTackStallBookings(params) {
     function () {
       var quantity = Number(tackQuantity || 0);
       var unitPrice = Number(selectedTackStallType?.itemPrice || 0);
-      var total = quantity * unitPrice;
+      var total = calculateTackPreviewTotal({
+        quantity: quantity,
+        unitPrice: unitPrice,
+        startDate: tackStartDate,
+        endDate: tackEndDate,
+      }).totalPrice;
       var payerCount = effectiveTackPayers.length;
       var perPayer = payerCount > 0 ? Math.ceil(total / payerCount) : 0;
 
@@ -247,7 +253,13 @@ export default function useAdminTackStallBookings(params) {
         amountPerPayer: perPayer,
       };
     },
-    [tackQuantity, selectedTackStallType, effectiveTackPayers],
+    [
+      tackQuantity,
+      selectedTackStallType,
+      tackStartDate,
+      tackEndDate,
+      effectiveTackPayers,
+    ],
   );
 
   async function handleSubmitTackDraft() {
