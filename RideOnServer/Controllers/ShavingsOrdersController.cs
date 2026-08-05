@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.ShavingsOrders;
 using RideOnServer.DAL;
+using System.Linq;
 
 namespace RideOnServer.Controllers
 {
@@ -190,12 +191,54 @@ namespace RideOnServer.Controllers
                     return BadRequest("At least one stall is required.");
                 }
 
+                // Ranch-model fix: requesting ranch is derived server-side
+                // from the referenced stall bookings themselves -- never
+                // trusted from request.RanchId. Fails fast here (before the
+                // write) if a stall is missing or if the selection spans more
+                // than one requesting ranch; usp_createshavingsorder repeats
+                // this exact check internally as defense in depth.
+                List<int> stallBookingIds = request.Stalls
+                    .Select(s => s.StallBookingId)
+                    .Distinct()
+                    .ToList();
+
+                Dictionary<int, int> requestingRanchByStall =
+                    StallBookingDAL.GetRequestingRanchIdsForStallBookings(stallBookingIds);
+
+                List<int> missingStallIds = stallBookingIds
+                    .Where(id => !requestingRanchByStall.ContainsKey(id))
+                    .ToList();
+
+                if (missingStallIds.Count > 0)
+                {
+                    return NotFound($"Stall booking(s) not found: {string.Join(", ", missingStallIds)}");
+                }
+
+                List<int> distinctRequestingRanchIds = requestingRanchByStall.Values.Distinct().ToList();
+
+                if (distinctRequestingRanchIds.Count != 1)
+                {
+                    return BadRequest("All selected stalls must belong to the same requesting ranch.");
+                }
+
+                int requestingRanchId = distinctRequestingRanchIds[0];
+
                 UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
-                    request.RanchId,
+                    requestingRanchId,
                     RoleNames.RanchAdmin,
                     RoleNames.HostSecretary
                 );
+
+                // Host/service ranch is the COMPETITION's own host ranch,
+                // derived server-side -- never trusted from request.RanchId.
+                RideOnServer.BL.Competition? competition = new CompetitionDAL().GetCompetitionById(request.CompetitionId);
+                if (competition == null)
+                {
+                    return NotFound("התחרות לא נמצאה");
+                }
+
+                request.RanchId = competition.HostRanchId;
 
                 // לא סומכים על ה-client.
                 // גם אם הוא שלח OrderedBySystemUserId אחר, אנחנו דורסים אותו לפי הטוקן.

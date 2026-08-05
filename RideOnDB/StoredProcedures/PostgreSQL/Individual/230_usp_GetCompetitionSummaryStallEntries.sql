@@ -1,13 +1,23 @@
+-- 230_usp_GetCompetitionSummaryStallEntries.sql
+--
+-- FIRST-TIME COMMIT of a previously LIVE-ONLY procedure. No repo file
+-- existed for this proc before this audit (confirmed by exhaustive glob
+-- across RideOnDB/StoredProcedures, 2026-08-05). Body captured verbatim
+-- from live via pg_get_functiondef on 2026-08-05.
+--
 -- RANCH-MODEL CORRECTION (2026-08-05, owner-approved architecture fix):
--- p_ranchid is host-validated; p_bookingranchid already existed as a
--- separate parameter filtering by sb.ranchid (the buggy value pre-fix).
--- Filter and "BookingRanchName" display source changed from sb.ranchid to
--- sb.requestingranchid (see
--- migrations/add_stallbooking_requestingranchid.sql). Parameter names and
--- all other columns/behavior unchanged.
+-- this proc already has TWO distinct ranch parameters -- p_ranchid
+-- (validated against competition.hostranchid) and p_bookingranchid (an
+-- unvalidated second parameter that filters/displays by sb.ranchid) --
+-- i.e. its signature already anticipated the host-ranch/guest-ranch split
+-- this fix formalizes; only the buggy column it read from needed to
+-- change. The p_bookingranchid filter and "BookingRanchName" display
+-- source changed from sb.ranchid to sb.requestingranchid (see
+-- migrations/add_stallbooking_requestingranchid.sql). Parameter names,
+-- p_ranchid's host-ranch validation, and all other columns are unchanged.
 
-CREATE OR REPLACE FUNCTION public.usp_getcompetitionsummaryshavingsentries(p_competitionid integer, p_ranchid integer, p_bookingranchid integer)
- RETURNS TABLE("ShavingsOrderId" integer, "BookingRanchName" text, "StallCount" integer, "BagQuantity" integer, "RequestedDeliveryTime" timestamp without time zone, "DeliveryStatus" text, "HorseNames" text, "PayerNames" text, "IsPaid" boolean, "ExpectedAmount" numeric, "PaidAmount" numeric, "UnpaidAmount" numeric)
+CREATE OR REPLACE FUNCTION public.usp_getcompetitionsummarystallentries(p_competitionid integer, p_ranchid integer, p_bookingranchid integer, p_productid smallint, p_isfortack boolean)
+ RETURNS TABLE("StallBookingId" integer, "BookingRanchName" text, "ProductName" text, "IsForTack" boolean, "HorseName" text, "BarnName" text, "StartDate" date, "EndDate" date, "PayerNames" text, "IsPaid" boolean, "ExpectedAmount" numeric, "PaidAmount" numeric, "UnpaidAmount" numeric)
  LANGUAGE plpgsql
 AS $function$
 begin
@@ -21,6 +31,10 @@ begin
 
     if p_bookingranchid is null or p_bookingranchid <= 0 then
         raise exception 'Invalid booking ranch id';
+    end if;
+
+    if p_productid is null or p_productid <= 0 then
+        raise exception 'Invalid product id';
     end if;
 
     return query
@@ -52,31 +66,31 @@ begin
                     when bc.chargestatus = 'Open' then bc.amounttopay
                     else 0
                 end
-            ), 0)::numeric as unpaidamount
+            ), 0)::numeric as unpaidamount,
+
+            bool_or(bc.chargestatus = 'Paid')::boolean as haspaid,
+            bool_or(bc.chargestatus = 'Open')::boolean as hasopen
 
         from public.billcharge bc
         inner join public.person payer_p
             on payer_p.personid = bc.paidbypersonid
         where bc.sourcetype = 'ProductRequest'
-          and bc.categorykey = 'shavings'
+          and bc.categorykey = 'stalls'
           and bc.chargestatus in ('Open', 'Paid')
         group by bc.sourceid
     )
 
     select
-        so.shavingsorderid::integer as "ShavingsOrderId",
+        sb.stallbookingid::integer as "StallBookingId",
         r.ranchname::text as "BookingRanchName",
+        p.productname::text as "ProductName",
+        sb.isfortack::boolean as "IsForTack",
 
-        count(sofsb.stallbookingid)::integer as "StallCount",
-        coalesce(sum(sofsb.bagquantityperstall), 0)::integer as "BagQuantity",
+        h.horsename::text as "HorseName",
+        h.barnname::text as "BarnName",
 
-        so.requesteddeliverytime as "RequestedDeliveryTime",
-        so.deliverystatus::text as "DeliveryStatus",
-
-        string_agg(
-            distinct coalesce(h.horsename, 'תא ציוד'),
-            ', '
-        )::text as "HorseNames",
+        sb.startdate::date as "StartDate",
+        sb.enddate::date as "EndDate",
 
         coalesce(pd.payernames, '-')::text as "PayerNames",
 
@@ -89,40 +103,29 @@ begin
         coalesce(pd.paidamount, 0)::numeric as "PaidAmount",
         coalesce(pd.unpaidamount, 0)::numeric as "UnpaidAmount"
 
-    from public.shavingsorder so
+    from public.stallbooking sb
     inner join public.productrequest pr
-        on pr.prequestid = so.shavingsorderid
+        on pr.prequestid = sb.stallbookingid
     inner join public.pricecatalog pc
         on pc.pricecatalogid = pr.pricecatalogid
     inner join public.product p
         on p.productid = pc.productid
-    inner join public.shavingsorderforstallbooking sofsb
-        on sofsb.shavingsorderid = so.shavingsorderid
-    inner join public.stallbooking sb
-        on sb.stallbookingid = sofsb.stallbookingid
     inner join public.ranch r
         on r.ranchid = sb.requestingranchid
     left join public.horse h
         on h.horseid = sb.horseid
-    inner join payer_data pd
-        on pd.prequestid = pr.prequestid
     inner join public.competition c
         on c.competitionid = pr.competitionid
+    inner join payer_data pd
+        on pd.prequestid = pr.prequestid
     where pr.competitionid = p_competitionid
       and c.hostranchid = p_ranchid
-      and p.categoryid = 3
       and sb.requestingranchid = p_bookingranchid
-    group by
-        so.shavingsorderid,
-        r.ranchname,
-        so.requesteddeliverytime,
-        so.deliverystatus,
-        pd.payernames,
-        pd.expectedamount,
-        pd.paidamount,
-        pd.unpaidamount
+      and p.productid = p_productid
+      and sb.isfortack = p_isfortack
     order by
-        so.requesteddeliverytime nulls last,
-        so.shavingsorderid;
+        sb.startdate,
+        h.horsename nulls last,
+        sb.stallbookingid;
 end;
-$function$;
+$function$

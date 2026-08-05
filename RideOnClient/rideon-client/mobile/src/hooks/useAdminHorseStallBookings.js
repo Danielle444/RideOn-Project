@@ -274,7 +274,10 @@ export default function useAdminHorseStallBookings(params) {
           orderedBySystemUserId: user.personId,
           priceCatalogId: currentStallType.priceCatalogId,
           notes: notes ? notes.trim() : null,
-          ranchId: activeRole.ranchId,
+          // Ranch-model fix: the server now derives both the horse's
+          // requesting ranch (from horseId) and the host ranch (from
+          // competitionId) itself -- it never trusts a client-supplied
+          // ranchId for this endpoint, so it is intentionally not sent.
           horseId: booking.horse.horseId,
           startDate: startDate,
           endDate: endDate,

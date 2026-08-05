@@ -395,9 +395,12 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
   }
 
   async function handleCreateStallBookingForPayer(payload) {
+    // Ranch-model fix: the server derives the host ranch from competitionId
+    // and never reads ranchId for this call -- it is intentionally not sent.
+    // requestingRanchId is the guest/home ranch (required for tack, derived
+    // from the horse otherwise) and is forwarded from the modal's payload.
     var res = await secretaryCreateStallBookingForPayer({
       competitionId: competitionId,
-      ranchId: ranchId,
       payerPersonId: payload.payerPersonId,
       horseId: payload.horseId,
       startDate: payload.startDate,
@@ -405,6 +408,7 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
       isForTack: payload.isForTack,
       productId: payload.productId,
       notes: payload.notes,
+      requestingRanchId: payload.requestingRanchId,
     });
     await refreshAssignmentsAndOverview();
     return res.data;

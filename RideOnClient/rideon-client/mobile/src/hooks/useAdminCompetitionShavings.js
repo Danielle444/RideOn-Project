@@ -539,7 +539,13 @@ export default function useAdminCompetitionShavings(params) {
         competitionId: competitionId,
         orderedBySystemUserId: user.personId,
         priceCatalogId: selectedPriceCatalog.priceCatalogId,
-        ranchId: activeRole.ranchId,
+        // Ranch-model fix: the server derives the requesting ranch from the
+        // selected stallBookingIds themselves and the host ranch from
+        // competitionId -- it never trusts a client-supplied ranchId for
+        // this endpoint, so it is intentionally not sent. The stall picker
+        // above is already scoped to activeRole.ranchId (one requesting
+        // ranch at a time), so a mixed-ranch selection cannot occur through
+        // this screen; server-side validation remains authoritative.
         notes: notes ? notes.trim() : null,
         requestedDeliveryTime: getRequestedDeliveryTime(),
         stalls: selectedStalls.map(function (item) {

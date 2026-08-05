@@ -4,6 +4,13 @@
 --   the TABLE shape). The new column is appended LAST and every consumer reads by name, so the deployed
 --   DAL keeps working unchanged. The DROP+CREATE runs atomically in one migration (no window where the
 --   function is missing), so this may be applied ahead of the web deploy (backward-compatible append).
+-- RANCH-MODEL CORRECTION (2026-08-05, owner-approved architecture fix):
+-- p_ranchid means the guest/requesting ranch (no host-ranch validation
+-- exists in this proc). Filter changed from sb.ranchid = p_ranchid to
+-- sb.requestingranchid = p_ranchid (see
+-- migrations/add_stallbooking_requestingranchid.sql). Return shape and
+-- every other column/behavior unchanged -- no DROP+CREATE needed this time
+-- since the parameter list itself is unchanged from the prior signature.
 DROP FUNCTION IF EXISTS public.usp_getshavingsordersforcompetitionandranch(integer, integer);
 
 CREATE OR REPLACE FUNCTION public.usp_getshavingsordersforcompetitionandranch(
@@ -58,7 +65,7 @@ BEGIN
         GROUP BY bpr.prequestid
     ) bpr_total ON bpr_total.prequestid = pr.prequestid
     WHERE pr.competitionid = p_competitionid
-      AND sb.ranchid = p_ranchid
+      AND sb.requestingranchid = p_ranchid
     ORDER BY so.requesteddeliverytime DESC;
 END;
 $function$;

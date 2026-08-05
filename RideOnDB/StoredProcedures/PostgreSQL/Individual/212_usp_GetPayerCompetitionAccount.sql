@@ -17,6 +17,20 @@
 -- ranch it was given (unlike the self-service my-competition-account variant,
 -- which forces payerPersonId=caller and so has limited blast radius). No
 -- issue in this SQL body itself was flagged.
+--
+-- RANCH-MODEL CORRECTION (2026-08-05, owner-approved architecture fix):
+-- p_ranchid here means the guest/requesting ranch -- confirmed by
+-- class_items/paidtime_items already filtering on h.ranchid = p_ranchid
+-- (the horse's own home ranch) and by the internal authorization check
+-- being against personranchrole.ranchid (the admin's own managed ranch),
+-- never against competition.hostranchid. The stall_items and
+-- shavings_items CTEs filtered by sb.ranchid = p_ranchid, which before this
+-- fix held the same (buggy) value as home ranch -- now that
+-- stallbooking.ranchid means host ranch, both were changed to
+-- sb.requestingranchid = p_ranchid (see
+-- migrations/add_stallbooking_requestingranchid.sql) for consistency with
+-- the class/paid-time filtering already in this same query. No other
+-- behavior changed.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_getpayercompetitionaccount(p_competitionid integer, p_ranchid integer, p_payerpersonid integer, p_adminsystemuserid integer)
@@ -512,7 +526,7 @@ begin
             on h.horseid = sb.horseid
         where pcs.categorykey = 'stalls'
           and pr.competitionid = p_competitionid
-          and sb.ranchid = p_ranchid
+          and sb.requestingranchid = p_ranchid
           and not exists (
               select 1
               from public.productchangerequest pcr
@@ -557,7 +571,7 @@ begin
               inner join public.stallbooking sb
                   on sb.stallbookingid = sosb.stallbookingid
               where sosb.shavingsorderid = so.shavingsorderid
-                and sb.ranchid = p_ranchid
+                and sb.requestingranchid = p_ranchid
           )
     ),
 
