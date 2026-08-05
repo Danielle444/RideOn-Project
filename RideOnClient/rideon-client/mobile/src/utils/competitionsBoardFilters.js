@@ -58,6 +58,19 @@ function competitionDateOnly(value) {
   return String(value || "").slice(0, 10);
 }
 
+// CAP-1: status/host-ranch/field are now multi-select sets rather than a
+// single scalar. An empty (or missing) set means "no filtering for this
+// facet"; a non-empty set matches when the row's value is contained in it.
+function matchesMultiSelect(value, selectedValues) {
+  if (!Array.isArray(selectedValues) || selectedValues.length === 0) {
+    return true;
+  }
+
+  return selectedValues.some(function (selected) {
+    return String(selected) === String(value);
+  });
+}
+
 // Client-side only, mirroring the secretary web board's filter set. Draft is
 // always excluded regardless of whether the source proc already excludes it.
 function filterCompetitionsForBoard(items, filters) {
@@ -85,15 +98,15 @@ function filterCompetitionsForBoard(items, filters) {
       return false;
     }
 
-    if (hostRanchFilter && String(item.hostRanchId) !== String(hostRanchFilter)) {
+    if (!matchesMultiSelect(item.hostRanchId, hostRanchFilter)) {
       return false;
     }
 
-    if (fieldFilter && String(item.fieldId) !== String(fieldFilter)) {
+    if (!matchesMultiSelect(item.fieldId, fieldFilter)) {
       return false;
     }
 
-    if (statusFilter && item.competitionStatus !== statusFilter) {
+    if (!matchesMultiSelect(item.competitionStatus, statusFilter)) {
       return false;
     }
 
@@ -115,5 +128,6 @@ export {
   buildHostRanchOptions,
   buildFieldOptions,
   buildStatusOptions,
+  matchesMultiSelect,
   filterCompetitionsForBoard,
 };
