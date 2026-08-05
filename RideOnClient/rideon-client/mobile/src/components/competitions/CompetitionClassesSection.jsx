@@ -127,11 +127,11 @@ export default function CompetitionClassesSection(props) {
                     ) : null}
 
                     <Text style={competitionInvitationStyles.itemMeta}>
-                      למארגן: {formatPrice(item.organizerCost)}
+                      עלות מארגן: {formatPrice(item.organizerCost)}
                     </Text>
 
                     <Text style={competitionInvitationStyles.itemMeta}>
-                      להתאחדות: {formatPrice(item.federationCost)}
+                      עלות התאחדות: {formatPrice(item.federationCost)}
                     </Text>
 
                     {item.prizesDisplay ? (

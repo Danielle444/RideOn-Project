@@ -638,14 +638,14 @@ export default function PayerCompetitionAccountScreen(props) {
 
           <View style={styles.splitRow}>
             <View style={styles.splitPill}>
-              <Text style={styles.splitPillLabel}>מארגן</Text>
+              <Text style={styles.splitPillLabel}>עלות מארגן</Text>
               <Text style={styles.splitPillValue}>
                 {formatCurrency(item.organizerCost)}
               </Text>
             </View>
 
             <View style={styles.splitPill}>
-              <Text style={styles.splitPillLabel}>התאחדות</Text>
+              <Text style={styles.splitPillLabel}>עלות התאחדות</Text>
               <Text style={styles.splitPillValue}>
                 {formatCurrency(item.federationCost)}
               </Text>
