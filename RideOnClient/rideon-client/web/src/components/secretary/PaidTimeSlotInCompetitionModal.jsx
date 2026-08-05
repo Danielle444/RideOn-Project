@@ -12,6 +12,7 @@ import {
   buildDayOptions,
   getTimeOfDayOptions,
   getTimingForDate,
+  getDefaultHoursForTimeOfDay,
   findBaseSlotId,
   formatDateOnlyForDisplay,
   buildHourOptions,
@@ -211,6 +212,25 @@ export default function PaidTimeSlotInCompetitionModal(props) {
     });
   }
 
+  function handleTimeOfDayChange(value) {
+    setFormData(function (prev) {
+      var defaultHours = getDefaultHoursForTimeOfDay(value);
+      var next = { ...prev, timeOfDay: value };
+
+      if (defaultHours) {
+        if (!prev.startTimeHour) {
+          next.startTimeHour = defaultHours.startHour;
+        }
+
+        if (!prev.endTimeHour) {
+          next.endTimeHour = defaultHours.endHour;
+        }
+      }
+
+      return next;
+    });
+  }
+
   function handleSubmit(e) {
     e.preventDefault();
 
@@ -373,7 +393,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                   return item;
                 }}
                 onChange={function (e) {
-                  handleChange("timeOfDay", e.target.value);
+                  handleTimeOfDayChange(e.target.value);
                 }}
               />
 
@@ -437,7 +457,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                 <span className="text-red-500 mr-0.5">*</span>
               </label>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2" dir="rtl">
                 <div className="flex-1">
                   <CustomDropdown
                     dropdownKey="paid-time-start-time-hour"
@@ -493,7 +513,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                 <span className="text-red-500 mr-0.5">*</span>
               </label>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2" dir="rtl">
                 <div className="flex-1">
                   <CustomDropdown
                     dropdownKey="paid-time-end-time-hour"
