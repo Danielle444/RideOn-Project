@@ -809,7 +809,7 @@ export default function PayerCompetitionAccountScreen(props) {
                 : item.barnName || item.horseName || "תא"}
             </Text>
             <Text style={styles.itemAmount}>
-              {formatCurrency(item.stallAmountToPay)}
+              {formatCurrency(item.amountToPay)}
             </Text>
           </View>
 
@@ -823,7 +823,7 @@ export default function PayerCompetitionAccountScreen(props) {
             תא: {item.stallId ? "#" + item.stallId : "טרם שובץ"}
           </Text>
 
-          {renderPaymentBadge(item.isPaid, item.stallAmountToPay)}
+          {renderPaymentBadge(item.isPaid, item.amountToPay)}
 
           {shavingsOrders.length > 0 ? (
             <View style={{ marginTop: 12 }}>
@@ -835,8 +835,8 @@ export default function PayerCompetitionAccountScreen(props) {
                     key={String(order.shavingsOrderId)}
                     style={styles.itemText}
                   >
-                    {order.bagQuantityPerStall} שקים ·{" "}
-                    {formatCurrency(order.estimatedAmountToPay)} ·{" "}
+                    {order.bagQuantity} שקים ·{" "}
+                    {formatCurrency(order.amountToPay)} ·{" "}
                     {order.deliveryStatus || "-"}
                   </Text>
                 );

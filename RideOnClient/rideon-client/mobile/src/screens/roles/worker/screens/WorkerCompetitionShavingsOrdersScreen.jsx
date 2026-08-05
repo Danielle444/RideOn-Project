@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
@@ -17,6 +17,8 @@ import {
 import { getMobileWorkerCompetitionsBoard } from "../../../../services/competitionService";
 import { getCompetitionStatusLabel } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
 import { supabase } from "../../../../lib/supabaseClient";
+import { bucketWorkerCompetitionOrders } from "../../../../utils/workerHomeShavingsFeed";
+import roleSharedStyles from "../../../../styles/roleSharedStyles";
 
 const DELIVERY_BUCKET = "delivery-photos";
 
@@ -189,6 +191,67 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
 
   const currentUserId = user?.personId;
 
+  const orderBuckets = useMemo(
+    function () {
+      return bucketWorkerCompetitionOrders(orders, new Date());
+    },
+    [orders],
+  );
+
+  function renderOrderCard(order) {
+    const isMyOrder = order.workerSystemUserId === currentUserId;
+    const isTakenByOther =
+      order.workerSystemUserId !== null &&
+      order.workerSystemUserId !== undefined &&
+      !isMyOrder;
+    const isUnclaimed =
+      order.workerSystemUserId === null ||
+      order.workerSystemUserId === undefined;
+
+    return (
+      <WorkerShavingsOrderCard
+        key={order.shavingsOrderId}
+        deliveryStatus={order.deliveryStatus}
+        arrivalTime={order.arrivalTime}
+        requestedDeliveryTime={order.requestedDeliveryTime}
+        workerSystemUserId={order.workerSystemUserId}
+        stallNumber={order.stallNumber}
+        bagQuantity={order.bagQuantity}
+        payerFirstName={order.payerFirstName}
+        payerLastName={order.payerLastName}
+        workerFirstName={order.workerFirstName}
+        workerLastName={order.workerLastName}
+        isMyOrder={isMyOrder}
+        isTakenByOther={isTakenByOther}
+        isUnclaimed={isUnclaimed}
+        uploading={uploadingOrderId === order.shavingsOrderId}
+        claiming={claimingOrderId === order.shavingsOrderId}
+        marking={markingOrderId === order.shavingsOrderId}
+        showNoPhotoFallback={photoFailedOrderId === order.shavingsOrderId}
+        onCapturePhoto={function () {
+          handleCapturePhoto(order);
+        }}
+        onClaim={function () {
+          handleClaimOrder(order);
+        }}
+        onMarkDelivered={function () {
+          handleMarkDelivered(order);
+        }}
+      />
+    );
+  }
+
+  function renderOrderSection(title, sectionOrders) {
+    if (sectionOrders.length === 0) return null;
+
+    return (
+      <View style={{ gap: 12 }}>
+        <Text style={roleSharedStyles.sectionTitle}>{title}</Text>
+        {sectionOrders.map(renderOrderCard)}
+      </View>
+    );
+  }
+
   return (
     <MobileScreenLayout
       title="הזמנות נסורת"
@@ -320,48 +383,9 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
             </Text>
           )}
 
-          {orders.map(function (order) {
-            const isMyOrder = order.workerSystemUserId === currentUserId;
-            const isTakenByOther =
-              order.workerSystemUserId !== null &&
-              order.workerSystemUserId !== undefined &&
-              !isMyOrder;
-            const isUnclaimed =
-              order.workerSystemUserId === null ||
-              order.workerSystemUserId === undefined;
-
-            return (
-              <WorkerShavingsOrderCard
-                key={order.shavingsOrderId}
-                orderTitle={`הזמנה #${order.shavingsOrderId}`}
-                deliveryStatus={order.deliveryStatus}
-                arrivalTime={order.arrivalTime}
-                workerSystemUserId={order.workerSystemUserId}
-                stallNumber={order.stallNumber}
-                bagQuantity={order.bagQuantity}
-                payerFirstName={order.payerFirstName}
-                payerLastName={order.payerLastName}
-                workerFirstName={order.workerFirstName}
-                workerLastName={order.workerLastName}
-                isMyOrder={isMyOrder}
-                isTakenByOther={isTakenByOther}
-                isUnclaimed={isUnclaimed}
-                uploading={uploadingOrderId === order.shavingsOrderId}
-                claiming={claimingOrderId === order.shavingsOrderId}
-                marking={markingOrderId === order.shavingsOrderId}
-                showNoPhotoFallback={photoFailedOrderId === order.shavingsOrderId}
-                onCapturePhoto={function () {
-                  handleCapturePhoto(order);
-                }}
-                onClaim={function () {
-                  handleClaimOrder(order);
-                }}
-                onMarkDelivered={function () {
-                  handleMarkDelivered(order);
-                }}
-              />
-            );
-          })}
+          {renderOrderSection("להיום", orderBuckets.today)}
+          {renderOrderSection("לטיפול — הזמנות קודמות", orderBuckets.older)}
+          {renderOrderSection("בהמשך", orderBuckets.future)}
         </View>
       )}
     </MobileScreenLayout>

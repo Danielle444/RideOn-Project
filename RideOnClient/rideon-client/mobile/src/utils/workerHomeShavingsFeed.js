@@ -90,3 +90,111 @@ export function sortWorkerHomeFeed(orders, currentUserId) {
       return entry.order;
     });
 }
+
+// --- Worker competition shavings-orders screen bucketing (separate from the
+// home-feed sort above: "mine first" semantics are wrong here — see the
+// module comment on sortWorkerHomeFeed. This buckets by requested date only.) --
+
+// "Delivered" here matches the card's own deriveState() exactly: the stored
+// deliveryStatus token, or an arrivalTime already set.
+function isOrderDelivered(order) {
+  return order.deliveryStatus === "Delivered" || !!order.arrivalTime;
+}
+
+// Local (not UTC) Y-M-D as a single comparable integer, e.g. 2026-08-05 ->
+// 20260805. RequestedDeliveryTime is a `timestamp without time zone` and
+// parses as local time in JS - comparing local calendar components (not UTC
+// date-string slicing) avoids a midnight off-by-one for any caller/timezone.
+function toLocalDateKey(value) {
+  var date = new Date(value);
+  return (
+    date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate()
+  );
+}
+
+// Ascending by requested time, stable tiebreak by original array position -
+// same technique as compareWithinGroup, kept separate since this bucketing
+// has different group membership rules than the home-feed sort above.
+function compareByRequestedTimeAscending(a, b) {
+  var aTime = getDeliveryTimeOrNull(a.order);
+  var bTime = getDeliveryTimeOrNull(b.order);
+
+  if (aTime !== bTime) {
+    return aTime - bTime;
+  }
+
+  return a.index - b.index;
+}
+
+/**
+ * Buckets a worker's competition shavings orders into three sections by the
+ * requested delivery date relative to `now`, for the (non-home-feed)
+ * competition orders screen:
+ *
+ *   today  - RequestedDeliveryTime local date === today's local date, sorted
+ *            time-ascending.
+ *   older  - three concatenated groups, in this exact order: (1) past-date,
+ *            not-yet-delivered orders, time-ascending; (2) null/undefined-time
+ *            orders (delivery status irrelevant - there is no date to bucket
+ *            them by); (3) past-date, delivered orders, time-ascending. Locked
+ *            business rule: past delivered orders stay visible here, never
+ *            dropped, and render collapsed by default (see the card).
+ *   future - local date > today, sorted ascending (a single timestamp compare
+ *            already orders by date then time together).
+ *
+ * Pure: returns fresh arrays, never mutates `orders`.
+ * @param {Array<Object>} orders
+ * @param {Date|number|string} now
+ * @returns {{today: Array<Object>, older: Array<Object>, future: Array<Object>}}
+ */
+export function bucketWorkerCompetitionOrders(orders, now) {
+  var safeOrders = Array.isArray(orders) ? orders : [];
+  var todayKey = toLocalDateKey(now);
+
+  var today = [];
+  var pastUndelivered = [];
+  var nullTime = [];
+  var pastDelivered = [];
+  var future = [];
+
+  safeOrders.forEach(function (order, index) {
+    var entry = { order: order, index: index };
+    var time = getDeliveryTimeOrNull(order);
+
+    if (time === null) {
+      nullTime.push(entry);
+      return;
+    }
+
+    var dateKey = toLocalDateKey(time);
+
+    if (dateKey === todayKey) {
+      today.push(entry);
+    } else if (dateKey < todayKey) {
+      if (isOrderDelivered(order)) {
+        pastDelivered.push(entry);
+      } else {
+        pastUndelivered.push(entry);
+      }
+    } else {
+      future.push(entry);
+    }
+  });
+
+  today.sort(compareByRequestedTimeAscending);
+  pastUndelivered.sort(compareByRequestedTimeAscending);
+  pastDelivered.sort(compareByRequestedTimeAscending);
+  future.sort(compareByRequestedTimeAscending);
+
+  function unwrap(entries) {
+    return entries.map(function (entry) {
+      return entry.order;
+    });
+  }
+
+  return {
+    today: unwrap(today),
+    older: unwrap(pastUndelivered).concat(unwrap(nullTime)).concat(unwrap(pastDelivered)),
+    future: unwrap(future),
+  };
+}
