@@ -196,6 +196,53 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPatch("{PaidTimeSlotInCompId}/publish-state")]
+        public IActionResult SetPaidTimeSlotPublishState(int PaidTimeSlotInCompId, [FromBody] SetPaidTimeSlotPublishStateRequest request)
+        {
+            try
+            {
+                if (request == null)
+                    return BadRequest("Invalid request");
+
+                if (PaidTimeSlotInCompId <= 0)
+                    return BadRequest("Invalid request");
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.HostRanchId,
+                    RoleNames.HostSecretary
+                );
+
+                var updatedItem = PaidTimeSlotInCompetition.SetPaidTimeSlotPublishState(
+                    PaidTimeSlotInCompId,
+                    request.HostRanchId,
+                    request.IsPublished
+                );
+
+                if (updatedItem == null)
+                {
+                    return NotFound("Updated paid time slot was not found");
+                }
+
+                return Ok(updatedItem);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in SetPaidTimeSlotPublishState: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון פייד-טיים");
+            }
+        }
+
         [HttpDelete("{PaidTimeSlotInCompId}")]
         public IActionResult DeletePaidTimeSlotInCompetition(
             int PaidTimeSlotInCompId,
