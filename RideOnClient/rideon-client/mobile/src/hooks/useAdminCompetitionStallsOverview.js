@@ -347,7 +347,11 @@ export default function useAdminCompetitionStallsOverview(params) {
 
   var activeRole = params.activeRole;
 
-  var [loading, setLoading] = useState(false);
+  // Start loading=true so the first mount frame shows a spinner, not the empty
+  // "עדיין אין הזמנות תאים" card, which would otherwise flash before loadData's
+  // setLoading(true) runs. The guard in loadData settles this back to false when
+  // there is no valid context to fetch.
+  var [loading, setLoading] = useState(true);
 
   var [screenError, setScreenError] = useState("");
 
@@ -368,6 +372,9 @@ export default function useAdminCompetitionStallsOverview(params) {
   var loadData = useCallback(
     async function () {
       if (!competitionId || !activeRole || !activeRole.ranchId) {
+        // Nothing to fetch: settle the initial loading=true so the screen shows
+        // its empty state rather than a stuck spinner.
+        setLoading(false);
         return;
       }
 

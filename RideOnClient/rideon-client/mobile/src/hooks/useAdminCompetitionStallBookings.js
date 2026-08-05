@@ -434,7 +434,11 @@ export default function useAdminCompetitionStallBookings(params) {
   var [endDate, setendDate] = useState("");
   var [notes, setNotes] = useState("");
   var [mode, setMode] = useState("horse");
-  var [loading, setLoading] = useState(false);
+  // Start loading=true so the first frame after this tab activates shows a
+  // spinner, not the empty "לא נמצאו סוגי תאים לבחירה" branch, which would
+  // otherwise flash before loadData's setLoading(true) runs. The guard in
+  // loadData settles this back to false when there is no valid context to fetch.
+  var [loading, setLoading] = useState(true);
   var [screenError, setScreenError] = useState("");
   var isActiveTab = params.isActiveTab;
 
@@ -466,6 +470,9 @@ export default function useAdminCompetitionStallBookings(params) {
   var loadData = useCallback(
     async function () {
       if (!activeRole || !activeRole.ranchId || !competitionId) {
+        // Nothing to fetch: settle the initial loading=true so the tab shows its
+        // empty state rather than a stuck spinner.
+        setLoading(false);
         return;
       }
 

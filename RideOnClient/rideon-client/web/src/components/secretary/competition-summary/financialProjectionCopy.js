@@ -32,6 +32,11 @@ var FINANCIAL_PROJECTION_COPY = {
     },
   },
 
+  // Shown as the hint on the Actual/Comparison tabs while the competition data is still loading,
+  // instead of the "unavailableHint" locked message -- availability is not yet known during the
+  // fetch, so the tab must not claim it is locked/waiting for registration to close.
+  tabLoadingHint: "טוען נתונים...",
+
   projectionTitle: "תחזית הכנסות",
   // Shown in a highlighted band under the enlarged title, two lines: first the warning (this is
   // an estimate, not actual income), then the methodology (range = one standard deviation, gross
@@ -96,6 +101,10 @@ var FINANCIAL_PROJECTION_COPY = {
       ? "מקצה אחד ללא חיזוי כניסות אינו נכלל בתחזית."
       : count + " מקצים ללא חיזוי כניסות אינם נכללים בתחזית.";
   },
+
+  // Shown while the projection data is still being fetched -- so the panel never shows the
+  // noPredictions empty state (below) before the fetch resolves.
+  loading: "טוען תחזית הכנסות...",
 
   noPredictions:
     "עדיין אין חיזוי כניסות למקצי תחרות זו, ולכן לא ניתן להציג תחזית הכנסות.",

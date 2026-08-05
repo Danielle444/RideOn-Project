@@ -156,11 +156,15 @@ function SummaryPageContent(props) {
         onChangeView={changeActiveView}
         registrationClosed={page.financialRegistrationClosed}
         hasActualData={hasActualData}
+        loading={page.financialLoading}
       />
 
       {effectiveView === TAB_PROJECTION ? (
         <div className="space-y-4">
-          <FinancialProjectionPanel projection={page.financialProjection} />
+          <FinancialProjectionPanel
+            projection={page.financialProjection}
+            loading={page.financialLoading}
+          />
 
           {hasActualData ? (
             <p className="rounded-xl border border-[#EFE3DC] bg-[#FBF7F4] px-4 py-2 text-xs text-[#8D6E63]">

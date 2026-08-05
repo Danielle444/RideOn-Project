@@ -64,7 +64,15 @@ export default function useRegistrationStepStatus(params) {
   var enabled = params.enabled;
 
   var [status, setStatus] = useState(null);
-  var [loading, setLoading] = useState(false);
+  // Start loading=true so the very first render (before the mount effect fires
+  // and setLoading(true) runs) shows the spinner, not the fail-closed
+  // STATUS_UNAVAILABLE notice. computeRegistrationStepAvailability(null) returns
+  // "unavailable" for the not-yet-loaded status, and the notice only distinguishes
+  // loading from unavailable via this flag - so a false initial value flashes a
+  // "cannot verify registration status" lie for one frame. The mount effect always
+  // settles this: shouldFetch path sets it true→false, the !shouldFetch path sets
+  // it false immediately.
+  var [loading, setLoading] = useState(true);
   var [error, setError] = useState(null);
 
   var isMountedRef = useRef(true);

@@ -121,6 +121,11 @@ export default function useCompetitionSummaryPage(options) {
   var [finPredictions, setFinPredictions] = useState([]);
   var [finCompetition, setFinCompetition] = useState(null);
   var [finConfig, setFinConfig] = useState(null);
+  // Loading flag for the financial-projection fetch. Init true because it fetches on mount
+  // alongside the summary; without it the projection panel and tab strip cannot tell "still
+  // loading" from "genuinely no prediction / registration not closed" and show the empty /
+  // "unavailable" copy during the fetch window.
+  var [financialLoading, setFinancialLoading] = useState(true);
 
   var [federationInvoiceImporting, setFederationInvoiceImporting] =
     useState(false);
@@ -282,23 +287,32 @@ export default function useCompetitionSummaryPage(options) {
 
   async function loadFinancialData() {
     if (!competitionId || !ranchId) {
+      // Nothing to fetch: settle the initial loading=true so the panel/tabs show
+      // their terminal state instead of a permanent loading placeholder.
+      setFinancialLoading(false);
       return;
     }
 
-    await Promise.all([
-      loadFinancialResource(function () {
-        return getClassesByCompetitionId(competitionId, ranchId);
-      }, setFinClasses, []),
-      loadFinancialResource(function () {
-        return getPredictionsByCompetitionId(competitionId, ranchId);
-      }, setFinPredictions, []),
-      loadFinancialResource(function () {
-        return getCompetitionById(competitionId, ranchId);
-      }, setFinCompetition, null),
-      loadFinancialResource(function () {
-        return getFinancialConfigForCompetition(competitionId, ranchId);
-      }, setFinConfig, null),
-    ]);
+    setFinancialLoading(true);
+
+    try {
+      await Promise.all([
+        loadFinancialResource(function () {
+          return getClassesByCompetitionId(competitionId, ranchId);
+        }, setFinClasses, []),
+        loadFinancialResource(function () {
+          return getPredictionsByCompetitionId(competitionId, ranchId);
+        }, setFinPredictions, []),
+        loadFinancialResource(function () {
+          return getCompetitionById(competitionId, ranchId);
+        }, setFinCompetition, null),
+        loadFinancialResource(function () {
+          return getFinancialConfigForCompetition(competitionId, ranchId);
+        }, setFinConfig, null),
+      ]);
+    } finally {
+      setFinancialLoading(false);
+    }
   }
 
   async function loadFinancialResource(request, setter, fallback) {
@@ -1318,6 +1332,7 @@ export default function useCompetitionSummaryPage(options) {
     financialProjection: financialProjection,
     financialActual: financialActual,
     financialRegistrationClosed: financialRegistrationClosed,
+    financialLoading: financialLoading,
 
     detailsModal: detailsModal,
     detailsItems: detailsItems,

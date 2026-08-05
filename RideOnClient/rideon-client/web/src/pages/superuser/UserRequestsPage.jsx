@@ -32,7 +32,10 @@ export default function UserRequestsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // Start loading=true so the table shows a spinner on first paint instead of the
+  // "לא נמצאו בקשות להצגה" empty row before the mount fetch runs. loadData sets loading
+  // true→false unconditionally, so this always resolves.
+  const [loading, setLoading] = useState(true);
   const [actionLoadingKey, setActionLoadingKey] = useState("");
   const [pendingCounts, setPendingCounts] = useState({
     admin: 0,
