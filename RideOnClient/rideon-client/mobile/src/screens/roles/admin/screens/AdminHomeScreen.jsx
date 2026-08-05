@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -12,27 +13,31 @@ import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLa
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
+import { useCompetition } from "../../../../context/CompetitionContext";
 import { getAdminMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import homeScreenStyles from "../../../../styles/homeScreenStyles";
 import HomeCompetitionCard from "../../../../components/home/HomeCompetitionCard";
-import HomeShortcutGrid from "../../../../components/home/HomeShortcutGrid";
 import { getMobileAdminHomeCompetitions } from "../../../../services/competitionService";
 import {
-  canAdminSeeCompetitionDetails,
-  canAdminRegisterCompetition,
-  canAdminEnterCompetition,
-} from "../../../../../../shared/auth/utils/competitions/competitionStatus";
+  selectCompetitionsShortlist,
+  DEFAULT_SHORTLIST_CAP,
+  HOME_TEASER_ALLOWED_STATUSES,
+} from "../../../../../../shared/auth/utils/competitions/competitionHomeShortlist";
+import { MOBILE_COMPETITION_STATUS_ORDER } from "../../../../../../shared/auth/utils/competitions/competitionStatusOrder";
+import { buildAdminCompetitionActions } from "../utils/buildAdminCompetitionActions";
 
 export default function AdminHomeScreen(props) {
   var userContext = useUser();
   var activeRoleContext = useActiveRole();
+  var competitionContext = useCompetition();
 
   var user = userContext.user;
   var activeRole = activeRoleContext.activeRole;
 
   var [competitions, setCompetitions] = useState([]);
   var [loading, setLoading] = useState(false);
+  var [refreshing, setRefreshing] = useState(false);
 
   useEffect(
     function () {
@@ -50,13 +55,29 @@ export default function AdminHomeScreen(props) {
       setLoading(true);
 
       var response = await getMobileAdminHomeCompetitions(activeRole.ranchId);
-      setCompetitions(Array.isArray(response.data) ? response.data : []);
+      setCompetitions(
+        selectCompetitionsShortlist(
+          response.data,
+          MOBILE_COMPETITION_STATUS_ORDER,
+          DEFAULT_SHORTLIST_CAP,
+          HOME_TEASER_ALLOWED_STATUSES,
+        ),
+      );
     } catch (error) {
       console.error(error);
       setCompetitions([]);
       Alert.alert("שגיאה", "אירעה שגיאה בטעינת דף הבית");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleRefresh() {
+    try {
+      setRefreshing(true);
+      await loadHomeCompetitions();
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -71,74 +92,12 @@ export default function AdminHomeScreen(props) {
   }
 
   function buildCompetitionActions(item) {
-    return [
-      {
-        key: "details",
-        label: "פרטי תחרות",
-        onPress: function () {
-          Alert.alert("בהמשך", "מסך פרטי תחרות יחובר בהמשך");
-        },
-        disabled: !canAdminSeeCompetitionDetails(item.competitionStatus),
-        variant: "secondary",
-      },
-      {
-        key: "registration",
-        label: "הרשמה",
-        onPress: function () {
-          Alert.alert("בהמשך", "מסך הכנסת הרשמות יחובר בהמשך");
-        },
-        disabled: !canAdminRegisterCompetition(item.competitionStatus),
-        variant: "secondary",
-      },
-      {
-        key: "enter",
-        label: "כניסה",
-        onPress: function () {
-          Alert.alert("בהמשך", "כניסה לתחרות תחובר בהמשך");
-        },
-        disabled: !canAdminEnterCompetition(item.competitionStatus),
-        variant: "primary",
-      },
-    ];
+    return buildAdminCompetitionActions(item, {
+      navigation: props.navigation,
+      competitionContext: competitionContext,
+      activeRole: activeRole,
+    });
   }
-
-  var shortcutItems = useMemo(
-    function () {
-      return [
-        {
-          key: "board",
-          label: "לוח התחרויות",
-          icon: "trophy-outline",
-          onPress: function () {
-            props.navigation.navigate("AdminCompetitionsBoard");
-          },
-        },
-        {
-          key: "profile",
-          label: "פרופיל",
-          icon: "person-outline",
-          onPress: function () {
-            props.navigation.navigate("AdminProfile");
-          },
-        },
-        {
-          key: "switch-role",
-          label: "החלפת פרופיל",
-          icon: "sync-outline",
-          onPress: function () {
-            props.navigation.replace("SelectActiveRole");
-          },
-        },
-        {
-          key: "refresh",
-          label: "רענון נתונים",
-          icon: "refresh-outline",
-          onPress: loadHomeCompetitions,
-        },
-      ];
-    },
-    [props.navigation, activeRole],
-  );
 
   var userName = (
     (user && ((user.firstName || "") + " " + (user.lastName || "")).trim()) ||
@@ -172,6 +131,14 @@ export default function AdminHomeScreen(props) {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={homeScreenStyles.pageContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={["#8B6352"]}
+            tintColor="#8B6352"
+          />
+        }
       >
         <View style={homeScreenStyles.welcomeCard}>
           <Text style={homeScreenStyles.welcomeTitle}>
@@ -228,11 +195,6 @@ export default function AdminHomeScreen(props) {
               );
             })
           )}
-        </View>
-
-        <View style={homeScreenStyles.sectionCard}>
-          <Text style={homeScreenStyles.sectionTitle}>קיצורים</Text>
-          <HomeShortcutGrid items={shortcutItems} />
         </View>
       </ScrollView>
     </MobileScreenLayout>

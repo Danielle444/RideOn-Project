@@ -438,7 +438,7 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin
                 );
 
-                List<Competition> list = Competition.GetCompetitionsForMobileAdminHome(personId);
+                List<Competition> list = Competition.GetCompetitionsForMobileAdminHome(ranchId);
                 return Ok(list);
             }
             catch (UnauthorizedAccessException ex)

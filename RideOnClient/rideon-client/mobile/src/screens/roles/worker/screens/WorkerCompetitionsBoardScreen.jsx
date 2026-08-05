@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Text, View } from "react-native";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
+import CompetitionsFilterBar from "../../../../components/competitions/CompetitionsFilterBar";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import competitionBoardStyles from "../../../../styles/competitionBoardStyles";
 import { getWorkerBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
@@ -16,7 +17,13 @@ import CompetitionBoardCard from "../../../../components/competitions/Competitio
 import { formatCompetitionDateRange } from "../../../../../../shared/auth/utils/competitions/competitionFormatters";
 import { canWorkerEnterCompetition } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
 import { sortCompetitionsByStatusAndDate } from "../../../../../../shared/auth/utils/competitions/competitionSorting";
-import { MOBILE_COMPETITION_STATUS_ORDER } from "../../../../config/competitionStatusOrder";
+import { MOBILE_COMPETITION_STATUS_ORDER } from "../../../../../../shared/auth/utils/competitions/competitionStatusOrder";
+import {
+  buildHostRanchOptions,
+  buildFieldOptions,
+  buildStatusOptions,
+  filterCompetitionsForBoard,
+} from "../../../../utils/competitionsBoardFilters";
 
 export default function WorkerCompetitionsBoardScreen(props) {
   var userContext = useUser();
@@ -30,6 +37,13 @@ export default function WorkerCompetitionsBoardScreen(props) {
   var [selectedCompetition, setSelectedCompetition] = useState(null);
   var [competitions, setCompetitions] = useState([]);
   var [loading, setLoading] = useState(false);
+
+  var [searchText, setSearchText] = useState("");
+  var [hostRanchFilter, setHostRanchFilter] = useState("");
+  var [fieldFilter, setFieldFilter] = useState("");
+  var [statusFilter, setStatusFilter] = useState("");
+  var [dateFrom, setDateFrom] = useState("");
+  var [dateTo, setDateTo] = useState("");
 
   useEffect(
     function () {
@@ -125,6 +139,50 @@ export default function WorkerCompetitionsBoardScreen(props) {
     ];
   }
 
+  function handleResetFilters() {
+    setSearchText("");
+    setHostRanchFilter("");
+    setFieldFilter("");
+    setStatusFilter("");
+    setDateFrom("");
+    setDateTo("");
+  }
+
+  var hostRanchOptions = useMemo(
+    function () {
+      return buildHostRanchOptions(competitions);
+    },
+    [competitions],
+  );
+
+  var fieldOptions = useMemo(
+    function () {
+      return buildFieldOptions(competitions);
+    },
+    [competitions],
+  );
+
+  var statusOptions = useMemo(
+    function () {
+      return buildStatusOptions(competitions, MOBILE_COMPETITION_STATUS_ORDER);
+    },
+    [competitions],
+  );
+
+  var filteredCompetitions = useMemo(
+    function () {
+      return filterCompetitionsForBoard(competitions, {
+        searchText: searchText,
+        hostRanchFilter: hostRanchFilter,
+        fieldFilter: fieldFilter,
+        statusFilter: statusFilter,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+      });
+    },
+    [competitions, searchText, hostRanchFilter, fieldFilter, statusFilter, dateFrom, dateTo],
+  );
+
   function renderCompetitionCard(info) {
     var item = info.item;
 
@@ -148,7 +206,7 @@ export default function WorkerCompetitionsBoardScreen(props) {
     <MobileScreenLayout
       title="לוח התחרויות"
       subtitle=""
-      activeBottomTab="home"
+      activeBottomTab="board"
       bottomNavItems={getWorkerBottomNavConfig(props.navigation)}
       menuContent={function ({ closeMenu }) {
         if (menuMode === "competition" && selectedCompetition) {
@@ -196,18 +254,37 @@ export default function WorkerCompetitionsBoardScreen(props) {
     >
       <Text style={roleSharedStyles.sectionTitle}>תחרויות החווה</Text>
 
+      <CompetitionsFilterBar
+        searchText={searchText}
+        onSearchTextChange={setSearchText}
+        hostRanchOptions={hostRanchOptions}
+        hostRanchFilter={hostRanchFilter}
+        onHostRanchFilterChange={setHostRanchFilter}
+        fieldOptions={fieldOptions}
+        fieldFilter={fieldFilter}
+        onFieldFilterChange={setFieldFilter}
+        statusOptions={statusOptions}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        dateFrom={dateFrom}
+        onDateFromChange={setDateFrom}
+        dateTo={dateTo}
+        onDateToChange={setDateTo}
+        onReset={handleResetFilters}
+      />
+
       {loading ? (
         <View style={competitionBoardStyles.loadingWrapper}>
           <ActivityIndicator size="large" color="#8B6352" />
         </View>
       ) : (
         <View style={competitionBoardStyles.listContent}>
-          {competitions.length === 0 ? (
+          {filteredCompetitions.length === 0 ? (
             <Text style={competitionBoardStyles.emptyText}>
-              לא נמצאו תחרויות להצגה
+              לא נמצאו תחרויות התואמות את הסינון
             </Text>
           ) : (
-            competitions.map(function (item) {
+            filteredCompetitions.map(function (item) {
               return (
                 <View key={String(item.competitionId)}>
                   {renderCompetitionCard({ item: item })}

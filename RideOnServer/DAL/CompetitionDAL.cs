@@ -246,11 +246,11 @@ namespace RideOnServer.DAL
             }
         }
 
-        public List<Competition> GetCompetitionsForMobileAdminHome(int systemUserId)
+        public List<Competition> GetCompetitionsForMobileAdminHome(int ranchId)
         {
             Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
-                { "@SystemUserId", systemUserId }
+                { "@RanchId", ranchId }
             };
 
             try
@@ -259,7 +259,7 @@ namespace RideOnServer.DAL
                 {
                     connection.Open();
 
-                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetMobileAdminHomeCompetitions", connection, paramDic))
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetMobileAdminHomeCompetitionsForRanch", connection, paramDic))
                     using (NpgsqlDataReader reader = command.ExecuteReader())
                     {
                         List<Competition> list = new List<Competition>();
