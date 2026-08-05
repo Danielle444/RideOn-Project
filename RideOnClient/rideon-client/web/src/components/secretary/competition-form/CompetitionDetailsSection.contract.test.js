@@ -18,6 +18,20 @@ const SECTION_PATH = new URL(
 // this checkout's CRLF line endings (confirmed present in this file).
 const sectionSource = readFileSync(SECTION_PATH, "utf8").replace(/\r\n/g, "\n");
 
+describe("CompetitionDetailsSection — CAP-10 date fields use the shared DatePicker", () => {
+  it("imports the shared DatePicker rather than a native date input", () => {
+    expect(sectionSource).toContain(
+      'import DatePicker from "../../common/DatePicker";',
+    );
+    expect(sectionSource).not.toContain('type="date"');
+  });
+
+  it("uses DatePicker for all six date fields in this section", () => {
+    const occurrences = (sectionSource.match(/<DatePicker/g) || []).length;
+    expect(occurrences).toBe(6);
+  });
+});
+
 describe("CompetitionDetailsSection — start date is directly editable", () => {
   it("derives isExistingCompetition from competitionId alone, not status or any other signal", () => {
     expect(sectionSource).toContain(
@@ -25,7 +39,7 @@ describe("CompetitionDetailsSection — start date is directly editable", () => 
     );
   });
 
-  it("the start-date input is never disabled — no disabled attribute on it at all", () => {
+  it("the start-date field is never disabled — no disabled attribute on it at all", () => {
     const startDateBlockAt = sectionSource.indexOf("תאריך התחלה");
     const endDateBlockAt = sectionSource.indexOf("תאריך סיום");
 
@@ -34,7 +48,11 @@ describe("CompetitionDetailsSection — start date is directly editable", () => 
 
     const startDateBlock = sectionSource.slice(startDateBlockAt, endDateBlockAt);
 
-    expect(startDateBlock).toContain('type="date"');
+    // CAP-10: native type="date" was replaced by the shared DatePicker
+    // (component contract covered in DatePicker.contract.test.js). The
+    // CAP-6 behavior this test protects -- start date always editable --
+    // still holds: no disabled prop reaches this DatePicker instance.
+    expect(startDateBlock).toContain("<DatePicker");
     expect(startDateBlock).toContain(
       'value={props.detailsForm.competitionStartDate}',
     );

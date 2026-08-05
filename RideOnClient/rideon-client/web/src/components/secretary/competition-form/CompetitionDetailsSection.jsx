@@ -3,6 +3,7 @@ import SectionCard from "./SectionCard";
 import StatusBadge from "./StatusBadge";
 import CustomDropdown from "../../common/CustomDropdown";
 import MultiSelectPicker from "../../common/MultiSelectPicker";
+import DatePicker from "../../common/DatePicker";
 import JudgeModal from "../../common/JudgeModal";
 import useJudgeCreation from "../../../hooks/common/useJudgeCreation";
 import { getWholeDayOffsetDays } from "../../../utils/competitionForm.utils";
@@ -171,8 +172,7 @@ export default function CompetitionDetailsSection(props) {
                 תאריך התחלה
                 <span className="text-red-500 mr-0.5">*</span>
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={props.detailsForm.competitionStartDate}
                 onChange={function (e) {
                   props.onChange("competitionStartDate", e.target.value);
@@ -191,8 +191,7 @@ export default function CompetitionDetailsSection(props) {
                 תאריך סיום
                 <span className="text-red-500 mr-0.5">*</span>
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={isExistingCompetition ? displayedEndDate : props.detailsForm.competitionEndDate}
                 disabled={isExistingCompetition}
                 onChange={function (e) {
@@ -211,8 +210,7 @@ export default function CompetitionDetailsSection(props) {
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 פתיחת הרשמה
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={props.detailsForm.registrationOpenDate}
                 onChange={function (e) {
                   props.onChange("registrationOpenDate", e.target.value);
@@ -225,8 +223,7 @@ export default function CompetitionDetailsSection(props) {
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 סגירת הרשמה
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={props.detailsForm.registrationEndDate}
                 min={registrationOpenDate || undefined}
                 max={competitionStartDate || undefined}
@@ -247,8 +244,7 @@ export default function CompetitionDetailsSection(props) {
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 פתיחת הרשמת פייד־טיים
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={props.detailsForm.paidTimeRegistrationDate}
                 onChange={function (e) {
                   props.onChange("paidTimeRegistrationDate", e.target.value);
@@ -261,8 +257,7 @@ export default function CompetitionDetailsSection(props) {
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 פרסום לו״ז פייד־טיים
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={props.detailsForm.paidTimePublicationDate}
                 onChange={function (e) {
                   props.onChange("paidTimePublicationDate", e.target.value);

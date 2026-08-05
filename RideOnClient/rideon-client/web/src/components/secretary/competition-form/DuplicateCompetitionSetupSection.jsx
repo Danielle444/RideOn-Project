@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import SectionCard from "./SectionCard";
 import CustomDropdown from "../../common/CustomDropdown";
 import MultiSelectPicker from "../../common/MultiSelectPicker";
+import DatePicker from "../../common/DatePicker";
 import JudgeModal from "../../common/JudgeModal";
 import useJudgeCreation from "../../../hooks/common/useJudgeCreation";
 import { getAllJudges } from "../../../services/superUserService";
@@ -1099,8 +1100,7 @@ export default function DuplicateCompetitionSetupSection(props) {
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 תאריך התחלה
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={formData.newCompetitionStartDate}
                 onChange={function (e) {
                   handleNewStartDateChange(e.target.value);
@@ -1113,8 +1113,7 @@ export default function DuplicateCompetitionSetupSection(props) {
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 תאריך סיום
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={formData.newCompetitionEndDate}
                 onChange={function (e) {
                   handleChange("newCompetitionEndDate", e.target.value);
@@ -1134,8 +1133,7 @@ export default function DuplicateCompetitionSetupSection(props) {
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 פתיחת הרשמה
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={formData.registrationOpenDate}
                 onChange={function (e) {
                   handleChange("registrationOpenDate", e.target.value);
@@ -1148,8 +1146,7 @@ export default function DuplicateCompetitionSetupSection(props) {
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 סגירת הרשמה
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={formData.registrationEndDate}
                 onChange={function (e) {
                   handleChange("registrationEndDate", e.target.value);
@@ -1162,8 +1159,7 @@ export default function DuplicateCompetitionSetupSection(props) {
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 פתיחת הרשמת פייד־טיים
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={formData.paidTimeRegistrationDate}
                 onChange={function (e) {
                   handleChange("paidTimeRegistrationDate", e.target.value);
@@ -1176,8 +1172,7 @@ export default function DuplicateCompetitionSetupSection(props) {
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 פרסום לו״ז פייד־טיים
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={formData.paidTimePublicationDate}
                 onChange={function (e) {
                   handleChange("paidTimePublicationDate", e.target.value);
