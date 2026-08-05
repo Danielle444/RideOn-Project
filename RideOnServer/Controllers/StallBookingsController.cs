@@ -584,6 +584,52 @@ namespace RideOnServer.Controllers
             }
         }
 
+        // Admin-payer direct-changes feature: RanchAdmin direct stall
+        // booking edit, the stall sibling of EntriesController.AdminEditEntry.
+        // Deliberately a NEW, separate endpoint -- the existing
+        // POST /change-request (payer-style pending change request) is left
+        // completely unchanged, so the mobile edit modal's old behavior
+        // stays available to any client that still calls it.
+        [HttpPost("admin-edit")]
+        public IActionResult AdminEditStallBooking([FromBody] AdminEditStallBookingRequest request)
+        {
+            try
+            {
+                if (request == null || request.StallBookingId <= 0 || request.RanchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.RanchAdmin
+                );
+
+                StallBooking.AdminEditStallBooking(request, personId);
+
+                return Ok(new { Message = "Stall booking updated" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_admineditstallbooking, including the assigned-booking
+                // product-change rejection.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in AdminEditStallBooking: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון הזמנת התא");
+            }
+        }
+
         [HttpPost("secretary/create-for-payer")]
         public IActionResult SecretaryCreateStallBookingForPayer(
             [FromBody] SecretaryCreateStallBookingRequest request)
