@@ -32,6 +32,45 @@ namespace RideOnServer.BL
             return dal.AdminCreateEntry(request, personId);
         }
 
+        // Stage C: thin wrapper, same shape as AdminCreateEntry above. All
+        // three-way routing (DirectUpdated / DirectReplaced /
+        // PendingReplaceApproval) is decided entirely inside
+        // usp_admineditentry, from the entry's actual current class and live
+        // registration state -- never here or in the controller. personId is
+        // a separate parameter, never a field on the request DTO -- see
+        // AdminEditEntryRequest's header comment.
+        public static AdminEditEntryResult AdminEditEntry(AdminEditEntryRequest request, int personId)
+        {
+            EntryDAL dal = new EntryDAL();
+            return dal.AdminEditEntry(request, personId);
+        }
+
+        // Stage C: direct RanchAdmin cancellation, regardless of
+        // registration-ended state. usp_admincancelentry composes the
+        // already-proven usp_insertchangeentryrequestsecured +
+        // usp_answerchangeentryrequestsecured procs internally -- no fine,
+        // refund or Federation-release logic is decided here.
+        public static AdminCancelEntryResult AdminCancelEntry(int entryId, int personId, int competitionId, int ranchId)
+        {
+            if (entryId <= 0)
+            {
+                throw new Exception("Invalid EntryId");
+            }
+
+            if (competitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            if (ranchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            EntryDAL dal = new EntryDAL();
+            return dal.AdminCancelEntry(entryId, personId, competitionId, ranchId);
+        }
+
         public static List<PaidTimeCandidateItem> GetPaidTimeCandidatesByRanch(int competitionId, int ranchId)
         {
             if (competitionId <= 0)
