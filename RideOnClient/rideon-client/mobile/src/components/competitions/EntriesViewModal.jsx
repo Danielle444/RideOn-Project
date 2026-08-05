@@ -36,6 +36,28 @@ function fmtDayBandHeading(value) {
   return fmtDate(value).replace(", ", " • ");
 }
 
+// Shared by the day band and the class header: mine/total over rows that
+// are not cancelled-after-start. Reuses isCancelledAfterStartRow rather than
+// re-implementing the exclusion so the count and the draw gate never drift.
+function countRanchStats(rows, ranchId) {
+  var mine = 0;
+  var total = 0;
+
+  rows.forEach(function (it) {
+    if (isCancelledAfterStartRow(it)) {
+      return;
+    }
+
+    total += 1;
+
+    if (Number(it.horseRanchId) === Number(ranchId)) {
+      mine += 1;
+    }
+  });
+
+  return { mine: mine, total: total };
+}
+
 // Modal צפייה בסדר כניסות. read-only.
 // אם focusClassInCompId מסופק - מציג רק את המקצה ההוא.
 // אחרת מציג את כל המקצים, מקובצים ומסודרים לפי תאריך/שעה/drawOrder, ומקובצים
@@ -45,11 +67,21 @@ export default function EntriesViewModal(props) {
   var isOpen = !!props.isOpen;
   var competitionId = props.competitionId;
   var ranchId = props.ranchId;
+  var ranchName = props.ranchName || "";
   var focusClassInCompId = props.focusClassInCompId || null;
+  var isFocused = !!focusClassInCompId;
 
   var [loading, setLoading] = useState(false);
   var [error, setError] = useState(null);
   var [items, setItems] = useState([]);
+
+  // Collapse state is presentation-only and keyed by id so it never touches
+  // sort/group order. Both sets start empty on every open: an empty
+  // expanded-days set reads as "every day collapsed", an empty
+  // collapsed-classes set reads as "every class expanded" - the required
+  // default.
+  var [expandedDayKeys, setExpandedDayKeys] = useState(new Set());
+  var [collapsedClassIds, setCollapsedClassIds] = useState(new Set());
 
   useEffect(
     function () {
@@ -59,6 +91,8 @@ export default function EntriesViewModal(props) {
       setLoading(true);
       setError(null);
       setItems([]);
+      setExpandedDayKeys(new Set());
+      setCollapsedClassIds(new Set());
 
       async function load() {
         try {
@@ -84,6 +118,30 @@ export default function EntriesViewModal(props) {
     },
     [isOpen, competitionId, ranchId],
   );
+
+  function toggleDay(dayKey) {
+    setExpandedDayKeys(function (prev) {
+      var next = new Set(prev);
+      if (next.has(dayKey)) {
+        next.delete(dayKey);
+      } else {
+        next.add(dayKey);
+      }
+      return next;
+    });
+  }
+
+  function toggleClass(classInCompId) {
+    setCollapsedClassIds(function (prev) {
+      var next = new Set(prev);
+      if (next.has(classInCompId)) {
+        next.delete(classInCompId);
+      } else {
+        next.add(classInCompId);
+      }
+      return next;
+    });
+  }
 
   var groups = useMemo(
     function () {
@@ -224,41 +282,103 @@ export default function EntriesViewModal(props) {
           ) : (
             <ScrollView style={{ maxHeight: 540 }}>
               {dayGroups.map(function (day, dayIndex) {
+                var isDayExpanded = isFocused || expandedDayKeys.has(day.dayKey);
+
+                var dayRows = day.classes.reduce(function (acc, g) {
+                  return acc.concat(g.items);
+                }, []);
+                var dayStats = countRanchStats(dayRows, ranchId);
+
                 return (
                   <View
                     key={"day-" + day.dayKey}
                     style={{ marginTop: dayIndex === 0 ? 0 : 14 }}
                   >
-                    <View
-                      style={{
-                        backgroundColor: "#7B5A4D",
-                        borderRadius: 8,
-                        paddingVertical: 6,
-                        paddingHorizontal: 10,
-                        marginBottom: 8,
-                      }}
-                    >
-                      <Text
+                    {isFocused ? (
+                      <View
                         style={{
-                          fontSize: 13,
-                          fontWeight: "800",
-                          color: "#FFFFFF",
-                          textAlign: "right",
+                          backgroundColor: "#7B5A4D",
+                          borderRadius: 8,
+                          paddingVertical: 6,
+                          paddingHorizontal: 10,
+                          marginBottom: 8,
                         }}
                       >
-                        {fmtDayBandHeading(day.classDate)}
-                      </Text>
-                    </View>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: "800",
+                            color: "#FFFFFF",
+                            textAlign: "right",
+                          }}
+                        >
+                          {fmtDayBandHeading(day.classDate)}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Pressable
+                        onPress={function () {
+                          toggleDay(day.dayKey);
+                        }}
+                        style={{
+                          flexDirection: "row-reverse",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          backgroundColor: "#7B5A4D",
+                          borderRadius: 8,
+                          paddingVertical: 6,
+                          paddingHorizontal: 10,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <View
+                          style={{
+                            flexDirection: "row-reverse",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, color: "#FFFFFF" }}>
+                            {isDayExpanded ? "▾" : "▸"}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              fontWeight: "800",
+                              color: "#FFFFFF",
+                              textAlign: "right",
+                            }}
+                          >
+                            {fmtDayBandHeading(day.classDate)}
+                          </Text>
+                        </View>
 
-                    {day.classes.map(function (g) {
-                      return (
-                        <ClassGroup
-                          key={"class-" + g.classInCompId}
-                          group={g}
-                          ranchId={ranchId}
-                        />
-                      );
-                    })}
+                        <Text style={{ fontSize: 12, color: "#FFFFFF" }}>
+                          {ranchName ? ranchName + " " : ""}
+                          <Text style={{ fontWeight: "700" }}>
+                            {dayStats.mine + "/" + dayStats.total}
+                          </Text>
+                        </Text>
+                      </Pressable>
+                    )}
+
+                    {isDayExpanded
+                      ? day.classes.map(function (g) {
+                          return (
+                            <ClassGroup
+                              key={"class-" + g.classInCompId}
+                              group={g}
+                              ranchId={ranchId}
+                              ranchName={ranchName}
+                              isFocused={isFocused}
+                              isCollapsed={collapsedClassIds.has(
+                                g.classInCompId,
+                              )}
+                              onToggle={toggleClass}
+                            />
+                          );
+                        })
+                      : null}
                   </View>
                 );
               })}
@@ -286,11 +406,59 @@ export default function EntriesViewModal(props) {
 function ClassGroup(props) {
   var g = props.group;
   var ranchId = props.ranchId;
+  var ranchName = props.ranchName;
+  var isFocused = props.isFocused;
+  var isCollapsed = props.isCollapsed;
+  var onToggle = props.onToggle;
 
   // CAP-2: computed once per class, not per row - the "not drawn" note
-  // renders once for the whole class, and every row's draw badge depends on
+  // renders once for the whole class, and every row's draw number depends on
   // the same isDrawn verdict.
   var drawState = computeClassDrawState(g.items);
+  var classStats = countRanchStats(g.items, ranchId);
+
+  // Focused single-class view keeps today's always-expanded rendering with
+  // no collapse chrome; everywhere else the class body follows the chevron.
+  var showBody = isFocused || !isCollapsed;
+
+  var headerMarginBottom = showBody && g.items.length > 0 && !drawState.isDrawn ? 2 : 8;
+
+  var headerRow = (
+    <View
+      style={{
+        flexDirection: "row-reverse",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}
+    >
+      <View
+        style={{ flexDirection: "row-reverse", alignItems: "center", gap: 6 }}
+      >
+        {isFocused ? null : (
+          <Text style={{ fontSize: 12, color: "#3F312B" }}>
+            {isCollapsed ? "▸" : "▾"}
+          </Text>
+        )}
+        <Text
+          style={{
+            fontSize: 15,
+            fontWeight: "700",
+            color: "#3F312B",
+            textAlign: "right",
+          }}
+        >
+          {g.className || "מקצה"}
+        </Text>
+      </View>
+
+      <Text style={{ fontSize: 12, color: "#8D6E63" }}>
+        {ranchName ? ranchName + " " : ""}
+        <Text style={{ fontWeight: "700", color: "#3F312B" }}>
+          {classStats.mine + "/" + classStats.total}
+        </Text>
+      </Text>
+    </View>
+  );
 
   return (
     <View
@@ -303,19 +471,20 @@ function ClassGroup(props) {
         padding: 10,
       }}
     >
-      <Text
-        style={{
-          fontSize: 15,
-          fontWeight: "700",
-          color: "#3F312B",
-          textAlign: "right",
-          marginBottom: g.items.length > 0 && !drawState.isDrawn ? 2 : 8,
-        }}
-      >
-        {g.className || "מקצה"}
-      </Text>
+      {isFocused ? (
+        <View style={{ marginBottom: headerMarginBottom }}>{headerRow}</View>
+      ) : (
+        <Pressable
+          onPress={function () {
+            onToggle(g.classInCompId);
+          }}
+          style={{ marginBottom: headerMarginBottom }}
+        >
+          {headerRow}
+        </Pressable>
+      )}
 
-      {g.items.length > 0 && !drawState.isDrawn ? (
+      {showBody && g.items.length > 0 && !drawState.isDrawn ? (
         <Text
           style={{
             fontSize: 11,
@@ -329,7 +498,7 @@ function ClassGroup(props) {
         </Text>
       ) : null}
 
-      {g.items.length === 0 ? (
+      {!showBody ? null : g.items.length === 0 ? (
         <Text style={{ color: "#8D6E63", fontSize: 12, textAlign: "right" }}>
           אין הרשמות במקצה זה
         </Text>
@@ -357,13 +526,22 @@ function EntryRow(props) {
   var isMine = Number(it.horseRanchId) === Number(ranchId);
   var isCancelledAfterStart = isCancelledAfterStartRow(it);
 
-  // CAP-1: horse / רוכב/ת / optional מאמן/ת all share this one style, so
-  // they render at equal bold weight on the primary row.
-  var primaryTextStyle = {
+  // CAP-4: horse name is the primary line; רוכב/ת and מאמן/ת render lighter
+  // and muted on their own line beneath it, so the row reads horse-first
+  // instead of a uniform bold wall.
+  var horseTextStyle = {
     fontSize: 14,
     fontWeight: "700",
     textAlign: "right",
     color: isCancelledAfterStart ? "#8A7A6E" : "#3F312B",
+    textDecorationLine: isCancelledAfterStart ? "line-through" : "none",
+  };
+
+  var secondaryTextStyle = {
+    fontSize: 13,
+    fontWeight: "400",
+    textAlign: "right",
+    color: isCancelledAfterStart ? "#8A7A6E" : "#8D6E63",
     textDecorationLine: isCancelledAfterStart ? "line-through" : "none",
   };
 
@@ -378,29 +556,23 @@ function EntryRow(props) {
           borderTopWidth: 1,
           borderTopColor: "#F3EAE4",
         },
-        // CAP-3: own-ranch rows stay full-strength; other-ranch rows are
-        // visibly muted (opacity only - no hiding, no replacement label).
+        // own-ranch rows stay full-strength; other-ranch rows are visibly
+        // muted (opacity only - no hiding, no replacement label).
         !isMine ? { opacity: 0.55 } : null,
       ]}
     >
       {isDrawn ? (
-        <View
+        <Text
           style={{
-            minWidth: 26,
-            height: 22,
-            paddingHorizontal: 6,
-            borderRadius: 11,
-            borderWidth: 1,
-            borderColor: "#D9CFC2",
-            backgroundColor: "#FFFFFF",
-            alignItems: "center",
-            justifyContent: "center",
+            fontSize: 23,
+            fontWeight: "800",
+            color: "#7B5A4D",
+            minWidth: 30,
+            textAlign: "center",
           }}
         >
-          <Text style={{ fontSize: 12, fontWeight: "700", color: "#7B5A4D" }}>
-            {it.drawOrder}
-          </Text>
-        </View>
+          {it.drawOrder != null ? it.drawOrder : ""}
+        </Text>
       ) : null}
 
       <View style={{ flex: 1 }}>
@@ -412,16 +584,10 @@ function EntryRow(props) {
             flexWrap: "wrap",
           }}
         >
-          <Text style={primaryTextStyle}>
+          <Text style={horseTextStyle}>
             {it.horseName}
             {it.barnName ? " (" + it.barnName + ")" : ""}
           </Text>
-
-          <Text style={primaryTextStyle}>• רוכב/ת: {it.riderName}</Text>
-
-          {it.coachName ? (
-            <Text style={primaryTextStyle}>• מאמן/ת: {it.coachName}</Text>
-          ) : null}
 
           {isCancelledAfterStart ? (
             <View
@@ -440,6 +606,22 @@ function EntryRow(props) {
                 בוטל
               </Text>
             </View>
+          ) : null}
+        </View>
+
+        <View
+          style={{
+            flexDirection: "row-reverse",
+            alignItems: "center",
+            gap: 6,
+            flexWrap: "wrap",
+            marginTop: 2,
+          }}
+        >
+          <Text style={secondaryTextStyle}>• רוכב/ת: {it.riderName}</Text>
+
+          {it.coachName ? (
+            <Text style={secondaryTextStyle}>• מאמן/ת: {it.coachName}</Text>
           ) : null}
         </View>
       </View>

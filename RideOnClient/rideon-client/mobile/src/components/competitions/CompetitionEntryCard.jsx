@@ -243,7 +243,7 @@ export default function CompetitionEntryCard(props) {
                 justifyContent: "space-between",
               }}
             >
-              <Text style={styles.detailText}>חלק החווה</Text>
+              <Text style={styles.detailText}>עלות מארגן</Text>
               <Text style={styles.detailText}>
                 ₪{Number(item.organizerCost || 0)}
               </Text>
@@ -255,7 +255,7 @@ export default function CompetitionEntryCard(props) {
                 justifyContent: "space-between",
               }}
             >
-              <Text style={styles.detailText}>חלק ההתאחדות</Text>
+              <Text style={styles.detailText}>עלות התאחדות</Text>
               <Text style={styles.detailText}>
                 ₪{Number(item.federationCost || 0)}
               </Text>

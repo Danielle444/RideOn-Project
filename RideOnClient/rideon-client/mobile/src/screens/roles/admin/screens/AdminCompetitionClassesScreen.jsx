@@ -41,6 +41,10 @@ import RegistrationStepNotice from "../../../../components/competitions/Registra
 import { createChangeEntryRequest } from "../../../../services/entriesService";
 import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
 
+// Duplicate-from-previous-competition is hidden (off-design modal, escape-trap).
+// Flip to true to restore. Modal + utils remain in the repo.
+const DUPLICATE_ENTRIES_ENABLED = false;
+
 export default function AdminCompetitionClassesScreen(props) {
   var activeRoleContext = useActiveRole();
 
@@ -492,19 +496,21 @@ export default function AdminCompetitionClassesScreen(props) {
           }}
         />
 
-        <Button
-          variant="outline"
-          label="שכפל הרשמות מתחרות קודמת"
-          disabled={!availability.classes.isEnabled}
-          onPress={function () {
-            if (!availability.classes.isEnabled) {
-              return;
-            }
+        {DUPLICATE_ENTRIES_ENABLED ? (
+          <Button
+            variant="outline"
+            label="שכפל הרשמות מתחרות קודמת"
+            disabled={!availability.classes.isEnabled}
+            onPress={function () {
+              if (!availability.classes.isEnabled) {
+                return;
+              }
 
-            setDuplicateModalOpen(true);
-          }}
-          style={{ marginTop: 10, marginBottom: 12 }}
-        />
+              setDuplicateModalOpen(true);
+            }}
+            style={{ marginTop: 10, marginBottom: 12 }}
+          />
+        ) : null}
 
         <Button
           variant="outline"
@@ -528,19 +534,22 @@ export default function AdminCompetitionClassesScreen(props) {
           isOpen={entriesViewOpen}
           competitionId={activeCompetition?.competitionId}
           ranchId={activeRole?.ranchId}
+          ranchName={activeRole?.ranchName}
           focusClassInCompId={entriesViewFocusClass}
           onClose={handleCloseEntriesView}
         />
 
-        <DuplicateEntriesModal
-          isOpen={duplicateModalOpen && availability.classes.isEnabled}
-          activeCompetitionId={activeCompetition?.competitionId}
-          ranchId={activeRole?.ranchId}
-          onClose={function () {
-            setDuplicateModalOpen(false);
-          }}
-          onDuplicated={handleMutationSuccess}
-        />
+        {DUPLICATE_ENTRIES_ENABLED ? (
+          <DuplicateEntriesModal
+            isOpen={duplicateModalOpen && availability.classes.isEnabled}
+            activeCompetitionId={activeCompetition?.competitionId}
+            ranchId={activeRole?.ranchId}
+            onClose={function () {
+              setDuplicateModalOpen(false);
+            }}
+            onDuplicated={handleMutationSuccess}
+          />
+        ) : null}
 
         <Text style={styles.resultsText}>
           מוצגות {entries.filteredItems.length} מתוך {entries.items.length}{" "}
