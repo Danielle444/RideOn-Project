@@ -38,6 +38,7 @@ export default function StallBookingCreateModal(props) {
     activeRole: activeRole,
     competitionId: competitionId,
     isActiveTab: props.visible,
+    lockedPayerPersonId: props.lockedPayerPersonId || null,
   });
 
   async function handleCreated() {
@@ -146,7 +147,7 @@ export default function StallBookingCreateModal(props) {
             tackEndDate={stallBookings.tackEndDate}
             setTackEndDate={stallBookings.setTackEndDate}
             tackPricingSummary={stallBookings.tackPricingSummary}
-            allSelectedHorsePayers={stallBookings.allSelectedHorsePayers}
+            allSelectedHorsePayers={stallBookings.tackPayerChoices}
             allTackTypes={stallBookings.allTackTypes}
             existingTackBookingsCount={stallBookings.existingTackBookingsCount}
             handleBackToHorseMode={stallBookings.handleBackToHorseMode}

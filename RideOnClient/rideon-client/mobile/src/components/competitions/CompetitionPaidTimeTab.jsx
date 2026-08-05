@@ -62,6 +62,7 @@ export default function CompetitionPaidTimeTab(props) {
         setNotes={props.setNotes}
         locks={props.locks}
         onToggleLock={props.onToggleLock}
+        payerFieldDisabled={props.payerFieldDisabled}
         formatRequestedSlotLabel={props.formatRequestedSlotLabel}
         formatMemberLabel={props.formatMemberLabel}
         formatHorseLabel={props.formatHorseLabel}

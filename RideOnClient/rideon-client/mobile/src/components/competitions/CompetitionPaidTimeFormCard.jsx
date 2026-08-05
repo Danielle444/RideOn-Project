@@ -556,6 +556,7 @@ export default function CompetitionPaidTimeFormCard(props) {
             onToggleLock={function () {
               props.onToggleLock("payer");
             }}
+            disabled={props.payerFieldDisabled}
           />
 
           <FieldError message={fieldErrors.payer} />

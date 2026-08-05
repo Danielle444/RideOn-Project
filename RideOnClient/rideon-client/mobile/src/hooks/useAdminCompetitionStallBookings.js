@@ -9,6 +9,7 @@ import {
 } from "../services/stallBookingsService";
 import useAdminHorseStallBookings from "./useAdminHorseStallBookings";
 import useAdminTackStallBookings from "./useAdminTackStallBookings";
+import { resolveTackPayerChoices } from "../utils/tackPayerLock";
 
 function normalizeHorseItem(item) {
   if (!item) {
@@ -383,6 +384,11 @@ export default function useAdminCompetitionStallBookings(params) {
   var user = params.user;
   var activeRole = params.activeRole;
   var competitionId = params.competitionId;
+  // CAP-5: optional payer-account entry point. Resolved against the same
+  // managedPayers list every other payer picker on this screen already uses
+  // - no new endpoint/parameter. null/undefined for the real Registrations
+  // screen (it never passes this), so existing callers are unaffected.
+  var lockedPayerPersonId = params.lockedPayerPersonId || null;
 
   var [competitionSummary, setCompetitionSummary] = useState({
     competitionStartDate: "",
@@ -532,6 +538,21 @@ export default function useAdminCompetitionStallBookings(params) {
     ),
   );
 
+  var lockedPayer = useMemo(
+    function () {
+      if (!lockedPayerPersonId) {
+        return null;
+      }
+
+      return (
+        managedPayers.find(function (item) {
+          return item.paidByPersonId === lockedPayerPersonId;
+        }) || null
+      );
+    },
+    [lockedPayerPersonId, managedPayers],
+  );
+
   var horseHook = useAdminHorseStallBookings({
     user: user,
     activeRole: activeRole,
@@ -544,6 +565,7 @@ export default function useAdminCompetitionStallBookings(params) {
     endDate: endDate,
     notes: notes,
     reloadStallBookings: loadData,
+    lockedPayer: lockedPayer,
   });
 
   var allSelectedHorsePayers = useMemo(
@@ -575,6 +597,18 @@ export default function useAdminCompetitionStallBookings(params) {
     [horseHook.selectedHorseBookings, horsePayers, existingStallBookings],
   );
 
+  // CAP-5 correction: a narrow, tack-draft-only view of who can be OFFERED
+  // as a tack payer choice. Deliberately NOT a change to
+  // allSelectedHorsePayers itself (its existing merged-with-history meaning
+  // is unchanged and still returned below as-is) - this is a second,
+  // separate value that the locked-account modal substitutes at the prop
+  // boundary instead (see StallBookingCreateModal.jsx). Unlocked callers
+  // never read this field, so they are unaffected either way.
+  var tackPayerChoices = resolveTackPayerChoices({
+    lockedPayer: lockedPayer,
+    allSelectedHorsePayers: allSelectedHorsePayers,
+  });
+
   var tackHook = useAdminTackStallBookings({
     user: user,
     activeRole: activeRole,
@@ -588,6 +622,7 @@ export default function useAdminCompetitionStallBookings(params) {
     endDate: endDate,
     allSelectedHorsePayers: allSelectedHorsePayers,
     reloadStallBookings: loadData,
+    lockedPayer: lockedPayer,
   });
 
   async function handleOpenTackMode() {
@@ -731,6 +766,7 @@ export default function useAdminCompetitionStallBookings(params) {
     tackPricingSummary: tackHook.tackPricingSummary,
     allTackTypes: tackHook.allTackTypes,
     allSelectedHorsePayers: allSelectedHorsePayers,
+    tackPayerChoices: tackPayerChoices,
 
     handleOpenTackMode: handleOpenTackMode,
     handleBackToHorseMode: handleBackToHorseMode,

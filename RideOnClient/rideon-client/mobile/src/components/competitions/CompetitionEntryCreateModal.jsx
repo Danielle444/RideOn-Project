@@ -23,6 +23,8 @@ import styles from "../../styles/adminCompetitionClassesStyles";
 
 import { createChangeEntryRequest } from "../../services/entriesService";
 
+import { resolveEntryEditInitialization } from "../../utils/entryEditInitialization";
+
 export default function CompetitionEntryCreateModal(props) {
   var userContext = useUser();
 
@@ -53,54 +55,60 @@ export default function CompetitionEntryCreateModal(props) {
     excludeEntryId: editItem ? editItem.entryId : null,
   });
 
+  // CAP-6: guards edit-mode initialization so it (1) waits until every
+  // lookup editItem actually references has resolved against the CURRENT
+  // lists - not merely "the lists are non-empty" - and (2) runs at most once
+  // per visible-editItem session, so a later loadScreenData() refresh (new
+  // array references, same or different content) can never overwrite a
+  // selection the user has since changed by hand. Reset whenever the modal
+  // closes, editItem is cleared, or a different entry is opened for edit -
+  // the ref comparison below covers all three: closing/clearing sets it to
+  // null directly, and switching to a different entryId simply never
+  // matches the ref, so resolution (and the eventual initialized-marker)
+  // re-runs for the new entry exactly as it would on a fresh open.
+  var initializedEntryIdRef = useRef(null);
+
   useEffect(
     function () {
       if (!props.visible || !editItem) {
+        initializedEntryIdRef.current = null;
         return;
       }
 
-      var selectedClass = registrations.classes.find(function (item) {
-        return item.classInCompId === editItem.classInCompId;
+      if (initializedEntryIdRef.current === editItem.entryId) {
+        return;
+      }
+
+      var resolved = resolveEntryEditInitialization(editItem, {
+        classes: registrations.classes,
+        riders: registrations.riders,
+        trainers: registrations.trainers,
+        payers: registrations.payers,
       });
 
-      // The horse list is no longer preloaded (the picker fetches a bounded
-      // list when it opens), so the edit-mode horse is built from the entry
-      // itself. It carries every field the label and the submit payload use.
-      // Deliberately NOT resolved against registrations.horses: that list now
-      // changes on every picker open/keystroke, and depending on it here would
-      // re-run this effect and wipe the user's in-progress selections.
-      var selectedHorse = editItem.horseId
-        ? {
-            horseId: editItem.horseId,
-            horseName: editItem.horseName || "",
-            barnName: editItem.barnName || "",
-            federationNumber: editItem.federationNumber || "",
-          }
-        : null;
+      // A required lookup (one editItem actually carries an id for) hasn't
+      // resolved against the current lists yet - do NOT set any selection
+      // and do NOT mark this entry initialized. The list references below
+      // stay in the dependency array specifically so a later
+      // loadScreenData() refresh re-fires this effect and gets another
+      // attempt once riders/trainers/payers/classes actually arrive.
+      if (!resolved) {
+        return;
+      }
 
-      var selectedRider = registrations.riders.find(function (item) {
-        return item.federationMemberId === editItem.riderFederationMemberId;
-      });
+      registrations.setSelectedClass(resolved.selectedClass);
 
-      var selectedTrainer = registrations.trainers.find(function (item) {
-        return item.federationMemberId === editItem.coachFederationMemberId;
-      });
+      registrations.setSelectedHorse(resolved.selectedHorse);
 
-      var selectedPayer = registrations.payers.find(function (item) {
-        return item.personId === editItem.paidByPersonId;
-      });
+      registrations.setSelectedRider(resolved.selectedRider);
 
-      registrations.setSelectedClass(selectedClass || null);
+      registrations.setSelectedTrainer(resolved.selectedTrainer);
 
-      registrations.setSelectedHorse(selectedHorse || null);
+      registrations.setSelectedPayer(resolved.selectedPayer);
 
-      registrations.setSelectedRider(selectedRider || null);
+      registrations.setPrizeRecipientName(resolved.prizeRecipientName);
 
-      registrations.setSelectedTrainer(selectedTrainer || null);
-
-      registrations.setSelectedPayer(selectedPayer || null);
-
-      registrations.setPrizeRecipientName(editItem.prizeRecipientName || "");
+      initializedEntryIdRef.current = editItem.entryId;
     },
     [
       props.visible,

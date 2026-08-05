@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert } from "react-native";
 import { createTackStallBookings } from "../services/stallBookingsService";
+import {
+  resolveEffectiveTackPayers,
+  isTackPayerSelectionLocked,
+} from "../utils/tackPayerLock";
 
 function uniqByPersonId(items) {
   var map = {};
@@ -49,6 +53,11 @@ export default function useAdminTackStallBookings(params) {
   var endDate = params.endDate;
   var allSelectedHorsePayers = params.allSelectedHorsePayers;
   var reloadStallBookings = params.reloadStallBookings;
+  // CAP-5: same lock as the horse hook - "equal" split already resolves to
+  // just the locked payer via allSelectedHorsePayers (every horse booking is
+  // locked to it), this only needs to block the "specific" split's manual
+  // toggle from adding/removing anyone.
+  var lockedPayer = params.lockedPayer || null;
 
   var [selectedTackStallType, setSelectedTackStallType] = useState(null);
   var [tackQuantity, setTackQuantity] = useState("1");
@@ -187,6 +196,10 @@ export default function useAdminTackStallBookings(params) {
   );
 
   function toggleTackPayerSelection(payerItem) {
+    if (isTackPayerSelectionLocked(lockedPayer)) {
+      return;
+    }
+
     if (!payerItem || !payerItem.paidByPersonId) {
       return;
     }
@@ -208,13 +221,14 @@ export default function useAdminTackStallBookings(params) {
 
   var effectiveTackPayers = useMemo(
     function () {
-      if (tackSplitMode === "equal") {
-        return allSelectedHorsePayers;
-      }
-
-      return selectedTackPayers;
+      return resolveEffectiveTackPayers({
+        lockedPayer: lockedPayer,
+        tackSplitMode: tackSplitMode,
+        allSelectedHorsePayers: allSelectedHorsePayers,
+        selectedTackPayers: selectedTackPayers,
+      });
     },
-    [tackSplitMode, allSelectedHorsePayers, selectedTackPayers],
+    [lockedPayer, tackSplitMode, allSelectedHorsePayers, selectedTackPayers],
   );
 
   var tackPricingSummary = useMemo(
