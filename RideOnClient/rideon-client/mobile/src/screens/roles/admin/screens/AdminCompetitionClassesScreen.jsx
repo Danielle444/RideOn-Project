@@ -412,10 +412,8 @@ export default function AdminCompetitionClassesScreen(props) {
 
         {!availability.classes.isEnabled ? (
           <RegistrationStepNotice
-            message={buildRegistrationStepNoticeMessage(
-              availability.classes,
-              isRegistrationStatusLoading,
-            )}
+            message={buildRegistrationStepNoticeMessage(availability.classes)}
+            isLoading={isRegistrationStatusLoading}
             containerStyle={styles.errorCard}
             textStyle={styles.errorText}
           />

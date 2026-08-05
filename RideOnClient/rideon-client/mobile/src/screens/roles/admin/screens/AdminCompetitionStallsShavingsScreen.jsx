@@ -422,8 +422,8 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           <RegistrationStepNotice
             message={buildRegistrationStepNoticeMessage(
               availability.stalls,
-              isRegistrationStatusLoading,
             )}
+            isLoading={isRegistrationStatusLoading}
             containerStyle={styles.errorWrap}
             textStyle={styles.errorText}
             ctaLabel={
@@ -445,8 +445,8 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           <RegistrationStepNotice
             message={buildRegistrationStepNoticeMessage(
               availability.shavings,
-              isRegistrationStatusLoading,
             )}
+            isLoading={isRegistrationStatusLoading}
             containerStyle={styles.errorWrap}
             textStyle={styles.errorText}
             ctaLabel={

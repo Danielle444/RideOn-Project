@@ -18,6 +18,11 @@ import {
   getDuplicatableEntriesFromCompetition,
   bulkDuplicateEntries,
 } from "../../services/entriesService";
+import {
+  getVisibleDuplicateEntries,
+  isDuplicateEntryEligible,
+  getDuplicateEntryCounts,
+} from "../../utils/duplicateEntriesVisibility";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -138,9 +143,7 @@ export default function DuplicateEntriesModal(props) {
 
         var initial = {};
         list.forEach(function (item) {
-          var canDuplicate =
-            item.targetClassInCompId && !item.alreadyExists;
-          if (canDuplicate) {
+          if (isDuplicateEntryEligible(item)) {
             initial[item.sourceEntryId] = true;
           }
         });
@@ -175,17 +178,23 @@ export default function DuplicateEntriesModal(props) {
     });
   }
 
+  // CAP-4: derived from the same visible set the list itself renders, so a
+  // now-hidden (no target class) row can never contribute to the selected
+  // count even if it was checked before the fetch that hid it.
+  var visibleEntries = useMemo(
+    function () {
+      return getVisibleDuplicateEntries(entries);
+    },
+    [entries],
+  );
+
   var selectedItems = useMemo(
     function () {
-      return entries.filter(function (item) {
-        return (
-          checked[item.sourceEntryId] === true &&
-          item.targetClassInCompId &&
-          !item.alreadyExists
-        );
+      return visibleEntries.filter(function (item) {
+        return checked[item.sourceEntryId] === true && isDuplicateEntryEligible(item);
       });
     },
-    [entries, checked],
+    [visibleEntries, checked],
   );
 
   function handleSubmit() {
@@ -390,17 +399,17 @@ export default function DuplicateEntriesModal(props) {
   }
 
   function renderEntryRow(item) {
-    var eligible = !!item.targetClassInCompId && !item.alreadyExists;
+    // Every row reaching this function already has a targetClassInCompId -
+    // rows without one are excluded upstream by visibleEntries (CAP-4) - so
+    // "no matching class" is no longer a reachable status here.
+    var eligible = isDuplicateEntryEligible(item);
 
     var isChecked = checked[item.sourceEntryId] === true && eligible;
 
     var statusText = "";
     var statusColor = "#6D564A";
 
-    if (!item.targetClassInCompId) {
-      statusText = "אין מקצה תואם בתחרות הפעילה";
-      statusColor = "#A0522D";
-    } else if (item.alreadyExists) {
+    if (item.alreadyExists) {
       statusText = "כבר רשום במקצה הזה בתחרות הפעילה";
       statusColor = "#A0522D";
     } else {
@@ -521,7 +530,7 @@ export default function DuplicateEntriesModal(props) {
       );
     }
 
-    if (entries.length === 0) {
+    if (visibleEntries.length === 0) {
       return (
         <View style={{ padding: 18 }}>
           <Text style={{ color: "#5A4036", textAlign: "right" }}>
@@ -531,9 +540,7 @@ export default function DuplicateEntriesModal(props) {
       );
     }
 
-    var eligibleCount = entries.filter(function (item) {
-      return item.targetClassInCompId && !item.alreadyExists;
-    }).length;
+    var counts = getDuplicateEntryCounts(visibleEntries);
 
     return (
       <ScrollView
@@ -565,12 +572,12 @@ export default function DuplicateEntriesModal(props) {
               marginTop: 4,
             }}
           >
-            סה״כ הרשמות: {entries.length} · ניתנות לשכפול: {eligibleCount} · נבחרו:{" "}
+            סה״כ הרשמות: {counts.total} · ניתנות לשכפול: {counts.eligible} · נבחרו:{" "}
             {selectedItems.length}
           </Text>
         </View>
 
-        {entries.map(renderEntryRow)}
+        {visibleEntries.map(renderEntryRow)}
       </ScrollView>
     );
   }
