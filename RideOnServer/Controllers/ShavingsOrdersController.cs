@@ -223,12 +223,7 @@ namespace RideOnServer.Controllers
 
                 int requestingRanchId = distinctRequestingRanchIds[0];
 
-                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
-                    personId,
-                    requestingRanchId,
-                    RoleNames.RanchAdmin,
-                    RoleNames.HostSecretary
-                );
+                EnsureCanAccessCompetitionRanchShavings(personId, request.CompetitionId, requestingRanchId);
 
                 // Host/service ranch is the COMPETITION's own host ranch,
                 // derived server-side -- never trusted from request.RanchId.
@@ -270,12 +265,7 @@ namespace RideOnServer.Controllers
             {
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
-                    personId,
-                    ranchId,
-                    RoleNames.RanchAdmin,
-                    RoleNames.HostSecretary
-                );
+                EnsureCanAccessCompetitionRanchShavings(personId, competitionId, ranchId);
 
                 var result = ShavingsOrderDAL.GetStallBookingsForShavings(competitionId, ranchId);
                 return Ok(result);
@@ -299,12 +289,7 @@ namespace RideOnServer.Controllers
             {
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
-                    personId,
-                    ranchId,
-                    RoleNames.RanchAdmin,
-                    RoleNames.HostSecretary
-                );
+                EnsureCanAccessCompetitionRanchShavings(personId, competitionId, ranchId);
 
                 var result = ShavingsOrderDAL.GetShavingsOrdersForCompetitionAndRanch(competitionId, ranchId);
                 return Ok(result);
@@ -326,6 +311,11 @@ namespace RideOnServer.Controllers
             {
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
+                // NOTE: still the strict single-ranch check, so a host secretary cannot read a
+                // guest ranch's order here the way they can on the competition-scoped endpoints.
+                // This route has no competitionId to resolve the host ranch from, and no client
+                // currently calls it. If a caller is added, resolve the competition from
+                // shavingsOrderId and switch to EnsureCanAccessCompetitionRanchShavings.
                 UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
                     ranchId,
@@ -353,6 +343,8 @@ namespace RideOnServer.Controllers
             {
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
+                // NOTE: strict single-ranch check (same limitation as {id}/details) -- no
+                // competitionId on this route to derive the host ranch, and no client calls it.
                 UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
                     ranchId,
@@ -382,12 +374,7 @@ namespace RideOnServer.Controllers
             {
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
-                    personId,
-                    ranchId,
-                    RoleNames.RanchAdmin,
-                    RoleNames.HostSecretary
-                );
+                EnsureCanAccessCompetitionRanchShavings(personId, competitionId, ranchId);
 
                 var result = ShavingsOrderDAL.GetAllShavingsOrderPayersForCompetitionAndRanch(competitionId, ranchId);
                 return Ok(result);
@@ -414,13 +401,7 @@ namespace RideOnServer.Controllers
                     UserAccessValidator
                         .GetPersonIdFromClaims(User);
 
-                UserAccessValidator
-                    .EnsureUserHasAnyRoleInRanch(
-                        personId,
-                        ranchId,
-                        RoleNames.HostSecretary,
-                        RoleNames.RanchAdmin
-                    );
+                EnsureCanAccessCompetitionRanchShavings(personId, competitionId, ranchId);
 
                 var list =
                     ShavingsOrderDAL
@@ -448,6 +429,51 @@ namespace RideOnServer.Controllers
                     "אירעה שגיאה בשליפת פרטי נסורת"
                 );
             }
+        }
+
+        // Read-authorization for a single (competition, requesting-ranch) shavings slice.
+        //
+        // Two legitimate callers, either one is sufficient:
+        //   1. Own-ranch view (mobile RanchAdmin looking at their own ranch): the caller
+        //      has RanchAdmin/HostSecretary in the passed ranchId itself.
+        //   2. Host cross-ranch view (web HostSecretary of the competition's host ranch
+        //      paging over every PARTICIPATING guest ranch): the caller has
+        //      HostSecretary/RanchAdmin in the competition's own host ranch.
+        //
+        // Case 2 is why the plain EnsureUserHasAnyRoleInRanch(personId, ranchId, ...) check
+        // was wrong here -- a host secretary is not a member of the guest ranches whose
+        // orders they legitimately manage, so every guest ranch returned 403. The proc is
+        // scoped by competitionId + requestingranchid, so host access cannot leak data from
+        // a competition the caller does not host.
+        private void EnsureCanAccessCompetitionRanchShavings(int personId, int competitionId, int ranchId)
+        {
+            // 1. Own-ranch access -- cheapest, covers the mobile admin path unchanged.
+            if (UserAccessValidator.HasUserAnyRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin,
+                    RoleNames.HostSecretary))
+            {
+                return;
+            }
+
+            // 2. Host-ranch access -- host ranch is derived server-side from the competition,
+            //    never trusted from the request.
+            RideOnServer.BL.Competition? competition =
+                new CompetitionDAL().GetCompetitionById(competitionId);
+
+            if (competition != null &&
+                UserAccessValidator.HasUserAnyRoleInRanch(
+                    personId,
+                    competition.HostRanchId,
+                    RoleNames.HostSecretary,
+                    RoleNames.RanchAdmin))
+            {
+                return;
+            }
+
+            throw new UnauthorizedAccessException(
+                "אין לך הרשאה לבצע פעולה זו עבור החווה שנבחרה");
         }
     }
 }
