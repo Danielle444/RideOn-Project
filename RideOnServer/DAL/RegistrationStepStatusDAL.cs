@@ -45,7 +45,9 @@ namespace RideOnServer.DAL
 
                                 HasAdminCreatedActiveNonTackStallBooking = ReadOptionalBool(reader, "hasadmincreatedactivenontackstallbooking"),
                                 HasManagedPayerWithActiveNonTackStallBooking = ReadOptionalBool(reader, "hasmanagedpayerwithactivenontackstallbooking"),
-                                HasRelevantActiveNonTackStallBooking = ReadOptionalBool(reader, "hasrelevantactivenontackstallbooking")
+                                HasRelevantActiveNonTackStallBooking = ReadOptionalBool(reader, "hasrelevantactivenontackstallbooking"),
+
+                                IsRegistrationEnded = ReadOptionalBool(reader, "isregistrationended")
                             };
                         }
                     }

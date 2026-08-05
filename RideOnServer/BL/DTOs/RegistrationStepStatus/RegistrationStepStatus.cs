@@ -30,5 +30,12 @@ namespace RideOnServer.BL.DTOs.RegistrationStepStatus
         public bool? HasAdminCreatedActiveNonTackStallBooking { get; init; }
         public bool? HasManagedPayerWithActiveNonTackStallBooking { get; init; }
         public bool? HasRelevantActiveNonTackStallBooking { get; init; }
+
+        // Distinct, independent signal from IsCompetitionEnded -- computed from
+        // registrationEndDate/competitionStartDate, not competitionEndDate. Added
+        // last on the proc's RETURNS TABLE; read via the same absent-column-tolerant
+        // pattern as every other field here, so an old deployed backend against a
+        // migrated DB (or vice versa) degrades to null rather than throwing.
+        public bool? IsRegistrationEnded { get; init; }
     }
 }
