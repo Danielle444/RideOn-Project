@@ -1,7 +1,7 @@
-import { DoorOpen, Package, X } from "lucide-react";
+import { DoorOpen, X } from "lucide-react";
 import DroppableBox from "../../common/dnd/DroppableBox";
 import DraggableItem from "../../common/dnd/DraggableItem";
-import StallBookingLabel from "./StallBookingLabel";
+import BookingCardBody from "./BookingCardBody";
 
 export default function StallCell({ cell, assignment, onUnassign }) {
   const droppableId = `stall-${cell.col}-${cell.row}`;
@@ -48,18 +48,10 @@ export default function StallCell({ cell, assignment, onUnassign }) {
           <DraggableItem
             id={`stall-cell-booking-${assignment.stallBookingId}`}
             data={{ assignment: assignment, sourceCell: cell }}
-            className="mt-2 flex max-w-full cursor-grab flex-col items-center leading-tight active:cursor-grabbing"
-            draggingClassName="opacity-40"
+            className="mt-2 flex w-full min-w-0 cursor-grab items-start gap-1.5 text-right leading-tight active:cursor-grabbing"
+            draggingClassName="border-[#795548] bg-[#F5EDE8] shadow-lg opacity-90 z-50"
           >
-            <span className="mb-0.5 flex items-center gap-1 text-[8px] text-[#7B5A4D]">
-              {assignment.isForTack ? (
-                <Package size={9} />
-              ) : (
-                <span className="text-[10px]">🐴</span>
-              )}
-            </span>
-
-            <StallBookingLabel item={assignment} />
+            <BookingCardBody item={assignment} />
           </DraggableItem>
 
           <button
