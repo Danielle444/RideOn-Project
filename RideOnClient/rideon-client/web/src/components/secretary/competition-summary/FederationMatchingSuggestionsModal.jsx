@@ -538,8 +538,8 @@ export default function FederationMatchingSuggestionsModal(props) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
       dir="rtl"
     >
-      <div className="max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-[28px] bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-[#E6DCD5] px-6 py-5">
+      <div className="flex max-h-[90vh] w-full max-w-[1400px] flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#E6DCD5] px-6 py-5">
           <div>
             <h2 className="text-2xl font-black text-[#3F312B]">
               התאמת קבלות התאחדות
@@ -560,20 +560,20 @@ export default function FederationMatchingSuggestionsModal(props) {
           </button>
         </div>
 
-        <div className="max-h-[calc(90vh-90px)] overflow-y-auto px-6 py-5">
+        <div className="flex min-h-0 flex-1 flex-col px-6 py-5">
           {props.error ? (
-            <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+            <div className="mb-4 shrink-0 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
               {props.error}
             </div>
           ) : null}
 
           {props.success ? (
-            <div className="mb-4 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-bold text-green-700">
+            <div className="mb-4 shrink-0 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-bold text-green-700">
               {props.success}
             </div>
           ) : null}
 
-          <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="mb-5 flex shrink-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex rounded-2xl border border-[#E6DCD5] bg-[#FCFAF8] p-1">
               <button
                 type="button"
@@ -625,16 +625,18 @@ export default function FederationMatchingSuggestionsModal(props) {
             ) : null}
           </div>
 
-          {activeTab === "suggestions" ? (
-            <SuggestionsTab
-              items={items}
-              loading={props.loading}
-              approving={props.approving}
-              onApprove={props.onApprove}
-            />
-          ) : (
-            <ManualTab {...props} />
-          )}
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+            {activeTab === "suggestions" ? (
+              <SuggestionsTab
+                items={items}
+                loading={props.loading}
+                approving={props.approving}
+                onApprove={props.onApprove}
+              />
+            ) : (
+              <ManualTab {...props} />
+            )}
+          </div>
         </div>
       </div>
     </div>
