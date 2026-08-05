@@ -1,5 +1,6 @@
 import { KeyRound, Pencil, UserRound, X } from "lucide-react";
 import ProfileFieldBox from "./ProfileFieldBox";
+import { GENDER_OPTIONS, genderLabel } from "../../../utils/gender.utils";
 
 export default function UserProfileCard(props) {
   const page = props.page;
@@ -78,9 +79,11 @@ export default function UserProfileCard(props) {
             value={
               page.isEditingUser
                 ? page.userForm.gender
-                : page.data?.userProfile?.gender
+                : genderLabel(page.data?.userProfile?.gender)
             }
             editable={page.isEditingUser}
+            options={GENDER_OPTIONS}
+            placeholder="בחר/י מגדר"
             onChange={function (e) {
               page.setUserField("gender", e.target.value);
             }}

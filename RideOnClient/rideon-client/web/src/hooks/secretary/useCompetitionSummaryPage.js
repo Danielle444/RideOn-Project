@@ -4,13 +4,11 @@ import {
   getClassesByCompetitionId,
   getPredictionsByCompetitionId,
 } from "../../services/classInCompetitionService";
-import { getSecretaryCompetitionEntries } from "../../services/entryService";
 import { getCompetitionById } from "../../services/competitionService";
 import { getFinancialConfigForCompetition } from "../../services/financialConfigService";
 import {
   deriveFinancialProjection,
-  getClassCost,
-  getEntryBandForClass,
+  deriveFinancialActual,
 } from "../../utils/financialProjection.utils";
 import { isRegistrationClosed } from "../../utils/classesView.utils";
 import {
@@ -121,7 +119,6 @@ export default function useCompetitionSummaryPage(options) {
   // failed fetch just degrades a band, never blocks the summary.
   var [finClasses, setFinClasses] = useState([]);
   var [finPredictions, setFinPredictions] = useState([]);
-  var [finEntries, setFinEntries] = useState([]);
   var [finCompetition, setFinCompetition] = useState(null);
   var [finConfig, setFinConfig] = useState(null);
 
@@ -296,9 +293,6 @@ export default function useCompetitionSummaryPage(options) {
         return getPredictionsByCompetitionId(competitionId, ranchId);
       }, setFinPredictions, []),
       loadFinancialResource(function () {
-        return getSecretaryCompetitionEntries(competitionId, ranchId);
-      }, setFinEntries, []),
-      loadFinancialResource(function () {
         return getCompetitionById(competitionId, ranchId);
       }, setFinCompetition, null),
       loadFinancialResource(function () {
@@ -332,19 +326,6 @@ export default function useCompetitionSummaryPage(options) {
     );
   }
 
-  function getActiveEntriesCountForClass(item) {
-    var classId = getFinClassInCompId(item);
-
-    return finEntries.filter(function (entry) {
-      if (Number(getFinClassInCompId(entry)) !== Number(classId)) {
-        return false;
-      }
-
-      var status = entry.entryStatus || entry.EntryStatus || "Active";
-      return status === "Active";
-    }).length;
-  }
-
   // The whole-competition income projection (entry / stall / shavings bands + bag order). Never
   // per-day: horse-days and unique horses span the entire event. All derivation is read-time.
   var financialProjection = useMemo(
@@ -355,43 +336,22 @@ export default function useCompetitionSummaryPage(options) {
     [finClasses, finPredictions, finConfig],
   );
 
-  // The actual side of the tabs. Entry income is real (Active entries x class cost); the
-  // projected entry-income range it is compared against reuses the same read-time entry band, so
-  // the comparison is like-for-like. hasActualData gates the actual + comparison tabs.
+  // The actual side of the tabs, for the same four sources the projection tab shows (organizer
+  // entries, federation entries, stalls, shavings). "Actual" is the real billed amount from
+  // confirmed bookings (getCompetitionSummary's ExpectedAmount per category) -- the same
+  // accounting basis for all four, never a proxy like entry count x cost. The predicted side
+  // reuses financialProjection's own bands, so Comparison never shows a number Projection itself
+  // does not also show. hasActualData gates the actual + comparison tabs.
   var financialActual = useMemo(
     function () {
-      var items = Array.isArray(finClasses) ? finClasses : [];
-      var entryIncomeActual = 0;
-      var entryIncomePredictedLo = 0;
-      var entryIncomePredictedHi = 0;
-
-      items.forEach(function (item) {
-        var cost = getClassCost(item);
-
-        if (cost === null) {
-          return;
-        }
-
-        entryIncomeActual += getActiveEntriesCountForClass(item) * cost;
-
-        var band = getEntryBandForClass(getPredictionForClass(item));
-
-        if (!band) {
-          return;
-        }
-
-        entryIncomePredictedLo += band.lo * cost;
-        entryIncomePredictedHi += band.hi * cost;
-      });
-
-      return {
-        hasActualData: isRegistrationClosed(finCompetition),
-        entryIncomeActual: entryIncomeActual,
-        entryIncomePredictedLo: entryIncomePredictedLo,
-        entryIncomePredictedHi: entryIncomePredictedHi,
-      };
+      return deriveFinancialActual(
+        financialProjection,
+        summary.organizerCategories,
+        summary.federation,
+        isRegistrationClosed(finCompetition),
+      );
     },
-    [finClasses, finEntries, finPredictions, finCompetition],
+    [financialProjection, summary, finCompetition],
   );
 
   var financialRegistrationClosed = isRegistrationClosed(finCompetition);

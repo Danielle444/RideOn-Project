@@ -2,7 +2,7 @@ import { ArrowRight, X } from "lucide-react";
 import {
   computeDetailLevelTotals,
   computeEntriesLevelTotals,
-  getProductSlotCountForDay,
+  getProductRequestCountForDay,
 } from "../../../utils/competitionSummaryDayGrouping.utils";
 
 function getValue(item, camelKey, pascalKey, fallback) {
@@ -542,7 +542,7 @@ function PaidTimeDayListTable(props) {
       onRowClick={props.onRowClick}
       renderRow={function (day) {
         var productCells = productColumns.map(function (product) {
-          return getProductSlotCountForDay(day, product.productName);
+          return getProductRequestCountForDay(day, product.productName);
         });
 
         return [formatDate(day.dayKey)]

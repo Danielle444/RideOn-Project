@@ -8,6 +8,7 @@ import {
   deriveTackStalls,
   deriveHorseDays,
   deriveFinancialProjection,
+  deriveFinancialActual,
 } from "./financialProjection.utils.js";
 
 // A prediction as the Phase 6 /predictions endpoint returns it: point + band of +/- RMSE, the
@@ -334,5 +335,144 @@ describe("deriveFinancialProjection (integration)", () => {
     expect(result.entry.organizerLo).toBe(3200);
     expect(result.stall.available).toBe(false);
     expect(result.shavings.incomeAvailable).toBe(false);
+  });
+});
+
+describe("deriveFinancialActual", () => {
+  // One class, one predicted band, DK pricing -- gives entry organizer/federation bands and a
+  // real stall/shavings band to compare real category amounts against.
+  function projectionFixture(config) {
+    var classes = [classRow(1, "2026-04-28", 100, 50)];
+    var predictor = function () {
+      return prediction(10, 2);
+    };
+
+    return deriveFinancialProjection(classes, predictor, config === undefined ? DK_CONFIG : config);
+  }
+
+  // Shaped like usp_getcompetitionsummarybycategory's organizerCategories rows -- competition 7
+  // live values (2026-08-05): classes 2050 (Open 1550 + Paid 500), stalls 10000 (Open 7000 + Paid
+  // 3000, Cancelled/Replaced excluded), shavings 3440 (Open 3200 + Paid 240), plus paid-time which
+  // is NOT one of the four sources this view compares.
+  var ORGANIZER_CATEGORIES = [
+    { categoryKey: "classes", expectedAmount: 2050 },
+    { categoryKey: "paid-time", expectedAmount: 9970 },
+    { categoryKey: "stalls", expectedAmount: 10000 },
+    { categoryKey: "shavings", expectedAmount: 3440 },
+  ];
+  var FEDERATION_TOTALS = { expectedAmount: 900 };
+
+  it("organizer actual comes from the categories row keyed 'classes', not paid-time/stalls/shavings", () => {
+    var projection = projectionFixture();
+    var actual = deriveFinancialActual(projection, ORGANIZER_CATEGORIES, FEDERATION_TOTALS, true);
+
+    expect(actual.organizer.actual).toBe(2050);
+  });
+
+  it("federation actual comes from the federation totals object, independent of organizerCategories", () => {
+    var projection = projectionFixture();
+    var actual = deriveFinancialActual(projection, ORGANIZER_CATEGORIES, FEDERATION_TOTALS, true);
+
+    expect(actual.federation.actual).toBe(900);
+  });
+
+  it("stall and shavings actual come from their own categories rows", () => {
+    var projection = projectionFixture();
+    var actual = deriveFinancialActual(projection, ORGANIZER_CATEGORIES, FEDERATION_TOTALS, true);
+
+    expect(actual.stall.actual).toBe(10000);
+    expect(actual.shavings.actual).toBe(3440);
+  });
+
+  it("organizer + federation actual reproduces the total classes billcharge amount (Open + Paid)", () => {
+    // Live ground truth, competition 7: organizer classes Open 1550 + Paid 500 = 2050; federation
+    // classes Open 400 + Paid 500 = 900; combined = 2950, the whole competition's class income.
+    var projection = projectionFixture();
+    var actual = deriveFinancialActual(projection, ORGANIZER_CATEGORIES, FEDERATION_TOTALS, true);
+
+    expect(actual.organizer.actual + actual.federation.actual).toBe(2950);
+  });
+
+  it("a missing category (e.g. no stalls booked yet) defaults its actual to 0, not undefined", () => {
+    var projection = projectionFixture();
+    var actual = deriveFinancialActual(
+      projection,
+      [{ categoryKey: "classes", expectedAmount: 500 }],
+      null,
+      true,
+    );
+
+    expect(actual.stall.actual).toBe(0);
+    expect(actual.shavings.actual).toBe(0);
+    expect(actual.federation.actual).toBe(0);
+  });
+
+  it("predicted bands are reused verbatim from deriveFinancialProjection's entry/stall/shavings", () => {
+    var projection = projectionFixture();
+    var actual = deriveFinancialActual(projection, ORGANIZER_CATEGORIES, FEDERATION_TOTALS, true);
+
+    expect(actual.organizer.predictedLo).toBe(projection.entry.organizerLo);
+    expect(actual.organizer.predictedHi).toBe(projection.entry.organizerHi);
+    expect(actual.federation.predictedLo).toBe(projection.entry.federationLo);
+    expect(actual.federation.predictedHi).toBe(projection.entry.federationHi);
+    expect(actual.stall.predictedLo).toBe(projection.stall.lo);
+    expect(actual.stall.predictedHi).toBe(projection.stall.hi);
+    expect(actual.shavings.predictedLo).toBe(projection.shavings.lo);
+    expect(actual.shavings.predictedHi).toBe(projection.shavings.hi);
+  });
+
+  it("organizer and federation entry sources are always available (ranch-independent)", () => {
+    var projection = projectionFixture();
+    var actual = deriveFinancialActual(projection, ORGANIZER_CATEGORIES, FEDERATION_TOTALS, true);
+
+    expect(actual.organizer.available).toBe(true);
+    expect(actual.federation.available).toBe(true);
+  });
+
+  it("stall/shavings degrade to unavailable (null predicted band) when the ranch has no pricing", () => {
+    var projection = projectionFixture(RANCH49_CONFIG);
+    var actual = deriveFinancialActual(projection, ORGANIZER_CATEGORIES, FEDERATION_TOTALS, true);
+
+    expect(actual.stall.available).toBe(false);
+    expect(actual.stall.predictedLo).toBeNull();
+    expect(actual.stall.predictedHi).toBeNull();
+    expect(actual.shavings.available).toBe(false);
+    expect(actual.shavings.predictedLo).toBeNull();
+    expect(actual.shavings.predictedHi).toBeNull();
+  });
+
+  it("still reports the real actual amount for an unavailable (no-pricing) source", () => {
+    // Absence of a predicted band must never hide a real actual amount that already exists.
+    var projection = projectionFixture(RANCH49_CONFIG);
+    var actual = deriveFinancialActual(projection, ORGANIZER_CATEGORIES, FEDERATION_TOTALS, true);
+
+    expect(actual.stall.actual).toBe(10000);
+    expect(actual.shavings.actual).toBe(3440);
+  });
+
+  it("passes hasActualData through unchanged", () => {
+    var projection = projectionFixture();
+
+    expect(
+      deriveFinancialActual(projection, ORGANIZER_CATEGORIES, FEDERATION_TOTALS, true)
+        .hasActualData,
+    ).toBe(true);
+    expect(
+      deriveFinancialActual(projection, ORGANIZER_CATEGORIES, FEDERATION_TOTALS, false)
+        .hasActualData,
+    ).toBe(false);
+  });
+
+  it("tolerates PascalCase category/amount keys", () => {
+    var projection = projectionFixture();
+    var actual = deriveFinancialActual(
+      projection,
+      [{ CategoryKey: "classes", ExpectedAmount: 2050 }],
+      { ExpectedAmount: 900 },
+      true,
+    );
+
+    expect(actual.organizer.actual).toBe(2050);
+    expect(actual.federation.actual).toBe(900);
   });
 });

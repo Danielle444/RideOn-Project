@@ -60,6 +60,77 @@ function formatSignedDelta(value) {
   return formatMoney(0);
 }
 
+// The four rows, in the same order as the projection cards. Labels/prompts are mirrored from
+// financialProjectionCopy.js verbatim -- no new copy is invented here.
+var COMPARISON_ROWS = [
+  { key: "organizer", labelKey: "organizerIncomeLabel" },
+  { key: "federation", labelKey: "federationIncomeLabel" },
+  { key: "stall", labelKey: "stallIncomeLabel", promptKey: "stallPricePrompt" },
+  { key: "shavings", labelKey: "shavingsIncomeLabel", promptKey: "shavingsPricePrompt" },
+];
+
+function ComparisonRow(props) {
+  var copy = props.copy;
+  var row = props.row;
+  var data = props.data;
+
+  if (!data || !data.available) {
+    return (
+      <div>
+        <p className="text-sm font-bold text-[#6D4C41]">{copy[row.labelKey]}</p>
+        <p className="mt-3 rounded-xl border border-dashed border-[#D9C7BD] bg-[#FBF7F4] px-4 py-3 text-sm text-[#8D6E63]">
+          {row.promptKey ? copy[row.promptKey] : copy.comparisonUnavailable}
+        </p>
+      </div>
+    );
+  }
+
+  var verdict = verdictLabel(data.actual, data.predictedLo, data.predictedHi, copy);
+  var delta = computeDelta(data.actual, data.predictedLo, data.predictedHi);
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-bold text-[#6D4C41]">{copy[row.labelKey]}</p>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <SummaryFigureCard
+          title={copy.comparisonPredictedLabel}
+          value={formatMoneyRange(data.predictedLo, data.predictedHi)}
+        />
+
+        <SummaryFigureCard
+          title={copy.comparisonActualLabel}
+          value={formatMoney(data.actual)}
+          colorClass="text-[#2E7D32]"
+        />
+
+        {/* Neutral by design (locked decision) -- the verdict banner below stays the only
+            green/amber semantic indicator; the delta card is a plain figure, not a second
+            verdict. */}
+        <SummaryFigureCard
+          title={copy.comparisonDeltaLabel}
+          value={formatSignedDelta(delta)}
+        />
+      </div>
+
+      <div
+        className={
+          "rounded-2xl border px-6 py-5 text-right shadow-sm " + verdict.cardClass
+        }
+      >
+        <p className="text-lg font-black">{verdict.text}</p>
+        <p className="mt-2 text-sm leading-relaxed">
+          {copy.comparisonLine(
+            formatMoney(data.actual),
+            formatMoney(data.predictedLo),
+            formatMoney(data.predictedHi),
+          )}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function FinancialComparisonPanel(props) {
   var copy = FINANCIAL_PROJECTION_COPY;
   var actual = props.actual;
@@ -72,60 +143,14 @@ export default function FinancialComparisonPanel(props) {
     );
   }
 
-  var verdict = verdictLabel(
-    actual.entryIncomeActual,
-    actual.entryIncomePredictedLo,
-    actual.entryIncomePredictedHi,
-    copy,
-  );
-
-  var delta = computeDelta(
-    actual.entryIncomeActual,
-    actual.entryIncomePredictedLo,
-    actual.entryIncomePredictedHi,
-  );
-
   return (
     <SummarySectionShell title={copy.comparisonTitle}>
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <SummaryFigureCard
-            title={copy.comparisonPredictedLabel}
-            value={formatMoneyRange(
-              actual.entryIncomePredictedLo,
-              actual.entryIncomePredictedHi,
-            )}
-          />
-
-          <SummaryFigureCard
-            title={copy.comparisonActualLabel}
-            value={formatMoney(actual.entryIncomeActual)}
-            colorClass="text-[#2E7D32]"
-          />
-
-          {/* Neutral by design (locked decision) -- the verdict card below stays the only
-              green/amber semantic indicator; the delta card is a plain figure, not a second
-              verdict. */}
-          <SummaryFigureCard
-            title={copy.comparisonDeltaLabel}
-            value={formatSignedDelta(delta)}
-          />
-        </div>
-
-        <div
-          className={
-            "rounded-2xl border px-6 py-5 text-right shadow-sm " + verdict.cardClass
-          }
-        >
-          <p className="text-lg font-black">{verdict.text}</p>
-          <p className="mt-2 text-sm leading-relaxed">
-            {copy.comparisonLine(
-              formatMoney(actual.entryIncomeActual),
-              formatMoney(actual.entryIncomePredictedLo),
-              formatMoney(actual.entryIncomePredictedHi),
-            )}
-          </p>
-        </div>
+      <div className="space-y-6">
+        {COMPARISON_ROWS.map(function (row) {
+          return (
+            <ComparisonRow key={row.key} copy={copy} row={row} data={actual[row.key]} />
+          );
+        })}
       </div>
     </SummarySectionShell>
   );

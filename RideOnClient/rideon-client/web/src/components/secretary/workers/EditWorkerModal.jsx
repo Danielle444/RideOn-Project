@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import { GENDER_OPTIONS } from "../../../utils/gender.utils";
 
 export default function EditWorkerModal(props) {
   if (!props.isOpen) {
@@ -85,13 +86,23 @@ export default function EditWorkerModal(props) {
               <label className="text-sm font-semibold text-[#7B5A4D]">
                 מגדר
               </label>
-              <input
+              <select
                 value={props.editForm.gender}
                 onChange={function (e) {
                   props.onChangeField("gender", e.target.value);
                 }}
+                dir="rtl"
                 className="mt-2 h-10 w-full rounded-xl border border-[#D8CBC3] bg-white px-4 text-right text-[#3F312B] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D2B7A7]"
-              />
+              >
+                <option value="">בחר/י מגדר</option>
+                {GENDER_OPTIONS.map(function (option) {
+                  return (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  );
+                })}
+              </select>
             </div>
 
             <div className="rounded-2xl border border-[#E7DCD5] bg-[#F8F5F2] px-4 py-3">

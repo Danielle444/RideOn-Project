@@ -8,6 +8,7 @@ import {
   addProfileToUser,
 } from "../../services/profileSettingsService";
 import { getRanches, getRoles } from "../../services/authService";
+import { normalizeGenderValue } from "../../utils/gender.utils";
 
 export default function useProfileSettingsPage() {
   const activeRole = getActiveRole();
@@ -99,7 +100,7 @@ export default function useProfileSettingsPage() {
         personId: responseData.userProfile?.personId || 0,
         firstName: responseData.userProfile?.firstName || "",
         lastName: responseData.userProfile?.lastName || "",
-        gender: responseData.userProfile?.gender || "",
+        gender: normalizeGenderValue(responseData.userProfile?.gender) || "",
         cellPhone: responseData.userProfile?.cellPhone || "",
         email: responseData.userProfile?.email || "",
       });
@@ -205,7 +206,7 @@ export default function useProfileSettingsPage() {
       personId: data?.userProfile?.personId || 0,
       firstName: data?.userProfile?.firstName || "",
       lastName: data?.userProfile?.lastName || "",
-      gender: data?.userProfile?.gender || "",
+      gender: normalizeGenderValue(data?.userProfile?.gender) || "",
       cellPhone: data?.userProfile?.cellPhone || "",
       email: data?.userProfile?.email || "",
     });
