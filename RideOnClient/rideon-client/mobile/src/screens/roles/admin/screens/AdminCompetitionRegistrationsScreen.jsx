@@ -423,8 +423,8 @@ export default function AdminCompetitionRegistrationsScreen(props) {
               <RegistrationStepNotice
                 message={buildRegistrationStepNoticeMessage(
                   availability.classes,
-                  isRegistrationStatusLoading,
                 )}
+                isLoading={isRegistrationStatusLoading}
                 containerStyle={styles.errorCard}
                 textStyle={styles.errorText}
               />
@@ -473,8 +473,8 @@ export default function AdminCompetitionRegistrationsScreen(props) {
               <RegistrationStepNotice
                 message={buildRegistrationStepNoticeMessage(
                   availability.paidTimes,
-                  isRegistrationStatusLoading,
                 )}
+                isLoading={isRegistrationStatusLoading}
                 containerStyle={styles.errorCard}
                 textStyle={styles.errorText}
               />
@@ -602,8 +602,8 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             <RegistrationStepNotice
               message={buildRegistrationStepNoticeMessage(
                 availability.stalls,
-                isRegistrationStatusLoading,
               )}
+              isLoading={isRegistrationStatusLoading}
               containerStyle={styles.errorCard}
               textStyle={styles.errorText}
               ctaLabel={
@@ -664,8 +664,8 @@ export default function AdminCompetitionRegistrationsScreen(props) {
             <RegistrationStepNotice
               message={buildRegistrationStepNoticeMessage(
                 availability.shavings,
-                isRegistrationStatusLoading,
               )}
+              isLoading={isRegistrationStatusLoading}
               containerStyle={styles.errorCard}
               textStyle={styles.errorText}
               ctaLabel={

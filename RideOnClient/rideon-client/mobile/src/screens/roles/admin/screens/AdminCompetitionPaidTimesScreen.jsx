@@ -467,8 +467,8 @@ export default function AdminCompetitionPaidTimesScreen(props) {
           <RegistrationStepNotice
             message={buildRegistrationStepNoticeMessage(
               availability.paidTimes,
-              isRegistrationStatusLoading,
             )}
+            isLoading={isRegistrationStatusLoading}
             containerStyle={styles.errorCard}
             textStyle={styles.errorText}
           />

@@ -19,8 +19,6 @@ var REGISTRATION_STEP_REASON_MESSAGES = {
 var REGISTRATION_STEP_ENDED_MESSAGE =
   "התחרות הסתיימה, ולא ניתן עוד לבצע שינויים בשלב זה.";
 
-var REGISTRATION_STEP_LOADING_MESSAGE = "בודקת זמינות השלב...";
-
 function formatOpeningDate(value) {
   if (!value) {
     return "";
@@ -41,11 +39,11 @@ function formatOpeningDate(value) {
 
 // הודעה גנרית ל"שלב לא זמין" - נשענת על reason keys קריאים למכונה בלבד
 // (ראה registrationStepAvailability.js), לא על טקסט עסקי כפול.
-function buildRegistrationStepNoticeMessage(stepAvailability, isStatusLoading) {
-  if (isStatusLoading) {
-    return REGISTRATION_STEP_LOADING_MESSAGE;
-  }
-
+//
+// CAP-5: loading is no longer this function's concern - RegistrationStepNotice
+// itself short-circuits to a spinner-only render via its own isLoading prop,
+// so callers never need a "checking availability..." string here.
+function buildRegistrationStepNoticeMessage(stepAvailability) {
   if (!stepAvailability) {
     return REGISTRATION_STEP_REASON_MESSAGES.STATUS_UNAVAILABLE;
   }
@@ -75,5 +73,4 @@ export {
   formatOpeningDate,
   REGISTRATION_STEP_REASON_MESSAGES,
   REGISTRATION_STEP_ENDED_MESSAGE,
-  REGISTRATION_STEP_LOADING_MESSAGE,
 };
