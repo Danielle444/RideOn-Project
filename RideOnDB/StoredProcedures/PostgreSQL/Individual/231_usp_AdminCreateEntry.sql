@@ -363,7 +363,9 @@ begin
 
         insert into public.createentryrequest (proposedentryid, status)
         values (v_entryid, 'Pending')
-        returning createentryrequestid
+        -- Table-qualified: same RETURNS TABLE ambiguity as entryid above,
+        -- this time on createentryrequestid (42702).
+        returning public.createentryrequest.createentryrequestid
         into v_createentryrequestid;
 
         v_resulttype := 'PendingCreateApproval';

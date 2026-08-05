@@ -496,6 +496,33 @@ namespace RideOnServer.Tests
             ProcSource().Should().Contain("RETURNS TABLE(\n    resulttype text,\n    entryid integer,\n    createentryrequestid integer\n)");
         }
 
+        [Fact]
+        public void Pending_branch_qualifies_the_returned_createentryrequestid_column()
+        {
+            // Same RETURNS TABLE ambiguity as entryid, on the other output column:
+            // createentryrequestid is also declared in RETURNS TABLE(...), so a bare
+            // "returning createentryrequestid" on the createentryrequest insert is
+            // ambiguous and fails live with PostgreSQL 42702. Only the Pending
+            // branch inserts into createentryrequest, so exactly one qualified
+            // occurrence is expected (unlike entryid's two).
+            string source = ProcSource();
+
+            CountOccurrences(source, "returning public.createentryrequest.createentryrequestid").Should().Be(
+                1, "only the Pending branch inserts into createentryrequest, and it must qualify the RETURNING column");
+
+            Regex.IsMatch(source, @"returning\s+createentryrequestid\b").Should().BeFalse(
+                "no bare, unqualified 'returning createentryrequestid' may remain anywhere in the proc");
+        }
+
+        [Fact]
+        public void Public_return_shape_still_names_the_third_column_createentryrequestid()
+        {
+            // Same guarantee as the entryid sibling test above: the fix must not
+            // touch the function's own public contract -- callers still read
+            // reader["createentryrequestid"] by that exact name.
+            ProcSource().Should().Contain("RETURNS TABLE(\n    resulttype text,\n    entryid integer,\n    createentryrequestid integer\n)");
+        }
+
         // =================================================================
         // 6. usp_admincreateentry: reused usp_insertentry validations present
         //    verbatim.
