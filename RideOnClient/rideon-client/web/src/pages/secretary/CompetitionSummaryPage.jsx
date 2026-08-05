@@ -271,6 +271,8 @@ function SummaryPageContent(props) {
         items={page.federationMatchingItems}
         loading={page.federationMatchingLoading}
         approving={page.federationMatchingApproving}
+        processingRowKeys={page.federationMatchingProcessingRowKeys}
+        bulkApproving={page.federationMatchingBulkRunning}
         error={page.federationMatchingError}
         success={page.federationMatchingSuccess}
         activeTab={page.federationMatchingActiveTab}
@@ -288,6 +290,7 @@ function SummaryPageContent(props) {
         onClose={page.closeFederationMatchingModal}
         onReload={page.loadFederationMatchingSuggestions}
         onApprove={page.approveFederationMatchingSuggestion}
+        onApproveAll={page.approveAllFederationMatchingSuggestions}
         onChangeTab={page.changeFederationMatchingTab}
         onManualCreditSearchTextChange={page.changeManualCreditSearchText}
         onSearchManualCredits={page.searchManualFederationCredits}

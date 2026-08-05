@@ -32,6 +32,19 @@ function getConfidenceClass(confidenceLevel) {
   return "border-[#E6DCD5] bg-[#FCFAF8] text-[#7B5A4D]";
 }
 
+function getRowKey(item) {
+  var creditId = getValue(
+    item,
+    "federationExternalCreditId",
+    "FederationExternalCreditId",
+    0,
+  );
+
+  var paidByPersonId = getValue(item, "paidByPersonId", "PaidByPersonId", 0);
+
+  return String(creditId) + "-" + String(paidByPersonId);
+}
+
 function getCreditId(credit) {
   return getValue(
     credit,
@@ -51,6 +64,9 @@ function getPayerName(payer) {
 
 function SuggestionsTab(props) {
   var items = Array.isArray(props.items) ? props.items : [];
+  var processingRowKeys = Array.isArray(props.processingRowKeys)
+    ? props.processingRowKeys
+    : [];
 
   if (props.loading) {
     return (
@@ -89,21 +105,9 @@ function SuggestionsTab(props) {
 
           <tbody>
             {items.map(function (item) {
-              var creditId = getValue(
-                item,
-                "federationExternalCreditId",
-                "FederationExternalCreditId",
-                0,
-              );
-
-              var paidByPersonId = getValue(
-                item,
-                "paidByPersonId",
-                "PaidByPersonId",
-                0,
-              );
-
-              var rowKey = String(creditId) + "-" + String(paidByPersonId);
+              var rowKey = getRowKey(item);
+              var isRowProcessing = processingRowKeys.indexOf(rowKey) >= 0;
+              var isRowDisabled = isRowProcessing || props.bulkApproving;
 
               var confidenceLevel = getValue(
                 item,
@@ -192,7 +196,7 @@ function SuggestionsTab(props) {
                       onClick={function () {
                         props.onApprove(item);
                       }}
-                      disabled={props.approving}
+                      disabled={isRowDisabled}
                       className="flex items-center justify-center gap-2 rounded-xl bg-[#8B5E4C] px-4 py-2 text-xs font-black text-white transition-colors hover:bg-[#765041] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <CheckCircle2 size={15} />
@@ -532,6 +536,13 @@ export default function FederationMatchingSuggestionsModal(props) {
 
   var items = Array.isArray(props.items) ? props.items : [];
   var activeTab = props.activeTab || "suggestions";
+  var processingRowKeys = Array.isArray(props.processingRowKeys)
+    ? props.processingRowKeys
+    : [];
+
+  var approvableCount = items.filter(function (item) {
+    return processingRowKeys.indexOf(getRowKey(item)) < 0;
+  }).length;
 
   return (
     <div
@@ -612,10 +623,27 @@ export default function FederationMatchingSuggestionsModal(props) {
                   נמצאו {items.length} הצעות התאמה
                 </div>
 
+                {approvableCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={props.onApproveAll}
+                    disabled={props.bulkApproving}
+                    className="flex items-center justify-center gap-2 rounded-2xl bg-[#8B5E4C] px-5 py-3 font-black text-white transition-colors hover:bg-[#765041] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <CheckCircle2 size={17} />
+                    אשר הכל
+                  </button>
+                ) : null}
+
                 <button
                   type="button"
                   onClick={props.onReload}
-                  disabled={props.loading || props.approving}
+                  disabled={
+                    props.loading ||
+                    props.approving ||
+                    props.bulkApproving ||
+                    processingRowKeys.length > 0
+                  }
                   className="flex items-center justify-center gap-2 rounded-2xl border border-[#D8CBC3] bg-white px-5 py-3 font-bold text-[#6D4C41] transition-colors hover:bg-[#F8F3EF] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <RefreshCw size={17} />
@@ -630,7 +658,8 @@ export default function FederationMatchingSuggestionsModal(props) {
               <SuggestionsTab
                 items={items}
                 loading={props.loading}
-                approving={props.approving}
+                processingRowKeys={processingRowKeys}
+                bulkApproving={props.bulkApproving}
                 onApprove={props.onApprove}
               />
             ) : (
