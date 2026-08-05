@@ -255,6 +255,11 @@ namespace RideOnServer.BL
                 throw new Exception("Invalid federation credit allocation request");
             }
 
+            if (string.IsNullOrWhiteSpace(request.OperationId))
+            {
+                throw new Exception("OperationId is required");
+            }
+
             ValidateCompetitionAndRanch(
                 request.CompetitionId,
                 request.RanchId
@@ -840,6 +845,11 @@ namespace RideOnServer.BL
     ApproveFederationMatchingSuggestionRequest request,
     int approvedBySystemUserId)
         {
+            if (string.IsNullOrWhiteSpace(request.OperationId))
+            {
+                throw new Exception("OperationId is required");
+            }
+
             ValidateCompetitionAndRanch(
                 request.CompetitionId,
                 request.RanchId
@@ -877,6 +887,11 @@ namespace RideOnServer.BL
     BulkAllocateFederationCreditRequest request,
     int allocatedBySystemUserId)
         {
+            if (string.IsNullOrWhiteSpace(request.OperationId))
+            {
+                throw new Exception("OperationId is required");
+            }
+
             ValidateCompetitionAndRanch(
                 request.CompetitionId,
                 request.RanchId

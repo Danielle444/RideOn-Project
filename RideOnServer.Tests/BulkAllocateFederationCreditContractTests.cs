@@ -270,11 +270,17 @@ namespace RideOnServer.Tests
         }
 
         [Fact]
-        public void The_dal_calls_the_bulk_stored_procedure_not_the_single_charge_one()
+        public void The_dal_calls_the_idempotent_bulk_wrapper_not_the_single_charge_functions()
         {
+            // 2026-08-06: superseded by usp_bulkallocatefederationcredittochargesidempotent
+            // (229), which reproduces 225's own validation and delegates to the
+            // secured wrapper (226) per charge inside its own SQL body - see
+            // AllocationIdempotencyContractTests. The DAL no longer calls 225
+            // directly for this method.
             string body = DalBulkAllocateMethodBody();
 
-            body.Should().Contain("public.usp_bulkallocatefederationcredittocharges(");
+            body.Should().Contain("public.usp_bulkallocatefederationcredittochargesidempotent(");
+            body.Should().NotContain("usp_bulkallocatefederationcredittocharges(");
             body.Should().NotContain("usp_allocatefederationcredittocharge(");
         }
 
