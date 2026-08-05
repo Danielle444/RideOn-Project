@@ -111,6 +111,104 @@ namespace RideOnServer.DAL
             }
         }
 
+        // Stage B: builds the usp_admincreateentry call. Named-argument
+        // notation, same reasoning as BuildInsertEntryCommand above -- never
+        // the positional CreateCommandWithStoredProcedure helper for a new
+        // proc with this many parameters. Public static for the same
+        // no-database unit-testability reason.
+        // personId is a separate parameter, deliberately not a field on
+        // AdminCreateEntryRequest -- see that DTO's header comment.
+        public static NpgsqlCommand BuildAdminCreateEntryCommand(
+            AdminCreateEntryRequest request,
+            int personId,
+            NpgsqlConnection? connection)
+        {
+            NpgsqlCommand command = new NpgsqlCommand(@"
+                SELECT *
+                FROM public.usp_admincreateentry(
+                    p_operationid             := @operationId,
+                    p_personid                := @personId,
+                    p_competitionid           := @competitionId,
+                    p_ranchid                 := @ranchId,
+                    p_classincompid           := @classInCompId,
+                    p_horseid                 := @horseId,
+                    p_riderfederationmemberid := @riderFederationMemberId,
+                    p_coachfederationmemberid := @coachFederationMemberId,
+                    p_paidbypersonid          := @paidByPersonId,
+                    p_prizerecipientname      := @prizeRecipientName
+                );", connection);
+
+            command.Parameters.Add("@operationId", NpgsqlDbType.Text).Value =
+                request.OperationId;
+
+            command.Parameters.Add("@personId", NpgsqlDbType.Integer).Value =
+                personId;
+
+            command.Parameters.Add("@competitionId", NpgsqlDbType.Integer).Value =
+                request.CompetitionId;
+
+            command.Parameters.Add("@ranchId", NpgsqlDbType.Integer).Value =
+                request.RanchId;
+
+            command.Parameters.Add("@classInCompId", NpgsqlDbType.Integer).Value =
+                request.ClassInCompId;
+
+            command.Parameters.Add("@horseId", NpgsqlDbType.Integer).Value =
+                request.HorseId;
+
+            command.Parameters.Add("@riderFederationMemberId", NpgsqlDbType.Integer).Value =
+                request.RiderFederationMemberId;
+
+            command.Parameters.Add("@coachFederationMemberId", NpgsqlDbType.Integer).Value =
+                request.CoachFederationMemberId.HasValue
+                    ? (object)request.CoachFederationMemberId.Value
+                    : DBNull.Value;
+
+            command.Parameters.Add("@paidByPersonId", NpgsqlDbType.Integer).Value =
+                request.PaidByPersonId;
+
+            command.Parameters.Add("@prizeRecipientName", NpgsqlDbType.Varchar).Value =
+                (object?)request.PrizeRecipientName ?? DBNull.Value;
+
+            return command;
+        }
+
+        public AdminCreateEntryResult AdminCreateEntry(AdminCreateEntryRequest request, int personId)
+        {
+            try
+            {
+                using var connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using var command = BuildAdminCreateEntryCommand(request, personId, connection);
+
+                using NpgsqlDataReader reader = command.ExecuteReader();
+
+                if (!reader.Read())
+                {
+                    throw new Exception("usp_admincreateentry returned no row");
+                }
+
+                return new AdminCreateEntryResult
+                {
+                    ResultType = reader["resulttype"].ToString() ?? string.Empty,
+                    EntryId = Convert.ToInt32(reader["entryid"]),
+                    CreateEntryRequestId = reader["createentryrequestid"] == DBNull.Value
+                        ? null
+                        : Convert.ToInt32(reader["createentryrequestid"])
+                };
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule guard raised inside usp_admincreateentry
+                // (idempotency mismatch, authorization failure, or any of the
+                // reused usp_insertentry validations). Same convention as
+                // InsertEntry above -- surfaced verbatim, mapped to 409 by
+                // the controller.
+                throw new BL.ValidationException(ex.MessageText);
+            }
+        }
+
         public List<PaidTimeCandidateItem> GetPaidTimeCandidatesByRanch(int competitionId, int ranchId)
         {
             List<PaidTimeCandidateItem> result = new List<PaidTimeCandidateItem>();

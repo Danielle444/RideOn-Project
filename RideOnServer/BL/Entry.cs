@@ -20,6 +20,18 @@ namespace RideOnServer.BL
             return dal.InsertEntry(request);
         }
 
+        // Stage B: thin wrapper, same shape as CreateEntry above. No
+        // registration-ended business decision is made here or in the
+        // controller -- usp_admincreateentry alone decides DirectCreated vs
+        // PendingCreateApproval, from live competition dates. personId is a
+        // separate parameter, never a field on the request DTO -- see
+        // AdminCreateEntryRequest's header comment.
+        public static AdminCreateEntryResult AdminCreateEntry(AdminCreateEntryRequest request, int personId)
+        {
+            EntryDAL dal = new EntryDAL();
+            return dal.AdminCreateEntry(request, personId);
+        }
+
         public static List<PaidTimeCandidateItem> GetPaidTimeCandidatesByRanch(int competitionId, int ranchId)
         {
             if (competitionId <= 0)

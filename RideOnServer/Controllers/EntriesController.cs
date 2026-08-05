@@ -54,6 +54,53 @@ namespace RideOnServer.Controllers
             }
         }
 
+        // Stage B: admin-direct entry creation, routed server-side (Direct vs
+        // Pending) by usp_admincreateentry from live registration state.
+        // Deliberately a NEW, separate endpoint -- POST /Entries above is
+        // left completely unchanged, so any client still calling it keeps
+        // its exact current behavior regardless of this addition.
+        [HttpPost("admin-create")]
+        public IActionResult AdminCreateEntry([FromBody] AdminCreateEntryRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.RanchAdmin
+                );
+
+                // personId is never a field on AdminCreateEntryRequest -- it
+                // is passed as its own parameter, so there is nothing on the
+                // request body to overwrite. See the DTO's header comment.
+                AdminCreateEntryResult result = Entry.AdminCreateEntry(request, personId);
+
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Idempotency mismatch, payer authorization failure, or any
+                // reused usp_insertentry business-rule guard raised as RN001.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in AdminCreateEntry: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת הרשמה למקצה");
+            }
+        }
+
         [HttpGet("paid-time-candidates")]
         public IActionResult GetPaidTimeCandidatesByRanch(
             [FromQuery] int competitionId,
