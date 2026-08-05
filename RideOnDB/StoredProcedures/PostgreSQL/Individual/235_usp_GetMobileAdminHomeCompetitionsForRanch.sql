@@ -2,6 +2,16 @@
 -- replacement for the admin-home teaser. usp_getmobileadminhomecompetitions
 -- (person-scoped, EXISTS-gated on personal orders) is left unchanged so the
 -- currently-deployed backend keeps working until this branch's server ships.
+--
+-- CAP-1 fix (competition-visibility-gating-backend, 2026-08-06): the original
+-- filter matched on stored competitionstatus in ('כעת','פעילה','עתידית') --
+-- values that are recomputed in C# (Competition.CalculateEffectiveStatus) and
+-- are not reliably persisted, so the filter matched zero rows in practice
+-- (live audit: no row in the table has ever stored any of those three
+-- values). Replaced with a date-based gate (not yet finished) plus explicit
+-- exclusion of the two reliably-stored non-public states; LIMIT widened from
+-- 3 to 10 so the BL's own effective-status recompute + Take(3) still has a
+-- real candidate pool to work with.
 
 CREATE OR REPLACE FUNCTION public.usp_getmobileadminhomecompetitionsforranch(p_ranchid integer)
  RETURNS TABLE("CompetitionId" integer, "HostRanchId" integer, "HostRanchName" text, "FieldId" smallint, "CreatedBySystemUserId" integer, "CompetitionName" character varying, "CompetitionStartDate" date, "CompetitionEndDate" date, "RegistrationOpenDate" date, "RegistrationEndDate" date, "PaidTimeRegistrationDate" date, "PaidTimePublicationDate" date, "CompetitionStatus" character varying, "Notes" character varying, "StallMapUrl" character varying, "FieldName" text)
@@ -32,14 +42,11 @@ begin
     inner join public.ranch r
         on c.hostranchid = r.ranchid
     where c.hostranchid = p_ranchid
-      and c.competitionstatus in ('כעת', 'פעילה', 'עתידית')
+      and c.competitionenddate >= current_date
+      and c.competitionstatus is distinct from 'טיוטה'
+      and c.competitionstatus is distinct from 'בוטלה'
     order by
-        case c.competitionstatus
-            when 'כעת' then 0
-            when 'פעילה' then 1
-            when 'עתידית' then 2
-        end,
         c.competitionstartdate asc
-    limit 3;
+    limit 10;
 end;
 $function$
