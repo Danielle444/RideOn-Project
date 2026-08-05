@@ -75,6 +75,7 @@ export default function CompetitionStallBookingFormCard(props) {
         minimumDate={props.minCompetitionDate}
         maximumDate={props.maxCompetitionDate}
         highlightedRange={props.highlightedCompetitionRange}
+        orderedDates={props.orderedDates}
       />
 
       <CompetitionDateField
@@ -84,6 +85,7 @@ export default function CompetitionStallBookingFormCard(props) {
         minimumDate={props.minCompetitionDate}
         maximumDate={props.maxCompetitionDate}
         highlightedRange={props.highlightedCompetitionRange}
+        orderedDates={props.orderedDates}
       />
 
       {isDateRangeInvalid ? (
@@ -98,20 +100,29 @@ export default function CompetitionStallBookingFormCard(props) {
             לכל הסוסים שרשומים למקצים כבר הוזמן תא בתחרות הזו.
           </Text>
         </View>
-      ) : (
-        <CompetitionRegistrationDropdown
-          label="הוספת סוס"
-          placeholder="בחירת סוס"
-          searchPlaceholder="חיפוש סוס"
-          items={props.availableHorseOptions}
-          selectedItem={props.selectedHorseToAdd}
-          getItemId={function (item) {
-            return item.horseId;
-          }}
-          getItemLabel={props.formatHorseLabel}
-          onSelect={props.setSelectedHorseToAdd}
-        />
-      )}
+      ) : null}
+
+      <CompetitionRegistrationDropdown
+        label="הוספת סוס"
+        placeholder="בחירת סוס"
+        searchPlaceholder="חיפוש סוס"
+        items={props.availableHorseOptions}
+        selectedItem={props.selectedHorseToAdd}
+        getItemId={function (item) {
+          return item.horseId;
+        }}
+        getItemLabel={props.formatHorseLabel}
+        getItemDisabled={function (item) {
+          return (
+            Array.isArray(props.bookedHorseIds) &&
+            props.bookedHorseIds.includes(item.horseId)
+          );
+        }}
+        getItemDisabledLabel={function () {
+          return "כבר הוזמן תא";
+        }}
+        onSelect={props.setSelectedHorseToAdd}
+      />
 
       <View style={styles.fieldBlock}>
         {props.selectedHorseBookings.length > 0 ? (

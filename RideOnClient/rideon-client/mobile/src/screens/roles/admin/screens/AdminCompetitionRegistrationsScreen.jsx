@@ -555,6 +555,8 @@ export default function AdminCompetitionRegistrationsScreen(props) {
               setNotes={stallBookings.setNotes}
               selectedHorseBookings={stallBookings.selectedHorseBookings}
               availableHorseOptions={stallBookings.availableHorseOptions}
+              bookedHorseIds={stallBookings.bookedHorseIds}
+              orderedDates={stallBookings.orderedDates}
               allEligibleHorsesAlreadyBooked={
                 stallBookings.allEligibleHorsesAlreadyBooked
               }

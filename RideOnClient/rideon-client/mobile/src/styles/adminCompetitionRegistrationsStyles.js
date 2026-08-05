@@ -153,11 +153,25 @@ var styles = StyleSheet.create({
     borderBottomColor: "#F0E4DC",
   },
 
+  dropdownItemDisabled: {
+    backgroundColor: "#F7F2ED",
+  },
+
   dropdownItemText: {
     fontSize: 14,
     color: "#4F3B31",
     textAlign: "right",
     lineHeight: 22,
+  },
+
+  dropdownItemTextDisabled: {
+    color: "#B3A79C",
+  },
+
+  dropdownItemBadgeText: {
+    fontSize: 12,
+    color: "#A79185",
+    textAlign: "right",
   },
 
   dropdownEmptyWrap: {

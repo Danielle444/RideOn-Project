@@ -1,12 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import {
-  getRidersByRanch,
-  getTrainersByRanch,
-} from "../services/federationMembersService";
+import { getTrainersByRanch } from "../services/federationMembersService";
 import { getCompetitionInvitationDetails } from "../services/competitionService";
-import { getHorsesByRanch } from "../services/horsesService";
-import { getManagedPayers } from "../services/payerService";
+import { getPaidTimeCandidatesByRanch } from "../services/entriesService";
 import { createPaidTimeRequest } from "../services/paidTimeRequestsService";
 import {
   validatePaidTimeForm,
@@ -54,6 +50,8 @@ function normalizeFederationMemberItem(item) {
     fullName:
       item.fullName ||
       item.FullName ||
+      item.riderName ||
+      item.RiderName ||
       (
         (item.firstName || item.FirstName || "") +
         " " +
@@ -68,18 +66,45 @@ function normalizePayerItem(item) {
   }
 
   return {
-    personId: item.personId || item.PersonId || null,
+    personId:
+      item.personId ||
+      item.PersonId ||
+      item.paidByPersonId ||
+      item.PaidByPersonId ||
+      null,
     firstName: item.firstName || item.FirstName || "",
     lastName: item.lastName || item.LastName || "",
     fullName:
       item.fullName ||
       item.FullName ||
+      item.payerName ||
+      item.PayerName ||
       (
         (item.firstName || item.FirstName || "") +
         " " +
         (item.lastName || item.LastName || "")
       ).trim(),
   };
+}
+
+// דה-דופ של שורות מועמדים לפי מפתח, בסדר ההופעה הראשון - ל-CAP-1
+// (הורדת הכפילויות מ-usp_getpaidtimecandidatesbyranch, שמחזירה שורה לכל entry).
+function dedupeByKey(items, keyGetter) {
+  var seen = {};
+  var result = [];
+
+  items.forEach(function (item) {
+    var key = keyGetter(item);
+
+    if (key === null || key === undefined || key === "" || seen[key]) {
+      return;
+    }
+
+    seen[key] = true;
+    result.push(item);
+  });
+
+  return result;
 }
 
 function normalizePaidTimeSlotItem(item) {
@@ -255,17 +280,22 @@ export default function useAdminCompetitionPaidTimes(params) {
           activeRole.roleId,
           activeRole.ranchId,
         ),
-        getHorsesByRanch(activeRole.ranchId, null),
-        getManagedPayers(activeRole.ranchId, null, null),
-        getRidersByRanch(activeRole.ranchId, null),
+        getPaidTimeCandidatesByRanch(competitionId, activeRole.ranchId),
         getTrainersByRanch(activeRole.ranchId, null),
       ]);
 
       var invitationResponse = results[0];
-      var horsesResponse = results[1];
-      var payersResponse = results[2];
-      var ridersResponse = results[3];
-      var trainersResponse = results[4];
+      var candidatesResponse = results[1];
+      var trainersResponse = results[2];
+
+      // CAP-1: מקור אחד לסוס/רוכב/משלם - רק בעלי חיים/גורמים הרשומים
+      // בפועל למקצה בתחרות הזו (usp_getpaidtimecandidatesbyranch), במקום
+      // כל בעלי החיים/גורמי החווה כולל "רוחות רפאים". המאמן נשאר מכל
+      // מאמני החווה (getTrainersByRanch) - הפרוצדורה מסננת מאמן חובה,
+      // כך שרשימת מאמנים ממנה תהיה חסרה.
+      var candidateRows = Array.isArray(candidatesResponse?.data)
+        ? candidatesResponse.data
+        : [];
 
       var incomingSlots = Array.isArray(invitationResponse?.data?.paidTimeSlots)
         ? invitationResponse.data.paidTimeSlots
@@ -306,7 +336,9 @@ export default function useAdminCompetitionPaidTimes(params) {
       );
 
       setHorses(
-        (Array.isArray(horsesResponse?.data) ? horsesResponse.data : [])
+        dedupeByKey(candidateRows, function (item) {
+          return item.horseId || item.HorseId || null;
+        })
           .map(function (item) {
             return normalizeHorseItem(item);
           })
@@ -314,7 +346,9 @@ export default function useAdminCompetitionPaidTimes(params) {
       );
 
       setPayers(
-        (Array.isArray(payersResponse?.data) ? payersResponse.data : [])
+        dedupeByKey(candidateRows, function (item) {
+          return item.paidByPersonId || item.PaidByPersonId || null;
+        })
           .map(function (item) {
             return normalizePayerItem(item);
           })
@@ -322,7 +356,11 @@ export default function useAdminCompetitionPaidTimes(params) {
       );
 
       setRiders(
-        (Array.isArray(ridersResponse?.data) ? ridersResponse.data : [])
+        dedupeByKey(candidateRows, function (item) {
+          return (
+            item.riderFederationMemberId || item.RiderFederationMemberId || null
+          );
+        })
           .map(function (item) {
             return normalizeFederationMemberItem(item);
           })

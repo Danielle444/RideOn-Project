@@ -145,6 +145,32 @@ function addDaysToDateString(dateString, days) {
   return formatDateForInput(date);
 }
 
+// CAP-5: כל התאריכים (כולל) בין startDate ל-endDate של הזמנת תא קיימת, לצורך
+// צביעת ימים שכבר הוזמנו ביומן. גבול בטיחות למניעת לולאה אינסופית על נתונים
+// פגומים - לעולם לא יידרשו יותר מ-366 ימים לתחרות בודדת.
+var ORDERED_DATE_RANGE_SAFETY_LIMIT = 366;
+
+function enumerateDateRange(startDateString, endDateString) {
+  var start = parseDateOnlyString(startDateString);
+  var end = parseDateOnlyString(endDateString);
+
+  if (!start || !end || start.getTime() > end.getTime()) {
+    return [];
+  }
+
+  var dates = [];
+  var cursor = new Date(start.getTime());
+  var guard = 0;
+
+  while (cursor.getTime() <= end.getTime() && guard < ORDERED_DATE_RANGE_SAFETY_LIMIT) {
+    dates.push(formatDateForInput(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+    guard += 1;
+  }
+
+  return dates;
+}
+
 function normalizeCompetitionSummary(item) {
   if (!item) {
     return {
@@ -681,6 +707,29 @@ export default function useAdminCompetitionStallBookings(params) {
     [existingStallBookings],
   );
 
+  // CAP-5: ימים שכבר יש להם הזמנת תא בתחרות הזו (לכל סוס/ציוד) - צביעה
+  // בלבד, לא חסימת בחירה. "מוזמן" הוא לפי סוס בודד, לא הגבלה גלובלית.
+  var orderedDates = useMemo(
+    function () {
+      var uniqueDates = {};
+
+      existingStallBookings.forEach(function (booking) {
+        if (!booking || !booking.startDate || !booking.endDate) {
+          return;
+        }
+
+        enumerateDateRange(booking.startDate, booking.endDate).forEach(
+          function (dateString) {
+            uniqueDates[dateString] = true;
+          },
+        );
+      });
+
+      return Object.keys(uniqueDates);
+    },
+    [existingStallBookings],
+  );
+
   // CAP-1: כניסה מוגבלת מסיום ההרשמה (לא רשאים להזמין תא לפני שההרשמה
   // נסגרת), יציאה עם מרווח נוסף של יומיים אחרי סוף התחרות לפירוק.
   var minCompetitionDate = competitionSummary.registrationEndDate;
@@ -730,11 +779,13 @@ export default function useAdminCompetitionStallBookings(params) {
     minCompetitionDate: minCompetitionDate,
     maxCompetitionDate: maxCompetitionDate,
     highlightedCompetitionRange: highlightedCompetitionRange,
+    orderedDates: orderedDates,
 
     selectedHorseToAdd: horseHook.selectedHorseToAdd,
     setSelectedHorseToAdd: horseHook.setSelectedHorseToAdd,
     selectedHorseBookings: horseHook.selectedHorseBookings,
     availableHorseOptions: horseHook.availableHorseOptions,
+    bookedHorseIds: horseHook.bookedHorseIds,
     allEligibleHorsesAlreadyBooked: horseHook.allEligibleHorsesAlreadyBooked,
     hasAnyHorseStallBookingsForCompetition:
       horseHook.hasAnyHorseStallBookingsForCompetition,

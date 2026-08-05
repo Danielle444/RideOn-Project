@@ -116,6 +116,8 @@ export default function StallBookingCreateModal(props) {
             setSelectedHorseToAdd={stallBookings.setSelectedHorseToAdd}
             selectedHorseBookings={stallBookings.selectedHorseBookings}
             availableHorseOptions={stallBookings.availableHorseOptions}
+            bookedHorseIds={stallBookings.bookedHorseIds}
+            orderedDates={stallBookings.orderedDates}
             allEligibleHorsesAlreadyBooked={
               stallBookings.allEligibleHorsesAlreadyBooked
             }

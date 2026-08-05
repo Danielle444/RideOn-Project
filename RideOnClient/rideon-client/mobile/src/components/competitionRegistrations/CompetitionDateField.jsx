@@ -199,6 +199,9 @@ export default function CompetitionDateField(props) {
   var maximumDate = props.maximumDate;
   var highlightedRange = props.highlightedRange;
   var mode = props.mode || "date";
+  // CAP-5: אופציונלי, כבוי כברירת מחדל - רשימת תאריכים (מחרוזות YYYY-MM-DD)
+  // שכבר יש להם הזמנת תא בתחרות. צביעה בלבד, לעולם לא חוסם בחירה.
+  var orderedDates = Array.isArray(props.orderedDates) ? props.orderedDates : [];
 
   var [visible, setVisible] = useState(false);
 
@@ -235,6 +238,21 @@ export default function CompetitionDateField(props) {
       return parseDateString(highlightedRange && highlightedRange.end);
     },
     [highlightedRange && highlightedRange.end],
+  );
+
+  var orderedDatesSet = useMemo(
+    function () {
+      var set = {};
+
+      orderedDates.forEach(function (dateString) {
+        if (dateString) {
+          set[dateString] = true;
+        }
+      });
+
+      return set;
+    },
+    [orderedDates],
   );
 
   var [currentMonth, setCurrentMonth] = useState(
@@ -321,7 +339,16 @@ export default function CompetitionDateField(props) {
     return isDateInRange(date, highlightStartObj, highlightEndObj);
   }
 
+  function isOrderedDate(date) {
+    if (!date) {
+      return false;
+    }
+
+    return !!orderedDatesSet[formatDateForInput(date)];
+  }
+
   var hasHighlightedRange = !!(highlightStartObj && highlightEndObj);
+  var hasOrderedDates = orderedDates.length > 0;
 
   function getDisplayValue() {
     if (mode === "time") {
@@ -381,7 +408,7 @@ export default function CompetitionDateField(props) {
                   flexDirection: "row-reverse",
                   alignItems: "center",
                   gap: 6,
-                  marginBottom: 12,
+                  marginBottom: 8,
                 }}
               >
                 <View
@@ -396,6 +423,31 @@ export default function CompetitionDateField(props) {
                 />
                 <Text style={{ fontSize: 12, color: "#7B5A4D" }}>
                   ימי התחרות
+                </Text>
+              </View>
+            ) : null}
+
+            {mode === "date" && hasOrderedDates ? (
+              <View
+                style={{
+                  flexDirection: "row-reverse",
+                  alignItems: "center",
+                  gap: 6,
+                  marginBottom: 12,
+                }}
+              >
+                <View
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: 4,
+                    backgroundColor: "#E8C39E",
+                    borderWidth: 1,
+                    borderColor: "#B8763D",
+                  }}
+                />
+                <Text style={{ fontSize: 12, color: "#7B5A4D" }}>
+                  ימים שכבר הוזמן בהם תא
                 </Text>
               </View>
             ) : null}
@@ -476,8 +528,13 @@ export default function CompetitionDateField(props) {
                           {row.map(function (date, colIndex) {
                             var disabled = isDisabled(date);
                             var selected = isSameDay(date, selectedDate);
+                            var ordered =
+                              !disabled && !selected && isOrderedDate(date);
                             var highlighted =
-                              !disabled && !selected && isHighlighted(date);
+                              !disabled &&
+                              !selected &&
+                              !ordered &&
+                              isHighlighted(date);
 
                             return (
                               <Pressable
@@ -504,11 +561,15 @@ export default function CompetitionDateField(props) {
                                     alignItems: "center",
                                     backgroundColor: selected
                                       ? "#7B5A4D"
-                                      : highlighted
-                                        ? "#F3E7DF"
-                                        : "transparent",
-                                    borderWidth: highlighted ? 1 : 0,
-                                    borderColor: "#C9A98D",
+                                      : ordered
+                                        ? "#E8C39E"
+                                        : highlighted
+                                          ? "#F3E7DF"
+                                          : "transparent",
+                                    borderWidth: ordered || highlighted ? 1 : 0,
+                                    borderColor: ordered
+                                      ? "#B8763D"
+                                      : "#C9A98D",
                                   }}
                                 >
                                   <Text
