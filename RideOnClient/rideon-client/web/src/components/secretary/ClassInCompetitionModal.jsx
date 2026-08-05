@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
 import CustomDropdown from "../common/CustomDropdown";
 import MultiSelectPicker from "../common/MultiSelectPicker";
+import DatePicker from "../common/DatePicker";
 import {
   toInputDate,
   normalizeTimeForInput,
@@ -587,8 +588,7 @@ export default function ClassInCompetitionModal(props) {
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 תאריך
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={formData.classDate}
                 min={props.competitionStartDate || undefined}
                 max={props.competitionEndDate || undefined}

@@ -6,6 +6,7 @@ import { authTheme } from "../../../../shared/auth/theme/authTheme";
 import Field from "../../components/common/Field";
 import AuthButton from "../../components/common/AuthButton";
 import CustomDropdown from "../../components/common/CustomDropdown";
+import DatePicker from "../../components/common/DatePicker";
 import {
   register,
   createRanchRequest,
@@ -730,8 +731,7 @@ export default function RegisterScreen() {
                   </Field>
 
                   <Field label="תאריך לידה" required>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={form.dateOfBirth}
                       onChange={set("dateOfBirth")}
                       className={dateOfBirthLocked ? readOnlyCls : inputCls}

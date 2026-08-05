@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { getCompetitionPayersForSecretary } from "../../../services/secretaryPayersService";
 import { getHorsesForStallBooking } from "../../../services/stallBookingsService";
 import { getServicePricesDashboard } from "../../../services/servicePricesService";
+import DatePicker from "../../common/DatePicker";
 
 // Secretary "+ Add stall" modal. Loads payers, horses, and stall-product
 // types on open. Posts via parent's onSubmit.
@@ -308,8 +309,7 @@ export default function SecretaryCreateStallBookingModal(props) {
               <label className="block text-sm font-bold text-[#5D4037] mb-1">
                 מתאריך
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={startDate}
                 onChange={function (e) {
                   setStartDate(e.target.value);
@@ -321,8 +321,7 @@ export default function SecretaryCreateStallBookingModal(props) {
               <label className="block text-sm font-bold text-[#5D4037] mb-1">
                 עד תאריך
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={endDate}
                 onChange={function (e) {
                   setEndDate(e.target.value);

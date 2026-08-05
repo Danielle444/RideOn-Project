@@ -13,6 +13,7 @@ import {
 } from "../../../services/shavingsOrderService";
 import { getServicePricesDashboard } from "../../../services/servicePricesService";
 import { getErrorMessage } from "../../../utils/competitionForm.utils";
+import DatePicker from "../../common/DatePicker";
 
 function readKey(item, camel, pascal, fallback) {
   if (!item) {
@@ -487,8 +488,7 @@ export default function AddShavingsOrderModal(props) {
 
             {deliveryMode === "later" ? (
               <div className="mt-3 flex flex-wrap gap-3">
-                <input
-                  type="date"
+                <DatePicker
                   value={deliveryDate}
                   onChange={function (e) {
                     setDeliveryDate(e.target.value);
