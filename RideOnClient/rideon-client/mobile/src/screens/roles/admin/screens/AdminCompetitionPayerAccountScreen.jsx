@@ -29,6 +29,8 @@ import useRegistrationStepStatus from "../../../../hooks/useRegistrationStepStat
 
 import { canEditPaidTimeRow } from "../../../../utils/paidTimeEditAvailability";
 
+import { getAvailableDatesForTab } from "../../../../utils/payerAccountAvailableDates";
+
 import styles from "../../../../styles/adminCompetitionPayerAccountStyles";
 
 import { createChangeEntryRequest } from "../../../../services/entriesService";
@@ -39,7 +41,11 @@ import { createStallBookingCancelRequest } from "../../../../services/stallBooki
 
 import CompetitionEntryCreateModal from "../../../../components/competitions/CompetitionEntryCreateModal";
 
+import PaidTimeCreateModal from "../../../../components/competitions/PaidTimeCreateModal";
+
 import PaidTimeEditModal from "../../../../components/competitions/adminPaidTimes/PaidTimeEditModal";
+
+import StallBookingCreateModal from "../../../../components/competitions/StallBookingCreateModal";
 
 import StallBookingEditModal from "../../../../components/competitions/StallBookingEditModal";
 
@@ -216,6 +222,10 @@ export default function AdminCompetitionPayerAccountScreen(props) {
   var [showFilters, setShowFilters] = useState(false);
 
   var [showEntryCreateModal, setShowEntryCreateModal] = useState(false);
+
+  var [showPaidTimeCreateModal, setShowPaidTimeCreateModal] = useState(false);
+
+  var [showStallCreateModal, setShowStallCreateModal] = useState(false);
 
   var [editEntryItem, setEditEntryItem] = useState(null);
 
@@ -519,28 +529,33 @@ export default function AdminCompetitionPayerAccountScreen(props) {
     [account.stalls, searchText, dateFilter, paymentFilter],
   );
 
-  var availableDates = useMemo(
+  // CAP-4: date chips are scoped to whichever tab is active, using that
+  // tab's own date field only - never a union across classes/paidTimes/
+  // stalls (a date that only has, say, a stall booking must not appear as
+  // a choosable chip while on the classes tab). Logic lives in
+  // payerAccountAvailableDates.js so it's covered by focused vitest tests.
+  var availableDatesForActiveTab = useMemo(
     function () {
-      var keys = new Set();
-
-      (account.classes || []).forEach(function (item) {
-        var k = pickDateKey(item.classDateTime);
-        if (k !== "no-date") keys.add(k);
-      });
-
-      (account.paidTimes || []).forEach(function (item) {
-        var k = pickDateKey(item.displaySlotDate);
-        if (k !== "no-date") keys.add(k);
-      });
-
-      (account.stalls || []).forEach(function (item) {
-        var k = pickDateKey(item.startDate);
-        if (k !== "no-date") keys.add(k);
-      });
-
-      return Array.from(keys).sort();
+      return getAvailableDatesForTab(activeTab, account);
     },
-    [account.classes, account.paidTimes, account.stalls],
+    [activeTab, account.classes, account.paidTimes, account.stalls],
+  );
+
+  // CAP-4: switching tabs must not leave a date filter selected that has no
+  // meaning in the new tab. Smallest possible change - only resets when the
+  // currently selected date isn't one of the new tab's own dates; leaves an
+  // already-valid selection (or "all") untouched.
+  useEffect(
+    function () {
+      if (dateFilter === "all") {
+        return;
+      }
+
+      if (availableDatesForActiveTab.indexOf(dateFilter) === -1) {
+        setDateFilter("all");
+      }
+    },
+    [activeTab, availableDatesForActiveTab],
   );
 
   function renderChip(label, isActive, onPress, keyValue) {
@@ -672,7 +687,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
               {renderChip("כל התאריכים", dateFilter === "all", function () {
                 setDateFilter("all");
               })}
-              {availableDates.map(function (dKey) {
+              {availableDatesForActiveTab.map(function (dKey) {
                 return renderChip(
                   formatDate(dKey),
                   dateFilter === dKey,
@@ -810,7 +825,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
 
           <View style={styles.splitRow}>
             <View style={styles.splitPill}>
-              <Text style={styles.splitPillLabel}>חלק מארגן</Text>
+              <Text style={styles.splitPillLabel}>עלות מארגן</Text>
 
               <Text style={styles.splitPillValue}>
                 {formatCurrency(summary.classOrganizerTotal)}
@@ -818,7 +833,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
             </View>
 
             <View style={styles.splitPill}>
-              <Text style={styles.splitPillLabel}>חלק התאחדות</Text>
+              <Text style={styles.splitPillLabel}>עלות התאחדות</Text>
 
               <Text style={styles.splitPillValue}>
                 {formatCurrency(summary.classFederationTotal)}
@@ -835,10 +850,6 @@ export default function AdminCompetitionPayerAccountScreen(props) {
               {formatCurrency(summary.paidTimeTotal)}
             </Text>
           </View>
-
-          <Text style={styles.itemMutedText}>
-            חיוב מלא למארגן / חווה מארחת
-          </Text>
         </View>
 
         <View style={styles.itemCard}>
@@ -897,7 +908,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
     return (
       <Pressable
         onPress={function () {
-          props.navigation.navigate("AdminCompetitionRegistrations");
+          setShowPaidTimeCreateModal(true);
         }}
         style={{
           backgroundColor: "#FFFFFF",
@@ -910,7 +921,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
         }}
       >
         <Text style={{ color: "#7B5A4D", fontWeight: "800", fontSize: 13 }}>
-          + הוסף פייד טיים (מסך הרשמות)
+          + הוסף פייד טיים
         </Text>
       </Pressable>
     );
@@ -920,7 +931,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
     return (
       <Pressable
         onPress={function () {
-          props.navigation.navigate("AdminCompetitionStallsShavings");
+          setShowStallCreateModal(true);
         }}
         style={{
           backgroundColor: "#FFFFFF",
@@ -933,7 +944,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
         }}
       >
         <Text style={{ color: "#7B5A4D", fontWeight: "800", fontSize: 13 }}>
-          + הוסף תא (מסך תאים ונסורת)
+          + הוסף תא
         </Text>
       </Pressable>
     );
@@ -995,7 +1006,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
 
           <View style={styles.splitRow}>
             <View style={styles.splitPill}>
-              <Text style={styles.splitPillLabel}>מארגן</Text>
+              <Text style={styles.splitPillLabel}>עלות מארגן</Text>
 
               <Text style={styles.splitPillValue}>
                 {formatCurrency(item.organizerCost)}
@@ -1003,7 +1014,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
             </View>
 
             <View style={styles.splitPill}>
-              <Text style={styles.splitPillLabel}>התאחדות</Text>
+              <Text style={styles.splitPillLabel}>עלות התאחדות</Text>
 
               <Text style={styles.splitPillValue}>
                 {formatCurrency(item.federationCost)}
@@ -1347,6 +1358,17 @@ export default function AdminCompetitionPayerAccountScreen(props) {
         onCreated={account.reload}
       />
 
+      <PaidTimeCreateModal
+        visible={showPaidTimeCreateModal}
+        lockedPayerPersonId={lockedPayerPersonId}
+        paidTimesStepAvailability={paidTimesAvailability}
+        isRegistrationStatusLoading={registrationStepStatus.loading}
+        onClose={function () {
+          setShowPaidTimeCreateModal(false);
+        }}
+        onCreated={account.reload}
+      />
+
       <PaidTimeEditModal
         visible={!!editPaidTimeItem}
         item={editPaidTimeItem}
@@ -1357,6 +1379,15 @@ export default function AdminCompetitionPayerAccountScreen(props) {
           setEditPaidTimeItem(null);
         }}
         onSaved={account.reload}
+      />
+
+      <StallBookingCreateModal
+        visible={showStallCreateModal}
+        lockedPayerPersonId={lockedPayerPersonId}
+        onClose={function () {
+          setShowStallCreateModal(false);
+        }}
+        onCreated={account.reload}
       />
 
       <StallBookingEditModal

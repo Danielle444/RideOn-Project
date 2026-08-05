@@ -38,6 +38,12 @@ export default function useAdminHorseStallBookings(params) {
   var endDate = params.endDate;
   var notes = params.notes;
   var reloadStallBookings = params.reloadStallBookings;
+  // CAP-5: when set (the payer-account entry point), every horse booking in
+  // this session is hard-locked to this one payer - default-selected, the
+  // only choosable option, and not toggleable. undefined/null elsewhere
+  // (the real Registrations screen never passes this), so behavior there is
+  // unchanged.
+  var lockedPayer = params.lockedPayer || null;
 
   var [selectedHorseToAdd, setSelectedHorseToAdd] = useState(null);
   var [selectedHorseBookings, setSelectedHorseBookings] = useState([]);
@@ -124,7 +130,9 @@ export default function useAdminHorseStallBookings(params) {
         return prev.concat([
           {
             horse: selectedHorseToAdd,
-            payers: getDefaultHorsePayers(selectedHorseToAdd.horseId),
+            payers: lockedPayer
+              ? [lockedPayer]
+              : getDefaultHorsePayers(selectedHorseToAdd.horseId),
             stallType: selectedHorseStallType,
           },
         ]);
@@ -132,10 +140,14 @@ export default function useAdminHorseStallBookings(params) {
 
       setSelectedHorseToAdd(null);
     },
-    [selectedHorseToAdd, selectedHorseStallType],
+    [selectedHorseToAdd, selectedHorseStallType, lockedPayer],
   );
 
   function getAvailablePayersForHorse(horseId, managedPayers) {
+    if (lockedPayer) {
+      return [lockedPayer];
+    }
+
     var defaultPayers = getDefaultHorsePayers(horseId);
     return uniqByPersonId(defaultPayers.concat(managedPayers || []));
   }
@@ -153,6 +165,11 @@ export default function useAdminHorseStallBookings(params) {
   }
 
   function toggleHorsePayerSelection(horseId, payerItem) {
+    // CAP-5: locked payer can be neither deselected nor replaced.
+    if (lockedPayer) {
+      return;
+    }
+
     if (!horseId || !payerItem || !payerItem.paidByPersonId) {
       return;
     }
