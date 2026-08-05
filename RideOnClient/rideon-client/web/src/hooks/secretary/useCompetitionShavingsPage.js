@@ -125,7 +125,10 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
         setRanchRollup(rollup);
 
         // Enumerate participating ranches from the rollup; loop R2 per ranch in parallel.
-        const perRanch = await Promise.all(
+        // allSettled (not all): a single ranch's request failing must not blank the whole
+        // page. Render every ranch that loaded and drop the ones that errored, so one bad
+        // response degrades gracefully instead of bouncing the secretary off the screen.
+        const perRanchSettled = await Promise.allSettled(
           rollup.map(function (row) {
             const bookingRanchId = rollupRanchId(row);
 
@@ -148,8 +151,12 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
         );
 
         setOrders(
-          perRanch.reduce(function (all, list) {
-            return all.concat(list);
+          perRanchSettled.reduce(function (all, settled) {
+            if (settled.status === "fulfilled") {
+              return all.concat(settled.value);
+            }
+
+            return all;
           }, []),
         );
       } catch (err) {
