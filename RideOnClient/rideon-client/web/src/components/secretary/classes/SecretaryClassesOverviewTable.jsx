@@ -295,7 +295,6 @@ export default function SecretaryClassesOverviewTable(props) {
             ? items.map(function (item) {
                 var orderInDay = getOrderInDay(item);
                 var classEntriesCount = props.getEntriesCountForClass(item);
-                var groupEntriesCount = props.getEntriesCountForGroup(item);
                 var status = props.getClassStatus
                   ? props.getClassStatus(item)
                   : { key: "empty", label: "אין כניסות" };
@@ -396,10 +395,6 @@ export default function SecretaryClassesOverviewTable(props) {
                             }
                           >
                             {classEntriesCount}
-                          </span>
-
-                          <span className="text-xs text-[#8D6E63]">
-                            {groupEntriesCount} במס׳ זה
                           </span>
                         </div>
                       </td>
