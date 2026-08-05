@@ -16,6 +16,7 @@ export default function StallMapUploader({
   compound,
   onLayoutParsed,
   buttonLabel,
+  onError,
 }) {
   const inputRef = useRef(null);
 
@@ -69,7 +70,12 @@ export default function StallMapUploader({
         onLayoutParsed(layout);
         e.target.value = "";
       } catch (err) {
-        alert("שגיאה בקריאת קובץ ה-Excel. וודא שהקובץ תקין.");
+        const message = "שגיאה בקריאת קובץ ה-Excel. וודא שהקובץ תקין.";
+        if (onError) {
+          onError(message);
+        } else {
+          alert(message);
+        }
         e.target.value = "";
       }
     };

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getActiveRole } from "../../services/storageService";
+import { getErrorMessage } from "../../utils/competitionForm.utils";
 import {
   getServicePricesDashboard,
   createServiceProduct,
@@ -57,7 +58,7 @@ export default function useServicePricesPage() {
       console.error(err);
       showToast(
         "error",
-        err.response?.data || err.message || "שגיאה בטעינת מחירון השירותים",
+        getErrorMessage(err, "שגיאה בטעינת מחירון השירותים"),
       );
       setSections([]);
     } finally {
@@ -149,7 +150,10 @@ export default function useServicePricesPage() {
       setHistoryItems(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error(err);
-      showToast("error", err.response?.data || "שגיאה בטעינת היסטוריית המחירים");
+      showToast(
+        "error",
+        getErrorMessage(err, "שגיאה בטעינת היסטוריית המחירים"),
+      );
       setHistoryOpen(false);
       setHistoryProduct(null);
       setHistoryItems([]);
@@ -242,7 +246,7 @@ export default function useServicePricesPage() {
         } catch (err) {
           console.error(err);
           closeConfirmDialog();
-          showToast("error", err.response?.data || "שגיאה במחיקת המוצר");
+          showToast("error", getErrorMessage(err, "שגיאה במחיקת המוצר"));
         }
       },
     });
@@ -266,7 +270,7 @@ export default function useServicePricesPage() {
         } catch (err) {
           console.error(err);
           closeConfirmDialog();
-          showToast("error", err.response?.data || "שגיאה בהשבתת המוצר");
+          showToast("error", getErrorMessage(err, "שגיאה בהשבתת המוצר"));
         }
       },
     });
@@ -290,7 +294,7 @@ export default function useServicePricesPage() {
         } catch (err) {
           console.error(err);
           closeConfirmDialog();
-          showToast("error", err.response?.data || "שגיאה בהפעלת המוצר");
+          showToast("error", getErrorMessage(err, "שגיאה בהפעלת המוצר"));
         }
       },
     });
@@ -314,7 +318,7 @@ export default function useServicePricesPage() {
         } catch (err) {
           console.error(err);
           closeConfirmDialog();
-          showToast("error", err.response?.data || "שגיאה בהפעלת המחיר");
+          showToast("error", getErrorMessage(err, "שגיאה בהפעלת המחיר"));
         }
       },
     });

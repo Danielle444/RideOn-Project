@@ -304,7 +304,7 @@ export default function useCompetitionPaidTimePage(options) {
       if (onShowToast) {
         onShowToast(
           "error",
-          err.response?.data || "שגיאה במחיקת סלוט פייד־טיים",
+          getErrorMessage(err, "שגיאה במחיקת סלוט פייד־טיים"),
         );
       }
     }

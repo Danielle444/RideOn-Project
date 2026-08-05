@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
   Clock3,
   Home,
@@ -107,10 +107,36 @@ function ImportResultBox(props) {
   );
 }
 
+// This section has no toast infrastructure of its own (unlike the rest of
+// the app's ToastMessage-driven notices), so actionError/actionSuccess get
+// the same 4000ms auto-dismiss timing directly rather than a toast rewrite.
+var ACTION_MESSAGE_AUTO_DISMISS_MS = 4000;
+
 export default function CompetitionSummarySection(props) {
   var categories = Array.isArray(props.categories) ? props.categories : [];
   var showCategoriesTable = props.showCategoriesTable !== false;
   var fileInputRef = useRef(null);
+
+  useEffect(
+    function () {
+      if (!props.actionError && !props.actionSuccess) {
+        return undefined;
+      }
+
+      if (!props.onDismissActionMessages) {
+        return undefined;
+      }
+
+      var timerId = setTimeout(function () {
+        props.onDismissActionMessages();
+      }, ACTION_MESSAGE_AUTO_DISMISS_MS);
+
+      return function () {
+        clearTimeout(timerId);
+      };
+    },
+    [props.actionError, props.actionSuccess],
+  );
 
   function openFilePicker() {
     if (props.actionLoading) {

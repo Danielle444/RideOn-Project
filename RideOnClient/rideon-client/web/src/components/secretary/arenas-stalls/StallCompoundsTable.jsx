@@ -69,6 +69,7 @@ export default function StallCompoundsTable(props) {
                         onLayoutParsed={function (layout) {
                           props.onLayoutParsed(item, layout);
                         }}
+                        onError={props.onUploadError}
                       />
 
                       {item.layoutJson ? (

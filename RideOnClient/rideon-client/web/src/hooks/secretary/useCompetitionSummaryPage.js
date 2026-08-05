@@ -134,6 +134,11 @@ export default function useCompetitionSummaryPage(options) {
   var [federationInvoiceImportResult, setFederationInvoiceImportResult] =
     useState(null);
 
+  function dismissFederationInvoiceImportMessages() {
+    setFederationInvoiceImportError("");
+    setFederationInvoiceImportSuccess("");
+  }
+
   var [federationMatchingOpen, setFederationMatchingOpen] = useState(false);
   var [federationMatchingItems, setFederationMatchingItems] = useState([]);
   var [federationMatchingLoading, setFederationMatchingLoading] =
@@ -1409,6 +1414,8 @@ export default function useCompetitionSummaryPage(options) {
     federationInvoiceImportSuccess: federationInvoiceImportSuccess,
     federationInvoiceImportResult: federationInvoiceImportResult,
     importFederationInvoices: importFederationInvoices,
+    dismissFederationInvoiceImportMessages:
+      dismissFederationInvoiceImportMessages,
 
     federationMatchingOpen: federationMatchingOpen,
     federationMatchingItems: federationMatchingItems,

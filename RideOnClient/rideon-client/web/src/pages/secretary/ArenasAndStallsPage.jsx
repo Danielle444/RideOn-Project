@@ -101,6 +101,9 @@ export default function ArenasAndStallsPage() {
                 onEdit={page.openEditCompound}
                 onDelete={page.handleCompoundDelete}
                 onLayoutParsed={page.handleCompoundLayoutParsed}
+                onUploadError={function (message) {
+                  page.showToast("error", message);
+                }}
               />
             )}
           </div>
