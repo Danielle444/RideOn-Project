@@ -72,8 +72,10 @@ export default function CompetitionStallBookingsTab(props) {
       selectedHorseToAdd={props.selectedHorseToAdd}
       setSelectedHorseToAdd={props.setSelectedHorseToAdd}
       availableHorseOptions={props.availableHorseOptions}
+      bookedHorseIds={props.bookedHorseIds}
       selectedHorseBookings={props.selectedHorseBookings}
       allEligibleHorsesAlreadyBooked={props.allEligibleHorsesAlreadyBooked}
+      orderedDates={props.orderedDates}
       hasAnyHorseStallBookingsForCompetition={
         props.hasAnyHorseStallBookingsForCompetition
       }

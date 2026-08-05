@@ -75,6 +75,10 @@ export default function useAdminHorseStallBookings(params) {
     [existingStallBookings],
   );
 
+  // CAP-4: already-booked horses stay in the list (not filtered out) so the
+  // "add horse" surface can show them with a non-selectable indicator instead
+  // of silently omitting them. Only a horse already added to THIS draft is
+  // excluded here.
   var availableHorseOptions = useMemo(
     function () {
       return horses.filter(function (horse) {
@@ -82,19 +86,26 @@ export default function useAdminHorseStallBookings(params) {
           return booking.horse.horseId === horse.horseId;
         });
 
-        var alreadyBooked = bookedHorseIds.includes(horse.horseId);
-
-        return !alreadySelected && !alreadyBooked;
+        return !alreadySelected;
       });
     },
-    [horses, selectedHorseBookings, bookedHorseIds],
+    [horses, selectedHorseBookings],
+  );
+
+  var selectableHorseOptions = useMemo(
+    function () {
+      return availableHorseOptions.filter(function (horse) {
+        return !bookedHorseIds.includes(horse.horseId);
+      });
+    },
+    [availableHorseOptions, bookedHorseIds],
   );
 
   var allEligibleHorsesAlreadyBooked = useMemo(
     function () {
-      return horses.length > 0 && availableHorseOptions.length === 0;
+      return horses.length > 0 && selectableHorseOptions.length === 0;
     },
-    [horses, availableHorseOptions],
+    [horses, selectableHorseOptions],
   );
 
   var hasAnyHorseStallBookingsForCompetition = useMemo(
@@ -323,6 +334,7 @@ export default function useAdminHorseStallBookings(params) {
     setSelectedHorseToAdd: setSelectedHorseToAdd,
     selectedHorseBookings: selectedHorseBookings,
     availableHorseOptions: availableHorseOptions,
+    bookedHorseIds: bookedHorseIds,
     allEligibleHorsesAlreadyBooked: allEligibleHorsesAlreadyBooked,
     hasAnyHorseStallBookingsForCompetition:
       hasAnyHorseStallBookingsForCompetition,

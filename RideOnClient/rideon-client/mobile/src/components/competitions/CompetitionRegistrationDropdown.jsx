@@ -122,9 +122,23 @@ export default function CompetitionRegistrationDropdown(props) {
             label = "";
           }
 
+          var isItemDisabled =
+            typeof props.getItemDisabled === "function" &&
+            !!props.getItemDisabled(item);
+
+          var disabledLabel = isItemDisabled
+            ? getSafeText(
+                typeof props.getItemDisabledLabel === "function"
+                  ? props.getItemDisabledLabel(item)
+                  : "",
+              )
+            : "";
+
           return {
             item: item,
             label: label,
+            isDisabled: isItemDisabled,
+            disabledLabel: disabledLabel,
             renderKey: buildRenderKey(props, item, index),
           };
         })
@@ -144,6 +158,8 @@ export default function CompetitionRegistrationDropdown(props) {
       props.getItemId,
       props.getItemKey,
       props.label,
+      props.getItemDisabled,
+      props.getItemDisabledLabel,
     ],
   );
 
@@ -265,12 +281,33 @@ export default function CompetitionRegistrationDropdown(props) {
                 return (
                   <Pressable
                     key={entry.renderKey}
-                    style={styles.dropdownItem}
+                    style={[
+                      styles.dropdownItem,
+                      entry.isDisabled ? styles.dropdownItemDisabled : null,
+                    ]}
+                    disabled={entry.isDisabled}
                     onPress={function () {
+                      if (entry.isDisabled) {
+                        return;
+                      }
+
                       handleSelect(entry.item);
                     }}
                   >
-                    <Text style={styles.dropdownItemText}>{entry.label}</Text>
+                    <Text
+                      style={[
+                        styles.dropdownItemText,
+                        entry.isDisabled ? styles.dropdownItemTextDisabled : null,
+                      ]}
+                    >
+                      {entry.label}
+                    </Text>
+
+                    {entry.isDisabled && entry.disabledLabel ? (
+                      <Text style={styles.dropdownItemBadgeText}>
+                        {entry.disabledLabel}
+                      </Text>
+                    ) : null}
                   </Pressable>
                 );
               })
