@@ -122,6 +122,7 @@ export default function CompetitionShavingsTab(props) {
               value={props.deliveryDate}
               onChange={props.setDeliveryDate}
               minimumDate={props.earliestDeliveryDate}
+              highlightedRange={props.highlightedCompetitionRange}
             />
 
             <CompetitionDateField

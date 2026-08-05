@@ -365,10 +365,11 @@ export default function AdminCompetitionRegistrationsScreen(props) {
     handleScrollToOffset(0);
   }
 
-  // "סיום" - חוזר למסך הפייד טיימים הקיים (מסלול מאומת ב-AppNavigator).
+  // "סיום" - סוגר את מצב ההצלחה ונשארים במסך ההרשמות הנוכחי, כמו
+  // PaidTimeCreateModal.handleFinish (שם אין מסך נפרד לנווט אליו; כאן יש,
+  // אבל אין סיבה לעזוב את מסך ההרשמות רק בגלל סיום פייד טיים בודד).
   function handleFinishPaidTime() {
     paidTime.handleCloseSuccess();
-    props.navigation.navigate("AdminCompetitionPaidTimes");
   }
 
   return (
@@ -644,6 +645,7 @@ export default function AdminCompetitionRegistrationsScreen(props) {
               setDeliveryTime={shavings.setDeliveryTime}
               earliestDeliveryDate={shavings.earliestDeliveryDate}
               isNowDeliveryAvailable={shavings.isNowDeliveryAvailable}
+              highlightedCompetitionRange={shavings.highlightedCompetitionRange}
               quantityMode={shavings.quantityMode}
               setQuantityMode={shavings.setQuantityMode}
               equalBagQuantity={shavings.equalBagQuantity}

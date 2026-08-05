@@ -253,6 +253,15 @@ export default function useAdminCompetitionRegistrations(params) {
         }
 
         loadScreenData();
+
+        // CAP-3: eager-loads the horse picker's bounded default list right
+        // alongside the other dropdown sources, instead of waiting for the
+        // picker to open. loadHorsesForPicker is deliberately left out of
+        // this callback's own deps (same established pattern as onSearch in
+        // CompetitionRegistrationDropdown.jsx) - it is stable across
+        // renders unless activeRole itself changes, which this effect
+        // already re-runs on.
+        loadHorsesForPicker();
       },
       [activeRole, competitionId],
     ),

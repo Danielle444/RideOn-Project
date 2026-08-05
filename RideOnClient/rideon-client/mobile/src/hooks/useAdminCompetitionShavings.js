@@ -70,6 +70,28 @@ function normalizeShavingsOrder(item) {
   };
 }
 
+// CAP-7: same shape as useAdminCompetitionStallBookings.js's
+// normalizeCompetitionSummary - both read the same
+// getCompetitionInvitationDetails response, this hook just wasn't pulling
+// competition.competitionStartDate/EndDate out of it before.
+function normalizeCompetitionSummary(item) {
+  if (!item) {
+    return {
+      competitionStartDate: "",
+      competitionEndDate: "",
+    };
+  }
+
+  return {
+    competitionStartDate: normalizeDateString(
+      item.competitionStartDate || item.CompetitionStartDate,
+    ),
+    competitionEndDate: normalizeDateString(
+      item.competitionEndDate || item.CompetitionEndDate,
+    ),
+  };
+}
+
 function normalizePriceCatalogItem(item, categoryName) {
   if (!item) {
     return null;
@@ -187,6 +209,10 @@ export default function useAdminCompetitionShavings(params) {
   var [screenError, setScreenError] = useState("");
   var [isSaving, setIsSaving] = useState(false);
 
+  var [competitionSummary, setCompetitionSummary] = useState({
+    competitionStartDate: "",
+    competitionEndDate: "",
+  });
   var [availableStalls, setAvailableStalls] = useState([]);
   var [existingOrders, setExistingOrders] = useState([]);
   var [priceCatalogItems, setPriceCatalogItems] = useState([]);
@@ -227,6 +253,10 @@ export default function useAdminCompetitionShavings(params) {
         var invitationResponse = results[0];
         var stallsResponse = results[1];
         var ordersResponse = results[2];
+
+        setCompetitionSummary(
+          normalizeCompetitionSummary(invitationResponse?.data?.competition),
+        );
 
         var shavingsPrices = extractShavingsPriceItems(invitationResponse);
 
@@ -457,6 +487,33 @@ export default function useAdminCompetitionShavings(params) {
     [selectedStalls],
   );
 
+  // CAP-7: highlights the competition's own days on the "later" delivery
+  // date picker, same as the stall-booking date fields
+  // (useAdminCompetitionStallBookings.js's highlightedCompetitionRange).
+  // orderedDates (days that already have a stall booked) is deliberately
+  // NOT threaded through here - every stall in availableStalls already has
+  // a booking by definition, so that concept doesn't distinguish anything
+  // on this particular picker.
+  var highlightedCompetitionRange = useMemo(
+    function () {
+      if (
+        !competitionSummary.competitionStartDate ||
+        !competitionSummary.competitionEndDate
+      ) {
+        return null;
+      }
+
+      return {
+        start: competitionSummary.competitionStartDate,
+        end: competitionSummary.competitionEndDate,
+      };
+    },
+    [
+      competitionSummary.competitionStartDate,
+      competitionSummary.competitionEndDate,
+    ],
+  );
+
   var isNowDeliveryAvailable = useMemo(
     function () {
       if (!earliestDeliveryDate) {
@@ -628,6 +685,7 @@ export default function useAdminCompetitionShavings(params) {
     setDeliveryTime: setDeliveryTime,
     earliestDeliveryDate: earliestDeliveryDate,
     isNowDeliveryAvailable: isNowDeliveryAvailable,
+    highlightedCompetitionRange: highlightedCompetitionRange,
 
     quantityMode: quantityMode,
     setQuantityMode: setQuantityMode,
