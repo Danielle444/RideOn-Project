@@ -918,5 +918,154 @@ namespace RideOnServer.DAL
             }
         }
 
+        // Stage C: builds the usp_admineditentry call. Named-argument
+        // notation, same reasoning as BuildInsertEntryCommand /
+        // BuildAdminCreateEntryCommand above. Public static for the same
+        // no-database unit-testability reason. personId is a separate
+        // parameter, deliberately not a field on AdminEditEntryRequest --
+        // see that DTO's header comment.
+        public static NpgsqlCommand BuildAdminEditEntryCommand(
+            AdminEditEntryRequest request,
+            int personId,
+            NpgsqlConnection? connection)
+        {
+            NpgsqlCommand command = new NpgsqlCommand(@"
+                SELECT *
+                FROM public.usp_admineditentry(
+                    p_personid                := @personId,
+                    p_entryid                 := @entryId,
+                    p_competitionid           := @competitionId,
+                    p_ranchid                 := @ranchId,
+                    p_classincompid           := @classInCompId,
+                    p_horseid                 := @horseId,
+                    p_riderfederationmemberid := @riderFederationMemberId,
+                    p_coachfederationmemberid := @coachFederationMemberId,
+                    p_prizerecipientname      := @prizeRecipientName
+                );", connection);
+
+            command.Parameters.Add("@personId", NpgsqlDbType.Integer).Value =
+                personId;
+
+            command.Parameters.Add("@entryId", NpgsqlDbType.Integer).Value =
+                request.EntryId;
+
+            command.Parameters.Add("@competitionId", NpgsqlDbType.Integer).Value =
+                request.CompetitionId;
+
+            command.Parameters.Add("@ranchId", NpgsqlDbType.Integer).Value =
+                request.RanchId;
+
+            command.Parameters.Add("@classInCompId", NpgsqlDbType.Integer).Value =
+                request.ClassInCompId;
+
+            command.Parameters.Add("@horseId", NpgsqlDbType.Integer).Value =
+                request.HorseId;
+
+            command.Parameters.Add("@riderFederationMemberId", NpgsqlDbType.Integer).Value =
+                request.RiderFederationMemberId;
+
+            command.Parameters.Add("@coachFederationMemberId", NpgsqlDbType.Integer).Value =
+                request.CoachFederationMemberId.HasValue
+                    ? (object)request.CoachFederationMemberId.Value
+                    : DBNull.Value;
+
+            command.Parameters.Add("@prizeRecipientName", NpgsqlDbType.Varchar).Value =
+                (object?)request.PrizeRecipientName ?? DBNull.Value;
+
+            return command;
+        }
+
+        public AdminEditEntryResult AdminEditEntry(AdminEditEntryRequest request, int personId)
+        {
+            try
+            {
+                using var connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using var command = BuildAdminEditEntryCommand(request, personId, connection);
+
+                using NpgsqlDataReader reader = command.ExecuteReader();
+
+                if (!reader.Read())
+                {
+                    throw new Exception("usp_admineditentry returned no row");
+                }
+
+                return new AdminEditEntryResult
+                {
+                    ResultType = reader["resulttype"].ToString() ?? string.Empty,
+                    EntryId = Convert.ToInt32(reader["entryid"]),
+                    ChangeEntryRequestId = reader["changeentryrequestid"] == DBNull.Value
+                        ? null
+                        : Convert.ToInt32(reader["changeentryrequestid"])
+                };
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule/authorization guard raised inside
+                // usp_admineditentry. Same convention as AdminCreateEntry
+                // above -- surfaced verbatim, mapped to 409 by the controller.
+                throw new BL.ValidationException(ex.MessageText);
+            }
+        }
+
+        // Stage C: builds the usp_admincancelentry call. No request DTO --
+        // route/query-param shape, same convention as SecretaryDeleteEntry
+        // above.
+        public static NpgsqlCommand BuildAdminCancelEntryCommand(
+            int entryId,
+            int personId,
+            int competitionId,
+            int ranchId,
+            NpgsqlConnection? connection)
+        {
+            NpgsqlCommand command = new NpgsqlCommand(@"
+                SELECT *
+                FROM public.usp_admincancelentry(
+                    p_personid      := @personId,
+                    p_entryid       := @entryId,
+                    p_competitionid := @competitionId,
+                    p_ranchid       := @ranchId
+                );", connection);
+
+            command.Parameters.Add("@personId", NpgsqlDbType.Integer).Value = personId;
+            command.Parameters.Add("@entryId", NpgsqlDbType.Integer).Value = entryId;
+            command.Parameters.Add("@competitionId", NpgsqlDbType.Integer).Value = competitionId;
+            command.Parameters.Add("@ranchId", NpgsqlDbType.Integer).Value = ranchId;
+
+            return command;
+        }
+
+        public AdminCancelEntryResult AdminCancelEntry(int entryId, int personId, int competitionId, int ranchId)
+        {
+            try
+            {
+                using var connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using var command = BuildAdminCancelEntryCommand(entryId, personId, competitionId, ranchId, connection);
+
+                using NpgsqlDataReader reader = command.ExecuteReader();
+
+                if (!reader.Read())
+                {
+                    throw new Exception("usp_admincancelentry returned no row");
+                }
+
+                return new AdminCancelEntryResult
+                {
+                    ChangeEntryRequestId = Convert.ToInt32(reader["changeentryrequestid"]),
+                    EntryStatus = reader["entrystatus"].ToString() ?? string.Empty
+                };
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Business-rule/authorization guard raised inside
+                // usp_admincancelentry (or the 219/221 procs it composes
+                // with). Same convention as AdminEditEntry above.
+                throw new BL.ValidationException(ex.MessageText);
+            }
+        }
+
     }
 }
