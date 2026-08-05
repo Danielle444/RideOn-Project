@@ -237,19 +237,6 @@ var REGISTRATION_WINDOW_COPY = {
         "תקופת ההרשמה עומדת להסתיים וההרשמה עדיין מתחת לתחזית. זהו העיתוי האחרון שבו תזכורת עשויה להשפיע.",
     },
   },
-
-  notifyButton: "שליחת תזכורת לאדמינים",
-  notifyConfirmTitle: "שליחת תזכורת",
-  notifyConfirmBody: function (competitionName) {
-    return (
-      "תישלח התראה לכל האדמינים עם תזכורת להירשם לתחרות " +
-      competitionName +
-      ". לא ניתן לבטל שליחה."
-    );
-  },
-  notifyConfirm: "שלחי",
-  notifyCancel: "ביטול",
-  notifySent: "התזכורת נשלחה",
 };
 
 // Forecast summary cards for the planning view. Suggestion/expectation voice: everything
