@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Text, View } from "react-native";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
+import CompetitionsFilterBar from "../../../../components/competitions/CompetitionsFilterBar";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import competitionBoardStyles from "../../../../styles/competitionBoardStyles";
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
@@ -14,12 +15,15 @@ import { useCompetition } from "../../../../context/CompetitionContext";
 import { getMobileAdminCompetitionsBoard } from "../../../../services/competitionService";
 import CompetitionBoardCard from "../../../../components/competitions/CompetitionBoardCard";
 import { formatCompetitionDateRange } from "../../../../../../shared/auth/utils/competitions/competitionFormatters";
-import {
-  canAdminEnterCompetition,
-  canAdminRegisterCompetition,
-} from "../../../../../../shared/auth/utils/competitions/competitionStatus";
 import { sortCompetitionsByStatusAndDate } from "../../../../../../shared/auth/utils/competitions/competitionSorting";
-import { MOBILE_COMPETITION_STATUS_ORDER } from "../../../../config/competitionStatusOrder";
+import { MOBILE_COMPETITION_STATUS_ORDER } from "../../../../../../shared/auth/utils/competitions/competitionStatusOrder";
+import { buildAdminCompetitionActions } from "../utils/buildAdminCompetitionActions";
+import {
+  buildHostRanchOptions,
+  buildFieldOptions,
+  buildStatusOptions,
+  filterCompetitionsForBoard,
+} from "../../../../utils/competitionsBoardFilters";
 
 export default function AdminCompetitionsBoardScreen(props) {
   var userContext = useUser();
@@ -33,6 +37,13 @@ export default function AdminCompetitionsBoardScreen(props) {
   var [selectedCompetition, setSelectedCompetition] = useState(null);
   var [competitions, setCompetitions] = useState([]);
   var [loading, setLoading] = useState(false);
+
+  var [searchText, setSearchText] = useState("");
+  var [hostRanchFilter, setHostRanchFilter] = useState("");
+  var [fieldFilter, setFieldFilter] = useState("");
+  var [statusFilter, setStatusFilter] = useState("");
+  var [dateFrom, setDateFrom] = useState("");
+  var [dateTo, setDateTo] = useState("");
 
   useEffect(
     function () {
@@ -61,20 +72,6 @@ export default function AdminCompetitionsBoardScreen(props) {
     }
   }
 
-  async function setCompetitionAndNavigate(item, screen) {
-    await competitionContext.setActiveCompetitionAndPersist({
-      competitionId: item.competitionId,
-      competitionName: item.competitionName,
-      competitionStatus: item.competitionStatus,
-      ranchId: activeRole.ranchId,
-    });
-
-    props.navigation.navigate(screen, {
-      competitionId: item.competitionId,
-      competitionName: item.competitionName,
-    });
-  }
-
   async function handleLogout() {
     if (props.onLogout) {
       await props.onLogout();
@@ -90,40 +87,61 @@ export default function AdminCompetitionsBoardScreen(props) {
   }
 
   function buildActions(item) {
-    return [
-      {
-        key: "details",
-        label: "פרטי תחרות",
-        onPress: function () {
-          setCompetitionAndNavigate(item, "AdminCompetitionDetails");
-        },
-        disabled: false,
-        variant: "secondary",
-      },
-      {
-        key: "registration",
-        label: "הרשמה",
-        onPress: function () {
-          setCompetitionAndNavigate(item, "AdminCompetitionRegistrations");
-        },
-        disabled: !canAdminRegisterCompetition(item.competitionStatus),
-        variant: "secondary",
-      },
-      {
-        key: "enter",
-        label: "כניסה",
-        onPress: function () {
-          setCompetitionAndNavigate(item, "AdminCompetitionPayers");
-        },
-        disabled: !canAdminEnterCompetition(item.competitionStatus),
-        variant: "primary",
-      },
-    ];
+    return buildAdminCompetitionActions(item, {
+      navigation: props.navigation,
+      competitionContext: competitionContext,
+      activeRole: activeRole,
+    });
   }
+
+  function handleResetFilters() {
+    setSearchText("");
+    setHostRanchFilter("");
+    setFieldFilter("");
+    setStatusFilter("");
+    setDateFrom("");
+    setDateTo("");
+  }
+
+  var hostRanchOptions = useMemo(
+    function () {
+      return buildHostRanchOptions(competitions);
+    },
+    [competitions],
+  );
+
+  var fieldOptions = useMemo(
+    function () {
+      return buildFieldOptions(competitions);
+    },
+    [competitions],
+  );
+
+  var statusOptions = useMemo(
+    function () {
+      return buildStatusOptions(competitions, MOBILE_COMPETITION_STATUS_ORDER);
+    },
+    [competitions],
+  );
+
+  var filteredCompetitions = useMemo(
+    function () {
+      return filterCompetitionsForBoard(competitions, {
+        searchText: searchText,
+        hostRanchFilter: hostRanchFilter,
+        fieldFilter: fieldFilter,
+        statusFilter: statusFilter,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+      });
+    },
+    [competitions, searchText, hostRanchFilter, fieldFilter, statusFilter, dateFrom, dateTo],
+  );
 
   return (
     <MobileScreenLayout
       title="לוח התחרויות"
+      activeBottomTab="board"
       bottomNavItems={getAdminBottomNavConfig(props.navigation)}
       menuContent={({ closeMenu }) => {
         if (menuMode === "competition" && selectedCompetition) {
@@ -170,23 +188,48 @@ export default function AdminCompetitionsBoardScreen(props) {
     >
       <Text style={roleSharedStyles.sectionTitle}>כל התחרויות</Text>
 
+      <CompetitionsFilterBar
+        searchText={searchText}
+        onSearchTextChange={setSearchText}
+        hostRanchOptions={hostRanchOptions}
+        hostRanchFilter={hostRanchFilter}
+        onHostRanchFilterChange={setHostRanchFilter}
+        fieldOptions={fieldOptions}
+        fieldFilter={fieldFilter}
+        onFieldFilterChange={setFieldFilter}
+        statusOptions={statusOptions}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        dateFrom={dateFrom}
+        onDateFromChange={setDateFrom}
+        dateTo={dateTo}
+        onDateToChange={setDateTo}
+        onReset={handleResetFilters}
+      />
+
       {loading ? (
         <ActivityIndicator size="large" color="#8B6352" />
       ) : (
         <View style={competitionBoardStyles.listContent}>
-          {competitions.map((item) => (
-            <CompetitionBoardCard
-              key={item.competitionId}
-              title={item.competitionName}
-              ranchName={item.hostRanchName || ""}
-              dateText={formatCompetitionDateRange(
-                item.competitionStartDate,
-                item.competitionEndDate,
-              )}
-              status={item.competitionStatus}
-              actions={buildActions(item)}
-            />
-          ))}
+          {filteredCompetitions.length === 0 ? (
+            <Text style={competitionBoardStyles.emptyText}>
+              לא נמצאו תחרויות התואמות את הסינון
+            </Text>
+          ) : (
+            filteredCompetitions.map((item) => (
+              <CompetitionBoardCard
+                key={item.competitionId}
+                title={item.competitionName}
+                ranchName={item.hostRanchName || ""}
+                dateText={formatCompetitionDateRange(
+                  item.competitionStartDate,
+                  item.competitionEndDate,
+                )}
+                status={item.competitionStatus}
+                actions={buildActions(item)}
+              />
+            ))
+          )}
         </View>
       )}
     </MobileScreenLayout>

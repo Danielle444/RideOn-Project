@@ -18,6 +18,12 @@ function getAdminMenuItems() {
       screen: "AdminPayers",
       icon: "card-outline",
     },
+    {
+      key: "profile",
+      label: "פרופיל",
+      screen: "AdminProfile",
+      icon: "person-outline",
+    },
   ];
 }
 
@@ -28,6 +34,12 @@ function getPayerMenuItems() {
       label: "לוח תחרויות",
       screen: "PayerCompetitionsBoard",
       icon: "trophy-outline",
+    },
+    {
+      key: "profile",
+      label: "פרופיל",
+      screen: "PayerProfile",
+      icon: "person-outline",
     },
   ];
 }

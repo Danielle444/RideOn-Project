@@ -234,25 +234,30 @@ namespace RideOnServer.BL
             return status == CompetitionStatuses.Future;
         }
 
-        internal static List<Competition> GetCompetitionsForMobileAdminHome(int systemUserId)
+        internal static List<Competition> GetCompetitionsForMobileAdminHome(int ranchId)
         {
-            if (systemUserId <= 0)
+            if (ranchId <= 0)
             {
-                throw new Exception("SystemUserId is invalid");
+                throw new Exception("RanchId is invalid");
             }
 
             CompetitionDAL dal = new CompetitionDAL();
-            List<Competition> list = dal.GetCompetitionsForMobileAdminHome(systemUserId);
+            List<Competition> list = dal.GetCompetitionsForMobileAdminHome(ranchId);
 
             foreach (Competition item in list)
             {
                 item.CompetitionStatus = CalculateEffectiveStatus(item);
             }
 
+            // Admin home only ever shows a live or upcoming competition, even
+            // if the raw stored status (filtered in the proc) recomputes to
+            // Finished/Cancelled here via CalculateEffectiveStatus.
             return list
-                .Where(item => item.CompetitionStatus != CompetitionStatuses.Draft)
-                .OrderBy(item => item.CompetitionStartDate)
-                .Take(2)
+                .Where(item =>
+                    item.CompetitionStatus == CompetitionStatuses.Current ||
+                    item.CompetitionStatus == CompetitionStatuses.Active ||
+                    item.CompetitionStatus == CompetitionStatuses.Future)
+                .Take(3)
                 .ToList();
         }
 

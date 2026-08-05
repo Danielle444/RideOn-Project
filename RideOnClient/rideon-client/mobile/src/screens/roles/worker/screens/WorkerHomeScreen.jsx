@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -17,7 +18,6 @@ import { getWorkerMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { getWorkerBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import homeScreenStyles from "../../../../styles/homeScreenStyles";
 import HomeCompetitionCard from "../../../../components/home/HomeCompetitionCard";
-import HomeShortcutGrid from "../../../../components/home/HomeShortcutGrid";
 import { getMobileWorkerCompetitionsBoard } from "../../../../services/competitionService";
 import {
   getWorkerHomeShavingsFeed,
@@ -29,16 +29,12 @@ import {
 } from "../../../../utils/workerHomeShavingsFeed";
 import WorkerShavingsOrderCard from "../components/WorkerShavingsOrderCard";
 import { canWorkerEnterCompetition } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
-
-function sortAndTakeNearest(items) {
-  return [...items]
-    .sort(function (a, b) {
-      return String(a.competitionStartDate || "").localeCompare(
-        String(b.competitionStartDate || ""),
-      );
-    })
-    .slice(0, 2);
-}
+import {
+  selectCompetitionsShortlist,
+  DEFAULT_SHORTLIST_CAP,
+  HOME_TEASER_ALLOWED_STATUSES,
+} from "../../../../../../shared/auth/utils/competitions/competitionHomeShortlist";
+import { MOBILE_COMPETITION_STATUS_ORDER } from "../../../../../../shared/auth/utils/competitions/competitionStatusOrder";
 
 export default function WorkerHomeScreen(props) {
   var userContext = useUser();
@@ -53,6 +49,7 @@ export default function WorkerHomeScreen(props) {
   var [shavingsFeed, setShavingsFeed] = useState([]);
   var [loadingFeed, setLoadingFeed] = useState(false);
   var [claimingOrderId, setClaimingOrderId] = useState(null);
+  var [refreshing, setRefreshing] = useState(false);
 
   useEffect(
     function () {
@@ -71,8 +68,14 @@ export default function WorkerHomeScreen(props) {
       setLoading(true);
 
       var response = await getMobileWorkerCompetitionsBoard(activeRole.ranchId);
-      var items = Array.isArray(response.data) ? response.data : [];
-      setCompetitions(sortAndTakeNearest(items));
+      setCompetitions(
+        selectCompetitionsShortlist(
+          response.data,
+          MOBILE_COMPETITION_STATUS_ORDER,
+          DEFAULT_SHORTLIST_CAP,
+          HOME_TEASER_ALLOWED_STATUSES,
+        ),
+      );
     } catch (error) {
       console.error(error);
       setCompetitions([]);
@@ -126,6 +129,15 @@ export default function WorkerHomeScreen(props) {
     });
   }
 
+  async function handleRefresh() {
+    try {
+      setRefreshing(true);
+      await Promise.all([loadHomeCompetitions(), loadShavingsFeed()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   async function handleLogout() {
     if (props.onLogout) {
       await props.onLogout();
@@ -172,47 +184,6 @@ export default function WorkerHomeScreen(props) {
     ];
   }
 
-  var shortcutItems = useMemo(
-    function () {
-      return [
-        {
-          key: "board",
-          label: "לוח התחרויות",
-          icon: "trophy-outline",
-          onPress: function () {
-            props.navigation.navigate("WorkerCompetitionsBoard");
-          },
-        },
-        {
-          key: "profile",
-          label: "פרופיל",
-          icon: "person-outline",
-          onPress: function () {
-            props.navigation.navigate("WorkerProfile");
-          },
-        },
-        {
-          key: "switch-role",
-          label: "החלפת פרופיל",
-          icon: "sync-outline",
-          onPress: function () {
-            props.navigation.replace("SelectActiveRole");
-          },
-        },
-        {
-          key: "refresh",
-          label: "רענון נתונים",
-          icon: "refresh-outline",
-          onPress: function () {
-            loadHomeCompetitions();
-            loadShavingsFeed();
-          },
-        },
-      ];
-    },
-    [props.navigation, activeRole],
-  );
-
   var userName = (
     (user && ((user.firstName || "") + " " + (user.lastName || "")).trim()) ||
     ""
@@ -245,6 +216,14 @@ export default function WorkerHomeScreen(props) {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={homeScreenStyles.pageContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={["#8B6352"]}
+            tintColor="#8B6352"
+          />
+        }
       >
         <View style={homeScreenStyles.welcomeCard}>
           <Text style={homeScreenStyles.welcomeTitle}>
@@ -254,7 +233,7 @@ export default function WorkerHomeScreen(props) {
           <Text style={homeScreenStyles.welcomeRole}>
             {activeRole?.roleName}
           </Text>
-          
+
           <Text style={homeScreenStyles.welcomeSubtitle}>
             זה התפקיד הפעיל שלך בחווה {activeRole?.ranchName}
           </Text>
@@ -302,11 +281,6 @@ export default function WorkerHomeScreen(props) {
               );
             })
           )}
-        </View>
-
-        <View style={homeScreenStyles.sectionCard}>
-          <Text style={homeScreenStyles.sectionTitle}>קיצורים</Text>
-          <HomeShortcutGrid items={shortcutItems} />
         </View>
 
         <View style={homeScreenStyles.sectionCard}>

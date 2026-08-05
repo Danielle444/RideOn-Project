@@ -11,7 +11,7 @@ import { getCompetitionsByHostRanch } from "../../services/competitionService";
 import { saveActiveCompetition } from "../../services/competitionSessionService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
 import { sortCompetitionsByStatusAndDate } from "../../../../shared/auth/utils/competitions/competitionSorting";
-import { WEB_SECRETARY_COMPETITION_STATUS_ORDER } from "../../config/competitionStatusOrder";
+import { WEB_SECRETARY_COMPETITION_STATUS_ORDER } from "../../../../shared/auth/utils/competitions/competitionStatusOrder";
 
 export default function CompetitionsBoardPage() {
   const navigate = useNavigate();
