@@ -110,11 +110,16 @@ namespace RideOnServer.Tests
         }
 
         [Fact]
-        public void The_dal_calls_the_secured_wrapper_not_the_unscoped_function_directly()
+        public void The_dal_calls_the_idempotent_wrapper_not_the_secured_or_unscoped_function_directly()
         {
+            // 2026-08-06: superseded by usp_allocatefederationcredittochargeidempotent
+            // (228), which itself delegates to the secured wrapper (226) inside
+            // its own SQL body - see AllocationIdempotencyContractTests. The DAL
+            // no longer calls 226 (or 193) directly for this method.
             string body = DalAllocateMethodBody();
 
-            body.Should().Contain("public.usp_allocatefederationcredittochargesecured(");
+            body.Should().Contain("public.usp_allocatefederationcredittochargeidempotent(");
+            body.Should().NotContain("usp_allocatefederationcredittochargesecured(");
             body.Should().NotContain("usp_allocatefederationcredittocharge(");
         }
 

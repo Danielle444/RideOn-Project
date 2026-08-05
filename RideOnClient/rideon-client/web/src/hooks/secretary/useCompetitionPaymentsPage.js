@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { resolveOperationId } from "../../utils/operationId.utils.js";
 import {
   bulkAllocateFederationCreditToCharges,
   createCompetitionPayment,
@@ -130,6 +131,10 @@ export default function useCompetitionPaymentsPage(options) {
   var [federationApplyLoading, setFederationApplyLoading] = useState(false);
   var [federationApplyError, setFederationApplyError] = useState("");
   var [federationApplySuccess, setFederationApplySuccess] = useState("");
+  // { operationId, signature } | null - a ref, not state: minting/reusing an
+  // operation id must never itself trigger a re-render. See
+  // utils/operationId.utils.js for the reuse/mint semantics.
+  var federationApplyOperationIdRef = useRef(null);
 
   var [selectedCreditAllocations, setSelectedCreditAllocations] = useState([]);
   var [creditAllocationsLoading, setCreditAllocationsLoading] = useState(false);
@@ -684,6 +689,9 @@ export default function useCompetitionPaymentsPage(options) {
     setManualCreditOpen(false);
     resetManualCreditForm();
     clearFederationCreditAllocations();
+    // Explicit dismiss - a later apply, even with the exact same selection,
+    // is a new intentional action and must mint a fresh operation id.
+    federationApplyOperationIdRef.current = null;
   }
 
   function changeFederationCreditSearchText(value) {
@@ -873,6 +881,27 @@ export default function useCompetitionPaymentsPage(options) {
       return getValue(charge, "billChargeId", "BillChargeId", 0);
     });
 
+    var applyNotes = "שיוך כיסוי התאחדות דרך מסך תשלומים";
+
+    // Reuse the same operation id only when retrying this exact still-
+    // pending/failed selection; any change to the competition, credit or
+    // selected charges is a different submission and mints a fresh id.
+    var federationApplySignature = JSON.stringify({
+      competitionId: Number(competitionId),
+      federationExternalCreditId: creditId,
+      billChargeIds: billChargeIds.slice().sort(function (a, b) {
+        return a - b;
+      }),
+      notes: applyNotes,
+    });
+
+    var resolvedOperation = resolveOperationId(
+      federationApplyOperationIdRef.current,
+      federationApplySignature,
+    );
+
+    federationApplyOperationIdRef.current = resolvedOperation.pending;
+
     try {
       setFederationApplyLoading(true);
       setFederationApplyError("");
@@ -883,14 +912,17 @@ export default function useCompetitionPaymentsPage(options) {
       try {
         // One atomic request covers every selected charge in full, or the
         // whole request fails and nothing is written - see
-        // usp_bulkallocatefederationcredittocharges (225). No per-charge
+        // usp_bulkallocatefederationcredittochargesidempotent (229), which
+        // wraps the still-unchanged usp_bulkallocatefederationcredittocharges
+        // (225) with the operationId claim/replay contract. No per-charge
         // amount is sent; the server derives every remaining amount itself.
         await bulkAllocateFederationCreditToCharges({
+          operationId: resolvedOperation.operationId,
           competitionId: Number(competitionId),
           ranchId: Number(ranchId),
           federationExternalCreditId: creditId,
           billChargeIds: billChargeIds,
-          notes: "שיוך כיסוי התאחדות דרך מסך תשלומים",
+          notes: applyNotes,
         });
 
         allocationSucceeded = true;
@@ -902,6 +934,11 @@ export default function useCompetitionPaymentsPage(options) {
       }
 
       if (allocationSucceeded) {
+        // Success clears the pending operation - a later apply, even with
+        // an identical selection, is a new intentional partial allocation
+        // and must mint a fresh operation id.
+        federationApplyOperationIdRef.current = null;
+
         setFederationApplySuccess("כיסוי ההתאחדות שויך בהצלחה");
         setSelectedChargeIds([]);
         setSelectedFederationCredit(null);

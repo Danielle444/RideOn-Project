@@ -669,7 +669,8 @@ namespace RideOnServer.DAL
                         NpgsqlCommand command = new NpgsqlCommand(
                             @"
                     select *
-                    from public.usp_allocatefederationcredittochargesecured(
+                    from public.usp_allocatefederationcredittochargeidempotent(
+                        @requestId,
                         @competitionId,
                         @federationExternalCreditId,
                         @billChargeId,
@@ -681,6 +682,11 @@ namespace RideOnServer.DAL
                         )
                     )
                     {
+                        command.Parameters.Add(
+                            "@requestId",
+                            NpgsqlDbType.Text
+                        ).Value = request.OperationId;
+
                         command.Parameters.Add(
                             "@competitionId",
                             NpgsqlDbType.Integer
@@ -738,6 +744,13 @@ namespace RideOnServer.DAL
                 }
 
                 throw new Exception("Federation credit allocation was not created");
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Operation id reused with a different payload (idempotency
+                // integrity guard raised inside the stored procedure).
+                // Surface its message to the user rather than a generic 500.
+                throw new BL.ValidationException(ex.MessageText);
             }
             catch (NpgsqlException ex)
             {
@@ -1437,7 +1450,8 @@ namespace RideOnServer.DAL
                         NpgsqlCommand command = new NpgsqlCommand(
                             @"
                     select *
-                    from public.usp_approvefederationmatchingsuggestion(
+                    from public.usp_approvefederationmatchingsuggestionidempotent(
+                        @requestId,
                         @competitionId,
                         @federationExternalCreditId,
                         @paidByPersonId,
@@ -1449,6 +1463,9 @@ namespace RideOnServer.DAL
                         )
                     )
                     {
+                        command.Parameters.Add("@requestId", NpgsqlDbType.Text)
+                            .Value = request.OperationId;
+
                         command.Parameters.Add("@competitionId", NpgsqlDbType.Integer)
                             .Value = request.CompetitionId;
 
@@ -1485,6 +1502,10 @@ namespace RideOnServer.DAL
 
                 throw new Exception("No response returned from approval function");
             }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                throw new BL.ValidationException(ex.MessageText);
+            }
             catch (NpgsqlException ex)
             {
                 throw new Exception(ex.Message);
@@ -1508,7 +1529,8 @@ namespace RideOnServer.DAL
                         NpgsqlCommand command = new NpgsqlCommand(
                             @"
                     select *
-                    from public.usp_bulkallocatefederationcredittocharges(
+                    from public.usp_bulkallocatefederationcredittochargesidempotent(
+                        @requestId,
                         @competitionId,
                         @federationExternalCreditId,
                         @billChargeIds,
@@ -1519,6 +1541,11 @@ namespace RideOnServer.DAL
                         )
                     )
                     {
+                        command.Parameters.Add(
+                            "@requestId",
+                            NpgsqlDbType.Text
+                        ).Value = request.OperationId;
+
                         command.Parameters.Add(
                             "@competitionId",
                             NpgsqlDbType.Integer
@@ -1567,6 +1594,10 @@ namespace RideOnServer.DAL
                 }
 
                 return items;
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                throw new BL.ValidationException(ex.MessageText);
             }
             catch (NpgsqlException ex)
             {

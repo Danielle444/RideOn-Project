@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { resolveOperationId } from "../../utils/operationId.utils.js";
 import {
   getClassesByCompetitionId,
   getPredictionsByCompetitionId,
@@ -141,6 +142,12 @@ export default function useCompetitionSummaryPage(options) {
     useState(false);
   var [federationMatchingError, setFederationMatchingError] = useState("");
   var [federationMatchingSuccess, setFederationMatchingSuccess] = useState("");
+  // { operationId, signature } | null, refs not state - see
+  // utils/operationId.utils.js. Two distinct pending slots since the
+  // suggestion-approve and manual-approve actions are separate submissions
+  // that must never share (or accidentally collide on) an operation id.
+  var federationMatchingApproveOperationIdRef = useRef(null);
+  var manualFederationAllocationOperationIdRef = useRef(null);
 
   var [federationMatchingActiveTab, setFederationMatchingActiveTab] =
     useState("suggestions");
@@ -466,6 +473,11 @@ export default function useCompetitionSummaryPage(options) {
       return;
     }
 
+    // Explicit dismiss - a later approval, even of the exact same
+    // suggestion or manual entry, is a new intentional action.
+    federationMatchingApproveOperationIdRef.current = null;
+    manualFederationAllocationOperationIdRef.current = null;
+
     setFederationMatchingOpen(false);
     setFederationMatchingItems([]);
     setFederationMatchingError("");
@@ -508,18 +520,36 @@ export default function useCompetitionSummaryPage(options) {
       return;
     }
 
+    var approveNotes = "אישור הצעת התאמה ממסך סיכום תחרות";
+
+    var approveSignature = JSON.stringify({
+      competitionId: Number(competitionId),
+      federationExternalCreditId: federationExternalCreditId,
+      paidByPersonId: paidByPersonId,
+      amount: suggestedAllocatedAmount,
+      notes: approveNotes,
+    });
+
+    var resolvedOperation = resolveOperationId(
+      federationMatchingApproveOperationIdRef.current,
+      approveSignature,
+    );
+
+    federationMatchingApproveOperationIdRef.current = resolvedOperation.pending;
+
     try {
       setFederationMatchingApproving(true);
       setFederationMatchingError("");
       setFederationMatchingSuccess("");
 
       var response = await approveFederationMatchingSuggestionRequest({
+        operationId: resolvedOperation.operationId,
         competitionId: Number(competitionId),
         ranchId: Number(ranchId),
         federationExternalCreditId: federationExternalCreditId,
         paidByPersonId: paidByPersonId,
         amount: suggestedAllocatedAmount,
-        notes: "אישור הצעת התאמה ממסך סיכום תחרות",
+        notes: approveNotes,
       });
 
       var result = response.data || null;
@@ -527,6 +557,10 @@ export default function useCompetitionSummaryPage(options) {
         result && (result.message || result.Message)
           ? result.message || result.Message
           : "הצעת ההתאמה אושרה בהצלחה";
+
+      // Success clears the pending operation - approving another suggestion
+      // later, even an identical-looking one, is a new intentional action.
+      federationMatchingApproveOperationIdRef.current = null;
 
       setFederationMatchingSuccess(message);
 
@@ -741,18 +775,36 @@ export default function useCompetitionSummaryPage(options) {
       return;
     }
 
+    var manualNotes = "שיוך ידני ממסך סיכום תחרות";
+
+    var manualSignature = JSON.stringify({
+      competitionId: Number(competitionId),
+      federationExternalCreditId: federationExternalCreditId,
+      paidByPersonId: paidByPersonId,
+      amount: amount,
+      notes: manualNotes,
+    });
+
+    var resolvedOperation = resolveOperationId(
+      manualFederationAllocationOperationIdRef.current,
+      manualSignature,
+    );
+
+    manualFederationAllocationOperationIdRef.current = resolvedOperation.pending;
+
     try {
       setFederationMatchingApproving(true);
       setFederationMatchingError("");
       setFederationMatchingSuccess("");
 
       var response = await approveFederationMatchingSuggestionRequest({
+        operationId: resolvedOperation.operationId,
         competitionId: Number(competitionId),
         ranchId: Number(ranchId),
         federationExternalCreditId: federationExternalCreditId,
         paidByPersonId: paidByPersonId,
         amount: amount,
-        notes: "שיוך ידני ממסך סיכום תחרות",
+        notes: manualNotes,
       });
 
       var result = response.data || null;
@@ -760,6 +812,10 @@ export default function useCompetitionSummaryPage(options) {
         result && (result.message || result.Message)
           ? result.message || result.Message
           : "השיוך הידני נשמר בהצלחה";
+
+      // Success clears the pending operation - a later manual allocation,
+      // even with identical values, is a new intentional partial allocation.
+      manualFederationAllocationOperationIdRef.current = null;
 
       setFederationMatchingSuccess(message);
 

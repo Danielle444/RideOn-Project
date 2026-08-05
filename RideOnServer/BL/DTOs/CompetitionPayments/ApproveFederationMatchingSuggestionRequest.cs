@@ -2,6 +2,8 @@
 {
     public class ApproveFederationMatchingSuggestionRequest
     {
+        public string OperationId { get; set; } = string.Empty;
+
         public int CompetitionId { get; set; }
 
         public int RanchId { get; set; }
