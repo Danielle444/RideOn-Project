@@ -105,7 +105,6 @@ var EMPTY_FORM_DATA = {
   startTimeMinute: "",
   endTimeHour: "",
   endTimeMinute: "",
-  slotStatus: "",
   slotNotes: "",
 };
 
@@ -159,7 +158,6 @@ export default function PaidTimeSlotInCompetitionModal(props) {
         startTimeMinute: startTimeParts.minute,
         endTimeHour: endTimeParts.hour,
         endTimeMinute: endTimeParts.minute,
-        slotStatus: props.initialValue.slotStatus || "",
         slotNotes: props.initialValue.slotNotes || "",
       });
     },
@@ -270,7 +268,6 @@ export default function PaidTimeSlotInCompetitionModal(props) {
       endTime: normalizeTimeForServer(
         combineTimeValue(formData.endTimeHour, formData.endTimeMinute),
       ),
-      slotStatus: formData.slotStatus.trim() || null,
       slotNotes: formData.slotNotes.trim() || null,
     });
   }
@@ -434,21 +431,6 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                   {fieldErrors.arenaId}
                 </div>
               ) : null}
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
-                סטטוס סלוט
-              </label>
-              <input
-                type="text"
-                value={formData.slotStatus}
-                onChange={function (e) {
-                  handleChange("slotStatus", e.target.value);
-                }}
-                placeholder="לא חובה"
-                className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right"
-              />
             </div>
 
             <div>
