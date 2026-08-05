@@ -470,6 +470,32 @@ namespace RideOnServer.Tests
             CountOccurrences(ProcSource(), "insert into public.createentryrequest").Should().Be(1);
         }
 
+        [Fact]
+        public void Both_entry_insert_branches_qualify_the_returned_entryid_column()
+        {
+            // usp_admincreateentry declares RETURNS TABLE(..., entryid integer, ...),
+            // which makes entryid an implicit PL/pgSQL output variable throughout the
+            // function body. A bare "returning entryid" on the entry insert is
+            // therefore ambiguous between that output variable and entry.entryid,
+            // and fails live with PostgreSQL 42702. Both branches must instead
+            // return the table-qualified column.
+            string source = ProcSource();
+
+            CountOccurrences(source, "returning public.entry.entryid").Should().Be(
+                2, "both the Direct and Pending branches insert into entry and must both qualify the RETURNING column");
+
+            Regex.IsMatch(source, @"returning\s+entryid\b").Should().BeFalse(
+                "no bare, unqualified 'returning entryid' may remain anywhere in the proc");
+        }
+
+        [Fact]
+        public void Public_return_shape_still_names_the_second_column_entryid()
+        {
+            // The RETURNING fix must not touch the function's own public contract --
+            // callers (EntryDAL) still read reader["entryid"] by that exact name.
+            ProcSource().Should().Contain("RETURNS TABLE(\n    resulttype text,\n    entryid integer,\n    createentryrequestid integer\n)");
+        }
+
         // =================================================================
         // 6. usp_admincreateentry: reused usp_insertentry validations present
         //    verbatim.

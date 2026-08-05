@@ -323,7 +323,9 @@ begin
             (entryid, classincompid, prizerecipientname, riderfederationmemberid)
         values
             (v_srequestid, p_classincompid, p_prizerecipientname, p_riderfederationmemberid)
-        returning entryid
+        -- Table-qualified: RETURNS TABLE's own entryid output column would
+        -- otherwise make an unqualified RETURNING reference ambiguous (42702).
+        returning public.entry.entryid
         into v_entryid;
 
         if v_organizercost > 0 then
@@ -355,7 +357,8 @@ begin
             (entryid, classincompid, prizerecipientname, riderfederationmemberid, entrystatus)
         values
             (v_srequestid, p_classincompid, p_prizerecipientname, p_riderfederationmemberid, 'Proposed')
-        returning entryid
+        -- Table-qualified: see the Direct branch's insert above for why.
+        returning public.entry.entryid
         into v_entryid;
 
         insert into public.createentryrequest (proposedentryid, status)
