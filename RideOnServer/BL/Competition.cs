@@ -209,7 +209,9 @@ namespace RideOnServer.BL
         // Payer-board visibility:
         // - Drafts: never shown (incl. a competition reverted from active to draft).
         // - Enrolled: shown regardless of ranch; a cancelled one lingers 30 days past its end date.
-        // - Not enrolled: only future competitions at the selected ranch.
+        // - Not enrolled: cancelled hidden; otherwise visible until registration closes
+        //   (covers Future and Active — an in-progress/Current competition is always
+        //   past its own registration close, so it stays hidden here too).
         private const int CancelledVisibilityDays = 30;
 
         private static bool IsVisibleOnPayerBoard(Competition item, DateTime today)
@@ -231,7 +233,26 @@ namespace RideOnServer.BL
                 return true;
             }
 
-            return status == CompetitionStatuses.Future;
+            if (status == CompetitionStatuses.Cancelled)
+            {
+                return false;
+            }
+
+            return !IsRegistrationClosed(item, today);
+        }
+
+        // Mirrors the web rule in classesView.utils.js (isRegistrationClosed):
+        // registration end date is authoritative when present; otherwise a
+        // competition that has already started is not still taking
+        // registrations.
+        private static bool IsRegistrationClosed(Competition item, DateTime today)
+        {
+            if (item.RegistrationEndDate.HasValue)
+            {
+                return today.Date > item.RegistrationEndDate.Value.Date;
+            }
+
+            return today.Date >= item.CompetitionStartDate.Date;
         }
 
         internal static List<Competition> GetCompetitionsForMobileAdminHome(int ranchId)
