@@ -7,6 +7,7 @@ import { useUser } from "../../context/UserContext";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import { getSecretaryDisplayName } from "../../utils/secretaryDisplay.utils";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
+import { normalizeGenderValue } from "../../utils/gender.utils";
 import {
   getWorkersByRanch,
   getWorkerById,
@@ -263,7 +264,7 @@ export default function WorkersManagementPage() {
         ranchId: worker.ranchId,
         firstName: worker.firstName || "",
         lastName: worker.lastName || "",
-        gender: worker.gender || "",
+        gender: normalizeGenderValue(worker.gender) || "",
         cellPhone: worker.cellPhone || "",
         email: worker.email || "",
       });
