@@ -14,7 +14,10 @@ import {
 
 export default function useServicePricesPage() {
   const [sections, setSections] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // Start loading=true so the table shows a spinner on first paint instead of its empty row
+  // before the mount fetch runs. loadDashboard always resolves this (setLoading(true) then a
+  // finally setLoading(false)), including the no-ranch throw path.
+  const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
 

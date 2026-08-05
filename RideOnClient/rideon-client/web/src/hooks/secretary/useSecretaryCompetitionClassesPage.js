@@ -291,8 +291,11 @@ export default function useSecretaryCompetitionClassesPage(options) {
   var [entries, setEntries] = useState([]);
   var [predictions, setPredictions] = useState([]);
 
-  var [loadingClasses, setLoadingClasses] = useState(false);
-  var [loadingEntries, setLoadingEntries] = useState(false);
+  // Start loading=true so the classes/entries tables show a spinner on first paint instead of
+  // the "לא נמצאו מקצים/כניסות להצגה" empty rows before the mount fetch runs. loadPageData's
+  // guard settles both to false when there is no competition/ranch to fetch for.
+  var [loadingClasses, setLoadingClasses] = useState(true);
+  var [loadingEntries, setLoadingEntries] = useState(true);
 
   var [error, setError] = useState("");
 
@@ -609,6 +612,10 @@ export default function useSecretaryCompetitionClassesPage(options) {
 
   async function loadPageData() {
     if (!competitionId || !ranchId) {
+      // Nothing to fetch: settle the initial loading=true so the tables show their
+      // empty states rather than stuck spinners.
+      setLoadingClasses(false);
+      setLoadingEntries(false);
       return;
     }
 

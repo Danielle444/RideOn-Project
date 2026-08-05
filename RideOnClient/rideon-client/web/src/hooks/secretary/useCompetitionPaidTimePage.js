@@ -118,7 +118,10 @@ export default function useCompetitionPaidTimePage(options) {
   var [competitionStartDate, setCompetitionStartDate] = useState("");
   var [competitionEndDate, setCompetitionEndDate] = useState("");
 
-  var [loadingSlots, setLoadingSlots] = useState(false);
+  // Start loadingSlots=true so the slots table shows a spinner on first paint instead of the
+  // "לא נמצאו סלוטים להצגה" empty row before the mount fetch runs. loadSlots settles it to
+  // false when there is no competition/ranch to fetch for.
+  var [loadingSlots, setLoadingSlots] = useState(true);
   var [loadingRequests, setLoadingRequests] = useState(false);
   var [savingAssignment, setSavingAssignment] = useState(false);
 
@@ -153,7 +156,10 @@ export default function useCompetitionPaidTimePage(options) {
   );
 
   async function loadSlots() {
-    if (!competitionId || !ranchId) return;
+    if (!competitionId || !ranchId) {
+      setLoadingSlots(false);
+      return;
+    }
 
     try {
       setLoadingSlots(true);

@@ -15,6 +15,18 @@ export default function FinancialProjectionPanel(props) {
   var copy = FINANCIAL_PROJECTION_COPY;
   var projection = props.projection;
 
+  // Loading must win over the empty state: while the projection data is still being fetched,
+  // finClasses is [] and deriveFinancialProjection returns predictedClassCount === 0, which is
+  // indistinguishable from a genuine no-prediction competition. Show a loading placeholder first
+  // so the panel never claims "no prediction available" mid-fetch.
+  if (props.loading) {
+    return (
+      <div className="rounded-2xl border border-dashed border-[#D9C7BD] bg-[#FBF7F4] px-5 py-6 text-center text-sm text-[#8D6E63]">
+        {copy.loading}
+      </div>
+    );
+  }
+
   if (!projection || !projection.entry || projection.entry.predictedClassCount === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-[#D9C7BD] bg-[#FBF7F4] px-5 py-6 text-center text-sm text-[#8D6E63]">

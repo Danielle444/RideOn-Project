@@ -29,7 +29,9 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
   const [competitions, setCompetitions] = useState([]);
   const [selectedCompetition, setSelectedCompetition] = useState(null);
   const [orders, setOrders] = useState([]);
-  const [loadingCompetitions, setLoadingCompetitions] = useState(false);
+  // Start loading=true so the first frame shows a spinner, not "לא נמצאו תחרויות" before the
+  // fetch runs. loadCompetitions settles it to false when there is no active ranch.
+  const [loadingCompetitions, setLoadingCompetitions] = useState(true);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [uploadingOrderId, setUploadingOrderId] = useState(null);
   const [claimingOrderId, setClaimingOrderId] = useState(null);
@@ -37,9 +39,18 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
   // Orders whose photo upload just failed — reveals the no-photo fallback button (CAP-4).
   const [photoFailedOrderId, setPhotoFailedOrderId] = useState(null);
 
-  useEffect(function () {
-    loadCompetitions();
+  // Keyed on ranchId (not []) so a ranch that becomes known after mount actually triggers the
+  // fetch. With [] deps a late-arriving activeRole left loadingCompetitions=false and the list
+  // empty forever, showing a false "לא נמצאו תחרויות" that no fetch would ever clear.
+  useEffect(
+    function () {
+      loadCompetitions();
+    },
+    [activeRole?.ranchId],
+  );
 
+  // Route-param preselect runs once on mount only.
+  useEffect(function () {
     const pid = props.route?.params?.competitionId;
     if (pid) {
       handleSelectCompetition({
@@ -50,7 +61,12 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
   }, []);
 
   async function loadCompetitions() {
-    if (!activeRole?.ranchId) return;
+    if (!activeRole?.ranchId) {
+      // No active ranch yet: settle the initial loading=true so the screen shows its
+      // empty state rather than a stuck spinner (the effect re-runs when ranchId arrives).
+      setLoadingCompetitions(false);
+      return;
+    }
 
     try {
       setLoadingCompetitions(true);

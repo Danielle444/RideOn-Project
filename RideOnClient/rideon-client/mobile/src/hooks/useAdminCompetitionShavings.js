@@ -183,7 +183,11 @@ export default function useAdminCompetitionShavings(params) {
   var competitionId = params.competitionId;
   var isActiveTab = params.isActiveTab;
 
-  var [loading, setLoading] = useState(false);
+  // Start loading=true so the first frame after this tab activates shows a
+  // spinner, not the empty "לא נמצא מחיר פעיל / לא נמצאו סוסים" branch, which
+  // would otherwise flash before loadData's setLoading(true) runs. The guard in
+  // loadData settles this back to false when there is no valid context to fetch.
+  var [loading, setLoading] = useState(true);
   var [screenError, setScreenError] = useState("");
   var [isSaving, setIsSaving] = useState(false);
 
@@ -204,6 +208,9 @@ export default function useAdminCompetitionShavings(params) {
   var loadData = useCallback(
     async function () {
       if (!competitionId || !activeRole || !activeRole.ranchId) {
+        // Nothing to fetch: settle the initial loading=true so the tab shows its
+        // empty state rather than a stuck spinner.
+        setLoading(false);
         return;
       }
 

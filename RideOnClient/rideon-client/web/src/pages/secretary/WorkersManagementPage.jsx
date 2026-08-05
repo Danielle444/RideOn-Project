@@ -27,7 +27,10 @@ export default function WorkersManagementPage() {
   const activeRole = activeRoleContext.activeRole;
 
   const [workers, setWorkers] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // Start loading=true so the table shows a spinner on first paint instead of the
+  // "לא נמצאו עובדים להצגה" empty row before the mount fetch runs. The effect below
+  // settles it to false when there is no active ranch to fetch for.
+  const [loading, setLoading] = useState(true);
   const [actionLoadingKey, setActionLoadingKey] = useState("");
 
   const [statusFilter, setStatusFilter] = useState("");
@@ -75,6 +78,9 @@ export default function WorkersManagementPage() {
   useEffect(
     function () {
       if (!currentRanchId) {
+        // No active ranch to fetch for: settle the initial loading=true so the
+        // table shows its empty state rather than a stuck spinner.
+        setLoading(false);
         return;
       }
 

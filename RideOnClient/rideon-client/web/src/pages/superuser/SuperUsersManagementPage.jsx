@@ -11,7 +11,10 @@ import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function SuperUsersManagementPage() {
   const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // Start loading=true so the table shows a spinner on first paint instead of its empty row
+  // before the mount fetch runs. loadSuperUsers (called unconditionally on mount) sets loading
+  // true→false, so this always resolves.
+  const [loading, setLoading] = useState(true);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
