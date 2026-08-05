@@ -10,6 +10,7 @@ export default function SecretaryCreateStallBookingModal(props) {
   var isOpen = !!props.isOpen;
   var competitionId = props.competitionId;
   var ranchId = props.ranchId;
+  var ranchOptions = props.ranchOptions || [];
 
   var [payers, setPayers] = useState([]);
   var [horses, setHorses] = useState([]);
@@ -21,6 +22,7 @@ export default function SecretaryCreateStallBookingModal(props) {
   var [payerPersonId, setPayerPersonId] = useState("");
   var [isForTack, setIsForTack] = useState(false);
   var [horseId, setHorseId] = useState("");
+  var [requestingRanchId, setRequestingRanchId] = useState("");
   var [productId, setProductId] = useState("");
   var [startDate, setStartDate] = useState("");
   var [endDate, setEndDate] = useState("");
@@ -36,6 +38,7 @@ export default function SecretaryCreateStallBookingModal(props) {
       setPayerPersonId("");
       setIsForTack(false);
       setHorseId("");
+      setRequestingRanchId("");
       setProductId("");
       setStartDate("");
       setEndDate("");
@@ -121,6 +124,7 @@ export default function SecretaryCreateStallBookingModal(props) {
     if (new Date(endDate) < new Date(startDate))
       return "תאריך סיום חייב להיות אחרי תאריך התחלה";
     if (!isForTack && !horseId) return "יש לבחור סוס (או לסמן 'תא ציוד')";
+    if (isForTack && !requestingRanchId) return "יש לבחור חווה מבקשת עבור תא ציוד";
     return "";
   }
 
@@ -139,6 +143,11 @@ export default function SecretaryCreateStallBookingModal(props) {
         payerPersonId: Number(payerPersonId),
         horseId: isForTack ? null : Number(horseId),
         isForTack: isForTack,
+        // Ranch-model fix: requestingRanchId is the guest/home ranch for a
+        // tack booking (there is no horse to derive it from). Only sent for
+        // tack -- the server derives the requesting ranch from the horse
+        // for non-tack bookings and ignores this field in that case.
+        requestingRanchId: isForTack ? Number(requestingRanchId) : null,
         productId: Number(productId),
         startDate: startDate,
         endDate: endDate,
@@ -216,6 +225,30 @@ export default function SecretaryCreateStallBookingModal(props) {
               className="h-4 w-4 accent-[#8B5E4C]"
             />
           </label>
+
+          {isForTack ? (
+            <div>
+              <label className="block text-sm font-bold text-[#5D4037] mb-1">
+                חווה מבקשת
+              </label>
+              <select
+                value={requestingRanchId}
+                onChange={function (e) {
+                  setRequestingRanchId(e.target.value);
+                }}
+                className="w-full rounded-xl border border-[#E2D5CE] bg-white px-3 py-2 text-right text-sm"
+              >
+                <option value="">בחר חווה</option>
+                {ranchOptions.map(function (r) {
+                  return (
+                    <option key={r.ranchId} value={r.ranchId}>
+                      {r.ranchName}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          ) : null}
 
           {!isForTack ? (
             <div>

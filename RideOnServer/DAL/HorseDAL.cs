@@ -158,6 +158,46 @@ namespace RideOnServer.DAL
             }
         }
 
+        // Ranch-model fix (Phase 2, 2026-08-05): single-horse ranch lookup used
+        // by StallBookingsController to derive a horse's home/requesting ranch
+        // server-side for authorization, instead of trusting a client-supplied
+        // ranch value. Backed by usp_gethorseranchid (232) -- see that file's
+        // header for why no existing method/proc already provided this.
+        public int? GetHorseRanchId(int horseId)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@p_horseid", horseId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_gethorseranchid",
+                        connection,
+                        paramDic))
+                    {
+                        object? result = command.ExecuteScalar();
+
+                        if (result == null || result == DBNull.Value)
+                        {
+                            return null;
+                        }
+
+                        return Convert.ToInt32(result);
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
         public void UpdateHorseBarnName(UpdateHorseBarnNameRequest request)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>

@@ -339,7 +339,12 @@ export default function AddShavingsOrderModal(props) {
       const payload = {
         competitionId: competitionId,
         priceCatalogId: Number(selectedPriceId),
-        ranchId: Number(ranchId),
+        // Ranch-model fix: the server derives both the requesting ranch
+        // (from the selected stalls' requestingranchid) and the host ranch
+        // (from competitionId) itself -- it never trusts a client-supplied
+        // ranchId for this endpoint, so it is intentionally not sent. The
+        // ranchId state above is still needed to scope the stall picker and
+        // price-catalog fetch, which remain per-ranch reads.
         notes: notes ? notes.trim() : null,
         requestedDeliveryTime: buildRequestedDeliveryTime(),
         stalls: selectedStalls.map(function (s) {

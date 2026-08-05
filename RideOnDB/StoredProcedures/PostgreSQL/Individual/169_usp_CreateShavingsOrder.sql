@@ -1,3 +1,22 @@
+-- RANCH-MODEL CORRECTION (2026-08-05, owner-approved architecture fix):
+-- p_ranchid now means the competition's host/service ranch and must equal
+-- competition.hostranchid (new check, same pattern as 188). Each supplied
+-- StallBookingId's requesting ranch is now read from the new
+-- stallbooking.requestingranchid column (see
+-- migrations/add_stallbooking_requestingranchid.sql) instead of being left
+-- undetermined; if the supplied stalls resolve to more than one distinct
+-- requesting ranch, the whole call fails loudly (this is a NEW check --
+-- previously, requiring every stall to match the single p_ranchid value
+-- accidentally guaranteed single-ranch calls only because stallbooking.ranchid
+-- used to mean home ranch; now that it means host ranch, every guest
+-- ranch's stalls at this competition would share the same value, so that
+-- accidental protection is gone and must be replaced explicitly). No
+-- client-supplied requesting-ranch parameter was added -- it is always
+-- derived from the referenced stalls, never trusted from the caller. Bag
+-- quantity/product/price validation, payer inheritance from each stall's
+-- own 'stalls' billcharge, ceil-based per-payer split, bill/billcharge
+-- behavior, and return type are all unchanged.
+
 CREATE OR REPLACE FUNCTION public.usp_createshavingsorder(p_competitionid integer, p_orderedbysystemuserid integer, p_pricecatalogid integer, p_ranchid integer, p_notes text, p_requesteddeliverytime timestamp without time zone, p_stalls jsonb)
  RETURNS integer
  LANGUAGE plpgsql
@@ -9,6 +28,7 @@ declare
     v_catalog_ranchid integer;
     v_totalbags integer := 0;
     v_competitionenddate date;
+    v_hostranchid integer;
 
     v_stall jsonb;
     v_stallbookingid integer;
@@ -16,6 +36,8 @@ declare
     v_stallprice numeric(10,2);
     v_payercount integer;
     v_amountperpayer numeric(10,2);
+    v_requestingranchid integer;
+    v_stall_requestingranchid integer;
 
     v_billid integer;
     v_payerpersonid integer;
@@ -39,13 +61,17 @@ begin
         raise exception 'At least one stall is required';
     end if;
 
-    select c.competitionenddate
-    into v_competitionenddate
+    select c.competitionenddate, c.hostranchid
+    into v_competitionenddate, v_hostranchid
     from public.competition c
     where c.competitionid = p_competitionid;
 
     if (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate then
         raise exception 'Competition has already ended' using errcode = 'RN001';
+    end if;
+
+    if p_ranchid <> v_hostranchid then
+        raise exception 'RanchId must equal the competition host ranch';
     end if;
 
     select
@@ -94,17 +120,24 @@ begin
             raise exception 'Bag quantity must be positive';
         end if;
 
-        if not exists (
-            select 1
-            from public.stallbooking sb
-            inner join public.productrequest pr
-                on pr.prequestid = sb.stallbookingid
-            where sb.stallbookingid = v_stallbookingid
-              and pr.competitionid = p_competitionid
-              and sb.ranchid = p_ranchid
-              and sb.isfortack = false
-        ) then
+        select sb.requestingranchid
+        into v_stall_requestingranchid
+        from public.stallbooking sb
+        inner join public.productrequest pr
+            on pr.prequestid = sb.stallbookingid
+        where sb.stallbookingid = v_stallbookingid
+          and pr.competitionid = p_competitionid
+          and sb.ranchid = p_ranchid
+          and sb.isfortack = false;
+
+        if not found then
             raise exception 'Invalid stall booking id %', v_stallbookingid;
+        end if;
+
+        if v_requestingranchid is null then
+            v_requestingranchid := v_stall_requestingranchid;
+        elsif v_requestingranchid <> v_stall_requestingranchid then
+            raise exception 'All supplied stall bookings must belong to the same requesting ranch (found % and %)', v_requestingranchid, v_stall_requestingranchid;
         end if;
 
         select count(distinct b.paidbypersonid)
@@ -151,6 +184,10 @@ begin
                 temp_shavings_payer_amounts.amounttopay + excluded.amounttopay;
         end loop;
     end loop;
+
+    if v_requestingranchid is null then
+        raise exception 'Could not resolve a requesting ranch from the supplied stall bookings';
+    end if;
 
     insert into public.productrequest
     (

@@ -39,14 +39,47 @@
 -- reach the lock (the ADDED block only runs inside the `p_isfortack = false`
 -- branch, which already requires p_horseid to be non-null).
 --
--- STATUS AS WRITTEN: NOT DEPLOYED. This file has not been run against live
--- Supabase (no CREATE OR REPLACE executed). The live procedure as of
--- 2026-08-02 is IDENTICAL to this file minus the ADDED block -- deploying
--- this file only adds the lock, it changes no other behavior, no parameter,
--- and no return type. Deployment requires explicit owner approval showing
--- this exact diff against the live definition.
+-- STATUS AS WRITTEN (superseded, see below): the "NOT DEPLOYED" claim below
+-- was live-verified WRONG on 2026-08-05 -- a direct pg_get_functiondef read
+-- confirmed this file's base body (including the advisory-lock block) was
+-- already deployed. Kept for history; do not rely on it.
+--
+-- RANCH-MODEL CORRECTION (2026-08-05, owner-approved architecture fix):
+-- p_ranchid previously had to equal BOTH the horse's home ranch AND the
+-- PriceCatalog-owning ranch -- conflating the horse's home ranch, the
+-- competition's host/service ranch, and (at the API authorization layer)
+-- the actor's own ranch into one value. This only ever worked because every
+-- booking ever created was for the host ranch's own horses (RanchId 11 in
+-- every live row, confirmed 2026-08-05). Corrected model:
+--   - p_ranchid now means the competition's host/service ranch, and must
+--     equal competition.hostranchid (new check).
+--   - The horse-ranch check no longer compares horse.ranchid to p_ranchid;
+--     it only confirms the horse exists, and captures horse.ranchid as the
+--     requesting ranch (persisted to the new stallbooking.requestingranchid
+--     column -- see migrations/add_stallbooking_requestingranchid.sql).
+--   - A new trailing parameter, p_requestingranchid integer DEFAULT NULL,
+--     lets tack callers (horseid is NULL, so nothing to derive from) supply
+--     the requesting ranch explicitly; it is REQUIRED (non-null) when
+--     p_isfortack = true, and if supplied for a non-tack booking it must
+--     agree with the horse's own ranch or the call is rejected. The
+--     trailing DEFAULT NULL means every existing 10-argument caller keeps
+--     working unchanged.
+--   - PriceCatalog validation (v_catalog_ranchid <> p_ranchid) is
+--     unchanged in code but now correctly enforces PriceCatalog.RanchId =
+--     the host ranch, since p_ranchid itself now means host ranch.
+-- Competition-entry validation, the advisory lock, the global horse/date
+-- overlap check, payer JSON handling, the even payer split, and all
+-- bill/productrequest/billcharge/return-type/exception behavior are
+-- unchanged.
 
-CREATE OR REPLACE FUNCTION public.usp_createstallbooking(p_competitionid integer, p_orderedbysystemuserid integer, p_pricecatalogid integer, p_notes text, p_ranchid integer, p_horseid integer, p_startdate date, p_enddate date, p_isfortack boolean, p_payers jsonb)
+-- Adding p_requestingranchid changes the declared parameter-type list, so
+-- CREATE OR REPLACE alone would create a NEW 11-arg overload and leave the
+-- old 10-arg (pre-fix) function callable and unchanged. Drop the exact old
+-- signature first so only the corrected version remains -- same pattern
+-- already used in 149_usp_SecretaryCreateStallBookingForPayer.sql.
+DROP FUNCTION IF EXISTS public.usp_createstallbooking(integer, integer, integer, text, integer, integer, date, date, boolean, jsonb);
+
+CREATE OR REPLACE FUNCTION public.usp_createstallbooking(p_competitionid integer, p_orderedbysystemuserid integer, p_pricecatalogid integer, p_notes text, p_ranchid integer, p_horseid integer, p_startdate date, p_enddate date, p_isfortack boolean, p_payers jsonb, p_requestingranchid integer DEFAULT NULL)
  RETURNS integer
  LANGUAGE plpgsql
 AS $function$
@@ -61,11 +94,12 @@ declare
     v_billid integer;
     v_payer jsonb;
     v_payerpersonid integer;
-    v_horseexists integer;
     v_horseincompetition integer;
     v_overlappingexists integer;
     v_staydays integer;
     v_competitionenddate date;
+    v_hostranchid integer;
+    v_requestingranchid integer;
 begin
     if p_competitionid is null or p_competitionid <= 0 then
         raise exception 'Invalid competition id';
@@ -97,13 +131,17 @@ begin
         raise exception 'Invalid stay days';
     end if;
 
-    select c.competitionenddate
-    into v_competitionenddate
+    select c.competitionenddate, c.hostranchid
+    into v_competitionenddate, v_hostranchid
     from public.competition c
     where c.competitionid = p_competitionid;
 
     if (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate then
         raise exception 'Competition has already ended' using errcode = 'RN001';
+    end if;
+
+    if p_ranchid <> v_hostranchid then
+        raise exception 'RanchId must equal the competition host ranch';
     end if;
 
     if p_isfortack = false then
@@ -117,14 +155,17 @@ begin
         -- conflicting change between this check and this INSERT.
         perform pg_advisory_xact_lock(1735, p_horseid);
 
-        select count(*)
-        into v_horseexists
+        select h.ranchid
+        into v_requestingranchid
         from public.horse h
-        where h.horseid = p_horseid
-          and h.ranchid = p_ranchid;
+        where h.horseid = p_horseid;
 
-        if v_horseexists = 0 then
-            raise exception 'Horse does not belong to the specified ranch';
+        if not found then
+            raise exception 'Horse not found';
+        end if;
+
+        if p_requestingranchid is not null and p_requestingranchid <> v_requestingranchid then
+            raise exception 'RequestingRanchId does not match the horse''s home ranch';
         end if;
 
         select count(*)
@@ -169,6 +210,12 @@ begin
         if p_horseid is not null then
             raise exception 'HorseId must be NULL for tack stall booking';
         end if;
+
+        if p_requestingranchid is null or p_requestingranchid <= 0 then
+            raise exception 'RequestingRanchId is required for tack stall booking';
+        end if;
+
+        v_requestingranchid := p_requestingranchid;
     end if;
 
     select
@@ -230,7 +277,8 @@ begin
         startdate,
         enddate,
         horseid,
-        isfortack
+        isfortack,
+        requestingranchid
     )
     values
     (
@@ -244,7 +292,8 @@ begin
             when p_isfortack = true then null
             else p_horseid
         end,
-        p_isfortack
+        p_isfortack,
+        v_requestingranchid
     )
     returning stallbookingid
     into v_stallbookingid;

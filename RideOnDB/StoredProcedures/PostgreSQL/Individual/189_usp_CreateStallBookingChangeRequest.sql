@@ -32,10 +32,32 @@
 -- is now GLOBAL by horseid across all competitions. See 187's header for the
 -- full cross-competition consistency note.
 --
--- STATUS AS WRITTEN: NOT DEPLOYED. The live procedure as of 2026-08-02 is
--- IDENTICAL to this file minus the ADDED block. Deployment requires
--- explicit owner approval showing this exact diff against the live
--- definition.
+-- STATUS AS WRITTEN (superseded, see below): the "NOT DEPLOYED" claim was
+-- live-verified WRONG on 2026-08-05 -- a direct pg_get_functiondef read
+-- confirmed this file's base body (including the advisory lock) was
+-- already deployed, matching the same pattern found for 188.
+--
+-- RANCH-MODEL CORRECTION (2026-08-05, owner-approved architecture-fix
+-- extension): p_ranchid in this flow represents the actor/requesting
+-- ranch, not the service/host ranch -- confirmed via the full Controller/
+-- DAL/client trace (mobile sends activeRole.ranchId, Controller authorizes
+-- RanchAdmin-or-HostSecretary against it, matching the plain create path's
+-- pre-fix pattern). Both ownership/lookup predicates changed from
+-- `sb.ranchid = p_ranchid` to `sb.requestingranchid = p_ranchid` (see
+-- migrations/add_stallbooking_requestingranchid.sql) -- without this, a
+-- guest-ranch admin's own booking (sb.ranchid now = host ranch) would
+-- become unfindable by this proc the moment 188/149 deploy, breaking
+-- edit/cancel for the exact guest-ranch case the whole fix exists to
+-- enable. Additionally, the replacement-row INSERT below now carries
+-- `requestingranchid` forward from the original booking
+-- (v_original_stall_booking.requestingranchid) -- without this, approving
+-- any change request would violate the new NOT NULL constraint the moment
+-- it's enforced. `stallbooking.ranchid` continues to be copied unchanged
+-- (still the service/host ranch). No other logic changed: request
+-- creation, authorization assumptions, status/'Pending' logic, return
+-- value, the paid-charge guard, the pending-request guard, the advisory
+-- lock, the overlap check, and all billing/notification behavior are
+-- byte-for-byte unchanged.
 
 CREATE OR REPLACE FUNCTION public.usp_createstallbookingchangerequest(p_originalstallbookingid integer, p_ranchid integer, p_orderedbysystemuserid integer, p_newstartdate date, p_newenddate date, p_notes text)
  RETURNS integer
@@ -74,7 +96,7 @@ begin
     inner join public.stallbooking sb
         on sb.stallbookingid = pr.prequestid
     where pr.prequestid = p_originalstallbookingid
-      and sb.ranchid = p_ranchid;
+      and sb.requestingranchid = p_ranchid;
 
     if not found then
         raise exception 'Original stall booking was not found for this ranch';
@@ -84,7 +106,7 @@ begin
     into v_original_stall_booking
     from public.stallbooking sb
     where sb.stallbookingid = p_originalstallbookingid
-      and sb.ranchid = p_ranchid;
+      and sb.requestingranchid = p_ranchid;
 
     if not found then
         raise exception 'Original stall booking was not found';
@@ -177,7 +199,8 @@ begin
         startdate,
         enddate,
         horseid,
-        isfortack
+        isfortack,
+        requestingranchid
     )
     values
     (
@@ -188,7 +211,8 @@ begin
         p_newstartdate,
         p_newenddate,
         v_original_stall_booking.horseid,
-        v_original_stall_booking.isfortack
+        v_original_stall_booking.isfortack,
+        v_original_stall_booking.requestingranchid
     );
 
     insert into public.productchangerequest

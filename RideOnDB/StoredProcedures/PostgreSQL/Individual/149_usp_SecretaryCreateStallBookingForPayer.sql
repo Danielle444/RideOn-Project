@@ -49,6 +49,20 @@
 -- competition-id restriction is removed here; the check is now GLOBAL by
 -- horseid across all competitions. See 187's header for the full
 -- cross-competition consistency note.
+--
+-- RANCH-MODEL CORRECTION (2026-08-05, owner-approved architecture fix):
+-- this proc's host-ranch derivation (v_hostranchid from competition) and
+-- host-secretary authorization were already correct -- no change to either.
+-- Added: requesting-ranch persistence, for parity with 188/225. For
+-- non-tack, requestingranchid is derived server-side from horse.ranchid
+-- (never trusted from the client); if a caller supplies p_requestingranchid
+-- anyway and it disagrees with the horse's own ranch, the call is rejected.
+-- For tack, p_requestingranchid is required (no horse to derive it from).
+-- The new parameter is trailing with DEFAULT NULL, matching 188's
+-- backward-compatible pattern; the existing DROP FUNCTION IF EXISTS below
+-- (already present for a prior signature change) is updated to match this
+-- proc's immediately-prior 9-parameter signature, so only the corrected
+-- 10-parameter version remains callable.
 -- ============================================================================
 
 DROP FUNCTION IF EXISTS public.usp_secretarycreatestallbookingforpayer(
@@ -64,7 +78,8 @@ CREATE OR REPLACE FUNCTION public.usp_secretarycreatestallbookingforpayer(
     p_enddate                  date,
     p_isfortack                boolean,
     p_productid                smallint,       -- stalltype
-    p_notes                    text
+    p_notes                    text,
+    p_requestingranchid        integer DEFAULT NULL
 )
 RETURNS integer
 LANGUAGE plpgsql AS $$
@@ -77,6 +92,7 @@ DECLARE
     v_days             integer;
     v_amount           numeric;
     v_categorykey      varchar;
+    v_requestingranchid integer;
 BEGIN
     IF p_enddate < p_startdate THEN
         RAISE EXCEPTION 'End date must be on or after start date';
@@ -118,6 +134,29 @@ BEGIN
         ) THEN
             RAISE EXCEPTION 'An active overlapping stall booking already exists for this horse';
         END IF;
+    END IF;
+
+    -- Requesting (guest) ranch: derived from the horse for non-tack,
+    -- required explicitly for tack (no horse to derive it from).
+    IF NOT COALESCE(p_isfortack, FALSE) THEN
+        SELECT h.ranchid
+        INTO v_requestingranchid
+        FROM public.horse h
+        WHERE h.horseid = p_horseid;
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Horse not found';
+        END IF;
+
+        IF p_requestingranchid IS NOT NULL AND p_requestingranchid <> v_requestingranchid THEN
+            RAISE EXCEPTION 'RequestingRanchId does not match the horse''s home ranch';
+        END IF;
+    ELSE
+        IF p_requestingranchid IS NULL OR p_requestingranchid <= 0 THEN
+            RAISE EXCEPTION 'RequestingRanchId is required for tack stall booking';
+        END IF;
+
+        v_requestingranchid := p_requestingranchid;
     END IF;
 
     -- Competition + host ranch
@@ -221,7 +260,8 @@ BEGIN
         startdate,
         enddate,
         horseid,
-        isfortack
+        isfortack,
+        requestingranchid
     )
     VALUES (
         v_new_prequestid,
@@ -231,7 +271,8 @@ BEGIN
         p_startdate,
         p_enddate,
         p_horseid,
-        COALESCE(p_isfortack, FALSE)
+        COALESCE(p_isfortack, FALSE),
+        v_requestingranchid
     );
 
     -- Roll up to bill totals

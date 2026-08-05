@@ -111,7 +111,8 @@ namespace RideOnServer.BL
             DateTime endDate,
             bool isForTack,
             short productId,
-            string? notes)
+            string? notes,
+            int? requestingRanchId)
         {
             if (competitionId <= 0)
             {
@@ -148,6 +149,14 @@ namespace RideOnServer.BL
                 throw new Exception("Horse is required for a non-tack stall");
             }
 
+            // Ranch-model fix (Phase 2, 2026-08-05): mirrors the horse-required
+            // guard above -- for tack there is no horse to derive a requesting
+            // ranch from, so it must be supplied and valid.
+            if (isForTack && (!requestingRanchId.HasValue || requestingRanchId.Value <= 0))
+            {
+                throw new Exception("RequestingRanchId is required for a tack stall");
+            }
+
             return StallBookingDAL.SecretaryCreateStallBookingForPayer(
                 competitionId,
                 secretarySystemUserId,
@@ -157,7 +166,8 @@ namespace RideOnServer.BL
                 endDate,
                 isForTack,
                 productId,
-                notes);
+                notes,
+                requestingRanchId);
         }
     }
 }

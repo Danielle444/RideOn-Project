@@ -251,6 +251,17 @@ export default function useAdminTackStallBookings(params) {
       return false;
     }
 
+    // Ranch-model fix: RequestingRanchId (the guest/home ranch that owns
+    // this tack booking) must be a positive integer before sending -- there
+    // is no horse for the server to derive it from, so it can never be
+    // silently substituted with the host ranch. activeRole.ranchId is the
+    // correct source: it is the ranch the current actor is authorized in,
+    // already validated non-null above.
+    if (!activeRole.ranchId || activeRole.ranchId <= 0) {
+      Alert.alert("שגיאה", "לא ניתן לקבוע את החווה המבקשת עבור תא הציוד");
+      return false;
+    }
+
     try {
       setIsSavingTack(true);
 
@@ -259,7 +270,10 @@ export default function useAdminTackStallBookings(params) {
         orderedBySystemUserId: user.personId,
         priceCatalogId: selectedTackStallType.priceCatalogId,
         notes: tackNotes ? tackNotes.trim() : null,
-        ranchId: activeRole.ranchId,
+        // Ranch-model fix: requestingRanchId is the guest/home ranch that
+        // owns this tack booking (not the competition's host ranch) --
+        // server derives the host ranch separately from competitionId.
+        requestingRanchId: activeRole.ranchId,
         startDate: tackStartDate,
         endDate: tackEndDate,
         quantity: quantityNumber,

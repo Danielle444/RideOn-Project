@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   DndContext,
@@ -50,6 +50,32 @@ export default function CompetitionStallsPage() {
   const ranchId = activeRole?.ranchId || null;
 
   const page = useCompetitionStallsPage(Number(competitionId), ranchId);
+
+  // Ranch-model fix: reuse the already-computed participating-ranch list
+  // (page.ranchGroups) as the requesting-ranch options for a tack stall
+  // booking, adding the host ranch itself as a fallback option if it is
+  // not already one of the participating ranches.
+  const ranchOptions = useMemo(
+    function () {
+      const options = page.ranchGroups.map(function (group) {
+        return { ranchId: group.ranchId, ranchName: group.ranchName };
+      });
+
+      const hasHostRanch = options.some(function (option) {
+        return option.ranchId === ranchId;
+      });
+
+      if (!hasHostRanch && ranchId) {
+        options.push({
+          ranchId: ranchId,
+          ranchName: activeRole?.ranchName || "",
+        });
+      }
+
+      return options;
+    },
+    [page.ranchGroups, ranchId, activeRole],
+  );
 
   const [activeItem, setActiveItem] = useState(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -359,6 +385,7 @@ export default function CompetitionStallsPage() {
         isOpen={createModalOpen}
         competitionId={Number(competitionId)}
         ranchId={ranchId}
+        ranchOptions={ranchOptions}
         onClose={function () {
           setCreateModalOpen(false);
         }}
