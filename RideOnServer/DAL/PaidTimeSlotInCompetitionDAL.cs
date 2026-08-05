@@ -47,6 +47,7 @@ namespace RideOnServer.DAL
                                 PendingRequestsCount = reader["PendingRequestsCount"] != DBNull.Value
                                     ? Convert.ToInt32(reader["PendingRequestsCount"])
                                     : 0,
+                                IsPublished = reader["IsPublished"] != DBNull.Value && Convert.ToBoolean(reader["IsPublished"]),
                             });
                         }
 
@@ -150,6 +151,33 @@ namespace RideOnServer.DAL
             catch (NpgsqlException  ex)
             {
                 throw new Exception(ex.Message);
+            }
+        }
+
+        public void SetPaidTimeSlotPublishState(int paidTimeSlotInCompId, int hostRanchId, bool isPublished)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@PaidTimeSlotInCompId", paidTimeSlotInCompId },
+                { "@HostRanchId", hostRanchId },
+                { "@IsPublished", isPublished }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_SetPaidTimeSlotPublishState", connection, paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
             }
         }
 

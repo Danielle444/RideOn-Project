@@ -10,7 +10,10 @@
 --
 -- Guards:
 --   - Request exists, not cancelled
---   - Target slot exists in the same competition, and is not published
+--   - Target slot exists in the same competition
+--
+-- Publication: a published slot no longer blocks transfer (removed 2026-08-06,
+-- paid-time publish feature) - publication does not freeze placement.
 --
 -- Payment: a paid request MAY be transferred or unassigned. Payment freezes
 -- billing-related changes (product, short/long type, duration, price, charge
@@ -125,10 +128,6 @@ BEGIN
 
     IF v_target_compid <> v_request_compid THEN
         RAISE EXCEPTION 'Target slot belongs to a different competition';
-    END IF;
-
-    IF v_target_ispublished THEN
-        RAISE EXCEPTION 'Cannot transfer into a published slot';
     END IF;
 
     -- מיקום פנוי בסלוט-היעד: MAX(assignedorder)+1 (פערים אינם ממוחזרים),

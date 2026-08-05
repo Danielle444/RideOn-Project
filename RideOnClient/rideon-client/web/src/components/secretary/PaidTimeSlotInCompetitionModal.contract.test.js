@@ -113,3 +113,25 @@ describe("CAP-5 — seed start/end hour only when empty", () => {
     );
   });
 });
+
+describe("CAP-2 — the free-text slot-status field is fully removed", () => {
+  it("renders no סטטוס סלוט input anywhere in the modal", () => {
+    expect(modalSource).not.toContain("סטטוס סלוט");
+    expect(modalSource).not.toContain("slotStatus");
+    expect(modalSource).not.toContain("SlotStatus");
+  });
+
+  it("the submitted create/edit payload has no slotStatus or SlotStatus property", () => {
+    const submitAt = modalSource.indexOf("props.onSubmit({");
+    const submitEndAt = modalSource.indexOf("});", submitAt);
+
+    expect(submitAt).toBeGreaterThan(-1);
+
+    const payload = modalSource.slice(submitAt, submitEndAt);
+
+    expect(payload).not.toMatch(/\bslotStatus\s*:/);
+    expect(payload).not.toMatch(/\bSlotStatus\s*:/);
+    // slotNotes stays - only slotStatus was in scope for removal.
+    expect(payload).toContain("slotNotes:");
+  });
+});

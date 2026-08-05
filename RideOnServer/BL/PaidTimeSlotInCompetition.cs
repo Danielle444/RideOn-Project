@@ -40,6 +40,7 @@ namespace RideOnServer.BL
         public int EstimatedAvailablePlaces { get; set; }
         public int AssignedCount { get; set; }
         public int PendingRequestsCount { get; set; }
+        public bool IsPublished { get; set; }
 
         internal static List<PaidTimeSlotInCompetition> GetPaidTimeSlotsByCompetitionId(int competitionId)
         {
@@ -226,6 +227,31 @@ namespace RideOnServer.BL
 
             PaidTimeSlotInCompetitionDAL dal = new PaidTimeSlotInCompetitionDAL();
             return dal.GetById(PaidTimeSlotInCompId);
+        }
+
+        internal static PaidTimeSlotInCompetition? SetPaidTimeSlotPublishState(int paidTimeSlotInCompId, int hostRanchId, bool isPublished)
+        {
+            if (paidTimeSlotInCompId <= 0)
+            {
+                throw new Exception("PaidTimeSlotInCompId is invalid");
+            }
+
+            if (hostRanchId <= 0)
+            {
+                throw new Exception("HostRanchId is invalid");
+            }
+
+            PaidTimeSlotInCompetitionDAL dal = new PaidTimeSlotInCompetitionDAL();
+            dal.SetPaidTimeSlotPublishState(paidTimeSlotInCompId, hostRanchId, isPublished);
+
+            PaidTimeSlotInCompetition? item = dal.GetById(paidTimeSlotInCompId);
+
+            if (item != null)
+            {
+                item.IsPublished = isPublished;
+            }
+
+            return item;
         }
     }
 }

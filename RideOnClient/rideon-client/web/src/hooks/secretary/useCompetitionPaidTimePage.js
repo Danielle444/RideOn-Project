@@ -11,6 +11,7 @@ import {
   getAllPaidTimeBaseSlots,
   createPaidTimeSlotInCompetition,
   updatePaidTimeSlotInCompetition,
+  setPaidTimeSlotPublishState,
   deletePaidTimeSlotInCompetition,
 } from "../../services/paidTimeSlotInCompetitionService";
 
@@ -249,7 +250,6 @@ export default function useCompetitionPaidTimePage(options) {
         StartTime: data.startTime,
         EndTime: data.endTime,
 
-        SlotStatus: data.slotStatus,
         SlotNotes: data.slotNotes,
       };
 
@@ -277,6 +277,21 @@ export default function useCompetitionPaidTimePage(options) {
       setPaidTimeSlotModalError(getErrorMessage(err));
     } finally {
       setSavingPaidTimeSlot(false);
+    }
+  }
+
+  async function handleSetPublishState(slot, isPublished) {
+    try {
+      var id = getSlotId(slot);
+
+      await setPaidTimeSlotPublishState(id, {
+        hostRanchId: Number(ranchId),
+        isPublished: isPublished,
+      });
+
+      await loadSlots();
+    } catch (err) {
+      onShowToast?.("error", getErrorMessage(err));
     }
   }
 
@@ -679,6 +694,7 @@ export default function useCompetitionPaidTimePage(options) {
     openEditPaidTimeSlotModal,
     closePaidTimeSlotModal,
     handleSubmitPaidTimeSlot,
+    handleSetPublishState,
     handleDeletePaidTimeSlot,
 
     /* assignment */

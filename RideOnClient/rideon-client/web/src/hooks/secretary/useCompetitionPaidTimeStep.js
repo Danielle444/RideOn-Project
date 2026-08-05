@@ -126,7 +126,6 @@ export default function useCompetitionPaidTimeStep(options) {
             slotDate: formData.slotDate,
             startTime: formData.startTime,
             endTime: formData.endTime,
-            slotStatus: formData.slotStatus,
             slotNotes: formData.slotNotes,
           },
         );
@@ -156,7 +155,6 @@ export default function useCompetitionPaidTimeStep(options) {
           slotDate: formData.slotDate,
           startTime: formData.startTime,
           endTime: formData.endTime,
-          slotStatus: formData.slotStatus,
           slotNotes: formData.slotNotes,
         });
 

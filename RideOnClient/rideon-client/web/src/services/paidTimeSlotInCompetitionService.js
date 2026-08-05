@@ -47,6 +47,14 @@ function updatePaidTimeSlotInCompetition(PaidTimeSlotInCompId, data) {
   );
 }
 
+function setPaidTimeSlotPublishState(PaidTimeSlotInCompId, data) {
+  return axios.patch(
+    `${API}/PaidTimeSlotsInCompetition/${PaidTimeSlotInCompId}/publish-state`,
+    data,
+    getAuthHeaders(),
+  );
+}
+
 function deletePaidTimeSlotInCompetition(
   PaidTimeSlotInCompId,
   competitionId,
@@ -68,5 +76,6 @@ export {
   getAllPaidTimeBaseSlots,
   createPaidTimeSlotInCompetition,
   updatePaidTimeSlotInCompetition,
+  setPaidTimeSlotPublishState,
   deletePaidTimeSlotInCompetition,
 };

@@ -73,6 +73,7 @@ BEGIN
     WHERE ptr.assignedcompslotid = p_PaidTimeSlotInCompId
       AND slot.competitionid     = p_CompetitionId
       AND ptr.status             = 'Assigned'
+      AND COALESCE(slot.ispublished, FALSE) = TRUE
     ORDER BY
         ptr.assignedorder NULLS LAST,
         ptr.assignedstarttime NULLS LAST,

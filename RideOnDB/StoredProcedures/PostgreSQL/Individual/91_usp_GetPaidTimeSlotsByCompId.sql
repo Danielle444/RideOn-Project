@@ -1,5 +1,7 @@
+DROP FUNCTION IF EXISTS public.usp_getpaidtimeslotsbycompid(integer);
+
 CREATE OR REPLACE FUNCTION public.usp_getpaidtimeslotsbycompid(p_competitionid integer)
- RETURNS TABLE("PaidTimeSlotInCompId" integer, "PaidTimeSlotId" integer, "SlotDate" date, "TimeOfDay" character varying, "StartTime" time without time zone, "EndTime" time without time zone, "ArenaRanchId" integer, "ArenaId" integer, "ArenaName" character varying, "SlotStatus" character varying, "SlotNotes" character varying, "TotalCapacityMinutes" integer, "UsedCapacityMinutes" integer, "RemainingCapacityMinutes" integer, "EstimatedAvailablePlaces" integer, "AssignedCount" integer, "PendingRequestsCount" integer)
+ RETURNS TABLE("PaidTimeSlotInCompId" integer, "PaidTimeSlotId" integer, "SlotDate" date, "TimeOfDay" character varying, "StartTime" time without time zone, "EndTime" time without time zone, "ArenaRanchId" integer, "ArenaId" integer, "ArenaName" character varying, "SlotStatus" character varying, "SlotNotes" character varying, "TotalCapacityMinutes" integer, "UsedCapacityMinutes" integer, "RemainingCapacityMinutes" integer, "EstimatedAvailablePlaces" integer, "AssignedCount" integer, "PendingRequestsCount" integer, "IsPublished" boolean)
  LANGUAGE plpgsql
 AS $function$
 begin
@@ -53,7 +55,9 @@ begin
             where pending_ptr.requestedcompslotid = ptc.paidtimeslotincompid
               and pending_ptr.status = 'Pending'
               and pending_ptr.assignedcompslotid is null
-        ) as pendingrequestscount
+        ) as pendingrequestscount,
+
+        ptc.ispublished as ispublished
 
     from paidtimeslotincompetition ptc
     inner join paidtimeslot pt
@@ -80,7 +84,8 @@ begin
         ptc.arenaid,
         a.arenaname,
         ptc.slotstatus,
-        ptc.slotnotes
+        ptc.slotnotes,
+        ptc.ispublished
     order by ptc.slotdate asc, ptc.starttime asc;
 end;
 $function$;
