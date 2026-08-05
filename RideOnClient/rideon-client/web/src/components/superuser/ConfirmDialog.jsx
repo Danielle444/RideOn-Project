@@ -16,7 +16,7 @@ export default function ConfirmDialog(props) {
             onClick={props.onCancel}
             className="px-5 py-2.5 rounded-2xl border border-[#D8CBC3] text-[#5D4037] bg-white hover:bg-[#F8F5F2] transition-colors"
           >
-            ביטול
+            {props.cancelLabel || "ביטול"}
           </button>
 
           <button
@@ -24,7 +24,7 @@ export default function ConfirmDialog(props) {
             onClick={props.onConfirm}
             className="px-5 py-2.5 rounded-2xl bg-[#8B6352] text-white hover:bg-[#7A5547] transition-colors"
           >
-            אישור
+            {props.confirmLabel || "אישור"}
           </button>
         </div>
       </div>

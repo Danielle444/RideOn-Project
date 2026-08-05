@@ -5,6 +5,13 @@ import CustomDropdown from "../../common/CustomDropdown";
 import MultiSelectPicker from "../../common/MultiSelectPicker";
 import JudgeModal from "../../common/JudgeModal";
 import useJudgeCreation from "../../../hooks/common/useJudgeCreation";
+import { getWholeDayOffsetDays } from "../../../utils/competitionForm.utils";
+import { addDaysToDateOnly } from "../../../utils/paidTimeSlotForm.utils";
+
+var DATE_CHANGE_FORWARD_ONLY_GUARD =
+  "אפשר להזיז את התחרות רק קדימה. יש לבחור תאריך פתיחה מאוחר מהנוכחי.";
+var END_DATE_AUTO_UPDATE_HINT =
+  "תאריך הסיום מתעדכן אוטומטית לפי תאריך הפתיחה";
 
 export default function CompetitionDetailsSection(props) {
   var fields = Array.isArray(props.fields) ? props.fields : [];
@@ -25,35 +32,39 @@ export default function CompetitionDetailsSection(props) {
   var registrationEndDate = props.detailsForm.registrationEndDate;
   var competitionStartDate = props.detailsForm.competitionStartDate;
 
-  // Existing-competition dates are read-only in the ordinary details form —
-  // the server rejects a changed start/end date on this same PUT with 409
-  // regardless (CompetitionsController.UpdateCompetition), so this is a UI
-  // convenience that also prevents the desync warning from ever showing.
-  // Creation mode (no competitionId yet) keeps both fields editable.
+  // CAP-6: an existing competition's end date is always read-only and
+  // derived from the start date (duration preserved) - editing the start
+  // date directly is how a competition now gets moved, folding in what used
+  // to be the separate "postpone" flow. Creation mode (no competitionId yet)
+  // keeps both fields freely, independently editable - there is no persisted
+  // duration to preserve yet.
   var isExistingCompetition = !!props.competitionId;
 
-  // Client-side convenience gate only — never based on currentStatus, which
-  // can legitimately stay "טיוטה" long after competitionstartdate has
-  // passed (a manually-stored status is never overwritten by a date crossing
-  // it). The server (usp_RescheduleCompetition) re-checks CURRENT_DATE
-  // against the live competitionstartdate independently and is the only
-  // authoritative source for this rule.
-  var canOfferReschedule = !!(
-    props.competitionId && competitionStartDate
-  );
+  var persistedCompetitionStartDate = props.persistedCompetitionStartDate;
+  var persistedCompetitionEndDate = props.persistedCompetitionEndDate;
 
-  if (canOfferReschedule) {
-    var startDateValue = new Date(competitionStartDate + "T00:00:00Z");
-    var todayValue = new Date();
-    var todayUtc = new Date(
-      Date.UTC(
-        todayValue.getFullYear(),
-        todayValue.getMonth(),
-        todayValue.getDate(),
-      ),
+  var startDateChanged =
+    isExistingCompetition &&
+    !!persistedCompetitionStartDate &&
+    !!competitionStartDate &&
+    competitionStartDate !== persistedCompetitionStartDate;
+
+  var startDateOffsetDays = startDateChanged
+    ? getWholeDayOffsetDays(competitionStartDate, persistedCompetitionStartDate)
+    : 0;
+
+  var startDateGuardError =
+    startDateChanged && startDateOffsetDays <= 0
+      ? DATE_CHANGE_FORWARD_ONLY_GUARD
+      : "";
+
+  var displayedEndDate = props.detailsForm.competitionEndDate;
+
+  if (isExistingCompetition && startDateChanged && startDateOffsetDays > 0) {
+    displayedEndDate = addDaysToDateOnly(
+      persistedCompetitionEndDate,
+      startDateOffsetDays,
     );
-
-    canOfferReschedule = startDateValue.getTime() > todayUtc.getTime();
   }
 
   var registrationEndError = "";
@@ -111,16 +122,6 @@ export default function CompetitionDetailsSection(props) {
           <div className="flex flex-wrap items-center justify-start gap-3">
             <span className="text-sm font-semibold text-[#6D4C41]">סטטוס:</span>
             <StatusBadge status={props.currentStatus} />
-
-            {canOfferReschedule ? (
-              <button
-                type="button"
-                onClick={props.onOpenReschedule}
-                className="mr-auto rounded-xl border border-[#8B6352] px-4 py-2 text-sm font-semibold text-[#6D4C41] transition-colors hover:bg-[#FCF8F5]"
-              >
-                דחיית התחרות
-              </button>
-            ) : null}
           </div>
 
           <div className="grid grid-cols-1 gap-x-8 gap-y-7 md:grid-cols-2">
@@ -173,15 +174,14 @@ export default function CompetitionDetailsSection(props) {
               <input
                 type="date"
                 value={props.detailsForm.competitionStartDate}
-                disabled={isExistingCompetition}
                 onChange={function (e) {
                   props.onChange("competitionStartDate", e.target.value);
                 }}
-                className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right disabled:cursor-not-allowed disabled:bg-[#F3EEEA] disabled:text-[#8A7268]"
+                className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right"
               />
-              {isExistingCompetition ? (
-                <div className="mt-1.5 text-right text-xs text-[#8A7268]">
-                  לשינוי תאריך יש להשתמש בפעולת "דחיית התחרות"
+              {startDateGuardError ? (
+                <div className="mt-1.5 text-right text-xs text-red-600">
+                  {startDateGuardError}
                 </div>
               ) : null}
             </div>
@@ -193,7 +193,7 @@ export default function CompetitionDetailsSection(props) {
               </label>
               <input
                 type="date"
-                value={props.detailsForm.competitionEndDate}
+                value={isExistingCompetition ? displayedEndDate : props.detailsForm.competitionEndDate}
                 disabled={isExistingCompetition}
                 onChange={function (e) {
                   props.onChange("competitionEndDate", e.target.value);
@@ -202,7 +202,7 @@ export default function CompetitionDetailsSection(props) {
               />
               {isExistingCompetition ? (
                 <div className="mt-1.5 text-right text-xs text-[#8A7268]">
-                  לשינוי תאריך יש להשתמש בפעולת "דחיית התחרות"
+                  {END_DATE_AUTO_UPDATE_HINT}
                 </div>
               ) : null}
             </div>

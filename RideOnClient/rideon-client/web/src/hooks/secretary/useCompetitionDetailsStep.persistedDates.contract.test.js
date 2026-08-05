@@ -115,16 +115,17 @@ describe("persisted competition dates — set only by loadExistingCompetition", 
     expect(body).not.toContain("setPersistedCompetitionEndDate");
   });
 
-  it("handleReschedule never sets the persisted dates directly — it only triggers loadExistingCompetition, the single source of truth", () => {
-    const rescheduleAt = hookSource.indexOf(
-      "async function handleReschedule(",
+  it("saveWithDateChange never sets the persisted dates directly — it only triggers loadExistingCompetition, the single source of truth", () => {
+    const fnAt = hookSource.indexOf("async function saveWithDateChange(");
+    const nextFunctionAt = hookSource.indexOf(
+      "\n  async function saveOrdinary(",
+      fnAt,
     );
-    const nextFunctionAt = hookSource.indexOf("\n  return {", rescheduleAt);
 
-    expect(rescheduleAt).toBeGreaterThan(-1);
-    expect(nextFunctionAt).toBeGreaterThan(rescheduleAt);
+    expect(fnAt).toBeGreaterThan(-1);
+    expect(nextFunctionAt).toBeGreaterThan(fnAt);
 
-    const body = hookSource.slice(rescheduleAt, nextFunctionAt);
+    const body = hookSource.slice(fnAt, nextFunctionAt);
 
     expect(body).not.toContain("setPersistedCompetitionStartDate");
     expect(body).not.toContain("setPersistedCompetitionEndDate");
@@ -158,28 +159,40 @@ describe("persisted competition dates — passed through to the page and the mod
     );
   });
 
-  it("RescheduleCompetitionModal is wired to the persisted dates, never to detailsForm's own fields", () => {
+  it("CompetitionDetailsSection (CAP-6: the date-change anchor, since the separate reschedule modal is gone) receives both persisted dates as props", () => {
     // Other consumers on this page (ClassInCompetitionModal,
     // PaidTimeSlotInCompetitionModal) legitimately keep using
     // page.detailsForm.competitionStartDate/EndDate for their own bounds —
-    // this test scopes strictly to the <RescheduleCompetitionModal ... />
+    // this test scopes strictly to the <CompetitionDetailsSection ... />
     // block, not the whole file, so it cannot be satisfied by an unrelated
     // component's props.
-    const modalTagAt = pageSource.indexOf("<RescheduleCompetitionModal");
-    const modalTagEndAt = pageSource.indexOf("/>", modalTagAt);
+    const sectionTagAt = pageSource.indexOf("<CompetitionDetailsSection");
+    const sectionTagEndAt = pageSource.indexOf("/>", sectionTagAt);
 
-    expect(modalTagAt).toBeGreaterThan(-1);
-    expect(modalTagEndAt).toBeGreaterThan(modalTagAt);
+    expect(sectionTagAt).toBeGreaterThan(-1);
+    expect(sectionTagEndAt).toBeGreaterThan(sectionTagAt);
 
-    const modalBlock = pageSource.slice(modalTagAt, modalTagEndAt);
+    const sectionBlock = pageSource.slice(sectionTagAt, sectionTagEndAt);
 
-    expect(modalBlock).toContain(
-      "competitionStartDate={page.persistedCompetitionStartDate}",
+    expect(sectionBlock).toContain(
+      "persistedCompetitionStartDate={page.persistedCompetitionStartDate}",
     );
-    expect(modalBlock).toContain(
-      "competitionEndDate={page.persistedCompetitionEndDate}",
+    expect(sectionBlock).toContain(
+      "persistedCompetitionEndDate={page.persistedCompetitionEndDate}",
     );
+  });
 
-    expect(modalBlock).not.toContain("detailsForm");
+  it("the CAP-6 confirm dialog is wired to the hook's dateChangeConfirm state, not a local page state", () => {
+    const dialogTagAt = pageSource.indexOf("<ConfirmDialog");
+    const dialogTagEndAt = pageSource.indexOf("/>", dialogTagAt);
+
+    expect(dialogTagAt).toBeGreaterThan(-1);
+    expect(dialogTagEndAt).toBeGreaterThan(dialogTagAt);
+
+    const dialogBlock = pageSource.slice(dialogTagAt, dialogTagEndAt);
+
+    expect(dialogBlock).toContain("isOpen={page.dateChangeConfirm.isOpen}");
+    expect(dialogBlock).toContain("onConfirm={page.confirmDateChange}");
+    expect(dialogBlock).toContain("onCancel={page.cancelDateChangeConfirm}");
   });
 });
