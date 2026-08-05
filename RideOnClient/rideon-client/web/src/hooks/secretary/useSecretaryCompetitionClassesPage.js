@@ -534,7 +534,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
       await deleteClassInCompetition(classInCompId, competitionId, ranchId);
       await loadClasses();
     } catch (err) {
-      alert(getErrorMessage(err, "שגיאה במחיקת מקצה"));
+      showToast("error", getErrorMessage(err, "שגיאה במחיקת מקצה"));
     } finally {
       setDeletingClassId(null);
     }
@@ -553,7 +553,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
       await secretaryDeleteEntry(entryId, ranchId);
       await loadEntries();
     } catch (err) {
-      alert(getErrorMessage(err, "שגיאה בביטול הרשמה"));
+      showToast("error", getErrorMessage(err, "שגיאה בביטול הרשמה"));
     }
   }
 

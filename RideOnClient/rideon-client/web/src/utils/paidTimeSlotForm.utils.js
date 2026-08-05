@@ -165,6 +165,19 @@ function findBaseSlotId(baseSlots, dayName, timeOfDay) {
   return match.paidTimeSlotId || match.PaidTimeSlotId || null;
 }
 
+// Scroll-position aid only (CAP-5): defaults a 2-hour window near the chosen
+// time of day so the secretary starts close to the hour she wants, without
+// locking the value - every hour stays selectable.
+var DEFAULT_HOURS_BY_TIME_OF_DAY = {
+  "בוקר": { startHour: "09", endHour: "11" },
+  "צהריים": { startHour: "12", endHour: "14" },
+  "ערב": { startHour: "18", endHour: "20" },
+};
+
+function getDefaultHoursForTimeOfDay(timeOfDay) {
+  return DEFAULT_HOURS_BY_TIME_OF_DAY[timeOfDay] || null;
+}
+
 var MINUTE_OPTIONS = ["00", "15", "30", "45"];
 
 function buildHourOptions() {
@@ -208,6 +221,7 @@ export {
   buildDayOptions,
   getTimeOfDayOptions,
   getTimingForDate,
+  getDefaultHoursForTimeOfDay,
   findBaseSlotId,
   buildHourOptions,
   splitTimeValue,

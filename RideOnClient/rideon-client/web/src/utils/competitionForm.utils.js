@@ -70,6 +70,17 @@ function normalizeTimeForServer(value) {
   return value;
 }
 
+// Whole-day offset between two "YYYY-MM-DD" date-only strings, computed at
+// UTC midnight so DST never skews the count by a day. Mirrors the plain
+// date-plus-integer-days arithmetic usp_RescheduleCompetition uses server-side.
+function getWholeDayOffsetDays(newDateOnly, oldDateOnly) {
+  var msPerDay = 24 * 60 * 60 * 1000;
+  var newDate = new Date(newDateOnly + "T00:00:00Z");
+  var oldDate = new Date(oldDateOnly + "T00:00:00Z");
+
+  return Math.round((newDate.getTime() - oldDate.getTime()) / msPerDay);
+}
+
 function buildCompetitionBasePayload(detailsForm, currentRanchId) {
   return {
     hostRanchId: currentRanchId,
@@ -207,4 +218,5 @@ export {
   buildCompetitionBasePayload,
   getErrorMessage,
   validateDetailsForm,
+  getWholeDayOffsetDays,
 };

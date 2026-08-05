@@ -197,6 +197,9 @@ function SummaryPageContent(props) {
               actionLoading={page.federationInvoiceImporting}
               actionError={page.federationInvoiceImportError}
               actionSuccess={page.federationInvoiceImportSuccess}
+              onDismissActionMessages={
+                page.dismissFederationInvoiceImportMessages
+              }
               invoiceImportResult={page.federationInvoiceImportResult}
               showQuantity={true}
               quantity={federationQuantity}

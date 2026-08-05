@@ -28,6 +28,7 @@ import StallBookingLabel from "../../components/secretary/stall-map/StallBooking
 import useCompetitionStallsPage from "../../hooks/secretary/useCompetitionStallsPage";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import { useUser } from "../../context/UserContext";
+import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 function formatPublishDate(value) {
   if (!value) return "";
@@ -85,7 +86,11 @@ export default function CompetitionStallsPage() {
     try {
       await page.handleDeleteStallBooking(item.stallBookingId);
     } catch (err) {
-      alert(String(err?.response?.data || err?.message || "שגיאה בביטול תא"));
+      setToast({
+        isOpen: true,
+        type: "error",
+        message: getErrorMessage(err, "שגיאה בביטול תא"),
+      });
     }
   }
 
@@ -341,6 +346,13 @@ export default function CompetitionStallsPage() {
                                 page.activeCompound,
                                 layout,
                               );
+                            }}
+                            onError={function (message) {
+                              setToast({
+                                isOpen: true,
+                                type: "error",
+                                message: message,
+                              });
                             }}
                           />
                         </div>

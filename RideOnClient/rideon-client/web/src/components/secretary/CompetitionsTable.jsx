@@ -185,8 +185,18 @@ function HeaderCell(props) {
   );
 }
 
+// A short table (0-1 rows) leaves the column-header filter dropdown
+// (`HeaderFilterMenu`, absolute top-9) without enough room inside the
+// card's overflow-hidden bounds, clipping it. Filler rows reserve real
+// table height so the dropdown always has room to render fully.
+const MIN_ROWS_FOR_FILTER_ROOM = 3;
+
 export default function CompetitionsTable(props) {
   const rows = Array.isArray(props.competitions) ? props.competitions : [];
+  const fillerRowCount =
+    rows.length > 0
+      ? Math.max(0, MIN_ROWS_FOR_FILTER_ROOM - rows.length)
+      : 0;
 
   return (
     <div className="overflow-hidden rounded-[24px] border border-[#E8DDD7] bg-white">
@@ -317,6 +327,17 @@ export default function CompetitionsTable(props) {
                         <Pencil size={17} />
                       </button>
                     </div>
+                  </td>
+                </tr>
+              );
+            })}
+
+          {!props.loading &&
+            Array.from({ length: fillerRowCount }).map(function (_, index) {
+              return (
+                <tr key={`filler-${index}`} aria-hidden="true">
+                  <td className="px-5 py-5" colSpan={5}>
+                    &nbsp;
                   </td>
                 </tr>
               );
