@@ -831,3 +831,14 @@ export default function useAdminCompetitionStallBookings(params) {
     existingTackBookingsCount: existingTackBookingsCount,
   };
 }
+
+// Admin-payer direct-changes feature: exported so StallBookingEditModal can
+// reuse the exact same stall-type-option sourcing/filtering/labeling as
+// stall creation, instead of duplicating this logic. Purely additive --
+// the default hook export and every existing caller are unchanged.
+export {
+  getServicePriceSectionsFromInvitation,
+  extractHorseStallPriceItems,
+  extractTackStallPriceItems,
+  formatStallTypeLabel,
+};

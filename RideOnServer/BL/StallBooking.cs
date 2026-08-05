@@ -1,4 +1,5 @@
-﻿using RideOnServer.DAL;
+﻿using RideOnServer.BL.DTOs.StallBookings;
+using RideOnServer.DAL;
 
 namespace RideOnServer.BL
 {
@@ -100,6 +101,47 @@ namespace RideOnServer.BL
                 newNotes,
                 isForTack,
                 horseId);
+        }
+
+        // Admin-payer direct-changes feature: RanchAdmin direct edit of an
+        // existing stall booking. Dates/notes are always direct; a real
+        // product/type change is additionally rejected server-side
+        // (usp_admineditstallbooking) once the booking is assigned to a
+        // physical stall -- the registration window plays no part in that
+        // decision, unlike Stage C's entry edit routing.
+        public static void AdminEditStallBooking(AdminEditStallBookingRequest request, int personId)
+        {
+            if (request == null)
+            {
+                throw new Exception("Invalid request");
+            }
+
+            if (request.StallBookingId <= 0)
+            {
+                throw new Exception("Invalid StallBookingId");
+            }
+
+            if (request.RanchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            if (personId <= 0)
+            {
+                throw new Exception("Invalid PersonId");
+            }
+
+            if (request.NewStartDate == default || request.NewEndDate == default)
+            {
+                throw new Exception("Start and end dates are required");
+            }
+
+            if (request.NewEndDate.Date < request.NewStartDate.Date)
+            {
+                throw new Exception("End date must be on or after start date");
+            }
+
+            StallBookingDAL.AdminEditStallBooking(request, personId);
         }
 
         public static int SecretaryCreateStallBookingForPayer(

@@ -55,6 +55,10 @@ function createStallBookingChangeRequest(payload) {
   return axios.post("/StallBookings/change-request", payload);
 }
 
+function adminEditStallBooking(payload) {
+  return axios.post("/StallBookings/admin-edit", payload);
+}
+
 function cancelStallBookingByPayer(payload) {
   return axios.post("/StallBookings/cancel-by-payer", payload);
 }
@@ -72,6 +76,7 @@ export {
   createTackStallBookings,
   createStallBookingCancelRequest,
   createStallBookingChangeRequest,
+  adminEditStallBooking,
   cancelStallBookingByPayer,
   createStallChangeRequestByPayer,
 };

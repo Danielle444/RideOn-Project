@@ -648,6 +648,62 @@ namespace RideOnServer.DAL
             return cmd;
         }
 
+        // Admin-payer direct-changes feature: in-place admin edit, the stall
+        // sibling of EntryDAL's AdminEditEntry. Void return, same as
+        // SecretaryUpdateStallBooking above -- the caller re-reads via
+        // GetStallBookingsForCompetitionAndRanch afterward (same pattern the
+        // mobile edit modal already uses today).
+        public static NpgsqlCommand BuildAdminEditStallBookingCommand(
+            AdminEditStallBookingRequest request,
+            int personId,
+            NpgsqlConnection? connection
+        )
+        {
+            NpgsqlCommand cmd = new NpgsqlCommand(
+                @"SELECT public.usp_admineditstallbooking(
+                    p_personid       := @personId,
+                    p_stallbookingid := @stallBookingId,
+                    p_ranchid        := @ranchId,
+                    p_newstartdate   := @newStartDate::date,
+                    p_newenddate     := @newEndDate::date,
+                    p_newnotes       := @newNotes,
+                    p_newproductid   := @newProductId
+                );",
+                connection
+            );
+
+            cmd.Parameters.AddWithValue("@personId", personId);
+            cmd.Parameters.AddWithValue("@stallBookingId", request.StallBookingId);
+            cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
+            cmd.Parameters.Add("@newStartDate", NpgsqlDbType.Date).Value = request.NewStartDate.Date;
+            cmd.Parameters.Add("@newEndDate", NpgsqlDbType.Date).Value = request.NewEndDate.Date;
+            cmd.Parameters.AddWithValue("@newNotes", (object?)request.Notes ?? DBNull.Value);
+            cmd.Parameters.Add("@newProductId", NpgsqlDbType.Smallint).Value =
+                (object?)request.NewProductId ?? DBNull.Value;
+
+            return cmd;
+        }
+
+        public static void AdminEditStallBooking(AdminEditStallBookingRequest request, int personId)
+        {
+            try
+            {
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
+
+                using NpgsqlCommand cmd = BuildAdminEditStallBookingCommand(request, personId, conn);
+
+                cmd.ExecuteNonQuery();
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_admineditstallbooking (including the assigned-booking
+                // product-change rejection).
+                throw new BL.ValidationException(ex.MessageText);
+            }
+        }
+
         public static int SecretaryCreateStallBookingForPayer(
             int competitionId,
             int secretarySystemUserId,
