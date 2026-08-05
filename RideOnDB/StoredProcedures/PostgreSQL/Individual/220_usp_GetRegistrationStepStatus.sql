@@ -32,6 +32,18 @@
 -- Config proc family (160-167). Read-only; deploys independently of the
 -- backend and stays backward compatible (a brand-new proc no deployed code
 -- calls yet).
+--
+-- isregistrationended (added, appended LAST -- RETURNS TABLE shape change,
+-- requires DROP+CREATE): a distinct, independent signal from
+-- iscompetitionended, computed from registrationenddate/competitionstartdate
+-- instead of competitionenddate. iscompetitionended is preserved completely
+-- unchanged above -- nothing about its computation or callers is affected.
+-- Rule: registrationenddate IS NOT NULL -> closed once today > that date;
+-- otherwise -> closed once today >= competitionstartdate (competitionstartdate
+-- is NOT NULL on every competition, so the "both dates null" case is
+-- unreachable in practice, but the CASE below still degrades to this same
+-- branch rather than assuming). "Today" is the Jerusalem calendar date, same
+-- AT TIME ZONE convention already used for iscompetitionended.
 DROP FUNCTION IF EXISTS public.usp_getregistrationstepstatus(integer, integer, integer);
 
 CREATE FUNCTION public.usp_getregistrationstepstatus(
@@ -53,13 +65,15 @@ RETURNS TABLE(
     hasrelevantactiveentry boolean,
     hasadmincreatedactivenontackstallbooking boolean,
     hasmanagedpayerwithactivenontackstallbooking boolean,
-    hasrelevantactivenontackstallbooking boolean
+    hasrelevantactivenontackstallbooking boolean,
+    isregistrationended boolean
 )
 LANGUAGE sql
 STABLE
 AS $function$
 WITH comp AS (
-    SELECT c.competitionid, c.hostranchid, c.competitionenddate, c.paidtimeregistrationdate
+    SELECT c.competitionid, c.hostranchid, c.competitionenddate, c.paidtimeregistrationdate,
+           c.registrationenddate, c.competitionstartdate
     FROM public.competition c
     WHERE c.competitionid = p_competitionid
       AND c.hostranchid   = p_ranchid
@@ -69,6 +83,16 @@ signals AS (
         comp.competitionenddate,
         comp.paidtimeregistrationdate,
         (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > comp.competitionenddate AS iscompetitionended,
+
+        (
+            CASE
+                WHEN comp.registrationenddate IS NOT NULL
+                    THEN (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > comp.registrationenddate
+                WHEN comp.competitionstartdate IS NOT NULL
+                    THEN (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date >= comp.competitionstartdate
+                ELSE false
+            END
+        ) AS isregistrationended,
 
         EXISTS (
             SELECT 1 FROM public.paidtimeslotincompetition ptic
@@ -205,6 +229,7 @@ SELECT
     signals.hasadmincreatedactivenontackstallbooking,
     signals.hasmanagedpayerwithactivenontackstallbooking,
     (signals.hasadmincreatedactivenontackstallbooking OR signals.hasmanagedpayerwithactivenontackstallbooking)
-        AS hasrelevantactivenontackstallbooking
+        AS hasrelevantactivenontackstallbooking,
+    signals.isregistrationended
 FROM signals;
 $function$;
