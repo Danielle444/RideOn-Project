@@ -7,7 +7,7 @@ import {
   groupDetailsByDay,
   filterItemsByDay,
   buildPaidTimeProductColumns,
-  getProductSlotCountForDay,
+  getProductRequestCountForDay,
   getCategoryCountLabel,
   getDetailRowCountField,
   computeDetailLevelTotals,
@@ -182,40 +182,61 @@ describe("groupDetailsByDay -- paid-time", () => {
 });
 
 describe("buildProductBreakdown / product identity", () => {
-  it("counts two slots with five requests each as a product count of 2, not 10", () => {
+  it("one product, one row: the product's count equals that row's requestCount", () => {
+    var items = [
+      paidTimeRow({ productId: 10, productName: "מוצר א׳", requestCount: 5 }),
+    ];
+
+    expect(buildProductBreakdown(items)).toEqual([
+      { productName: "מוצר א׳", requestCount: 5 },
+    ]);
+  });
+
+  it("one product, multiple rows: sums requestCount across the rows, not a count of 2", () => {
     var items = [
       paidTimeRow({ productId: 10, productName: "מוצר א׳", requestCount: 5 }),
       paidTimeRow({ productId: 10, productName: "מוצר א׳", requestCount: 5 }),
     ];
 
-    var breakdown = buildProductBreakdown(items);
-
-    expect(breakdown).toEqual([
-      { productName: "מוצר א׳", slotCount: 2 },
+    expect(buildProductBreakdown(items)).toEqual([
+      { productName: "מוצר א׳", requestCount: 10 },
     ]);
   });
 
-  it("counts multiple slots for one productName by row, not by summing requestCount", () => {
+  it("sums requestCount for one productName across rows, not by counting rows", () => {
     var items = [
       paidTimeRow({ productName: "מוצר א׳", requestCount: 2 }),
       paidTimeRow({ productName: "מוצר א׳", requestCount: 3 }),
       paidTimeRow({ productName: "מוצר א׳", requestCount: 1 }),
     ];
 
-    var breakdown = buildProductBreakdown(items);
+    expect(buildProductBreakdown(items)).toEqual([
+      { productName: "מוצר א׳", requestCount: 6 },
+    ]);
+  });
 
-    expect(breakdown).toEqual([{ productName: "מוצר א׳", slotCount: 3 }]);
+  it("multiple products: keeps each product's summed requestCount separate", () => {
+    var items = [
+      paidTimeRow({ productName: "מוצר א׳", requestCount: 4 }),
+      paidTimeRow({ productName: "מוצר ב׳", requestCount: 7 }),
+      paidTimeRow({ productName: "מוצר א׳", requestCount: 1 }),
+    ];
+
+    expect(buildProductBreakdown(items)).toEqual([
+      { productName: "מוצר א׳", requestCount: 5 },
+      { productName: "מוצר ב׳", requestCount: 7 },
+    ]);
   });
 
   it("merges different productId values that share the same productName into one entry", () => {
     var items = [
-      paidTimeRow({ productId: 10, productName: "מוצר א׳" }),
-      paidTimeRow({ productId: 11, productName: "מוצר א׳" }),
+      paidTimeRow({ productId: 10, productName: "מוצר א׳", requestCount: 2 }),
+      paidTimeRow({ productId: 11, productName: "מוצר א׳", requestCount: 3 }),
     ];
 
-    var breakdown = buildProductBreakdown(items);
-
-    expect(breakdown).toEqual([{ productName: "מוצר א׳", slotCount: 2 }]);
+    expect(buildProductBreakdown(items)).toEqual([
+      { productName: "מוצר א׳", requestCount: 5 },
+    ]);
   });
 
   it("keeps different productName values as separate entries, not by durationMinutes", () => {
@@ -242,16 +263,94 @@ describe("buildProductBreakdown / product identity", () => {
       }),
     ).toEqual(["מוצר א׳", "מוצר ב׳"]);
   });
+
+  it("a row with requestCount 0 contributes 0, not 1", () => {
+    var items = [
+      paidTimeRow({ productName: "מוצר א׳", requestCount: 5 }),
+      paidTimeRow({ productName: "מוצר א׳", requestCount: 0 }),
+    ];
+
+    expect(buildProductBreakdown(items)).toEqual([
+      { productName: "מוצר א׳", requestCount: 5 },
+    ]);
+  });
+
+  it("a row with a missing/null requestCount contributes 0, not 1", () => {
+    var rowWithoutCount = paidTimeRow({ productName: "מוצר א׳" });
+    delete rowWithoutCount.requestCount;
+
+    var items = [
+      paidTimeRow({ productName: "מוצר א׳", requestCount: 5 }),
+      rowWithoutCount,
+      paidTimeRow({ productName: "מוצר א׳", requestCount: null }),
+    ];
+
+    expect(buildProductBreakdown(items)).toEqual([
+      { productName: "מוצר א׳", requestCount: 5 },
+    ]);
+  });
+
+  it("keeps first-seen product order stable regardless of row order later in the list", () => {
+    var items = [
+      paidTimeRow({ productName: "ב׳", requestCount: 1 }),
+      paidTimeRow({ productName: "א׳", requestCount: 1 }),
+      paidTimeRow({ productName: "ב׳", requestCount: 1 }),
+      paidTimeRow({ productName: "א׳", requestCount: 1 }),
+    ];
+
+    expect(
+      buildProductBreakdown(items).map(function (p) {
+        return p.productName;
+      }),
+    ).toEqual(["ב׳", "א׳"]);
+  });
+
+  it("does not mutate the input array", () => {
+    var items = [
+      paidTimeRow({ productName: "מוצר א׳", requestCount: 2 }),
+      paidTimeRow({ productName: "מוצר ב׳", requestCount: 3 }),
+    ];
+    var snapshot = JSON.parse(JSON.stringify(items));
+
+    buildProductBreakdown(items);
+
+    expect(items).toEqual(snapshot);
+    expect(items.length).toBe(2);
+  });
+
+  it("the day's overall requestCount (buildDayRollup) equals the sum of the product breakdown", () => {
+    var items = [
+      paidTimeRow({ productName: "מוצר א׳", requestCount: 5 }),
+      paidTimeRow({ productName: "מוצר א׳", requestCount: 3 }),
+      paidTimeRow({ productName: "מוצר ב׳", requestCount: 4 }),
+    ];
+
+    var rollup = buildDayRollup("paid-time", "2026-08-03", items);
+    var sumOfColumns = rollup.productBreakdown.reduce(function (total, p) {
+      return total + p.requestCount;
+    }, 0);
+
+    expect(rollup.requestCount).toBe(12);
+    expect(sumOfColumns).toBe(rollup.requestCount);
+  });
 });
 
-describe("getProductSlotCountForDay", () => {
+describe("getProductRequestCountForDay", () => {
+  it("returns the summed requestCount for a product that has rows on that day", () => {
+    var dayRollup = buildDayRollup("paid-time", "2026-08-03", [
+      paidTimeRow({ productName: "מוצר א׳", requestCount: 3 }),
+      paidTimeRow({ productName: "מוצר א׳", requestCount: 2 }),
+    ]);
+
+    expect(getProductRequestCountForDay(dayRollup, "מוצר א׳")).toBe(5);
+  });
+
   it("returns 0 for a product that had no rows on that day", () => {
     var dayRollup = buildDayRollup("paid-time", "2026-08-03", [
       paidTimeRow({ productName: "מוצר א׳" }),
     ]);
 
-    expect(getProductSlotCountForDay(dayRollup, "מוצר א׳")).toBe(1);
-    expect(getProductSlotCountForDay(dayRollup, "מוצר לא קיים")).toBe(0);
+    expect(getProductRequestCountForDay(dayRollup, "מוצר לא קיים")).toBe(0);
   });
 });
 

@@ -45,10 +45,12 @@ function getDayGroupKey(type, item) {
 }
 
 /**
- * Per-product slot-count breakdown for one day's paid-time rows. Products are identified by
+ * Per-product request-count breakdown for one day's paid-time rows. Products are identified by
  * productName (never by productId, never by durationMinutes) -- two rows with different
- * productId but the same productName belong to the same product. The count is the number of
- * slot rows for that product on that day, not a sum of requestCount.
+ * productId but the same productName belong to the same product. The unit is REQUESTS: each
+ * row's requestCount is summed into its product, not counted as one slot -- so the sum of every
+ * product's count on a day always equals that day's overall requestCount (buildDayRollup sums the
+ * same field). A missing/null requestCount contributes 0, same as sumField elsewhere.
  */
 function buildProductBreakdown(items) {
   var byProduct = {};
@@ -61,13 +63,15 @@ function buildProductBreakdown(items) {
     if (!byProduct[mapKey]) {
       byProduct[mapKey] = {
         productName: productName,
-        slotCount: 0,
+        requestCount: 0,
       };
 
       order.push(mapKey);
     }
 
-    byProduct[mapKey].slotCount += 1;
+    byProduct[mapKey].requestCount += Number(
+      getValue(item, "requestCount", "RequestCount", 0),
+    );
   });
 
   return order.map(function (mapKey) {
@@ -187,12 +191,12 @@ function buildPaidTimeProductColumns(items) {
 }
 
 /**
- * The slot count for one product on one day's rollup, or 0 when that product had no rows that
+ * The request count for one product on one day's rollup, or 0 when that product had no rows that
  * day -- for any reason (no slots that day, or the row simply wasn't returned). Pulled out as
  * its own function so the "missing product -> zero cell" behavior is directly unit-testable
  * without a DOM.
  */
-function getProductSlotCountForDay(dayRollup, productName) {
+function getProductRequestCountForDay(dayRollup, productName) {
   var breakdown =
     dayRollup && Array.isArray(dayRollup.productBreakdown)
       ? dayRollup.productBreakdown
@@ -202,7 +206,7 @@ function getProductSlotCountForDay(dayRollup, productName) {
     return String(entry.productName) === String(productName);
   });
 
-  return match ? match.slotCount : 0;
+  return match ? match.requestCount : 0;
 }
 
 /** The shared summary strip's leftmost label -- one fixed noun per category, at every level. */
@@ -308,7 +312,7 @@ export {
   groupDetailsByDay,
   filterItemsByDay,
   buildPaidTimeProductColumns,
-  getProductSlotCountForDay,
+  getProductRequestCountForDay,
   getCategoryCountLabel,
   getDetailRowCountField,
   computeDetailLevelTotals,
