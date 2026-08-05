@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   getWorkerHomeFeedCardFlags,
   sortWorkerHomeFeed,
+  bucketWorkerCompetitionOrders,
 } from "./workerHomeShavingsFeed.js";
 
 var ME = 501;
@@ -292,5 +293,188 @@ describe("sortWorkerHomeFeed", function () {
   it("returns an empty array for an empty or missing feed without throwing", function () {
     expect(sortWorkerHomeFeed([], ME)).toEqual([]);
     expect(sortWorkerHomeFeed(undefined, ME)).toEqual([]);
+  });
+});
+
+describe("bucketWorkerCompetitionOrders", function () {
+  var NOW = "2026-08-05T12:00:00Z";
+
+  it("buckets an order requested for today into the today section", function () {
+    var order = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-05T09:00:00Z",
+    });
+
+    var buckets = bucketWorkerCompetitionOrders([order], NOW);
+
+    expect(idsOf(buckets.today)).toEqual([1]);
+    expect(buckets.older).toEqual([]);
+    expect(buckets.future).toEqual([]);
+  });
+
+  it("sorts multiple today orders by requested time ascending", function () {
+    var late = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-05T18:00:00Z",
+    });
+    var early = makeOrder({
+      shavingsOrderId: 2,
+      requestedDeliveryTime: "2026-08-05T07:00:00Z",
+    });
+
+    var buckets = bucketWorkerCompetitionOrders([late, early], NOW);
+
+    expect(idsOf(buckets.today)).toEqual([2, 1]);
+  });
+
+  it("buckets a past undelivered order into the older section", function () {
+    var order = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-03T10:00:00Z",
+      deliveryStatus: "Pending",
+    });
+
+    var buckets = bucketWorkerCompetitionOrders([order], NOW);
+
+    expect(idsOf(buckets.older)).toEqual([1]);
+  });
+
+  it("places a null-requested-time order after past-undelivered orders within the older section", function () {
+    var pastUndelivered = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-03T10:00:00Z",
+      deliveryStatus: "Pending",
+    });
+    var nullTime = makeOrder({
+      shavingsOrderId: 2,
+      requestedDeliveryTime: null,
+    });
+
+    var buckets = bucketWorkerCompetitionOrders(
+      [nullTime, pastUndelivered],
+      NOW,
+    );
+
+    expect(idsOf(buckets.older)).toEqual([1, 2]);
+  });
+
+  it("places a past-delivered order after null-time orders within the older section", function () {
+    var pastUndelivered = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-03T10:00:00Z",
+      deliveryStatus: "Pending",
+    });
+    var nullTime = makeOrder({
+      shavingsOrderId: 2,
+      requestedDeliveryTime: null,
+    });
+    var pastDelivered = makeOrder({
+      shavingsOrderId: 3,
+      requestedDeliveryTime: "2026-08-02T10:00:00Z",
+      deliveryStatus: "Delivered",
+    });
+
+    var buckets = bucketWorkerCompetitionOrders(
+      [pastDelivered, nullTime, pastUndelivered],
+      NOW,
+    );
+
+    // Locked business rule: past-delivered orders stay visible, at the
+    // bottom of the section, never dropped - undelivered first, then
+    // null-time, then delivered.
+    expect(idsOf(buckets.older)).toEqual([1, 2, 3]);
+  });
+
+  it("buckets a future order into the future section", function () {
+    var order = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-07T10:00:00Z",
+    });
+
+    var buckets = bucketWorkerCompetitionOrders([order], NOW);
+
+    expect(idsOf(buckets.future)).toEqual([1]);
+  });
+
+  it("sorts multiple future orders by date then time ascending", function () {
+    var laterDay = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-09T06:00:00Z",
+    });
+    var soonerDayLaterTime = makeOrder({
+      shavingsOrderId: 2,
+      requestedDeliveryTime: "2026-08-07T20:00:00Z",
+    });
+    var soonerDayEarlierTime = makeOrder({
+      shavingsOrderId: 3,
+      requestedDeliveryTime: "2026-08-07T06:00:00Z",
+    });
+
+    var buckets = bucketWorkerCompetitionOrders(
+      [laterDay, soonerDayLaterTime, soonerDayEarlierTime],
+      NOW,
+    );
+
+    expect(idsOf(buckets.future)).toEqual([3, 2, 1]);
+  });
+
+  it("detects a delivered order in the older section through deliveryStatus, not just arrivalTime", function () {
+    var pastUndelivered = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-03T10:00:00Z",
+      deliveryStatus: "Pending",
+    });
+    var pastDeliveredByStatus = makeOrder({
+      shavingsOrderId: 2,
+      requestedDeliveryTime: "2026-08-02T10:00:00Z",
+      deliveryStatus: "Delivered",
+      arrivalTime: null,
+    });
+
+    var buckets = bucketWorkerCompetitionOrders(
+      [pastDeliveredByStatus, pastUndelivered],
+      NOW,
+    );
+
+    expect(idsOf(buckets.older)).toEqual([1, 2]);
+  });
+
+  it("detects a delivered order in the older section through arrivalTime, even when deliveryStatus still reads Pending", function () {
+    var pastUndelivered = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-03T10:00:00Z",
+      deliveryStatus: "Pending",
+    });
+    var pastDeliveredByArrival = makeOrder({
+      shavingsOrderId: 2,
+      requestedDeliveryTime: "2026-08-02T10:00:00Z",
+      deliveryStatus: "Pending",
+      arrivalTime: "2026-08-02T11:00:00Z",
+    });
+
+    var buckets = bucketWorkerCompetitionOrders(
+      [pastDeliveredByArrival, pastUndelivered],
+      NOW,
+    );
+
+    expect(idsOf(buckets.older)).toEqual([1, 2]);
+  });
+
+  it("does not mutate the input orders array", function () {
+    var first = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-07T10:00:00Z",
+    });
+    var second = makeOrder({
+      shavingsOrderId: 2,
+      requestedDeliveryTime: "2026-08-05T10:00:00Z",
+    });
+    var input = [first, second];
+
+    bucketWorkerCompetitionOrders(input, NOW);
+
+    expect(idsOf(input)).toEqual([1, 2]);
+    expect(input[0]).toBe(first);
+    expect(input[1]).toBe(second);
   });
 });

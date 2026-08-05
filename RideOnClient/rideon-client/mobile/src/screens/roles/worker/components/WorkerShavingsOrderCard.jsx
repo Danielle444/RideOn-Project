@@ -1,7 +1,26 @@
+import { useState } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import workerStyles from "../../../../styles/workerStyles";
+
+const STALL_NUMBER_FALLBACK = "נסורת";
+
+// House date format, mirroring PayerCompetitionAccountScreen's formatDate/
+// formatTime (toLocaleDateString + manual HH:mm) - timestamp only, no
+// "מיידי/עכשיו" label.
+function formatRequestedDeliveryTime(value) {
+  if (!value) return null;
+
+  var date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  var datePart = date.toLocaleDateString("he-IL");
+  var hours = String(date.getHours()).padStart(2, "0");
+  var minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return datePart + " " + hours + ":" + minutes;
+}
 
 // The stored deliveryStatus carries only {Pending, Delivered} (backward-compat model).
 // "Seen" is DERIVED, never stored: a claimed order stays stored-Pending, so branching on
@@ -38,44 +57,81 @@ export default function WorkerShavingsOrderCard(props) {
   const statusLabel = getStatusLabel(state);
   const busy = props.uploading || props.marking;
 
-  return (
-    <View style={roleSharedStyles.card}>
+  const isDelivered = state === "Delivered";
+  const [expanded, setExpanded] = useState(false);
+  const showFullDetails = !isDelivered || expanded;
+
+  const title = props.stallNumber || STALL_NUMBER_FALLBACK;
+  const requestedTimeText = formatRequestedDeliveryTime(
+    props.requestedDeliveryTime,
+  );
+
+  const headerBlock = (
+    <>
       <View style={roleSharedStyles.cardTopRow}>
         <View style={workerStyles.orderIconBox}>
           <Ionicons name="cube-outline" size={30} color="#8B6352" />
         </View>
 
         <View style={roleSharedStyles.cardTextWrap}>
-          <Text style={roleSharedStyles.cardTitle}>{props.orderTitle}</Text>
+          <Text style={roleSharedStyles.cardTitle}>{title}</Text>
 
           <View style={workerStyles.orderStatusBadge}>
             <Text style={workerStyles.orderStatusText}>{statusLabel}</Text>
           </View>
         </View>
+
+        {isDelivered && (
+          <Ionicons
+            name={expanded ? "chevron-up-outline" : "chevron-down-outline"}
+            size={20}
+            color="#8B6352"
+          />
+        )}
       </View>
 
-      <View style={workerStyles.orderDetailsWrap}>
+      {requestedTimeText && (
         <View style={workerStyles.orderDetailRow}>
-          <Text style={workerStyles.orderDetailLabel}>תא:</Text>
+          <Text style={workerStyles.orderDetailLabel}>מועד מבוקש:</Text>
           <Text style={workerStyles.orderDetailValue}>
-            {props.stallNumber || "-"}
+            {requestedTimeText}
           </Text>
         </View>
+      )}
+    </>
+  );
 
-        <View style={workerStyles.orderDetailRow}>
-          <Text style={workerStyles.orderDetailLabel}>כמות שקים:</Text>
-          <Text style={workerStyles.orderDetailValue}>
-            {props.bagQuantity} שקים
-          </Text>
-        </View>
+  return (
+    <View style={roleSharedStyles.card}>
+      {isDelivered ? (
+        <Pressable
+          onPress={function () {
+            setExpanded(!expanded);
+          }}
+        >
+          {headerBlock}
+        </Pressable>
+      ) : (
+        headerBlock
+      )}
 
-        <View style={workerStyles.orderDetailRow}>
-          <Text style={workerStyles.orderDetailLabel}>משלם:</Text>
-          <Text style={workerStyles.orderDetailValue}>
-            {props.payerFirstName} {props.payerLastName}
-          </Text>
+      {showFullDetails && (
+        <View style={workerStyles.orderDetailsWrap}>
+          <View style={workerStyles.orderDetailRow}>
+            <Text style={workerStyles.orderDetailLabel}>כמות שקים:</Text>
+            <Text style={workerStyles.orderDetailValue}>
+              {props.bagQuantity} שקים
+            </Text>
+          </View>
+
+          <View style={workerStyles.orderDetailRow}>
+            <Text style={workerStyles.orderDetailLabel}>משלם:</Text>
+            <Text style={workerStyles.orderDetailValue}>
+              {props.payerFirstName} {props.payerLastName}
+            </Text>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Pending + unclaimed — show claim button */}
       {state === "Pending" && props.isUnclaimed && props.onClaim && (
@@ -187,8 +243,8 @@ export default function WorkerShavingsOrderCard(props) {
         </View>
       )}
 
-      {/* Delivered — terminal confirmation */}
-      {state === "Delivered" && (
+      {/* Delivered — terminal confirmation, only when expanded (collapsed by default, CAP-6) */}
+      {state === "Delivered" && showFullDetails && (
         <View
           style={[roleSharedStyles.buttonsRow, { justifyContent: "center" }]}
         >
