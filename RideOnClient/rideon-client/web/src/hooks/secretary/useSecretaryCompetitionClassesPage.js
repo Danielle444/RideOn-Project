@@ -48,6 +48,7 @@ import {
   groupEntriesIntoPhysicalRuns,
   expandRunsToEntryDrawOrders,
   formatDuplicateEntriesMessage,
+  buildDisplayRunRows,
 } from "../../utils/physicalRunGrouping.utils";
 
 function normalizeDateOnly(value) {
@@ -986,6 +987,17 @@ export default function useSecretaryCompetitionClassesPage(options) {
         });
       }
 
+      // Shared physical runs, read-only screen (operational draw view
+      // consolidation): the "group" view is exactly the classDate+orderInDay
+      // scope a physical run is defined over, so it is the one screen where a
+      // rider+horse entered in two classes configured to run together must
+      // collapse into a single row/draw number instead of showing two. Class
+      // view (canEditEntry) is scoped to one ClassInCompId and can never
+      // contain a multi-classification run, so it is left untouched.
+      if (viewMode === "group") {
+        items = buildDisplayRunRows(items);
+      }
+
       return sortEntries(items);
     },
     [
@@ -995,6 +1007,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
       searchText,
       drawOrderEditMode,
       drawOrderDraftEntries,
+      viewMode,
     ],
   );
 

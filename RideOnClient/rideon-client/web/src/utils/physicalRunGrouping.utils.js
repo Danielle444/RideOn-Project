@@ -13,6 +13,19 @@
 //
 // Field access follows the existing dual-casing convention used throughout
 // this screen's hook/table (see useSecretaryCompetitionClassesPage.js).
+//
+// KNOWN OPEN QUESTION, deliberately not addressed by this key (2026-08-07 audit):
+// the key does not include ArenaId. classincompetition.arenaid exists and is not
+// part of the key, so two classes sharing ClassDate+OrderInDay but scheduled in
+// DIFFERENT arenas are still merged into one physical run today. Live data shows
+// this is rare (cross-arena OrderInDay ties are a small minority of all ties --
+// see the schedule-view Phase 7 notes), and same rider+horse in two arenas at the
+// same slot is itself a data anomaly rather than a real scenario, but this is a
+// genuine unresolved business-rule question, not an oversight to silently fix
+// here. Do not add ArenaId to this key without an explicit business decision --
+// it is the same locked rule PhysicalRunGrouper.cs (server) and
+// entriesPhysicalRunGrouping.js (mobile) implement, and all three must change
+// together if it ever does.
 
 function normalizeDateOnly(value) {
   if (!value) {
@@ -220,6 +233,77 @@ export function groupEntriesIntoPhysicalRuns(entries) {
   });
 
   return { runs: runs, duplicates: duplicates };
+}
+
+function getEntryDrawOrderValue(item) {
+  var value = item.drawOrder;
+  return value === null || value === undefined || value === "" ? item.DrawOrder : value;
+}
+
+// Read-only display rows for the non-edit draw/entries screen: one row per
+// physical run (grouped, DrawOrder taken from the underlying persisted
+// entries), plus one row per Cancelled/CancelledAfterStart entry left
+// ungrouped (CAP-9: a cancelled classification is never merged into a
+// physical run). Unlike buildRunDraft, this NEVER renumbers DrawOrder -- an
+// undrawn group must keep showing empty draw numbers, not a fabricated
+// sequential draft, since this is what is actually persisted, not an edit
+// draft.
+//
+// If a run's linked entries disagree on DrawOrder (stale data persisted by
+// the pre-grouping generator, before this file existed), the lowest value is
+// shown and hasInconsistentDrawOrder is set so the caller can surface a
+// "needs redraw" signal -- this is a display fallback for already-published
+// old draws, not a silent merge: no persisted row is changed or hidden by
+// this function, both original DrawOrder values remain in the underlying
+// `entries` the run carries.
+//
+// Entries caught in an invalid same-class duplicate (see
+// groupEntriesIntoPhysicalRuns) are excluded from `runs` entirely -- for a
+// read-only screen that must still account for every row, they are shown
+// individually (ungrouped, isInvalidDuplicate flagged) rather than silently
+// dropped the way an edit-mode caller (buildRunDraft) is allowed to block on.
+export function buildDisplayRunRows(items) {
+  var list = Array.isArray(items) ? items : [];
+
+  var cancelledRows = list.filter(function (entry) {
+    return !isActiveEntry(entry);
+  });
+
+  var grouping = groupEntriesIntoPhysicalRuns(list);
+
+  var duplicateEntryIds = {};
+  grouping.duplicates.forEach(function (duplicate) {
+    duplicate.entryIds.forEach(function (id) {
+      duplicateEntryIds[id] = true;
+    });
+  });
+
+  var duplicateRows = list
+    .filter(function (entry) {
+      return isActiveEntry(entry) && duplicateEntryIds[getEntryId(entry)];
+    })
+    .map(function (entry) {
+      return { ...entry, isInvalidDuplicate: true };
+    });
+
+  var runRows = grouping.runs.map(function (run) {
+    var drawOrders = uniqueValues(
+      run.entries.map(getEntryDrawOrderValue).map(function (value) {
+        return value === null || value === undefined || value === ""
+          ? null
+          : Number(value);
+      }),
+    );
+
+    return {
+      ...run,
+      drawOrder:
+        drawOrders.length > 0 ? Math.min.apply(null, drawOrders) : null,
+      hasInconsistentDrawOrder: drawOrders.length > 1,
+    };
+  });
+
+  return runRows.concat(cancelledRows, duplicateRows);
 }
 
 // Expands a draft of run items (or plain entry items -- entryIds falls back
