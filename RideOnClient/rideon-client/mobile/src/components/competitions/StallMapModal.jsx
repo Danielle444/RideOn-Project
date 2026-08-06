@@ -45,7 +45,7 @@ export default function StallMapModal(props) {
       async function load() {
         try {
           var results = await Promise.all([
-            getCompounds(ranchId),
+            getCompounds(ranchId, competitionId),
             getAssignments(competitionId, ranchId),
           ]);
 
