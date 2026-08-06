@@ -16,6 +16,20 @@ namespace RideOnServer.DAL
         // configuration can't serve correctly anyway, so this fails fast until restart.
         private static readonly ConcurrentDictionary<string, Lazy<string>> _connectionStringCache = new();
 
+        // Supabase's Supavisor session-mode pooler caps this project at 15 concurrent
+        // client connections (the "pool_size: 15" in the EMAXCONNSESSION error). Npgsql's
+        // own client-side pool defaults to 100, so a single burst of parallel requests
+        // (the admin registration screen alone fans out ~9 DB calls on mount) can open
+        // more physical connections than the pooler allows and fail. We clamp Npgsql's
+        // Maximum Pool Size safely under the pooler limit so it QUEUES excess callers
+        // instead of exceeding the cap, and reap idle connections quickly so freed slots
+        // return to the pooler for any other backend sharing it (e.g. a local dev backend
+        // running against the same live database). The headroom below 15 also absorbs the
+        // pooler's own overhead and that occasional second backend.
+        private const int SafeMaxPoolSize = 12;
+        private const int IdleConnectionLifetimeSeconds = 30;
+        private const int PoolPruningIntervalSeconds = 10;
+
         private static string ResolveConnectionString(string conStr)
         {
             IConfigurationRoot configuration = new ConfigurationBuilder()
@@ -35,11 +49,43 @@ namespace RideOnServer.DAL
                     throw new InvalidOperationException($"Connection string '{conStr}' is not configured.");
                 }
 
-                return value;
+                return ApplyPoolingSafeguards(value);
             }
             finally
             {
                 (configuration as IDisposable)?.Dispose();
+            }
+        }
+
+        // Normalizes the configured connection string so Npgsql can never open more
+        // physical connections than the Supavisor pooler accepts. A smaller
+        // env-provided Maximum Pool Size is respected as-is; anything larger (including
+        // Npgsql's default of 100) is clamped down to SafeMaxPoolSize.
+        private static string ApplyPoolingSafeguards(string rawConnectionString)
+        {
+            try
+            {
+                NpgsqlConnectionStringBuilder builder = new NpgsqlConnectionStringBuilder(rawConnectionString)
+                {
+                    Pooling = true,
+                    MinPoolSize = 0,
+                    ConnectionIdleLifetime = IdleConnectionLifetimeSeconds,
+                    ConnectionPruningInterval = PoolPruningIntervalSeconds,
+                };
+
+                if (builder.MaxPoolSize > SafeMaxPoolSize)
+                {
+                    builder.MaxPoolSize = SafeMaxPoolSize;
+                }
+
+                return builder.ConnectionString;
+            }
+            catch (Exception)
+            {
+                // If the configured string can't be parsed here for any reason, fall back
+                // to using it verbatim (the prior behavior). NpgsqlConnection will still
+                // surface any genuine format problem when it opens.
+                return rawConnectionString;
             }
         }
 
