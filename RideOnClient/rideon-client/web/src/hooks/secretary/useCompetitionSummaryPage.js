@@ -10,7 +10,10 @@ import {
   deriveFinancialProjection,
   deriveFinancialActual,
 } from "../../utils/financialProjection.utils";
-import { isRegistrationClosed } from "../../utils/classesView.utils";
+import {
+  isRegistrationClosed,
+  isCompetitionEnded,
+} from "../../utils/classesView.utils";
 import {
   groupDetailsByDay,
   filterItemsByDay,
@@ -384,6 +387,7 @@ export default function useCompetitionSummaryPage(options) {
   );
 
   var financialRegistrationClosed = isRegistrationClosed(finCompetition);
+  var financialCompetitionEnded = isCompetitionEnded(finCompetition);
 
   async function importFederationInvoices(file) {
     if (!competitionId || !ranchId) {
@@ -1480,6 +1484,7 @@ export default function useCompetitionSummaryPage(options) {
     financialProjection: financialProjection,
     financialActual: financialActual,
     financialRegistrationClosed: financialRegistrationClosed,
+    financialCompetitionEnded: financialCompetitionEnded,
     financialLoading: financialLoading,
 
     detailsModal: detailsModal,

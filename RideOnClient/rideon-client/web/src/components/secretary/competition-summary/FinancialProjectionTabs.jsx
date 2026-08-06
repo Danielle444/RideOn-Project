@@ -35,11 +35,13 @@ function getTabClass(isActive, isAvailable, isPendingResolution) {
 export default function FinancialProjectionTabs(props) {
   var copy = FINANCIAL_PROJECTION_COPY;
 
-  // Projection is always available (it works with zero real entries -- its whole point).
-  // Actual applies once registration closes; comparison once there are real actuals to compare.
+  // Projection is always available (it works with zero real entries -- its whole point). Actual
+  // is now always available too -- it renders a lifecycle caption instead of waiting on
+  // registration to close (see resolveActualBannerText). Comparison still applies once there are
+  // real actuals to compare.
   var availability = {
     projection: true,
-    actual: !!props.registrationClosed,
+    actual: true,
     comparison: !!props.registrationClosed && !!props.hasActualData,
   };
 

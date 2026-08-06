@@ -123,6 +123,15 @@ var FINANCIAL_PROJECTION_COPY = {
     "הכנסות מתאים ומנסורת יחושבו מהזמנות בפועל (בפיתוח).",
   actualUnavailable: "התצוגה תהיה זמינה עם סגירת ההרשמה.",
 
+  // Lifecycle caption shown at the top of the Actual body itself -- distinct from the tab's own
+  // hint/unavailableHint above, which describe tab AVAILABILITY, not how settled the figures
+  // under it are. At most one renders at a time (resolution order: registration open -> live ->
+  // none once the competition has ended, see isCompetitionEnded).
+  actualBands: {
+    registrationOpen: "נתוני אמת — צפויים לשינויים רבים עד תום ההרשמה",
+    live: "נתוני אמת — עדיין עשויים להשתנות מעט עד תום התחרות",
+  },
+
   // Tab 3 (projection vs actual). A reliability scorecard about the FORECAST, not the
   // competition -- the same distinction the planned-vs-actual entries panel makes.
   comparisonTitle: "תחזית מול בפועל",

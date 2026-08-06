@@ -161,6 +161,66 @@ describe("Actual view content", () => {
   });
 });
 
+describe("Actual view availability (drastic -> small -> final banners)", () => {
+  it("is always available -- no longer keyed off registrationClosed", () => {
+    expect(pageSource).toContain(
+      "var financialViewAvailability = {\n    projection: true,\n    actual: true,\n    comparison: !!page.financialRegistrationClosed && !!hasActualData,\n  };",
+    );
+  });
+
+  it("leaves comparison gating unchanged (still registrationClosed AND hasActualData)", () => {
+    expect(pageSource).toContain(
+      "comparison: !!page.financialRegistrationClosed && !!hasActualData,",
+    );
+  });
+
+  it("resolves the banner text through a small local resolver, in the approved order", () => {
+    expect(pageSource).toContain(
+      "function resolveActualBannerText(registrationClosed, competitionEnded) {\n  if (!registrationClosed) {\n    return FINANCIAL_PROJECTION_COPY.actualBands.registrationOpen;\n  }\n\n  if (!competitionEnded) {\n    return FINANCIAL_PROJECTION_COPY.actualBands.live;\n  }\n\n  return null;\n}",
+    );
+  });
+
+  it("calls the resolver with financialRegistrationClosed and financialCompetitionEnded", () => {
+    expect(pageSource).toContain(
+      "var actualBannerText = resolveActualBannerText(\n    page.financialRegistrationClosed,\n    page.financialCompetitionEnded,\n  );",
+    );
+  });
+
+  it("renders the banner in the approved projection-caption-matching style, above the sections, only when non-null", () => {
+    var actualBranch = pageSource.slice(
+      pageSource.indexOf("effectiveView === TAB_ACTUAL"),
+      pageSource.indexOf("effectiveView === TAB_COMPARISON"),
+    );
+
+    expect(actualBranch).toContain("{actualBannerText ? (");
+    expect(actualBranch).toContain(
+      '<div className="rounded-2xl border border-[#E6DCD5] bg-[#FCFAF8] px-5 py-3 text-right">',
+    );
+    expect(actualBranch).toContain(
+      '<p className="text-sm font-bold text-[#7B5A4D]">{actualBannerText}</p>',
+    );
+
+    // The banner markup must precede the organizer section, not follow it.
+    expect(actualBranch.indexOf("{actualBannerText ? (")).toBeLessThan(
+      actualBranch.indexOf('title="מארגן"'),
+    );
+  });
+});
+
+describe("Actual lifecycle banner strings", () => {
+  it("defines both approved strings under actualBands, distinct from the tab hint copy", () => {
+    expect(copySource).toContain(
+      'actualBands: {\n    registrationOpen: "נתוני אמת — צפויים לשינויים רבים עד תום ההרשמה",\n    live: "נתוני אמת — עדיין עשויים להשתנות מעט עד תום התחרות",\n  },',
+    );
+  });
+
+  it("leaves the existing projection caption untouched", () => {
+    expect(copySource).toContain(
+      'projectionCaptionPrimary:\n    "המספרים המוצגים מהווים תחזית משוערת בלבד, אין להתייחס אליהם כהכנסות בפועל.",',
+    );
+  });
+});
+
 describe("Comparison view independence", () => {
   it("does not reference page.loading anywhere in its branch", () => {
     var comparisonBranch = pageSource.slice(
