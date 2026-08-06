@@ -152,6 +152,50 @@ describe("resolveShavingsOrderPlacement", () => {
 
     expect(placement.isNeedsReview).toBe(true);
   });
+
+  it("standalone cancellation: own isCancelled wins even though the linked stall is Active", () => {
+    var stallsById = { "10": makeActiveStall(10) };
+    var order = makeOrder(6, [10], { isCancelled: true });
+
+    var placement = resolveShavingsOrderPlacement(order, stallsById);
+
+    expect(placement.isNeedsReview).toBe(false);
+    expect(placement.lifecycleState).toBe("cancelled");
+    expect(placement.anchorStall.stallBookingId).toBe(10);
+  });
+
+  it("standalone pending cancellation: own hasPendingCancellation wins even though the linked stall is Active", () => {
+    var stallsById = { "10": makeActiveStall(10) };
+    var order = makeOrder(7, [10], { hasPendingCancellation: true });
+
+    var placement = resolveShavingsOrderPlacement(order, stallsById);
+
+    expect(placement.isNeedsReview).toBe(false);
+    expect(placement.lifecycleState).toBe("pendingCancellation");
+  });
+
+  it("standalone cancellation wins even when no linked stall can be resolved (never falls into needsReview)", () => {
+    var order = makeOrder(8, [10, 11], { isCancelled: true });
+
+    var placement = resolveShavingsOrderPlacement(order, {});
+
+    expect(placement.isNeedsReview).toBe(false);
+    expect(placement.lifecycleState).toBe("cancelled");
+    expect(placement.anchorStall).toBe(null);
+  });
+
+  it("own isCancelled outranks own hasPendingCancellation when both are set", () => {
+    var stallsById = { "10": makeActiveStall(10) };
+    var order = makeOrder(
+      9,
+      [10],
+      { isCancelled: true, hasPendingCancellation: true },
+    );
+
+    var placement = resolveShavingsOrderPlacement(order, stallsById);
+
+    expect(placement.lifecycleState).toBe("cancelled");
+  });
 });
 
 describe("groupEntriesByStall", () => {
@@ -292,6 +336,28 @@ describe("groupAndBandShavingsByStall", () => {
     var banded = groupAndBandShavingsByStall(orders, stalls);
 
     expect(banded.active[0].entries.map(function (o) { return o.shavingsOrderId; })).toEqual([2, 1]);
+  });
+
+  it("standalone-cancelled order lands in the cancelled band even though its linked stall is Active", () => {
+    var stalls = [makeActiveStall(10)];
+    var orders = [makeOrder(80, [10], { isCancelled: true })];
+
+    var banded = groupAndBandShavingsByStall(orders, stalls);
+
+    expect(banded.cancelled.length).toBe(1);
+    expect(banded.cancelled[0].entries[0].shavingsOrderId).toBe(80);
+    expect(banded.active.length).toBe(0);
+  });
+
+  it("standalone-pending-cancellation order lands in the pending band even though its linked stall is Active", () => {
+    var stalls = [makeActiveStall(10)];
+    var orders = [makeOrder(81, [10], { hasPendingCancellation: true })];
+
+    var banded = groupAndBandShavingsByStall(orders, stalls);
+
+    expect(banded.pending.length).toBe(1);
+    expect(banded.pending[0].entries[0].shavingsOrderId).toBe(81);
+    expect(banded.active.length).toBe(0);
   });
 
   it("missing/non-array inputs default to empty bands rather than throwing", () => {

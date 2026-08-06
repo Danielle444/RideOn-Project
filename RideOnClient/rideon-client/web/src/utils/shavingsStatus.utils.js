@@ -44,6 +44,24 @@ export function getDeliveryPhotoUrl(order) {
   return getValue(order, "deliveryPhotoUrl", "DeliveryPhotoUrl", null);
 }
 
+// Standalone shavings cancellation (proc 176 IsCancelled/HasPendingCancellation):
+// own-order state, independent of the DERIVED Pending/Seen/Delivered delivery
+// pipeline above — a cancelled order is no longer a live financial
+// obligation, but that is an orthogonal axis from "was it physically
+// delivered." Deliberately NOT folded into deriveShavingsStatus/
+// SHAVINGS_STATUS_ORDER: those drive the existing delivery-SLA grouping and
+// filters, which stay untouched by this feature.
+export function getIsCancelled(order) {
+  return getValue(order, "isCancelled", "IsCancelled", false) === true;
+}
+
+export function getHasPendingCancellation(order) {
+  return (
+    getValue(order, "hasPendingCancellation", "HasPendingCancellation", false) ===
+    true
+  );
+}
+
 // The fixed pipeline order the status grouping and chips use.
 export const SHAVINGS_STATUS_ORDER = ["Pending", "Seen", "Delivered"];
 

@@ -417,11 +417,122 @@ namespace RideOnServer.DAL
                     DeliveryPhotoUrl =
                         reader["deliveryphotourl"] == DBNull.Value
                             ? null
-                            : reader["deliveryphotourl"].ToString()
+                            : reader["deliveryphotourl"].ToString(),
+
+                    // Standalone shavings cancellation: own-order state, appended LAST to #176.
+                    IsCancelled = Convert.ToBoolean(reader["iscancelled"]),
+
+                    HasPendingCancellation = Convert.ToBoolean(reader["haspendingcancellation"])
                 });
             }
 
             return orders;
+        }
+
+        // Payer initiates a cancel request for a standalone shavings order -- the shavings
+        // sibling of StallBookingDAL.CancelStallBookingByPayer. Plain exception on failure
+        // (no RN001 catch), matching 141/usp_cancelstallbookingbypayer's own convention: the
+        // payer path never used the RN001 -> ValidationException -> 409 convention.
+        public static int CancelShavingsOrderByPayer(int shavingsOrderId, int payerPersonId)
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                @"SELECT public.usp_cancelshavingsorderbypayer(
+                    p_shavingsorderid := @shavingsOrderId,
+                    p_payerpersonid   := @payerPersonId
+                );",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@shavingsOrderId", shavingsOrderId);
+            cmd.Parameters.AddWithValue("@payerPersonId", payerPersonId);
+
+            object? result = cmd.ExecuteScalar();
+
+            if (result == null || result == DBNull.Value)
+            {
+                throw new Exception("Failed to create payer shavings cancel request");
+            }
+
+            return Convert.ToInt32(result);
+        }
+
+        // Direct RanchAdmin cancellation -- the shavings sibling of
+        // StallBookingDAL.AdminCancelStallBooking. RN001 catch matches that sibling exactly.
+        public static int AdminCancelShavingsOrder(int shavingsOrderId, int ranchId, int personId)
+        {
+            try
+            {
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
+
+                using NpgsqlCommand cmd = new NpgsqlCommand(
+                    @"SELECT public.usp_admincancelshavingsorder(
+                        p_personid        := @personId,
+                        p_shavingsorderid := @shavingsOrderId,
+                        p_ranchid         := @ranchId
+                    );",
+                    conn
+                );
+
+                cmd.Parameters.AddWithValue("@personId", personId);
+                cmd.Parameters.AddWithValue("@shavingsOrderId", shavingsOrderId);
+                cmd.Parameters.AddWithValue("@ranchId", ranchId);
+
+                object? result = cmd.ExecuteScalar();
+                if (result == null || result == DBNull.Value)
+                {
+                    throw new Exception("Failed to cancel shavings order");
+                }
+                return Convert.ToInt32(result);
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_admincancelshavingsorder (ranch mismatch, unauthorized
+                // caller, already-resolved request, paid order, etc.).
+                throw new BL.ValidationException(ex.MessageText);
+            }
+        }
+
+        // Direct HostSecretary cancellation -- the shavings sibling of
+        // StallBookingDAL.SecretaryDeleteStallBooking, but built to
+        // usp_admincancelshavingsorder's RN001 standard (see 242's own header):
+        // unlike 146, this new secretary proc DOES raise RN001, so this DAL method
+        // catches it exactly like AdminCancelShavingsOrder above.
+        public static int SecretaryCancelShavingsOrder(int shavingsOrderId, int secretarySystemUserId, int ranchId)
+        {
+            try
+            {
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
+
+                using NpgsqlCommand cmd = new NpgsqlCommand(
+                    @"SELECT public.usp_secretarycancelshavingsorder(
+                        p_shavingsorderid       := @shavingsOrderId,
+                        p_secretarysystemuserid := @secretaryId,
+                        p_ranchid               := @ranchId
+                    );",
+                    conn
+                );
+
+                cmd.Parameters.AddWithValue("@shavingsOrderId", shavingsOrderId);
+                cmd.Parameters.AddWithValue("@secretaryId", secretarySystemUserId);
+                cmd.Parameters.AddWithValue("@ranchId", ranchId);
+
+                object? result = cmd.ExecuteScalar();
+                if (result == null || result == DBNull.Value)
+                {
+                    throw new Exception("Failed to cancel shavings order");
+                }
+                return Convert.ToInt32(result);
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                throw new BL.ValidationException(ex.MessageText);
+            }
         }
 
         public static List<ShavingsOrderDetailsItem> GetShavingsOrderDetails(int shavingsOrderId)

@@ -53,5 +53,64 @@ namespace RideOnServer.BL
 
             return ShavingsOrderDAL.MarkDelivered(request.ShavingsOrderId);
         }
+
+        // Standalone shavings cancellation -- three role paths, exact mirror of
+        // StallBooking.cs's CancelStallBookingByPayer / AdminCancelStallBooking /
+        // SecretaryDeleteStallBooking validation shape.
+
+        public static int CancelShavingsOrderByPayer(int shavingsOrderId, int payerPersonId)
+        {
+            if (shavingsOrderId <= 0)
+            {
+                throw new Exception("Invalid ShavingsOrderId");
+            }
+
+            if (payerPersonId <= 0)
+            {
+                throw new Exception("Invalid PayerPersonId");
+            }
+
+            return ShavingsOrderDAL.CancelShavingsOrderByPayer(shavingsOrderId, payerPersonId);
+        }
+
+        public static int AdminCancelShavingsOrder(int shavingsOrderId, int ranchId, int personId)
+        {
+            if (shavingsOrderId <= 0)
+            {
+                throw new Exception("Invalid ShavingsOrderId");
+            }
+
+            if (ranchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            if (personId <= 0)
+            {
+                throw new Exception("Invalid PersonId");
+            }
+
+            return ShavingsOrderDAL.AdminCancelShavingsOrder(shavingsOrderId, ranchId, personId);
+        }
+
+        public static int SecretaryCancelShavingsOrder(int shavingsOrderId, int secretarySystemUserId, int ranchId)
+        {
+            if (shavingsOrderId <= 0)
+            {
+                throw new Exception("Invalid ShavingsOrderId");
+            }
+
+            if (secretarySystemUserId <= 0)
+            {
+                throw new Exception("Invalid SecretarySystemUserId");
+            }
+
+            if (ranchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            return ShavingsOrderDAL.SecretaryCancelShavingsOrder(shavingsOrderId, secretarySystemUserId, ranchId);
+        }
     }
 }

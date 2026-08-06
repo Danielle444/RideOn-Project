@@ -54,7 +54,11 @@ export default function ShavingsGroup(props) {
         </div>
       </div>
 
-      <ShavingsOrdersTable orders={orders} />
+      <ShavingsOrdersTable
+        orders={orders}
+        onCancelOrder={props.onCancelOrder}
+        cancellingId={props.cancellingId}
+      />
     </div>
   );
 }

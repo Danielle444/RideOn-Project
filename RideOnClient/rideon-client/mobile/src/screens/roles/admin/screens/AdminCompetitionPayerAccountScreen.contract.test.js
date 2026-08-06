@@ -57,7 +57,14 @@ function getDoCancelStallBlock(source) {
   return getFunctionBlock(
     source,
     "async function doCancelStall(item) {",
-    "function renderActions(",
+    // Ends at the next function (confirmCancelShavings, added by the
+    // standalone-shavings-cancellation slice, now sits immediately after
+    // doCancelStall) - NOT "function renderActions(" any more, since that
+    // boundary would swallow the new shavings functions in between and
+    // corrupt every block-scoped assertion below (e.g. lastIndexOf("} finally {")
+    // would then find doCancelShavings's own finally block instead of
+    // doCancelStall's).
+    "function confirmCancelShavings(",
   );
 }
 
@@ -616,8 +623,20 @@ describe("AdminCompetitionPayerAccountScreen - CAP-4 shavings tab", () => {
     expect(source).toContain(
       'import ShavingsGroupCard from "../../../../components/payerAccount/ShavingsGroupCard";',
     );
+    expect(source).toContain("<ShavingsGroupCard");
+    expect(source).toContain("key={group.key}");
+    expect(source).toContain("group={group}");
+  });
+
+  it("standalone shavings cancellation: the cancel action is wired only on the active section, via confirmCancelShavings and the shared cancellingId", () => {
+    var source = readSource();
+
+    expect(source).toContain('var isActiveSection = section.key === "active";');
     expect(source).toContain(
-      "<ShavingsGroupCard key={group.key} group={group} />",
+      "onCancelOrder={isActiveSection ? confirmCancelShavings : undefined}",
+    );
+    expect(source).toContain(
+      "cancellingId={isActiveSection ? cancellingId : undefined}",
     );
   });
 

@@ -256,6 +256,134 @@ namespace RideOnServer.Controllers
             }
         }
 
+        // Standalone shavings cancellation, Payer-gated: creates a Pending
+        // productchangerequest via usp_cancelshavingsorderbypayer (240) --
+        // the shavings sibling of StallBookingsController's
+        // POST /cancel-request. Secretary approval happens later through the
+        // existing Change Tracking page (proc 222 already handles this
+        // category correctly, unmodified).
+        [HttpPost("cancel-request")]
+        public IActionResult CancelShavingsOrderByPayer([FromBody] CancelShavingsOrderRequest request)
+        {
+            try
+            {
+                if (request == null || request.ShavingsOrderId <= 0 || request.RanchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.Payer
+                );
+
+                int requestId = ShavingsOrder.CancelShavingsOrderByPayer(request.ShavingsOrderId, personId);
+
+                return Ok(new { ChangeRequestId = requestId, Message = "בקשת הביטול נשלחה למזכירה" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in CancelShavingsOrderByPayer: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
+        // Standalone shavings cancellation, RanchAdmin-direct: calls
+        // usp_admincancelshavingsorder (241) -- the shavings sibling of
+        // StallBookingsController.AdminCancelStallBooking. Deliberately a
+        // separate endpoint from the payer-gated POST /cancel-request above.
+        [HttpDelete("admin-cancel/{shavingsOrderId}")]
+        public IActionResult AdminCancelShavingsOrder(
+            int shavingsOrderId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (shavingsOrderId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                int requestId = ShavingsOrder.AdminCancelShavingsOrder(shavingsOrderId, ranchId, personId);
+
+                return Ok(new { ChangeRequestId = requestId, Message = "הזמנת הנסורת בוטלה" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_admincancelshavingsorder.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in AdminCancelShavingsOrder: {ex.Message}");
+                return BadRequest("אירעה שגיאה בביטול הזמנת הנסורת");
+            }
+        }
+
+        // Standalone shavings cancellation, HostSecretary-direct: calls
+        // usp_secretarycancelshavingsorder (242) -- the shavings sibling of
+        // StallBookingsController.SecretaryDeleteStallBooking, built to the
+        // same RN001/409 standard as AdminCancelShavingsOrder above (242,
+        // unlike its stall sibling 146, raises RN001).
+        [HttpDelete("secretary/{shavingsOrderId}")]
+        public IActionResult SecretaryCancelShavingsOrder(
+            int shavingsOrderId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (shavingsOrderId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                int requestId = ShavingsOrder.SecretaryCancelShavingsOrder(shavingsOrderId, personId, ranchId);
+
+                return Ok(new { ChangeRequestId = requestId, Message = "הזמנת הנסורת בוטלה" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in SecretaryCancelShavingsOrder: {ex.Message}");
+                return BadRequest("אירעה שגיאה בביטול הזמנת הנסורת");
+            }
+        }
+
         [HttpGet("stall-bookings-for-order")]
         public IActionResult GetStallBookingsForShavings(
             [FromQuery] int competitionId,

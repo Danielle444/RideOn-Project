@@ -91,17 +91,36 @@ function resolvePaidTimeLifecycleState(paidTime) {
   return LIFECYCLE_STATE.ACTIVE;
 }
 
-// Shavings carry no lifecycle field of their own - only deliveryStatus,
-// which tracks Pending/Seen/Delivered and is unrelated to cancellation
-// (verified live: neither the nested stalls[].shavingsOrders[] rows nor the
-// top-level shavings[] rows have isCancelled/hasPendingCancellation/
-// hasPendingChange). They inherit the parent stall booking's already
-// resolved lifecycle state verbatim. A parentStallLifecycleState that isn't
-// one of the four known states (a caller bug, not real data - the contract
-// is "always pass an already-resolved stall state") resolves to UNKNOWN
-// rather than guessing Active, since there is no independent signal here to
-// fall back on.
-function resolveShavingsLifecycleState(parentStallLifecycleState) {
+// Standalone shavings cancellation: usp_getpayercompetitionaccount (212) and
+// usp_getshavingsordersforcompetitionandranch (176) now both append the
+// shavings order's OWN isCancelled/hasPendingCancellation, computed from its
+// own productchangerequest independent of any linked stall. Precedence,
+// exactly as locked for this feature:
+//   1. own isCancelled       -> CANCELLED, full stop
+//   2. own hasPendingCancellation -> PENDING_CANCELLATION, full stop
+//   3. inherited lifecycle from the linked stall(s) (parentStallLifecycleState)
+//   4. UNKNOWN (the existing CAP-4 needsReview fallback lives at the caller,
+//      which is where "no linked stall could be resolved" is decided)
+// Before this, shavings had NO independent signal and inherited the parent
+// stall's state unconditionally (verbatim) - that inheritance is still step
+// 3, now demoted below the order's own state. A standalone-cancelled order
+// must render Cancelled even when its stall is Active; a standalone-pending
+// cancellation must render Pending even when its stall is Active. A
+// parentStallLifecycleState that isn't one of the four known states (a
+// caller bug, not real data) still resolves to UNKNOWN when neither own flag
+// is set, since there is no independent signal here to fall back on.
+function resolveShavingsLifecycleState(
+  shavingsOrder,
+  parentStallLifecycleState,
+) {
+  if (shavingsOrder && shavingsOrder.isCancelled === true) {
+    return LIFECYCLE_STATE.CANCELLED;
+  }
+
+  if (shavingsOrder && shavingsOrder.hasPendingCancellation === true) {
+    return LIFECYCLE_STATE.PENDING_CANCELLATION;
+  }
+
   if (KNOWN_LIFECYCLE_STATES.indexOf(parentStallLifecycleState) === -1) {
     return LIFECYCLE_STATE_UNKNOWN;
   }
@@ -165,6 +184,7 @@ function resolvePayerAccountItemLifecycleState(itemType, item, context) {
 
   if (itemType === PAYER_ACCOUNT_ITEM_TYPE.SHAVINGS) {
     return resolveShavingsLifecycleState(
+      item,
       context && context.parentStallLifecycleState,
     );
   }

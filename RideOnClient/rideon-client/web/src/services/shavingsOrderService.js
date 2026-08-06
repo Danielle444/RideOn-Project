@@ -48,8 +48,19 @@ function createShavingsOrder(payload) {
   return axios.post(`${API}/ShavingsOrders`, payload, getAuthHeaders());
 }
 
+// Standalone shavings cancellation, HostSecretary-direct: cancels
+// immediately via usp_secretarycancelshavingsorder (242) — the shavings
+// sibling of stallBookingsService.js's secretaryDeleteStallBooking.
+function secretaryCancelShavingsOrder(shavingsOrderId, ranchId) {
+  return axios.delete(`${API}/ShavingsOrders/secretary/${shavingsOrderId}`, {
+    params: { ranchId: ranchId },
+    ...getAuthHeaders(),
+  });
+}
+
 export {
   getShavingsOrdersForCompetitionAndRanch,
   getStallBookingsForShavings,
   createShavingsOrder,
+  secretaryCancelShavingsOrder,
 };

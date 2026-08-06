@@ -84,11 +84,19 @@ function buildStallsById(stalls) {
   return byId;
 }
 
-// Resolves one order's lifecycle (from every linked id FOUND in stallsById)
-// and its display anchor (the first FOUND id, in the proc's own
-// ascending-id order). An order with zero linked ids found in stallsById -
-// e.g. every linked stall is billed to a different payer - resolves to
-// needsReview rather than a guessed active/cancelled state.
+// Resolves one order's lifecycle and its display anchor (the first FOUND
+// linked stall id, in the proc's own ascending-id order), in this exact
+// precedence (standalone shavings cancellation):
+//   1. own isCancelled              -> CANCELLED, full stop
+//   2. own hasPendingCancellation   -> PENDING_CANCELLATION, full stop
+//   3. inherited lifecycle from every linked stall FOUND in stallsById
+//   4. needsReview, when no linked stall could be resolved at all
+// Steps 1/2 are checked BEFORE step 4 on purpose: an order that is
+// independently, verifiably cancelled/pending must never fall into
+// needsReview just because its linked stalls happen to be unresolvable (e.g.
+// billed to a different payer) - its own state is already known for
+// certain. The anchor stall is still resolved the same way regardless of
+// which precedence step wins, purely for display grouping.
 function resolveShavingsOrderPlacement(order, stallsById) {
   var stallBookingIds = Array.isArray(order && order.stallBookingIds)
     ? order.stallBookingIds
@@ -107,6 +115,24 @@ function resolveShavingsOrderPlacement(order, stallsById) {
         anchorStall = stall;
       }
     }
+  }
+
+  if (order && order.isCancelled === true) {
+    return {
+      lifecycleState: LIFECYCLE_STATE.CANCELLED,
+      anchorStall: anchorStall,
+      isNeedsReview: false,
+      isMixedLifecycle: false,
+    };
+  }
+
+  if (order && order.hasPendingCancellation === true) {
+    return {
+      lifecycleState: LIFECYCLE_STATE.PENDING_CANCELLATION,
+      anchorStall: anchorStall,
+      isNeedsReview: false,
+      isMixedLifecycle: false,
+    };
   }
 
   if (foundStalls.length === 0) {

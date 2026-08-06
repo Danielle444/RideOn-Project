@@ -58,8 +58,20 @@ describe("PayerCompetitionAccountScreen - CAP-4 shavings tab", () => {
     expect(source).toContain(
       'import ShavingsGroupCard from "../../../../components/payerAccount/ShavingsGroupCard";',
     );
+    expect(source).toContain("<ShavingsGroupCard");
+    expect(source).toContain("key={group.key}");
+    expect(source).toContain("group={group}");
+  });
+
+  it("standalone shavings cancellation (payer-gated): the cancel action is wired only on the active section, via confirmCancelShavings and the shared cancellingId", () => {
+    var source = readSource();
+
+    expect(source).toContain('var isActiveSection = section.key === "active";');
     expect(source).toContain(
-      "<ShavingsGroupCard key={group.key} group={group} />",
+      "onCancelOrder={isActiveSection ? confirmCancelShavings : undefined}",
+    );
+    expect(source).toContain(
+      "cancellingId={isActiveSection ? cancellingId : undefined}",
     );
   });
 

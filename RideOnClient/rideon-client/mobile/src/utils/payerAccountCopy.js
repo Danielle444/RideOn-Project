@@ -71,6 +71,7 @@ var PAYER_ACCOUNT_ITEM_LABEL = {
   entry: "ההרשמה למקצה", // proposed
   paidTime: "בקשת הפייד טיים", // proposed
   stall: "הזמנת התא", // proposed
+  shavings: "הזמנת הנסורת", // proposed
 };
 
 // --- Post-mutation result copy --------------------------------------------
