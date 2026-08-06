@@ -15,6 +15,14 @@ namespace RideOnServer.Controllers
         // this is RanchAdmin-only. The admin id is derived from claims (PersonId) and is never
         // accepted from the client, matching every write controller's OrderedBySystemUserId
         // overwrite pattern.
+        //
+        // The supplied ranchId does NOT need to equal competition.HostRanchId: a RanchAdmin
+        // operates for the ranch represented by their activeRole.ranchId, and a ranch can have
+        // real registration activity (entries, stall bookings, paid time) in a competition it
+        // does not host. EnsureUserHasRoleInRanch below is the only ranch gate -- it proves the
+        // caller holds RanchAdmin at the SUPPLIED ranchId, which is sufficient; requiring that
+        // ranch to also be the host was a bug (RanchAdmins at non-host ranches got a 403 for a
+        // competition their own ranch was legitimately participating in).
         [HttpGet("{competitionId}")]
         public IActionResult GetRegistrationStepStatus(int competitionId, [FromQuery] int ranchId)
         {
@@ -35,21 +43,15 @@ namespace RideOnServer.Controllers
                     return NotFound("התחרות לא נמצאה");
                 }
 
-                if (competition.HostRanchId != ranchId)
-                {
-                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לצפות בנתוני ההרשמה של תחרות זו");
-                }
-
                 RegistrationStepStatus? status =
                     RegistrationStepStatusService.GetRegistrationStepStatus(competitionId, ranchId, personId);
 
                 if (status == null)
                 {
-                    // Competition existence and ranch ownership are already proven above via
-                    // Competition.GetCompetitionById. A null result here means the SP's own
-                    // independent re-check (the comp CTE) disagreed -- e.g. the competition was
-                    // deleted/reassigned between the two reads, or the SP contract broke. Never
-                    // surface this as a misleading 200-with-nulls.
+                    // Competition existence is already proven above via Competition.GetCompetitionById.
+                    // A null result here means the SP's own independent re-check (the comp CTE)
+                    // disagreed -- e.g. the competition was deleted between the two reads, or the
+                    // SP contract broke. Never surface this as a misleading 200-with-nulls.
                     Console.WriteLine(
                         $"RegistrationStepStatus: SP returned no row for competitionId={competitionId}, " +
                         $"ranchId={ranchId} despite passing the prior existence/ownership checks");
