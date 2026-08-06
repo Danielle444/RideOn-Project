@@ -7,7 +7,11 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
-import { getCompounds, getAssignments } from "../../services/stallMapService";
+import {
+  getCompounds,
+  getAssignments,
+  parseCompoundLayout,
+} from "../../services/stallMapService";
 
 export default function StallMapScreen({ route }) {
   const { competitionId, ranchId } = route.params;
@@ -68,18 +72,10 @@ export default function StallMapScreen({ route }) {
   });
 
   function renderGrid() {
-    if (!activeCompound?.layout) {
-      return <Text style={styles.emptyText}>לא הועלתה פריסה עבור מתחם זה</Text>;
-    }
+    const layout = parseCompoundLayout(activeCompound);
 
-    let layout;
-    try {
-      layout =
-        typeof activeCompound.layout === "string"
-          ? JSON.parse(activeCompound.layout)
-          : activeCompound.layout;
-    } catch {
-      return <Text style={styles.emptyText}>שגיאה בטעינת הפריסה</Text>;
+    if (!layout) {
+      return <Text style={styles.emptyText}>לא הועלתה פריסה עבור מתחם זה</Text>;
     }
 
     const cellMap = {};
