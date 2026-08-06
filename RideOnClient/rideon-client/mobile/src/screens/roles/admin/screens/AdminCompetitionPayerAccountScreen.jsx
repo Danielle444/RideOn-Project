@@ -44,7 +44,7 @@ import { getLifecycleBandHeader } from "../../../../utils/payerAccountCopy";
 
 import styles from "../../../../styles/adminCompetitionPayerAccountStyles";
 
-import { createChangeEntryRequest } from "../../../../services/entriesService";
+import { adminCancelEntry } from "../../../../services/entriesService";
 
 import { cancelPaidTimeRequest } from "../../../../services/paidTimeRequestsService";
 
@@ -75,6 +75,18 @@ function extractErrorMessage(err) {
   }
   if (err.message) return err.message;
   return "אירעה שגיאה";
+}
+
+// Phase 3C copy boundary: the ONLY place direct-admin-cancel success copy is
+// selected. Deliberately a small local function, not a new shared module -
+// when feature/payer-account-cohesion's payerAccountCopy.js is available,
+// this single function is the one spot a future integration replaces (an
+// import + a one-line call), instead of hunting through doCancelEntry.
+function getDirectCancelSuccessCopy() {
+  return {
+    title: "בוטל",
+    message: "ההרשמה בוטלה בהצלחה",
+  };
 }
 
 function pickDateKey(dateValue) {
@@ -313,7 +325,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
   function confirmCancelEntry(item) {
     Alert.alert(
       "ביטול הרשמה",
-      "האם לשלוח בקשת ביטול למזכירה?",
+      "האם לבטל את ההרשמה?",
       [
         { text: "לא", style: "cancel" },
         {
@@ -327,24 +339,47 @@ export default function AdminCompetitionPayerAccountScreen(props) {
     );
   }
 
+  // Phase 3C: direct admin cancellation via usp_admincancelentry - no
+  // ChangeEntryRequest is created from mobile for this screen anymore.
+  //
+  // Mutation vs refresh are deliberately two separate steps, not one
+  // try/catch: the mutation's own try/catch/finally decides success/failure
+  // and resets cancellingId the instant the API call settles, so success
+  // copy happens unconditionally once the cancel itself succeeded - never
+  // gated on account.reload(). Refresh runs afterward, best-effort, in its
+  // own try/catch, so a refresh failure can never be misreported as a failed
+  // cancel or leave cancellingId stuck.
   async function doCancelEntry(item) {
     try {
       setCancellingId("entry:" + item.entryId);
 
-      await createChangeEntryRequest({
-        competitionId: activeCompetition?.competitionId,
-        originalEntryId: item.entryId,
-        newEntryId: null,
-        isCancelled: true,
-      });
-
-      Alert.alert("נשלח", "בקשת הביטול נשלחה למזכירה");
-
-      await account.reload();
+      await adminCancelEntry(
+        item.entryId,
+        activeCompetition?.competitionId,
+        activeRole?.ranchId,
+      );
     } catch (err) {
       Alert.alert("שגיאה", extractErrorMessage(err));
+      return;
     } finally {
       setCancellingId(null);
+    }
+
+    // The cancel succeeded - everything below is refresh, not mutation
+    // outcome, and must not be able to turn this into a reported failure.
+    var copy = getDirectCancelSuccessCopy();
+
+    Alert.alert(copy.title, copy.message);
+
+    // account.reload() already owns its own failure UX (sets its screenError
+    // and shows its own Alert internally) and never rejects - this try/catch
+    // is a defensive backstop only, so a future reload implementation that
+    // DOES reject can never be attributed to the cancel that already
+    // succeeded above.
+    try {
+      await account.reload();
+    } catch (refreshError) {
+      console.log("CANCEL ENTRY REFRESH ERROR", refreshError);
     }
   }
 
@@ -1434,6 +1469,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
         visible={!!editEntryItem}
         editItem={editEntryItem}
         lockedPayerPersonId={lockedPayerPersonId}
+        useDirectAdminEdit={true}
         onClose={function () {
           setEditEntryItem(null);
         }}

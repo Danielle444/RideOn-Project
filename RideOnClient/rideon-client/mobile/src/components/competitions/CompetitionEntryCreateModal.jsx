@@ -1,4 +1,5 @@
 import {
+  Alert,
   Modal,
   Pressable,
   SafeAreaView,
@@ -7,7 +8,7 @@ import {
   View,
 } from "react-native";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Ionicons } from "@expo/vector-icons";
 
@@ -21,9 +22,31 @@ import CompetitionRegistrationsClassesTab from "./CompetitionRegistrationsClasse
 
 import styles from "../../styles/adminCompetitionClassesStyles";
 
-import { createChangeEntryRequest } from "../../services/entriesService";
+import {
+  createChangeEntryRequest,
+  adminEditEntry,
+} from "../../services/entriesService";
 
 import { resolveEntryEditInitialization } from "../../utils/entryEditInitialization";
+
+// Phase 3C copy boundary: the ONLY place direct-admin-edit result copy is
+// selected. Deliberately a small local function, not a new shared module -
+// when feature/payer-account-cohesion's payerAccountCopy.js is available,
+// this single function is the one spot a future integration replaces (an
+// import + a one-line call), instead of hunting through handleDirectAdminEdit.
+function getDirectEditResultCopy(resultType) {
+  if (resultType === "PendingReplaceApproval") {
+    return {
+      title: "נשלח",
+      message: "בקשת השינוי נשלחה למזכירה לאישור",
+    };
+  }
+
+  return {
+    title: "עודכן",
+    message: "ההרשמה עודכנה בהצלחה",
+  };
+}
 
 export default function CompetitionEntryCreateModal(props) {
   var userContext = useUser();
@@ -42,7 +65,14 @@ export default function CompetitionEntryCreateModal(props) {
 
   var isEditMode = !!editItem;
 
+  // Phase 3C: only the admin payer-account screen opts into this - the
+  // classes-screen edit call site never passes it, so its own edit flow
+  // (create replacement + createChangeEntryRequest below) is unchanged.
+  var useDirectAdminEdit = props.useDirectAdminEdit === true;
+
   var lockedPayerPersonId = props.lockedPayerPersonId || null;
+
+  var [isSubmittingDirect, setIsSubmittingDirect] = useState(false);
 
   // CAP-2: edit mode excludes the entry being replaced from the duplicate
   // check (it's about to be superseded by the new one, so matching against
@@ -167,7 +197,85 @@ export default function CompetitionEntryCreateModal(props) {
     [props.visible],
   );
 
+  // Phase 3C: rewires edit-mode submit to the existing admin-edit endpoint
+  // (usp_admineditentry) instead of create-replacement + change-request.
+  // The server decides Direct vs Pending; this only reflects that result.
+  //
+  // Mutation vs refresh are deliberately two separate steps, not one
+  // try/catch: the mutation's own try/catch/finally decides success/failure
+  // and resets isSubmittingDirect the instant the API call settles, so
+  // success copy and modal close happen unconditionally once the edit itself
+  // succeeded - never gated on props.onCreated (account.reload). Refresh
+  // runs afterward, best-effort, in its own try/catch, so a refresh failure
+  // can never be misreported as a failed edit, reopen the modal, or leave
+  // isSubmittingDirect stuck (blocking a legitimate retry).
+  async function handleDirectAdminEdit() {
+    if (isSubmittingDirect) {
+      return;
+    }
+
+    var response;
+
+    try {
+      setIsSubmittingDirect(true);
+
+      response = await adminEditEntry({
+        entryId: editItem.entryId,
+        competitionId: activeCompetition?.competitionId,
+        ranchId: activeRole?.ranchId,
+        classInCompId: registrations.selectedClass?.classInCompId,
+        horseId: registrations.selectedHorse?.horseId,
+        riderFederationMemberId:
+          registrations.selectedRider?.federationMemberId,
+        coachFederationMemberId:
+          registrations.selectedTrainer?.federationMemberId || null,
+        prizeRecipientName: registrations.prizeRecipientName
+          ? registrations.prizeRecipientName.trim()
+          : null,
+      });
+    } catch (error) {
+      Alert.alert(
+        "שגיאה",
+        String(error?.response?.data || "אירעה שגיאה בעדכון ההרשמה"),
+      );
+
+      return;
+    } finally {
+      setIsSubmittingDirect(false);
+    }
+
+    // The edit succeeded - everything below is refresh, not mutation
+    // outcome, and must not be able to turn this into a reported failure.
+    var resultType =
+      response?.data?.resultType || response?.data?.ResultType;
+
+    var copy = getDirectEditResultCopy(resultType);
+
+    Alert.alert(copy.title, copy.message);
+
+    if (typeof props.onClose === "function") {
+      props.onClose();
+    }
+
+    // account.reload() already owns its own failure UX (sets its screenError
+    // and shows its own Alert internally) and never rejects - this try/catch
+    // is a defensive backstop only, so a future onCreated that DOES reject
+    // can never be attributed to the edit that already succeeded above.
+    if (typeof props.onCreated === "function") {
+      try {
+        await props.onCreated();
+      } catch (refreshError) {
+        console.log("DIRECT ADMIN EDIT REFRESH ERROR", refreshError);
+      }
+    }
+  }
+
   async function handleSubmit() {
+    if (isEditMode && useDirectAdminEdit) {
+      await handleDirectAdminEdit();
+      return;
+    }
+
     try {
       if (isEditMode) {
         // The success banner/tally are create-only (CAP-1) - handleCreateEntry
@@ -269,9 +377,15 @@ export default function CompetitionEntryCreateModal(props) {
             formatHorseLabel={registrations.formatHorseLabel}
             formatMemberLabel={registrations.formatMemberLabel}
             formatPayerLabel={registrations.formatPayerLabel}
-            canSubmit={registrations.canSubmit}
-            isSaving={registrations.isSaving}
-            submitButtonText={isEditMode ? "שלח בקשת שינוי" : "הוסף הרשמה"}
+            canSubmit={registrations.canSubmit && !isSubmittingDirect}
+            isSaving={registrations.isSaving || isSubmittingDirect}
+            submitButtonText={
+              isEditMode
+                ? useDirectAdminEdit
+                  ? "שמירת שינויים"
+                  : "שלח בקשת שינוי"
+                : "הוסף הרשמה"
+            }
             onSubmit={handleSubmit}
             justCreated={registrations.justCreated}
             createdCount={registrations.createdCount}
