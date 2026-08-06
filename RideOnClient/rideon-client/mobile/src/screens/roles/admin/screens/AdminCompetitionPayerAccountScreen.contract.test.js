@@ -287,3 +287,133 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
     });
   });
 });
+
+function getRenderFinesSectionBlock(source) {
+  return getFunctionBlock(
+    source,
+    "function renderFinesSection() {",
+    "function renderClassesTab() {",
+  );
+}
+
+describe("AdminCompetitionPayerAccountScreen - Phase 3E Slice D class banding + fines", () => {
+  it("imports bandAndSortClasses; no longer imports sortClassesByVerifiedDate", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import {\n  bandAndSortPaidTimes,\n  bandAndSortStalls,\n  bandAndSortClasses,\n  sortShavingsOrders,\n} from "../../../../utils/payerAccountBands";',
+    );
+    expect(source).not.toContain("sortClassesByVerifiedDate");
+  });
+
+  it("bands classes via bandAndSortClasses and renders every band (active/pending/cancelled - which covers Cancelled and Replaced, since both map into the cancelled band) through the shared renderBandedSections helper", () => {
+    var source = readSource();
+
+    expect(source).toContain("bandAndSortClasses(filteredClasses)");
+    expect(source).toContain(
+      "renderBandedSections(bandedClasses, renderClassCard)",
+    );
+  });
+
+  it("classes reuse the one shared renderBandedSections/getLifecycleBandHeader helpers already used for paid time and stalls - no per-tab duplicate banding logic", () => {
+    var source = readSource();
+
+    expect(countOccurrences(source, "function renderBandedSections(")).toBe(
+      1,
+    );
+    expect(
+      countOccurrences(source, "renderBandedSections(bandedClasses,"),
+    ).toBe(1);
+    expect(
+      countOccurrences(source, "renderBandedSections(bandedPaidTimes,"),
+    ).toBe(1);
+    expect(
+      countOccurrences(source, "renderBandedSections(bandedStalls,"),
+    ).toBe(1);
+  });
+
+  it("unknown/missing entryStatus classes are never rendered in a lifecycle band - bandAndSortClasses drops them (see payerAccountBands.test.js); the screen never falls back to rendering account.classes directly", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("account.classes.map(");
+    expect(source).not.toContain("filteredClasses.map(");
+  });
+
+  it("no duplicate class rows - classes are read from account.classes (deduped by entryId inside the hook) exactly once, never re-derived from a second raw source", () => {
+    var source = readSource();
+
+    expect(
+      countOccurrences(
+        source,
+        "Array.isArray(account.classes) ? account.classes : []",
+      ),
+    ).toBe(1);
+  });
+
+  it("renders a fines section reading account.fines, defaulting to an empty array", () => {
+    var source = readSource();
+
+    expect(source).toContain("function renderFinesSection() {");
+    expect(source).toContain(
+      "var fines = Array.isArray(account.fines) ? account.fines : [];",
+    );
+    expect(source).toContain("{renderFinesSection()}");
+  });
+
+  it("fines section renders null (nothing) when there are no fines", () => {
+    var block = getRenderFinesSectionBlock(readSource());
+
+    expect(block).toContain(
+      "if (fines.length === 0) {\n      return null;\n    }",
+    );
+  });
+
+  it("fines section renders a card per fine, with a קנסות header, when fines exist", () => {
+    var block = getRenderFinesSectionBlock(readSource());
+
+    expect(block).toContain('<Text style={styles.sectionTitle}>קנסות</Text>');
+    expect(block).toContain("{fines.map(function (fine) {");
+    expect(block).toContain('key={String(fine.billChargeId)}');
+  });
+
+  it("each fine card reads only fields from the deployed proc-212 fines[] shape - never an invented field", () => {
+    var block = getRenderFinesSectionBlock(readSource());
+
+    expect(block).toContain("fine.billChargeId");
+    expect(block).toContain("fine.className");
+    expect(block).toContain("fine.amountToPay");
+    expect(block).toContain('fine.chargeStatus === "Paid"');
+    expect(block).toContain("fine.notes");
+  });
+
+  it("useAdminCompetitionPayerAccount hook passes fines through, deduped by billChargeId like every other list", () => {
+    var hookSource = fs
+      .readFileSync(
+        path.resolve(
+          __dirname,
+          "../../../../hooks/useAdminCompetitionPayerAccount.js",
+        ),
+        "utf8",
+      )
+      .replace(/\r\n/g, "\n");
+
+    expect(hookSource).toContain(
+      "fines: dedupBy(safeArray(safeAccount.fines), function (it) {\n          return it.billChargeId;\n        }),",
+    );
+    expect(hookSource).toContain("fines: normalized.fines,");
+  });
+
+  it("existing class edit/cancel action wiring is untouched - same isLocked/lockedLabel logic and renderActions call as before this slice", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'String(item.entryStatus || "").toLowerCase() === "cancelled"',
+    );
+    expect(source).toContain(
+      'renderActions(\n            "entry:" + item.entryId,',
+    );
+    expect(source).toContain(
+      "setEditEntryItem(item);",
+    );
+  });
+});

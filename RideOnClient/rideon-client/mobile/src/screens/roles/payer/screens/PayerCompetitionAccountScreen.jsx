@@ -29,8 +29,8 @@ import usePayerMyCompetitionAccount from "../../../../hooks/usePayerMyCompetitio
 import {
   bandAndSortPaidTimes,
   bandAndSortStalls,
+  bandAndSortClasses,
   sortShavingsOrders,
-  sortClassesByVerifiedDate,
 } from "../../../../utils/payerAccountBands";
 
 import { LIFECYCLE_STATE } from "../../../../utils/payerAccountLifecycle";
@@ -245,14 +245,14 @@ export default function PayerCompetitionAccountScreen(props) {
   var payer = account.payer;
   var summary = account.summary || {};
 
-  // CAP-3: classes have no verified lifecycle field yet (CAP-8 has not
-  // added one to usp_getpayercompetitionaccount's classes[] array) - they
-  // are deliberately NOT banded, only given the same deterministic
-  // date/time ordering every other list gets. See
-  // payerAccountBands.js/payerAccountLifecycle.js for why.
-  var sortedClasses = useMemo(
+  // Phase 3E Slice D: CAP-8/proc 212 now returns a verified entryStatus on
+  // every class row, so classes are banded the same way paid time and
+  // stalls already are - active / pending (always empty for classes, see
+  // payerAccountBands.js) / cancelled, sorted within each band by the same
+  // verified date/time fields as before.
+  var bandedClasses = useMemo(
     function () {
-      return sortClassesByVerifiedDate(account.classes);
+      return bandAndSortClasses(account.classes);
     },
     [account.classes],
   );
@@ -676,15 +676,53 @@ export default function PayerCompetitionAccountScreen(props) {
     );
   }
 
+  // Phase 3E Slice D: deployed proc 212's top-level fines[] array
+  // (billChargeId, className, amountToPay, chargeStatus, notes - see
+  // 212_usp_GetPayerCompetitionAccount.sql) rendered as its own section
+  // under the classes tab, since a fine always originates from a change to
+  // a class entry. Returns null (renders nothing) when there are no fines,
+  // matching renderBandedSections' own empty-section convention.
+  function renderFinesSection() {
+    var fines = Array.isArray(account.fines) ? account.fines : [];
+
+    if (fines.length === 0) {
+      return null;
+    }
+
+    return (
+      <>
+        <Text style={styles.sectionTitle}>קנסות</Text>
+
+        {fines.map(function (fine) {
+          var isPaidFine = fine.chargeStatus === "Paid";
+
+          return (
+            <View key={String(fine.billChargeId)} style={styles.itemCard}>
+              <View style={styles.itemTopRow}>
+                <Text style={styles.itemTitle}>{fine.className || "קנס"}</Text>
+                <Text style={styles.itemAmount}>
+                  {formatCurrency(fine.amountToPay)}
+                </Text>
+              </View>
+
+              {fine.notes ? (
+                <Text style={styles.itemText}>{fine.notes}</Text>
+              ) : null}
+
+              {renderPaymentBadge(isPaidFine, fine.amountToPay)}
+            </View>
+          );
+        })}
+      </>
+    );
+  }
+
   function renderClassesTab() {
     if (!account.classes || account.classes.length === 0) {
       return renderEmpty("אין לך הרשמות למקצים בתחרות זו");
     }
 
-    // CAP-3: date/time ordered only, deliberately not banded into
-    // active/pending/cancelled - see sortedClasses' own comment above for
-    // why (no verified class lifecycle field until CAP-8).
-    return sortedClasses.map(function (item) {
+    function renderClassCard(item) {
       var isLocked =
         item.isPaid === true ||
         item.hasPendingCancellation === true ||
@@ -744,7 +782,14 @@ export default function PayerCompetitionAccountScreen(props) {
           )}
         </View>
       );
-    });
+    }
+
+    return (
+      <>
+        {renderBandedSections(bandedClasses, renderClassCard)}
+        {renderFinesSection()}
+      </>
+    );
   }
 
   function renderPaidTimesTab() {
