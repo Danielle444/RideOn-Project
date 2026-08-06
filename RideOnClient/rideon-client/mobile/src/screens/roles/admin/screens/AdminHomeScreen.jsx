@@ -26,6 +26,7 @@ import {
 } from "../../../../../../shared/auth/utils/competitions/competitionHomeShortlist";
 import { MOBILE_COMPETITION_STATUS_ORDER } from "../../../../../../shared/auth/utils/competitions/competitionStatusOrder";
 import { buildAdminCompetitionActions } from "../utils/buildAdminCompetitionActions";
+import { withTransientRetry } from "../../../../utils/transientRequestRetry";
 
 export default function AdminHomeScreen(props) {
   var userContext = useUser();
@@ -54,7 +55,9 @@ export default function AdminHomeScreen(props) {
     try {
       setLoading(true);
 
-      var response = await getMobileAdminHomeCompetitions(activeRole.ranchId);
+      var response = await withTransientRetry(function () {
+        return getMobileAdminHomeCompetitions(activeRole.ranchId);
+      });
       setCompetitions(
         selectCompetitionsShortlist(
           response.data,
