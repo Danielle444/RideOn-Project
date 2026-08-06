@@ -44,29 +44,34 @@
 -- copied identically onto a new billproductrequest/billcharge row per
 -- existing payer. Both are EQUAL SPLIT with per-row independent rounding.
 --
--- ADDITIVE REFINEMENT on top of that proven rule, not a redesign: live data
--- proves the established per-row-independent-rounding tolerates a sum
--- mismatch of a few cents (prequestid 215: 14 x 64.29 = 900.06; 219:
--- 11 x 81.82 = 900.02; 221: 7 x 128.57 = 899.99; 111: 3 x 133.33 = 399.99 --
--- all real live rows). That drift is acceptable for the historical
--- creation-time flow (not touched here) but is not acceptable for a DIRECT
--- repricing mutation that a RanchAdmin can trigger repeatedly. This proc
--- keeps the exact same equal-split base share, computed in integer cents to
--- stay exact, and deterministically assigns any leftover cents (always
--- fewer than the payer count) one cent each to the payers with the
--- lowest billid, ordered ascending -- billid is a stable, monotonic
--- identity assigned once per payer's bill, so the same booking with the
--- same total always allocates the same way, including on retry. This
--- guarantees sum(new amounts) = the recalculated total exactly, which
--- neither usp_createstallbooking nor usp_answerproductchangerequest
--- guarantees today. Single-payer bookings are unaffected: with payercount
--- = 1, the base share equals the full total and there is no remainder to
--- distribute, so the resulting UPDATE is byte-for-byte the same value the
--- prior flat-UPDATE draft would have produced.
+-- WHOLE-SHEKEL SPLIT CORRECTION (2026-08-06, approved business rule,
+-- supersedes the cents-precision design below): the original version of
+-- this proc (deployed 2026-08-05) already fixed the multi-payer duplication
+-- bug and guaranteed sum(new amounts) = the recalculated total exactly, but
+-- did so at CENTS precision (integer cents, remainder cents to the lowest
+-- billproductrequest.billid), which the rule below explicitly calls
+-- "acceptable for the historical creation-time flow... but not acceptable
+-- for a DIRECT repricing mutation" -- i.e. it deliberately still allowed
+-- agorot on this proc, just guaranteed the sum. The new business rule goes
+-- further: payer charges must be whole shekels only, no agorot at all, any
+-- two shares differ by at most ₪1, and a non-whole service total fails
+-- loudly instead of silently succeeding. Replaced the inline cents math
+-- (v_total_cents/v_base_cents/v_remainder_cents) with the shared
+-- public.usp_splitwholeshekels(total, payercount) helper, and switched the
+-- deterministic remainder order from `billproductrequest.billid` ascending
+-- to `bill.paidbypersonid` ascending (joined via bill) -- billid was a
+-- coincidental creation-time order, not a stable payer identity, and using
+-- it here while every OTHER split site orders by paidbypersonid would let
+-- the "who gets the extra shekel" answer disagree between the create path
+-- and this edit path for the exact same booking. All original narrative
+-- above (the historical proof that equal-split-not-proportional is the
+-- existing rule, the reused guards, the authorization model) still holds
+-- and is preserved for context; only the split arithmetic and its ordering
+-- key changed.
 --
 -- Neither usp_secretaryupdatestallbooking nor usp_answerproductchangerequest
--- is modified by this file -- the correction is fully containable inside
--- this new proc, so per instruction they are left untouched.
+-- is modified by THIS file -- both received their own equivalent
+-- whole-shekel fix in their own repo files (147, 211, 222).
 --
 -- Mutation template reused, not reinvented:
 --   * usp_secretaryupdatestallbooking (live) -- the in-place dates/notes/
@@ -122,10 +127,9 @@ DECLARE
     v_itemprice            numeric;
     v_new_days             integer;
     v_new_amount           numeric;
-    v_total_cents          bigint;
     v_payercount           integer;
-    v_base_cents           bigint;
-    v_remainder_cents      bigint;
+    v_baseshare            integer;
+    v_remainder            integer;
     v_billid               integer;
 BEGIN
     IF p_personid IS NULL OR p_personid <= 0 THEN
@@ -317,10 +321,11 @@ BEGIN
     v_new_days   := GREATEST((p_newenddate - p_newstartdate)::integer + 1, 1);
     v_new_amount := COALESCE(v_itemprice, 0) * v_new_days;
 
-    -- Multi-payer equal split, computed in integer cents so the sum is
-    -- always exact (see header comment). v_payercount counts every
-    -- billproductrequest row for this booking -- by this point the paid
-    -- guard above has already proven none of them are paid.
+    -- WHOLE-SHEKEL SPLIT CORRECTION: equal split via the shared helper,
+    -- ordered by paidbypersonid ascending (joined through bill, since
+    -- billproductrequest carries no payer column of its own). v_payercount
+    -- counts every billproductrequest row for this booking -- by this point
+    -- the paid guard above has already proven none of them are paid.
     SELECT COUNT(*)
     INTO v_payercount
     FROM public.billproductrequest bpr
@@ -330,19 +335,20 @@ BEGIN
         RAISE EXCEPTION 'Could not find payers for this stall booking' USING ERRCODE = 'RN001';
     END IF;
 
-    v_total_cents     := ROUND(v_new_amount * 100)::bigint;
-    v_base_cents      := v_total_cents / v_payercount;
-    v_remainder_cents := v_total_cents - (v_base_cents * v_payercount);
+    SELECT o_baseshare, o_remainder
+    INTO v_baseshare, v_remainder
+    FROM public.usp_splitwholeshekels(v_new_amount, v_payercount);
 
     WITH ordered_payers AS (
         SELECT bpr.billid,
-               ROW_NUMBER() OVER (ORDER BY bpr.billid) AS rn
+               ROW_NUMBER() OVER (ORDER BY b.paidbypersonid ASC) AS rn
         FROM public.billproductrequest bpr
+        JOIN public.bill b ON b.billid = bpr.billid
         WHERE bpr.prequestid = p_stallbookingid
     ),
     allocated AS (
         SELECT billid,
-               (v_base_cents + CASE WHEN rn <= v_remainder_cents THEN 1 ELSE 0 END)::numeric / 100 AS allocated_amount
+               v_baseshare + CASE WHEN rn <= v_remainder THEN 1 ELSE 0 END AS allocated_amount
         FROM ordered_payers
     )
     UPDATE public.billproductrequest bpr
@@ -354,13 +360,14 @@ BEGIN
 
     WITH ordered_payers AS (
         SELECT bpr.billid,
-               ROW_NUMBER() OVER (ORDER BY bpr.billid) AS rn
+               ROW_NUMBER() OVER (ORDER BY b.paidbypersonid ASC) AS rn
         FROM public.billproductrequest bpr
+        JOIN public.bill b ON b.billid = bpr.billid
         WHERE bpr.prequestid = p_stallbookingid
     ),
     allocated AS (
         SELECT billid,
-               (v_base_cents + CASE WHEN rn <= v_remainder_cents THEN 1 ELSE 0 END)::numeric / 100 AS allocated_amount
+               v_baseshare + CASE WHEN rn <= v_remainder THEN 1 ELSE 0 END AS allocated_amount
         FROM ordered_payers
     )
     UPDATE public.billcharge bc
