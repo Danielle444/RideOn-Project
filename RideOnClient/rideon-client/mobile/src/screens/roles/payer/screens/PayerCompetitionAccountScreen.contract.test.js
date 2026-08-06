@@ -90,3 +90,222 @@ describe("PayerCompetitionAccountScreen - CAP-4 shavings tab", () => {
     expect(source).toContain("נסורת לתא זה:");
   });
 });
+
+function countOccurrences(haystack, needle) {
+  var count = 0;
+  var index = 0;
+
+  while ((index = haystack.indexOf(needle, index)) !== -1) {
+    count++;
+    index += needle.length;
+  }
+
+  return count;
+}
+
+function getFunctionBlock(source, signature, nextSignature) {
+  var start = source.indexOf(signature);
+  var end = source.indexOf(nextSignature, start);
+
+  expect(start).toBeGreaterThan(-1);
+  expect(end).toBeGreaterThan(start);
+
+  return source.slice(start, end);
+}
+
+describe("PayerCompetitionAccountScreen - terminal class-entry cancellation lock", () => {
+  it("imports resolveClassLifecycleState alongside LIFECYCLE_STATE", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import {\n  LIFECYCLE_STATE,\n  resolveClassLifecycleState,\n} from "../../../../utils/payerAccountLifecycle";',
+    );
+  });
+
+  it("renderClassCard's isLocked uses the shared lifecycle resolver, not the dead isCancelled/hasPendingCancellation fields or a lowercase literal compare", () => {
+    var source = readSource();
+    var block = getFunctionBlock(
+      source,
+      "function renderClassCard(item) {",
+      "var lockedLabel",
+    );
+
+    expect(block).toContain(
+      "resolveClassLifecycleState(item) === LIFECYCLE_STATE.CANCELLED",
+    );
+    expect(block).not.toContain("item.hasPendingCancellation");
+    expect(block).not.toContain("item.isCancelled");
+    expect(block).not.toContain('.toLowerCase() === "cancelled"');
+  });
+
+  it("isLocked still locks a paid entry regardless of lifecycle state", () => {
+    var source = readSource();
+    var block = getFunctionBlock(
+      source,
+      "function renderClassCard(item) {",
+      "var lockedLabel",
+    );
+
+    expect(block).toContain("item.isPaid === true");
+  });
+});
+
+describe("PayerCompetitionAccountScreen - independent in-flight guards for account mutations", () => {
+  it("declares a separate guard ref per action namespace (entry/paidTime/stall/stallChange), each lazily initialized", () => {
+    var source = readSource();
+
+    ["entryCancelGuardRef", "paidTimeCancelGuardRef", "stallCancelGuardRef", "stallChangeGuardRef"].forEach(
+      function (refName) {
+        expect(source).not.toContain("useRef(createInFlightGuard())");
+        expect(source).toContain("var " + refName + " = useRef(null);");
+        expect(source).toContain(
+          "if (" + refName + ".current === null) {\n    " +
+            refName +
+            ".current = createInFlightGuard();\n  }",
+        );
+      },
+    );
+  });
+
+  function getDoBlock(source, signature, nextSignature) {
+    return getFunctionBlock(source, signature, nextSignature);
+  }
+
+  it("doStallChangeRequest acquires stallChangeGuardRef before setCancellingId and the service call, and releases it in finally", () => {
+    var source = readSource();
+    var block = getDoBlock(
+      source,
+      "async function doStallChangeRequest(item) {",
+      "function confirmCancelEntry(item) {",
+    );
+
+    var guardCheckIndex = block.indexOf(
+      "if (!stallChangeGuardRef.current.tryAcquire(guardKey)) {",
+    );
+    var returnIndex = block.indexOf("return;", guardCheckIndex);
+    var setCancellingIdIndex = block.indexOf("setCancellingId(guardKey);");
+    var serviceCallIndex = block.indexOf(
+      "await createStallChangeRequestByPayer(",
+    );
+
+    expect(block).toContain('var guardKey = "stall-change:" + item.stallBookingId;');
+    expect(guardCheckIndex).toBeGreaterThan(-1);
+    expect(returnIndex).toBeGreaterThan(guardCheckIndex);
+    expect(returnIndex).toBeLessThan(setCancellingIdIndex);
+    expect(setCancellingIdIndex).toBeLessThan(serviceCallIndex);
+
+    var finallyIndex = block.lastIndexOf("} finally {");
+    var finallyBlock = block.slice(finallyIndex);
+    expect(finallyBlock).toContain("setCancellingId(null);");
+    expect(finallyBlock).toContain("stallChangeGuardRef.current.release(guardKey);");
+  });
+
+  it("doCancelEntry acquires entryCancelGuardRef before setCancellingId and the service call, and releases it in finally", () => {
+    var source = readSource();
+    var block = getDoBlock(
+      source,
+      "async function doCancelEntry(item) {",
+      "function confirmCancelPaidTime(item) {",
+    );
+
+    var guardCheckIndex = block.indexOf(
+      "if (!entryCancelGuardRef.current.tryAcquire(guardKey)) {",
+    );
+    var returnIndex = block.indexOf("return;", guardCheckIndex);
+    var setCancellingIdIndex = block.indexOf("setCancellingId(guardKey);");
+    var serviceCallIndex = block.indexOf("await cancelEntryByPayer(");
+
+    expect(block).toContain('var guardKey = "entry:" + item.entryId;');
+    expect(guardCheckIndex).toBeGreaterThan(-1);
+    expect(returnIndex).toBeGreaterThan(guardCheckIndex);
+    expect(returnIndex).toBeLessThan(setCancellingIdIndex);
+    expect(setCancellingIdIndex).toBeLessThan(serviceCallIndex);
+
+    var finallyIndex = block.lastIndexOf("} finally {");
+    var finallyBlock = block.slice(finallyIndex);
+    expect(finallyBlock).toContain("setCancellingId(null);");
+    expect(finallyBlock).toContain("entryCancelGuardRef.current.release(guardKey);");
+  });
+
+  it("doCancelPaidTime acquires paidTimeCancelGuardRef before setCancellingId and the service call, and releases it in finally", () => {
+    var source = readSource();
+    var block = getDoBlock(
+      source,
+      "async function doCancelPaidTime(item) {",
+      "function confirmCancelStall(item) {",
+    );
+
+    var guardCheckIndex = block.indexOf(
+      "if (!paidTimeCancelGuardRef.current.tryAcquire(guardKey)) {",
+    );
+    var returnIndex = block.indexOf("return;", guardCheckIndex);
+    var setCancellingIdIndex = block.indexOf("setCancellingId(guardKey);");
+    var serviceCallIndex = block.indexOf("await cancelPaidTimeRequestByPayer(");
+
+    expect(block).toContain('var guardKey = "paidTime:" + item.paidTimeRequestId;');
+    expect(guardCheckIndex).toBeGreaterThan(-1);
+    expect(returnIndex).toBeGreaterThan(guardCheckIndex);
+    expect(returnIndex).toBeLessThan(setCancellingIdIndex);
+    expect(setCancellingIdIndex).toBeLessThan(serviceCallIndex);
+
+    var finallyIndex = block.lastIndexOf("} finally {");
+    var finallyBlock = block.slice(finallyIndex);
+    expect(finallyBlock).toContain("setCancellingId(null);");
+    expect(finallyBlock).toContain("paidTimeCancelGuardRef.current.release(guardKey);");
+  });
+
+  it("doCancelStall acquires stallCancelGuardRef before setCancellingId and the service call, and releases it in finally", () => {
+    var source = readSource();
+    var block = getDoBlock(
+      source,
+      "async function doCancelStall(item) {",
+      "function confirmCancelShavings(order) {",
+    );
+
+    var guardCheckIndex = block.indexOf(
+      "if (!stallCancelGuardRef.current.tryAcquire(guardKey)) {",
+    );
+    var returnIndex = block.indexOf("return;", guardCheckIndex);
+    var setCancellingIdIndex = block.indexOf("setCancellingId(guardKey);");
+    var serviceCallIndex = block.indexOf("await cancelStallBookingByPayer(");
+
+    expect(block).toContain('var guardKey = "stall:" + item.stallBookingId;');
+    expect(guardCheckIndex).toBeGreaterThan(-1);
+    expect(returnIndex).toBeGreaterThan(guardCheckIndex);
+    expect(returnIndex).toBeLessThan(setCancellingIdIndex);
+    expect(setCancellingIdIndex).toBeLessThan(serviceCallIndex);
+
+    var finallyIndex = block.lastIndexOf("} finally {");
+    var finallyBlock = block.slice(finallyIndex);
+    expect(finallyBlock).toContain("setCancellingId(null);");
+    expect(finallyBlock).toContain("stallCancelGuardRef.current.release(guardKey);");
+  });
+
+  it("each guardKey matches the string previously (and still) used as the cancellingId busy-state key, so visible busy copy is unchanged", () => {
+    var source = readSource();
+
+    expect(source).toContain('setCancellingId(guardKey);');
+    // All five guarded actions (the four newly guarded here, plus the
+    // pre-existing doCancelShavings) now assign setCancellingId the same
+    // guardKey they acquire the guard with - not a hardcoded prefix string
+    // re-typed separately (which could silently drift from the key the
+    // guard was acquired under).
+    expect(countOccurrences(source, "setCancellingId(guardKey);")).toBe(5);
+  });
+
+  it("the pre-existing standalone shavings guard (doCancelShavings/shavingsCancelGuardRef) is untouched by this change", () => {
+    var source = readSource();
+    var block = getDoBlock(
+      source,
+      "async function doCancelShavings(order) {",
+      "function renderCancelButton(",
+    );
+
+    expect(source).toContain("var shavingsCancelGuardRef = useRef(null);");
+    expect(block).toContain('var guardKey = "shavings:" + order.shavingsOrderId;');
+    expect(block).toContain(
+      "if (!shavingsCancelGuardRef.current.tryAcquire(guardKey)) {",
+    );
+    expect(block).toContain("shavingsCancelGuardRef.current.release(guardKey);");
+  });
+});
