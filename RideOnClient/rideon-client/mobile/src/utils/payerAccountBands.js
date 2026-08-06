@@ -1,20 +1,19 @@
-// CAP-3: pure grouping/sorting for payer-account lists (paid time, stalls),
-// plus a date-only sort for classes and a plain sort for nested shavings
-// sub-lines. Buckets each paid-time/stall item into active /
-// pendingChange+pendingCancellation / cancelled using
+// CAP-3: pure grouping/sorting for payer-account lists (paid time, stalls,
+// and - since CAP-8 shipped a real entryStatus on classes[] - classes too),
+// plus a plain sort for nested shavings sub-lines. Buckets each item into
+// active / pendingChange+pendingCancellation / cancelled using
 // payerAccountLifecycle.js, then sorts within each bucket by that item
 // type's own verified date/time fields - mirroring
 // usp_getpayercompetitionaccount's own ORDER BY exactly (Phase 0, verified
 // live 2026-08-06), so the deterministic tiebreaker matches what the server
 // already guarantees.
 //
-// Classes are intentionally NOT banded here. CAP-8 has not yet added a
-// verified lifecycle field to the classes[] array (see
-// payerAccountLifecycle.js's resolveClassLifecycleState, which returns
-// LIFECYCLE_STATE_UNKNOWN for every real class item today) - banding
-// classes on an unknown state would mean guessing. sortClassesByVerifiedDate
-// gives classes the same deterministic date/time ordering as every other
-// list without attaching any lifecycle band or chip.
+// Classes never produce a pending band: resolveClassLifecycleState only
+// ever returns ACTIVE, CANCELLED, or UNKNOWN (there is no verified
+// pending-change/pending-cancellation signal on a class item), so
+// bandAndSortClasses's pending array is always empty - a real, verified
+// shape, not a gap. sortClassesByVerifiedDate remains exported separately
+// for the unbanded, verified-date-only ordering CAP-3 originally added.
 
 import {
   LIFECYCLE_STATE,
@@ -188,9 +187,20 @@ function bandAndSortStalls(items) {
   };
 }
 
+function bandAndSortClasses(items) {
+  var banded = bandItems(items, PAYER_ACCOUNT_ITEM_TYPE.CLASS);
+
+  return {
+    active: sortClassesByVerifiedDate(banded.active),
+    pending: sortClassesByVerifiedDate(banded.pending),
+    cancelled: sortClassesByVerifiedDate(banded.cancelled),
+  };
+}
+
 export {
   bandAndSortPaidTimes,
   bandAndSortStalls,
+  bandAndSortClasses,
   sortShavingsOrders,
   sortClassesByVerifiedDate,
 };

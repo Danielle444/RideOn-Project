@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   bandAndSortPaidTimes,
   bandAndSortStalls,
+  bandAndSortClasses,
   sortShavingsOrders,
   sortClassesByVerifiedDate,
 } from "./payerAccountBands.js";
@@ -101,6 +102,87 @@ describe("bandAndSortStalls", () => {
 
   it("missing/non-object items resolve to unknown, not active or cancelled", () => {
     var result = bandAndSortStalls([null, undefined]);
+
+    expect(result.active).toEqual([]);
+    expect(result.pending).toEqual([]);
+    expect(result.cancelled).toEqual([]);
+  });
+});
+
+describe("bandAndSortClasses", () => {
+  it("buckets Active into active and Cancelled/CancelledAfterStart/Replaced into cancelled, with no pending band", () => {
+    var result = bandAndSortClasses([
+      { entryId: 1, entryStatus: "Active" },
+      { entryId: 2, entryStatus: "Cancelled" },
+      { entryId: 3, entryStatus: "CancelledAfterStart" },
+      { entryId: 4, entryStatus: "Replaced" },
+    ]);
+
+    expect(result.active.map((it) => it.entryId)).toEqual([1]);
+    expect(result.pending).toEqual([]);
+    expect(result.cancelled.map((it) => it.entryId).sort()).toEqual([
+      2, 3, 4,
+    ]);
+  });
+
+  it("drops classes with unknown or missing entryStatus from every band, not into active", () => {
+    var result = bandAndSortClasses([
+      { entryId: 1, entryStatus: "Active" },
+      { entryId: 2 },
+      { entryId: 3, entryStatus: "Proposed" },
+      null,
+    ]);
+
+    expect(result.active.map((it) => it.entryId)).toEqual([1]);
+    expect(result.pending).toEqual([]);
+    expect(result.cancelled).toEqual([]);
+  });
+
+  it("sorts within a band by classDateTime then orderInDay then startTime then className then entryId, nulls last", () => {
+    var result = bandAndSortClasses([
+      {
+        entryId: 3,
+        entryStatus: "Active",
+        classDateTime: "2026-09-16",
+        orderInDay: 1,
+      },
+      {
+        entryId: 1,
+        entryStatus: "Active",
+        classDateTime: "2026-09-15",
+        orderInDay: 2,
+      },
+      {
+        entryId: 2,
+        entryStatus: "Active",
+        classDateTime: "2026-09-15",
+        orderInDay: 1,
+      },
+      {
+        entryId: 4,
+        entryStatus: "Active",
+        classDateTime: null,
+        orderInDay: null,
+      },
+    ]);
+
+    expect(result.active.map((it) => it.entryId)).toEqual([2, 1, 3, 4]);
+  });
+
+  it("does not mutate the input array", () => {
+    var input = [
+      { entryId: 1, entryStatus: "Active" },
+      { entryId: 2, entryStatus: "Cancelled" },
+    ];
+    var inputCopy = input.slice();
+
+    bandAndSortClasses(input);
+
+    expect(input).toEqual(inputCopy);
+  });
+
+  it("handles a non-array input without throwing", () => {
+    var result = bandAndSortClasses(null);
 
     expect(result.active).toEqual([]);
     expect(result.pending).toEqual([]);
