@@ -382,6 +382,28 @@ namespace RideOnServer.Tests
         }
 
         [Fact]
+        public void Upload_validation_failures_return_fixed_hebrew_messages_not_english()
+        {
+            // The mobile client used to echo response.data straight into its
+            // error Alert, so an English BadRequest string here would have
+            // reached a Hebrew screen verbatim. Fixed even though the client no
+            // longer echoes raw text, since a raw English string is still wrong
+            // for any caller of this endpoint (mobile, Swagger, a future web use).
+            string source = ControllerSource();
+
+            source.Should().Contain("return BadRequest(\"מזהה סוס לא תקין\");");
+            source.Should().Contain("return BadRequest(\"מזהה תחרות לא תקין\");");
+            source.Should().Contain("return BadRequest(\"מזהה חווה לא תקין\");");
+            source.Should().Contain("return BadRequest(\"יש לצרף קובץ להעלאה\");");
+            source.Should().Contain("return BadRequest(\"ניתן להעלות קובץ PDF בלבד\");");
+
+            source.Should().NotContain("return BadRequest(\"Invalid horse id\");");
+            source.Should().NotContain("return BadRequest(\"Invalid competition id\");");
+            source.Should().NotContain("return BadRequest(\"Invalid ranch id\");");
+            source.Should().NotContain("return BadRequest(\"File is required\");");
+        }
+
+        [Fact]
         public void Every_authorization_refusal_message_is_one_we_wrote()
         {
             // 403 replies do return the exception's message, which is safe only
