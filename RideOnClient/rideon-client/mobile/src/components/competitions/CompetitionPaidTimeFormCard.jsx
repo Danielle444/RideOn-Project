@@ -68,6 +68,11 @@ export default function CompetitionPaidTimeFormCard(props) {
   var cardOffsetRef = useRef(0);
   var sectionOffsetsRef = useRef({});
 
+  // זוכר את מזהה הסלוט שהרזולוציה האוטומטית (האפקט שלמטה) בחרה לאחרונה, כדי
+  // להבחין בין "המשתמשת מנקה את המדרג" לבין "הסלוט אופס מבחוץ" - ראו ההסבר
+  // המלא ליד אותו אפקט (הגנת ה-החייאה שמונעת את לולאת ה-Maximum update depth).
+  var lastAutoResolvedSlotIdRef = useRef(null);
+
   var fieldErrors = props.fieldErrors || {};
   var scrollRequest = props.scrollRequest || null;
   var onScrollToOffset = props.onScrollToOffset;
@@ -193,6 +198,16 @@ export default function CompetitionPaidTimeFormCard(props) {
   // רזולוציה אוטומטית: ברגע שהמדרג מוביל לסלוט יחיד, זה הסלוט שנבחר בפועל.
   // אם המדרג עדיין לא חד-משמעי (0 או יותר מ-1 אחרי הבחירה המלאה), לא נשלח
   // סלוט לא ודאי - השדה נשאר ריק עד לבחירה נוספת בשלב הניקוי הסופי.
+  //
+  // הגנת "החייאה" (lastAutoResolvedSlotIdRef): האפקט הזה (מדרג ← סלוט) והאפקט
+  // שלמעלה (סלוט ← מדרג) יוצרים טבעת דו-כיוונית עם פיגור של commit אחד. כשהסלוט
+  // מתאפס מבחוץ - האיפוס של השדות הלא-נעולים אחרי שליחה מוצלחת - בזמן שהמדרג
+  // עדיין מצביע על אותו סלוט (למשל המגרש עדיין "B2W"), שני האפקטים קופצים אחד
+  // מעל השני בכל רינדור: האפקט הזה "מחייה" את הסלוט מ-null חזרה ל-S כי הוא קורא
+  // מדרג ישן, והאפקט שלמעלה מנקה את המדרג ל-null כי הסלוט התאפס - וחוזר חלילה,
+  // עד ש-React זורק "Maximum update depth exceeded". לכן: אם המדרג עדיין מוביל
+  // בדיוק לסלוט שהאפקט הזה בחר לאחרונה אבל הסלוט כרגע ריק, זו הייתה נקייה
+  // מכוונת מבחוץ - לא מחזירים אותו, ונותנים לאפקט המדרג לסיים את הניקוי.
   useEffect(
     function () {
       if (needsFinalDisambiguation) {
@@ -210,9 +225,24 @@ export default function CompetitionPaidTimeFormCard(props) {
         ? resolvedSlot.paidTimeSlotInCompId
         : null;
 
-      if (currentSlotId !== resolvedSlotId) {
-        props.setSelectedRequestedSlot(resolvedSlot);
+      if (currentSlotId === resolvedSlotId) {
+        // כבר מסונכרן (כולל שניהם ריקים) - מעדכנים את הזיכרון ולא כותבים שוב.
+        lastAutoResolvedSlotIdRef.current = resolvedSlotId;
+        return;
       }
+
+      if (
+        currentSlotId === null &&
+        resolvedSlotId !== null &&
+        resolvedSlotId === lastAutoResolvedSlotIdRef.current
+      ) {
+        // הסלוט נוקה מבחוץ (איפוס אחרי שליחה) והמדרג עדיין תקוע על הערך הישן -
+        // לא מחייים אותו, אחרת נכנסים ללולאה אינסופית מול אפקט המדרג שלמעלה.
+        return;
+      }
+
+      props.setSelectedRequestedSlot(resolvedSlot);
+      lastAutoResolvedSlotIdRef.current = resolvedSlotId;
     },
     [slotsForFullSelection, needsFinalDisambiguation, props.selectedRequestedSlot],
   );
