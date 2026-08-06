@@ -1,8 +1,8 @@
 // Secretary shavings page hook — Spec 2 (component-structure.md).
 //
 // Owns everything: data assembly (R1 rollup + per-ranch R2 loop), derived status tagging,
-// URL-bound grouping/filters, SLA needs-attention, and the add-order modal surface. The page
-// stays presentational.
+// URL-bound grouping/filters, due-date needs-attention (overdue/due-today, Asia/Jerusalem — see
+// shavingsDueDate.utils.js), and the add-order modal surface. The page stays presentational.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -15,7 +15,7 @@ import {
   deriveShavingsStatus,
   getValue,
 } from "../../utils/shavingsStatus.utils";
-import { isDelayed } from "../../utils/shavingsSla.utils";
+import { groupActionRequiredOrders } from "../../utils/shavingsDueDate.utils";
 import {
   groupByRanch,
   groupByStatus,
@@ -214,13 +214,9 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
     [group, filteredOrders, ranchRollup],
   );
 
-  const needsAttention = useMemo(
+  const needsAttentionGroups = useMemo(
     function () {
-      const now = Date.now();
-
-      return orders.filter(function (order) {
-        return isDelayed(order, now);
-      });
+      return groupActionRequiredOrders(orders);
     },
     [orders],
   );
@@ -342,7 +338,8 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
     setFilterStatus: setFilterStatus,
 
     groups: groups,
-    needsAttention: needsAttention,
+    needsAttentionOverdue: needsAttentionGroups.overdue,
+    needsAttentionDueToday: needsAttentionGroups.dueToday,
 
     ranchOptions: ranchOptions,
     isAddOpen: isAddOpen,
