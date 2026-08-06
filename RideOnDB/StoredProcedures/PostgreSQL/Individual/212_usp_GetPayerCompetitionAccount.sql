@@ -84,6 +84,31 @@
 -- paid-time, stall, and financial-summary logic are unchanged, apart from
 -- fines now correctly contributing to fineTotal/grandTotal since the
 -- categorykey fix makes fine_items non-empty for the first time.
+--
+-- SHAVINGS TERMINAL-CANCELLATION VISIBILITY FIX (2026-08-06): shavings_items
+-- was driven by an INNER JOIN against product_charge_summary, which is built
+-- from payer_charges (chargestatus IN ('Open','Paid') only). Once a
+-- standalone shavings cancellation is Approved (usp_admincancelshavingsorder
+-- / usp_secretarycancelshavingsorder / payer-request then
+-- usp_answerproductchangerequestsecured), the order's billcharge flips to
+-- 'Cancelled' and the order vanished from shavings_items entirely -- before
+-- its own isCancelled flag could ever be emitted. Fixed the same way
+-- class_items already solves this for classes: a new shavings_charge_existence
+-- CTE reads billcharge directly (not via payer_charges) with a wider status
+-- set (Open/Paid/PendingApproval/Cancelled -- the full
+-- ck_billcharge_chargestatus domain minus 'Replaced', which is
+-- architecturally impossible for a shavings charge), and shavings_items is
+-- now driven by that existence CTE, LEFT JOINing the unchanged
+-- product_charge_summary for the money. A cancelled order's
+-- amountToPay/paidAmount/unpaidAmount/isPaid default to 0/false via COALESCE
+-- instead of the row disappearing, so it is excluded from every financial
+-- total (shavingsTotal, shavingsPaidAmount, grandTotal, etc. -- all of which
+-- sum from shavings_items) exactly as if it did not exist financially, while
+-- still being visible with isCancelled=true. payer_charges,
+-- product_charge_summary, stall_items, class_items, paidtime_items and
+-- fine_items are byte-for-byte unchanged -- this touches only the shavings
+-- read path. No JSON key added, removed or renamed on shavings[] or
+-- stalls[].shavingsOrders[].
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_getpayercompetitionaccount(p_competitionid integer, p_ranchid integer, p_payerpersonid integer, p_adminsystemuserid integer)
@@ -634,10 +659,24 @@ begin
           )
     ),
 
+    shavings_charge_existence as (
+        select
+            bc.sourceid as prequestid,
+            max(bc.billid) as billid
+        from public.billcharge bc
+        where bc.competitionid = p_competitionid
+          and bc.paidbypersonid = p_payerpersonid
+          and bc.sourcetype = 'ProductRequest'
+          and bc.categorykey = 'shavings'
+          and bc.chargestatus in ('Open', 'Paid', 'PendingApproval', 'Cancelled')
+        group by
+            bc.sourceid
+    ),
+
     shavings_items as (
         select
             so.shavingsorderid,
-            pcs.billid,
+            coalesce(pcs.billid, sce.billid) as billid,
 
             so.bagquantity,
             so.requesteddeliverytime,
@@ -648,10 +687,10 @@ begin
             pc.itemprice,
             product.productname::text as productname,
 
-            pcs.amounttopay,
-            pcs.paidamount,
-            pcs.unpaidamount,
-            pcs.ispaid,
+            coalesce(pcs.amounttopay, 0)::numeric as amounttopay,
+            coalesce(pcs.paidamount, 0)::numeric as paidamount,
+            coalesce(pcs.unpaidamount, 0)::numeric as unpaidamount,
+            coalesce(pcs.ispaid, false)::boolean as ispaid,
 
             exists (
                 select 1
@@ -669,17 +708,19 @@ begin
                   and pcr.status = 'Pending'
             ) as haspendingcancellation
 
-        from product_charge_summary pcs
+        from shavings_charge_existence sce
         inner join public.productrequest pr
-            on pr.prequestid = pcs.prequestid
+            on pr.prequestid = sce.prequestid
         inner join public.shavingsorder so
             on so.shavingsorderid = pr.prequestid
         inner join public.pricecatalog pc
             on pc.pricecatalogid = pr.pricecatalogid
         inner join public.product product
             on product.productid = pc.productid
-        where pcs.categorykey = 'shavings'
-          and pr.competitionid = p_competitionid
+        left join product_charge_summary pcs
+            on pcs.prequestid = sce.prequestid
+           and pcs.categorykey = 'shavings'
+        where pr.competitionid = p_competitionid
           and exists (
               select 1
               from public.shavingsorderforstallbooking sosb
