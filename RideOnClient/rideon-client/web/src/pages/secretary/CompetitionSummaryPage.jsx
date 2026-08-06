@@ -21,6 +21,21 @@ import {
   resolveEffectiveFinancialView,
 } from "../../utils/financialSummaryView.utils";
 
+// Resolution order: registration still open -> the registration-open caption; registration
+// closed but the competition hasn't ended -> the live caption; competition ended -> no banner
+// (the Actual figures are final by then, so no lifecycle caveat is needed).
+function resolveActualBannerText(registrationClosed, competitionEnded) {
+  if (!registrationClosed) {
+    return FINANCIAL_PROJECTION_COPY.actualBands.registrationOpen;
+  }
+
+  if (!competitionEnded) {
+    return FINANCIAL_PROJECTION_COPY.actualBands.live;
+  }
+
+  return null;
+}
+
 function SummaryPageContent(props) {
   var layout = props.layout;
   var activeRole = props.activeRole;
@@ -47,9 +62,14 @@ function SummaryPageContent(props) {
 
   var financialViewAvailability = {
     projection: true,
-    actual: !!page.financialRegistrationClosed,
+    actual: true,
     comparison: !!page.financialRegistrationClosed && !!hasActualData,
   };
+
+  var actualBannerText = resolveActualBannerText(
+    page.financialRegistrationClosed,
+    page.financialCompetitionEnded,
+  );
 
   // Guard against landing on a view that is not available (e.g. state changed under us). The tab
   // strip and the page body both key off this same value, never off the raw activeView.
@@ -181,6 +201,12 @@ function SummaryPageContent(props) {
           </div>
         ) : (
           <>
+            {actualBannerText ? (
+              <div className="rounded-2xl border border-[#E6DCD5] bg-[#FCFAF8] px-5 py-3 text-right">
+                <p className="text-sm font-bold text-[#7B5A4D]">{actualBannerText}</p>
+              </div>
+            ) : null}
+
             <CompetitionSummarySection
               title="מארגן"
               description="הכנסות המארגן ממקצים, פייד־טיים, תאים ונסורת"

@@ -4,6 +4,7 @@ import {
   CLASSES_VIEW_PLANNING,
   CLASSES_VIEW_ACTUALS,
   isRegistrationClosed,
+  isCompetitionEnded,
   isClassesViewAvailable,
   resolveDefaultClassesView,
   isColumnVisible,
@@ -60,6 +61,36 @@ describe("isRegistrationClosed", () => {
 
   it("reads PascalCase keys too", () => {
     expect(isRegistrationClosed({ RegistrationEndDate: "2026-07-20" }, TODAY)).toBe(true);
+  });
+});
+
+describe("isCompetitionEnded", () => {
+  it("is ended the day after the competition end date", () => {
+    var competition = { competitionEndDate: "2026-07-20" };
+
+    expect(isCompetitionEnded(competition, TODAY)).toBe(true);
+  });
+
+  it("is not ended on the competition end date itself", () => {
+    var competition = { competitionEndDate: "2026-07-21" };
+
+    expect(isCompetitionEnded(competition, TODAY)).toBe(false);
+  });
+
+  it("is not ended while the competition end date is still ahead", () => {
+    var competition = { competitionEndDate: "2026-08-01" };
+
+    expect(isCompetitionEnded(competition, TODAY)).toBe(false);
+  });
+
+  it("treats a missing competition end date as not ended", () => {
+    expect(isCompetitionEnded({}, TODAY)).toBe(false);
+    expect(isCompetitionEnded(null, TODAY)).toBe(false);
+    expect(isCompetitionEnded({ competitionEndDate: null }, TODAY)).toBe(false);
+  });
+
+  it("reads PascalCase keys too", () => {
+    expect(isCompetitionEnded({ CompetitionEndDate: "2026-07-20" }, TODAY)).toBe(true);
   });
 });
 
