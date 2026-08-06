@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { Alert } from "react-native";
 
@@ -10,6 +10,14 @@ import {
   getHealthCertificates,
   uploadHealthCertificateFile,
 } from "../services/horsesService";
+
+import { createInFlightGuard } from "../utils/inFlightGuard";
+
+import {
+  isHealthCertificateFileTooLarge,
+  isSupportedHealthCertificateFile,
+  resolveHealthCertificateErrorMessage,
+} from "../utils/healthCertificateUpload";
 
 function normalizeCertificatesResponse(response) {
   if (Array.isArray(response?.data)) {
@@ -30,6 +38,15 @@ export default function useAdminCompetitionHealthCertificates(params) {
   var [certificates, setCertificates] = useState([]);
   var [loading, setLoading] = useState(false);
   var [uploadingHorseId, setUploadingHorseId] = useState(null);
+
+  // Synchronous, per-horse in-flight guard so a rapid double-tap on the same
+  // "upload" button cannot open the picker/network flow twice - React state
+  // alone (uploadingHorseId) is not a correctness guard here, since it is
+  // only set after the picker promise resolves.
+  var uploadGuardRef = useRef(null);
+  if (uploadGuardRef.current === null) {
+    uploadGuardRef.current = createInFlightGuard();
+  }
 
   var loadCertificates = useCallback(
     async function () {
@@ -56,7 +73,10 @@ export default function useAdminCompetitionHealthCertificates(params) {
 
         Alert.alert(
           "שגיאה",
-          String(error?.response?.data || "לא ניתן לטעון את תעודות הבריאות"),
+          resolveHealthCertificateErrorMessage(
+            error,
+            "לא ניתן לטעון את תעודות הבריאות",
+          ),
         );
       } finally {
         setLoading(false);
@@ -75,34 +95,50 @@ export default function useAdminCompetitionHealthCertificates(params) {
   );
 
   async function uploadHealthCertificate(horse) {
-    if (!activeCompetition?.competitionId) {
-      Alert.alert("שגיאה", "לא נמצאה תחרות פעילה");
-      return;
-    }
+    var guardKey = String(horse.horseId);
 
-    if (!activeRole?.ranchId) {
-      Alert.alert("שגיאה", "לא נמצאה חווה פעילה");
-      return;
-    }
-
-    var result = await DocumentPicker.getDocumentAsync({
-      type: "application/pdf",
-      copyToCacheDirectory: true,
-    });
-
-    if (result.canceled) {
-      return;
-    }
-
-    var file =
-      result.assets && result.assets.length > 0 ? result.assets[0] : null;
-
-    if (!file || !file.uri) {
-      Alert.alert("שגיאה", "לא נמצא קובץ תקין להעלאה");
+    if (!uploadGuardRef.current.tryAcquire(guardKey)) {
       return;
     }
 
     try {
+      if (!activeCompetition?.competitionId) {
+        Alert.alert("שגיאה", "לא נמצאה תחרות פעילה");
+        return;
+      }
+
+      if (!activeRole?.ranchId) {
+        Alert.alert("שגיאה", "לא נמצאה חווה פעילה");
+        return;
+      }
+
+      var result = await DocumentPicker.getDocumentAsync({
+        type: "application/pdf",
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      var file =
+        result.assets && result.assets.length > 0 ? result.assets[0] : null;
+
+      if (!file || !file.uri) {
+        Alert.alert("שגיאה", "לא נמצא קובץ תקין להעלאה");
+        return;
+      }
+
+      if (!isSupportedHealthCertificateFile(file)) {
+        Alert.alert("שגיאה", "ניתן להעלות קובץ PDF בלבד");
+        return;
+      }
+
+      if (isHealthCertificateFileTooLarge(file)) {
+        Alert.alert("שגיאה", "הקובץ גדול מדי. הגודל המרבי המותר הוא 20MB");
+        return;
+      }
+
       setUploadingHorseId(horse.horseId);
 
       await uploadHealthCertificateFile({
@@ -125,14 +161,14 @@ export default function useAdminCompetitionHealthCertificates(params) {
 
       Alert.alert(
         "שגיאה",
-        String(
-          error?.response?.data ||
-            error?.message ||
-            "לא ניתן להעלות את הקובץ. נסי שוב.",
+        resolveHealthCertificateErrorMessage(
+          error,
+          "לא ניתן להעלות את הקובץ. נסי שוב.",
         ),
       );
     } finally {
       setUploadingHorseId(null);
+      uploadGuardRef.current.release(guardKey);
     }
   }
 

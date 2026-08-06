@@ -253,22 +253,22 @@ namespace RideOnServer.Controllers
             {
                 if (horseId <= 0)
                 {
-                    return BadRequest("Invalid horse id");
+                    return BadRequest("מזהה סוס לא תקין");
                 }
 
                 if (competitionId <= 0)
                 {
-                    return BadRequest("Invalid competition id");
+                    return BadRequest("מזהה תחרות לא תקין");
                 }
 
                 if (ranchId <= 0)
                 {
-                    return BadRequest("Invalid ranch id");
+                    return BadRequest("מזהה חווה לא תקין");
                 }
 
                 if (file == null || file.Length == 0)
                 {
-                    return BadRequest("File is required");
+                    return BadRequest("יש לצרף קובץ להעלאה");
                 }
 
                 if (!IsPdfFile(file))
@@ -316,7 +316,7 @@ namespace RideOnServer.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in UploadHealthCertificate: {ex.Message}");
+                Console.WriteLine($"[HealthCertificateUpload] {ex.Message}");
                 return StatusCode(500, "שגיאה בהעלאת תעודת הבריאות");
             }
         }
@@ -620,7 +620,7 @@ namespace RideOnServer.Controllers
             {
                 string errorText = await response.Content.ReadAsStringAsync();
 
-                Console.WriteLine($"Supabase upload failed: {response.StatusCode} {errorText}");
+                Console.WriteLine($"[HealthCertificateUpload] Supabase upload failed: {response.StatusCode} {errorText}");
 
                 throw new Exception("Supabase upload failed");
             }
