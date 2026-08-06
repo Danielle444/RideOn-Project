@@ -67,6 +67,21 @@ BEGIN
         RAISE EXCEPTION 'Shavings order not found' USING ERRCODE = 'RN001';
     END IF;
 
+    -- p_workersystemuserid is checked here against personranchrole.personid
+    -- (not a separate systemuser-keyed role table). This is correct, not a
+    -- domain mismatch: systemuser.systemuserid is created equal to
+    -- person.personid for the same individual (usp_RegisterSystemUserWithRoles
+    -- inserts both systemuser.systemuserid and personranchrole.personid from
+    -- the SAME captured v_person_id), the JWT "PersonId" claim is populated
+    -- from usp_GetSystemUserForLogin's su.systemuserid column
+    -- (SystemUserDAL.GetSystemUserForLogin maps PersonId from reader
+    -- ["SystemUserId"]), and the ASP.NET controller forwards that claim value
+    -- unchanged as p_workersystemuserid. Verified live 2026-08-07: zero
+    -- orphan systemuserid values, and every sampled Approved RanchWorker
+    -- personranchrole row has personid == systemuser.systemuserid. This is an
+    -- application-level invariant (no DB CHECK constraint enforces it), not a
+    -- coincidence of small test ids -- do not "fix" this predicate to compare
+    -- against a systemuser-only table without re-deriving this proof.
     IF NOT EXISTS (
         SELECT 1
         FROM public.personranchrole prr

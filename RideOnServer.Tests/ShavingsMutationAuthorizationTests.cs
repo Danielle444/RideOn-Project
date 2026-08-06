@@ -585,5 +585,90 @@ namespace RideOnServer.Tests
             sql.Should().NotContain("INSERT INTO");
             sql.Should().Contain("deliverystatus    = 'Delivered'");
         }
+
+        // =====================================================================
+        // Identity-chain proof (audited 2026-08-07): the three procedures check
+        // p_workersystemuserid against personranchrole.personid, not a systemuser-
+        // keyed table. This is correct only because systemuser.systemuserid is
+        // created equal to person.personid for the same individual, and the JWT
+        // "PersonId" claim is populated from that same systemuserid at login.
+        // These tests pin the two C# links in that chain so a future refactor
+        // cannot silently break the identity assumption the SP guards rely on.
+        // The registration/login SQL half of the chain and the live cross-checks
+        // (zero orphan systemuserids, real Approved RanchWorker rows where
+        // personid == systemuserid) are documented in the session report and in
+        // the SQL header comments themselves -- not re-provable here without a
+        // live connection.
+        // =====================================================================
+
+        [Fact]
+        public void JwtHelper_EmbedsUserPersonIdAsThePersonIdClaim()
+        {
+            string source = ReadRepoFile("RideOnServer", "BL", "JwtHelper.cs");
+
+            source.Should().Contain(
+                "new Claim(\"PersonId\", user.PersonId.ToString())",
+                "the JWT PersonId claim -- which the controller later forwards as workerSystemUserId -- must come from SystemUser.PersonId");
+        }
+
+        [Fact]
+        public void SystemUserDAL_LoginPathsMapPersonIdFromTheSystemUserIdColumnNotAPersonTable()
+        {
+            string source = ReadRepoFile("RideOnServer", "DAL", "SystemUserDAL.cs");
+
+            // Both login-adjacent readers (fresh login, and re-fetch by id) must map PersonId
+            // from the proc's SystemUserId column -- if either ever mapped from a genuinely
+            // different column, the JWT claim would stop being a valid personranchrole.personid.
+            int occurrences = 0;
+            int idx = source.IndexOf("PersonId = Convert.ToInt32(reader[\"SystemUserId\"])", StringComparison.Ordinal);
+            while (idx > -1)
+            {
+                occurrences++;
+                idx = source.IndexOf("PersonId = Convert.ToInt32(reader[\"SystemUserId\"])", idx + 1, StringComparison.Ordinal);
+            }
+
+            occurrences.Should().BeGreaterThanOrEqualTo(2,
+                "GetSystemUserForLogin and GetSystemUserByPersonId must both map PersonId from the SystemUserId column");
+        }
+
+        [Fact]
+        public void GetSystemUserForLogin_Sql_JoinsSystemUserToPersonOnTheSharedId()
+        {
+            string sql = ReadRepoFile("RideOnDB", "StoredProcedures", "PostgreSQL", "Individual", "04_usp_GetSystemUserForLogin.sql");
+
+            sql.Should().Contain("su.systemuserid", "the returned SystemUserId column must come from systemuser, not a separate sequence");
+            sql.Should().Contain("ON su.systemuserid = p.personid",
+                "login must join person via the shared-id convention, proving systemuserid doubles as personid for that row");
+        }
+
+        [Fact]
+        public void RegisterSystemUserWithRoles_Sql_AssignsSystemUserIdAndRolePersonIdFromTheSameCapturedPersonId()
+        {
+            string sql = ReadRepoFile("RideOnDB", "StoredProcedures", "PostgreSQL", "Individual", "03_usp_RegisterSystemUserWithRoles.sql");
+
+            // Both inserts must read from the SAME captured variable (v_person_id) -- this is
+            // the actual construction proof that systemuserid and personranchrole.personid can
+            // never diverge for a worker created through this registration path.
+            sql.Should().Contain("INSERT INTO systemuser (systemuserid, username, passwordhash, passwordsalt)");
+            sql.Should().Contain("VALUES (v_person_id, username_param, passwordhash_param, passwordsalt_param)");
+            sql.Should().Contain("INSERT INTO personranchrole (personid, ranchid, roleid, rolestatus)");
+            sql.Should().Contain("VALUES (v_person_id, ranchids_param[i], roleids_param[i], 'Pending')");
+        }
+
+        [Theory]
+        [InlineData("115_usp_ClaimShavingsOrder.sql")]
+        [InlineData("168_usp_SaveDeliveryPhoto.sql")]
+        [InlineData("178_usp_MarkDelivered.sql")]
+        public void Every_hardened_proc_documents_the_personid_systemuserid_identity_proof(string fileName)
+        {
+            string sql = SqlProcSource(fileName);
+
+            sql.Should().Contain(
+                "prr.personid = p_workersystemuserid",
+                "the role guard must still check personranchrole.personid -- confirmed correct, not a mismatch to silently rename away");
+            sql.Should().Contain(
+                "is correct,",
+                "each proc must carry the identity-chain proof comment so a future reader does not re-flag this as a bug");
+        }
     }
 }

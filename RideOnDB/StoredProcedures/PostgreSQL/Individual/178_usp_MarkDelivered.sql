@@ -68,6 +68,12 @@ BEGIN
         RAISE EXCEPTION 'Shavings order not found' USING ERRCODE = 'RN001';
     END IF;
 
+    -- p_workersystemuserid checked against personranchrole.personid is correct,
+    -- not a domain mismatch -- see usp_ClaimShavingsOrder (115) for the full
+    -- proof (registration/login code trace + live verification, 2026-08-07)
+    -- that systemuser.systemuserid == person.personid for the same individual
+    -- by construction, so the JWT "PersonId" claim forwarded here IS the
+    -- correct value to check personranchrole with.
     IF NOT EXISTS (
         SELECT 1
         FROM public.personranchrole prr
