@@ -75,16 +75,6 @@ function getRefreshStepBlock(doCancelEntryBlock) {
   return doCancelEntryBlock.slice(start);
 }
 
-function getCopyFunctionBlock(source) {
-  var start = source.indexOf("function getDirectCancelSuccessCopy() {");
-  var end = source.indexOf("function pickDateKey(dateValue) {");
-
-  expect(start).toBeGreaterThan(-1);
-  expect(end).toBeGreaterThan(start);
-
-  return source.slice(start, end);
-}
-
 function getEditModalInstance(source) {
   var start = source.indexOf("<CompetitionEntryCreateModal\n        visible={!!editEntryItem}");
   var end = source.indexOf("/>", start);
@@ -184,25 +174,26 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
   });
 
   describe("copy-selection boundary (Blocker 2)", () => {
-    it("getDirectCancelSuccessCopy is the ONLY place cancel-success copy is selected in this file (one definition, one call site)", () => {
+    it("no local cancel-copy helper remains - payerAccountCopy.js is the single source of truth", () => {
       var source = readSource();
 
-      expect(countOccurrences(source, "getDirectCancelSuccessCopy(")).toBe(2);
+      expect(source).not.toContain("getDirectCancelSuccessCopy");
+      expect(source).not.toContain("ההרשמה בוטלה בהצלחה");
     });
 
-    it("getDirectCancelSuccessCopy returns the exact direct-cancellation strings, never the send-to-secretary wording", () => {
-      var block = getCopyFunctionBlock(readSource());
+    it("imports DIRECT_CANCELLATION_COPY from payerAccountCopy.js", () => {
+      var source = readSource();
 
-      expect(block).toContain('title: "בוטל"');
-      expect(block).toContain('message: "ההרשמה בוטלה בהצלחה"');
+      expect(source).toContain(
+        'import {\n  getLifecycleBandHeader,\n  DIRECT_CANCELLATION_COPY,\n} from "../../../../utils/payerAccountCopy";',
+      );
+    });
+
+    it("doCancelEntry's success alert uses the SPEC title and DIRECT_CANCELLATION_COPY.text, never the send-to-secretary wording", () => {
+      var block = getDoCancelEntryBlock(readSource());
+
+      expect(block).toContain('Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);');
       expect(block).not.toContain("נשלח למזכירה");
-    });
-
-    it("is a normal function declaration, not an arrow function", () => {
-      var source = readSource();
-
-      expect(source).toContain("function getDirectCancelSuccessCopy() {");
-      expect(source).not.toContain("getDirectCancelSuccessCopy = (");
     });
   });
 
@@ -225,7 +216,7 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
         'Alert.alert("שגיאה", extractErrorMessage(err));',
       );
       expect(catchBlock).toContain("return;");
-      expect(catchBlock).not.toContain("getDirectCancelSuccessCopy");
+      expect(catchBlock).not.toContain("DIRECT_CANCELLATION_COPY");
       expect(catchBlock).not.toContain("account.reload");
 
       expect(doCancelEntryBlock).toContain("setCancellingId(null);");
@@ -241,22 +232,18 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
       ).toBe(1);
     });
 
-    it("copy selection and the success alert happen strictly after the mutation's finally settles, before refresh starts", () => {
+    it("the success alert happens strictly after the mutation's finally settles, before refresh starts", () => {
       var doCancelEntryBlock = getDoCancelEntryBlock(readSource());
 
       var finallyIndex = doCancelEntryBlock.indexOf("} finally {");
-      var copyIndex = doCancelEntryBlock.indexOf(
-        "var copy = getDirectCancelSuccessCopy();",
-      );
       var alertIndex = doCancelEntryBlock.indexOf(
-        "Alert.alert(copy.title, copy.message);",
+        'Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);',
       );
       var refreshIndex = doCancelEntryBlock.indexOf(
         "await account.reload();",
       );
 
-      expect(copyIndex).toBeGreaterThan(finallyIndex);
-      expect(alertIndex).toBeGreaterThan(copyIndex);
+      expect(alertIndex).toBeGreaterThan(finallyIndex);
       expect(refreshIndex).toBeGreaterThan(alertIndex);
     });
 
@@ -264,7 +251,7 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
       var doCancelEntryBlock = getDoCancelEntryBlock(readSource());
       var refreshBlock = getRefreshStepBlock(doCancelEntryBlock);
 
-      expect(refreshBlock).not.toContain("Alert.alert(copy");
+      expect(refreshBlock).not.toContain("DIRECT_CANCELLATION_COPY");
     });
 
     it("refresh (account.reload) runs in its own try/catch, isolated from the mutation's error handling", () => {

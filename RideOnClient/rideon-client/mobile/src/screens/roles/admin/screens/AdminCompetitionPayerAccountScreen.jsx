@@ -40,7 +40,10 @@ import {
 
 import { LIFECYCLE_STATE } from "../../../../utils/payerAccountLifecycle";
 
-import { getLifecycleBandHeader } from "../../../../utils/payerAccountCopy";
+import {
+  getLifecycleBandHeader,
+  DIRECT_CANCELLATION_COPY,
+} from "../../../../utils/payerAccountCopy";
 
 import styles from "../../../../styles/adminCompetitionPayerAccountStyles";
 
@@ -75,18 +78,6 @@ function extractErrorMessage(err) {
   }
   if (err.message) return err.message;
   return "אירעה שגיאה";
-}
-
-// Phase 3C copy boundary: the ONLY place direct-admin-cancel success copy is
-// selected. Deliberately a small local function, not a new shared module -
-// when feature/payer-account-cohesion's payerAccountCopy.js is available,
-// this single function is the one spot a future integration replaces (an
-// import + a one-line call), instead of hunting through doCancelEntry.
-function getDirectCancelSuccessCopy() {
-  return {
-    title: "בוטל",
-    message: "ההרשמה בוטלה בהצלחה",
-  };
 }
 
 function pickDateKey(dateValue) {
@@ -367,9 +358,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
 
     // The cancel succeeded - everything below is refresh, not mutation
     // outcome, and must not be able to turn this into a reported failure.
-    var copy = getDirectCancelSuccessCopy();
-
-    Alert.alert(copy.title, copy.message);
+    Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);
 
     // account.reload() already owns its own failure UX (sets its screenError
     // and shows its own Alert internally) and never rejects - this try/catch

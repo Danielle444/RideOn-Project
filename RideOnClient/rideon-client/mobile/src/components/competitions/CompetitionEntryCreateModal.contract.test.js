@@ -27,18 +27,6 @@ function countOccurrences(haystack, needle) {
   return count;
 }
 
-function getCopyFunctionBlock(source) {
-  var start = source.indexOf("function getDirectEditResultCopy(resultType) {");
-  var end = source.indexOf(
-    "export default function CompetitionEntryCreateModal(props) {",
-  );
-
-  expect(start).toBeGreaterThan(-1);
-  expect(end).toBeGreaterThan(start);
-
-  return source.slice(start, end);
-}
-
 function getDirectEditBlock(source) {
   var start = source.indexOf("async function handleDirectAdminEdit() {");
   var end = source.indexOf("async function handleSubmit() {");
@@ -219,33 +207,35 @@ describe("CompetitionEntryCreateModal - Phase 3C direct admin edit", () => {
     expect(catchBlock).toContain("return;");
     expect(catchBlock).not.toContain("props.onClose");
     expect(catchBlock).not.toContain("props.onCreated");
-    expect(catchBlock).not.toContain("getDirectEditResultCopy");
+    expect(catchBlock).not.toContain("getResultTypeCopy");
   });
 
   describe("copy-selection boundary (Blocker 2)", () => {
-    it("getDirectEditResultCopy is the ONLY place edit-result copy is selected in this file (one definition, one call site)", () => {
+    it("no local edit-result copy helper remains - payerAccountCopy.js is the single source of truth", () => {
       var source = readSource();
 
-      expect(
-        countOccurrences(source, "getDirectEditResultCopy("),
-      ).toBe(2);
+      expect(source).not.toContain("getDirectEditResultCopy");
+      expect(source).not.toContain("ההרשמה עודכנה בהצלחה");
+      expect(source).not.toContain("בקשת השינוי נשלחה למזכירה לאישור");
     });
 
-    it("getDirectEditResultCopy returns the pending copy only for PendingReplaceApproval, and the direct-success copy otherwise", () => {
-      var block = getCopyFunctionBlock(readSource());
-
-      expect(block).toContain('if (resultType === "PendingReplaceApproval") {');
-      expect(block).toContain('title: "נשלח"');
-      expect(block).toContain('message: "בקשת השינוי נשלחה למזכירה לאישור"');
-      expect(block).toContain('title: "עודכן"');
-      expect(block).toContain('message: "ההרשמה עודכנה בהצלחה"');
-    });
-
-    it("is a normal function declaration, not an arrow function", () => {
+    it("imports getResultTypeCopy and RESULT_CATEGORY from payerAccountCopy.js", () => {
       var source = readSource();
 
-      expect(source).toContain("function getDirectEditResultCopy(resultType) {");
-      expect(source).not.toContain("getDirectEditResultCopy = (");
+      expect(source).toContain(
+        'import {\n  getResultTypeCopy,\n  RESULT_CATEGORY,\n} from "../../utils/payerAccountCopy";',
+      );
+    });
+
+    it("handleDirectAdminEdit selects copy via getResultTypeCopy(resultType) exactly once, and derives the Alert title from category", () => {
+      var block = getDirectEditBlock(readSource());
+
+      expect(countOccurrences(block, "getResultTypeCopy(")).toBe(1);
+      expect(block).toContain("var copy = getResultTypeCopy(resultType);");
+      expect(block).toContain(
+        'copy.category === RESULT_CATEGORY.SECRETARY_PENDING ? "נשלח" : "עודכן"',
+      );
+      expect(block).toContain("Alert.alert(alertTitle, copy.text);");
     });
   });
 
@@ -256,9 +246,9 @@ describe("CompetitionEntryCreateModal - Phase 3C direct admin edit", () => {
       var finallyIndex = directEditBlock.indexOf("} finally {");
       var resultTypeIndex = directEditBlock.indexOf("var resultType =");
       var copyIndex = directEditBlock.indexOf(
-        "var copy = getDirectEditResultCopy(resultType);",
+        "var copy = getResultTypeCopy(resultType);",
       );
-      var alertIndex = directEditBlock.indexOf("Alert.alert(copy.title, copy.message);");
+      var alertIndex = directEditBlock.indexOf("Alert.alert(alertTitle, copy.text);");
       var closeIndex = directEditBlock.indexOf("props.onClose();");
       var refreshGuardIndex = directEditBlock.indexOf(
         'if (typeof props.onCreated === "function") {',
@@ -275,7 +265,7 @@ describe("CompetitionEntryCreateModal - Phase 3C direct admin edit", () => {
       var directEditBlock = getDirectEditBlock(readSource());
       var refreshBlock = getRefreshStepBlock(directEditBlock);
 
-      expect(refreshBlock).not.toContain("Alert.alert(copy");
+      expect(refreshBlock).not.toContain("Alert.alert(alertTitle");
       expect(refreshBlock).not.toContain("props.onClose();");
     });
 

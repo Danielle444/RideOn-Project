@@ -29,24 +29,10 @@ import {
 
 import { resolveEntryEditInitialization } from "../../utils/entryEditInitialization";
 
-// Phase 3C copy boundary: the ONLY place direct-admin-edit result copy is
-// selected. Deliberately a small local function, not a new shared module -
-// when feature/payer-account-cohesion's payerAccountCopy.js is available,
-// this single function is the one spot a future integration replaces (an
-// import + a one-line call), instead of hunting through handleDirectAdminEdit.
-function getDirectEditResultCopy(resultType) {
-  if (resultType === "PendingReplaceApproval") {
-    return {
-      title: "נשלח",
-      message: "בקשת השינוי נשלחה למזכירה לאישור",
-    };
-  }
-
-  return {
-    title: "עודכן",
-    message: "ההרשמה עודכנה בהצלחה",
-  };
-}
+import {
+  getResultTypeCopy,
+  RESULT_CATEGORY,
+} from "../../utils/payerAccountCopy";
 
 export default function CompetitionEntryCreateModal(props) {
   var userContext = useUser();
@@ -249,9 +235,12 @@ export default function CompetitionEntryCreateModal(props) {
     var resultType =
       response?.data?.resultType || response?.data?.ResultType;
 
-    var copy = getDirectEditResultCopy(resultType);
+    var copy = getResultTypeCopy(resultType);
 
-    Alert.alert(copy.title, copy.message);
+    var alertTitle =
+      copy.category === RESULT_CATEGORY.SECRETARY_PENDING ? "נשלח" : "עודכן";
+
+    Alert.alert(alertTitle, copy.text);
 
     if (typeof props.onClose === "function") {
       props.onClose();
