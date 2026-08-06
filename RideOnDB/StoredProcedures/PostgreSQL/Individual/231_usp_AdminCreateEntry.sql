@@ -53,6 +53,13 @@
 -- beyond existence -- none of that is reproduced here either, since none of
 -- it exists in the proc this design reuses from.
 --
+-- DUPLICATE-ENTRY GUARD: same guard as usp_insertentry (185) -- an Active
+-- entry for the same rider+horse+classincompid may not be created twice.
+-- This endpoint is currently unreachable from any client (no service wrapper,
+-- no caller found in RideOnClient) -- the guard is added for defense-in-
+-- depth/completeness, consistent with protecting every relevant active-entry
+-- creation path.
+--
 -- Brand-new proc: CREATE OR REPLACE, no prior version to DROP.
 CREATE OR REPLACE FUNCTION public.usp_admincreateentry(
     p_operationid text,
@@ -288,6 +295,21 @@ begin
 
     if not v_payer_authorized then
         raise exception 'Requested payer is not authorized for this admin' using errcode = 'RN001';
+    end if;
+
+    -- Multiple Active entries for the same rider+horse+class are an invalid
+    -- duplicate registration, never a legitimate second physical run -- same
+    -- guard as usp_insertentry (repo file 185).
+    if exists (
+        select 1
+        from public.entry e
+        join public.servicerequest sr on sr.srequestid = e.entryid
+        where e.classincompid = p_classincompid
+          and sr.riderfederationmemberid = p_riderfederationmemberid
+          and sr.horseid = p_horseid
+          and coalesce(e.entrystatus, 'Active') = 'Active'
+    ) then
+        raise exception 'An active entry already exists for this rider, horse and class' using errcode = 'RN001';
     end if;
 
     -- NEW: registration-ended routing signal, reproducing Stage A's exact

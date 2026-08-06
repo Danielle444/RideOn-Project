@@ -10,11 +10,16 @@ import {
 } from "react-native";
 
 import { getCompetitionEntriesView } from "../../services/entriesService";
-import { groupClassesByDay } from "../../utils/entriesViewGrouping";
+import { getDayKey, groupClassesByDay } from "../../utils/entriesViewGrouping";
 import {
   computeClassDrawState,
   isActiveEntryForDraw,
 } from "../../utils/entriesDrawState";
+import { buildPhysicalRunContexts } from "../../utils/entriesPhysicalRunGrouping";
+import {
+  DUPLICATE_WARNING_MAIN,
+  formatDuplicateWarningDetails,
+} from "../../utils/entriesPhysicalRunCopy";
 
 function fmtDate(value) {
   if (!value) return "";
@@ -141,7 +146,15 @@ export default function EntriesViewModal(props) {
     });
   }
 
-  var groups = useMemo(
+  // Shared physical runs: a rider+horse pair entered into several
+  // classifications for the same classDate+orderInDay is one arena pass and
+  // must render as ONE row, not one row per classification. Runs a physical-
+  // run-key bucket that contains an invalid same-class duplicate into
+  // `duplicateWarnings` INSTEAD of `displayItems` -- the whole bucket is one
+  // invalid grouping context (never a merge built from a partially-
+  // contaminated set), so none of its entries render as a normal row; see
+  // entriesPhysicalRunGrouping.js's header comment for the reasoning.
+  var runContexts = useMemo(
     function () {
       var filtered = focusClassInCompId
         ? items.filter(function (it) {
@@ -154,6 +167,38 @@ export default function EntriesViewModal(props) {
       // downstream (sorting, day bands, rendering, mine/total counts) ever
       // sees one.
       filtered = filtered.filter(isActiveEntryForDraw);
+
+      return buildPhysicalRunContexts(filtered);
+    },
+    [items, focusClassInCompId],
+  );
+
+  // One warning card per invalid physical-run-key bucket, filed under the
+  // day it belongs to (classDate), so it renders alongside that day's class
+  // groups rather than needing a class header of its own -- it may span more
+  // than one classInCompId.
+  var duplicateWarningsByDay = useMemo(
+    function () {
+      var byDay = {};
+
+      runContexts.duplicateWarnings.forEach(function (warning) {
+        var dayKey = getDayKey(warning.classDate);
+
+        if (!byDay[dayKey]) {
+          byDay[dayKey] = [];
+        }
+
+        byDay[dayKey].push(warning);
+      });
+
+      return byDay;
+    },
+    [runContexts],
+  );
+
+  var groups = useMemo(
+    function () {
+      var filtered = runContexts.displayItems;
 
       var byClass = {};
       filtered.forEach(function (it) {
@@ -195,7 +240,7 @@ export default function EntriesViewModal(props) {
 
       return groupList;
     },
-    [items, focusClassInCompId],
+    [runContexts],
   );
 
   // CAP-1: purely re-nests the already-sorted class groups above into day
@@ -206,6 +251,42 @@ export default function EntriesViewModal(props) {
       return groupClassesByDay(groups);
     },
     [groups],
+  );
+
+  // A day whose entries are ENTIRELY consumed by an invalid duplicate has no
+  // legitimate class group at all, so it would never appear in `dayGroups` --
+  // add a synthetic empty-classes day band for it so its warning is still
+  // reachable rather than silently absent from the list.
+  var dayGroupsWithWarnings = useMemo(
+    function () {
+      var base = dayGroups.slice();
+      var seenKeys = {};
+
+      base.forEach(function (d) {
+        seenKeys[d.dayKey] = true;
+      });
+
+      Object.keys(duplicateWarningsByDay).forEach(function (dayKey) {
+        if (seenKeys[dayKey]) {
+          return;
+        }
+
+        base.push({
+          dayKey: dayKey,
+          classDate: duplicateWarningsByDay[dayKey][0].classDate,
+          classes: [],
+        });
+      });
+
+      base.sort(function (a, b) {
+        var aTime = a.classDate ? new Date(a.classDate).getTime() : 0;
+        var bTime = b.classDate ? new Date(b.classDate).getTime() : 0;
+        return aTime - bTime;
+      });
+
+      return base;
+    },
+    [dayGroups, duplicateWarningsByDay],
   );
 
   return (
@@ -272,7 +353,7 @@ export default function EntriesViewModal(props) {
             >
               {error}
             </Text>
-          ) : dayGroups.length === 0 ? (
+          ) : dayGroupsWithWarnings.length === 0 ? (
             <Text
               style={{
                 color: "#8D6E63",
@@ -285,7 +366,7 @@ export default function EntriesViewModal(props) {
             </Text>
           ) : (
             <ScrollView style={{ maxHeight: 540 }}>
-              {dayGroups.map(function (day, dayIndex) {
+              {dayGroupsWithWarnings.map(function (day, dayIndex) {
                 var isDayExpanded = isFocused || expandedDayKeys.has(day.dayKey);
 
                 var dayRows = day.classes.reduce(function (acc, g) {
@@ -366,6 +447,17 @@ export default function EntriesViewModal(props) {
                       </Pressable>
                     )}
 
+                    {isDayExpanded && (duplicateWarningsByDay[day.dayKey] || []).length > 0
+                      ? (duplicateWarningsByDay[day.dayKey] || []).map(function (warning) {
+                          return (
+                            <DuplicateWarningCard
+                              key={"dup-" + warning.runKey}
+                              warning={warning}
+                            />
+                          );
+                        })
+                      : null}
+
                     {isDayExpanded
                       ? day.classes.map(function (g) {
                           return (
@@ -404,6 +496,70 @@ export default function EntriesViewModal(props) {
         </View>
       </View>
     </Modal>
+  );
+}
+
+// Shared physical runs (correction round): renders one invalid-duplicate
+// grouping context. Never a numbered row, never merged -- a plain warning
+// naming the affected class(es) and every entryId held back, so the data
+// stays visible without being presented as a valid run. Copy is centralized
+// in entriesPhysicalRunCopy.js, approved by Oren.
+function DuplicateWarningCard(props) {
+  var warning = props.warning;
+
+  return (
+    <View
+      style={{
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: "#E7BABA",
+        borderRadius: 10,
+        backgroundColor: "#FBEDED",
+        padding: 10,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 13,
+          fontWeight: "700",
+          color: "#A54848",
+          textAlign: "right",
+        }}
+      >
+        {DUPLICATE_WARNING_MAIN}
+      </Text>
+
+      <Text
+        style={{
+          fontSize: 12,
+          color: "#8D6E63",
+          textAlign: "right",
+          marginTop: 4,
+        }}
+      >
+        {warning.riderName} • {warning.horseName}
+      </Text>
+
+      {warning.duplicates.map(function (duplicate) {
+        return (
+          <View key={"dup-class-" + duplicate.classInCompId} style={{ marginTop: 6 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: "700",
+                color: "#3F312B",
+                textAlign: "right",
+              }}
+            >
+              {duplicate.className}
+            </Text>
+            <Text style={{ fontSize: 12, color: "#A54848", textAlign: "right" }}>
+              {formatDuplicateWarningDetails(duplicate.entryIds)}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -606,6 +762,26 @@ function EntryRow(props) {
             <Text style={secondaryTextStyle}>• מאמן/ת: {it.coachName}</Text>
           ) : null}
         </View>
+
+        {/* Shared physical runs: this row covers more than one active
+            classification (see entriesPhysicalRunGrouping.js) -- list every
+            one so a run entered into several classes is never mistaken for a
+            single-class entry. */}
+        {Array.isArray(it.classNames) && it.classNames.length > 1 ? (
+          <View
+            style={{
+              flexDirection: "row-reverse",
+              alignItems: "center",
+              gap: 6,
+              flexWrap: "wrap",
+              marginTop: 2,
+            }}
+          >
+            <Text style={secondaryTextStyle}>
+              • מקצים: {it.classNames.join(", ")}
+            </Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );

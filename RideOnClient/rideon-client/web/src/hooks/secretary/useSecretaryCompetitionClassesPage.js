@@ -44,6 +44,11 @@ import {
 } from "../../utils/plannedVsActual.utils";
 import { getDayRecommendations } from "../../utils/dayRecommendations.utils";
 import { analyzeRegistrationWindow } from "../../utils/registrationWindow.utils";
+import {
+  groupEntriesIntoPhysicalRuns,
+  expandRunsToEntryDrawOrders,
+  formatDuplicateEntriesMessage,
+} from "../../utils/physicalRunGrouping.utils";
 
 function normalizeDateOnly(value) {
   if (!value) {
@@ -77,11 +82,11 @@ function getOrderInDay(item) {
   return item.orderInDay || item.OrderInDay;
 }
 
-function getEntryId(item) {
+export function getEntryId(item) {
   return item.entryId || item.EntryId;
 }
 
-function getEntryDrawOrder(item) {
+export function getEntryDrawOrder(item) {
   var value = item.drawOrder;
 
   if (value === null || value === undefined || value === "") {
@@ -197,7 +202,12 @@ function sortEntries(items) {
   });
 }
 
-function normalizeDraftEntries(items) {
+// Exported (alongside moveItemInArray and buildRunDraft below) so the
+// run-id-safety proofs -- representative entryId is UI identity only, a
+// move/renumber never drops a linked entryId -- can be asserted directly
+// against the real functions the hook uses, not a re-implementation of them.
+// See useSecretaryCompetitionClassesPage.runIdSafety.test.js.
+export function normalizeDraftEntries(items) {
   return items.map(function (entry, index) {
     return {
       ...entry,
@@ -207,7 +217,26 @@ function normalizeDraftEntries(items) {
   });
 }
 
-function moveItemInArray(items, fromIndex, toIndex) {
+// Shared physical runs: the draw draft's unit is a physical run (one rider+
+// horse arena pass, possibly covering several classifications), not a raw
+// entry row. Groups `items` (a flat entry list) into runs and assigns
+// sequential positions in the same first-seen order the entries arrived in
+// (already drawOrder/createdAt-sorted by the caller). Returns
+// { draft, error } -- `error` is set (and `draft` is []) when an invalid
+// same-class duplicate is present, per the locked business rule that
+// duplicates must block editing/saving rather than silently receiving a
+// draw position.
+export function buildRunDraft(items) {
+  var grouping = groupEntriesIntoPhysicalRuns(items);
+
+  if (grouping.duplicates.length > 0) {
+    return { draft: [], error: formatDuplicateEntriesMessage(grouping.duplicates) };
+  }
+
+  return { draft: normalizeDraftEntries(grouping.runs), error: "" };
+}
+
+export function moveItemInArray(items, fromIndex, toIndex) {
   var nextItems = [...items];
   var item = nextItems.splice(fromIndex, 1)[0];
 
@@ -1034,15 +1063,22 @@ export default function useSecretaryCompetitionClassesPage(options) {
     setPaymentFilter("all");
 
     // CAP-9: Cancelled and CancelledAfterStart entries never receive or retain a
-    // draw position, so they must never enter the draft -- normalizeDraftEntries
-    // assigns every item a sequential position with no status awareness, and
-    // whatever ends up in the draft is exactly what gets sent to the save endpoint.
-    var activeEntries = selectedEntriesBase.filter(function (entry) {
-      var status = entry.entryStatus || entry.EntryStatus || "Active";
-      return status === "Active";
-    });
+    // draw position, so they must never enter the draft -- buildRunDraft's
+    // grouping filters them out before assigning positions, and whatever ends
+    // up in the draft is exactly what gets expanded to the save payload.
+    //
+    // Shared physical runs: the draft's unit is a physical run (rider+horse+
+    // classDate+orderInDay), not a raw entry row -- see buildRunDraft. Invalid
+    // same-class duplicates block entering edit mode entirely, with an
+    // explicit error naming the duplicate entry ids.
+    var result = buildRunDraft(selectedEntriesBase);
 
-    setDrawOrderDraftEntries(normalizeDraftEntries(activeEntries));
+    if (result.error) {
+      setDrawOrderError(result.error);
+      return;
+    }
+
+    setDrawOrderDraftEntries(result.draft);
     setDrawOrderEditMode(true);
   }
 
@@ -1186,7 +1222,18 @@ export default function useSecretaryCompetitionClassesPage(options) {
         return;
       }
 
-      setDrawOrderDraftEntries(normalizeDraftEntries(previewEntries));
+      // The server already expands each physical run to all its linked
+      // active entryIds sharing one drawOrder (DrawOrderGenerator). Grouping
+      // here collapses that flat response back into one draft row per run,
+      // in the same drawOrder order the server produced, for display/drag.
+      var result = buildRunDraft(previewEntries);
+
+      if (result.error) {
+        setDrawOrderError(result.error);
+        return;
+      }
+
+      setDrawOrderDraftEntries(result.draft);
       setDrawOrderWarnings(Array.isArray(warnings) ? warnings : []);
       setDrawOrderSummaryMessage(summaryMessage);
       setDrawOrderEditMode(true);
@@ -1220,17 +1267,17 @@ export default function useSecretaryCompetitionClassesPage(options) {
       setSavingDrawOrder(true);
       setDrawOrderError("");
 
+      // Shared physical runs: each draft item is a run that may cover several
+      // classifications -- expand it back to a flat { entryId, drawOrder }
+      // row per linked active entryId, all sharing the run's drawOrder. The
+      // DB write procs already accept repeated drawOrder values (verified
+      // live, no uniqueness check inside usp_updategroupentriesdraworder).
       var payload = {
         competitionId: Number(competitionId),
         classDate: selectedGroup.classDate,
         orderInDay: Number(selectedGroup.orderInDay),
         ranchId: Number(ranchId),
-        entries: itemsToSave.map(function (entry) {
-          return {
-            entryId: Number(getEntryId(entry)),
-            drawOrder: Number(getEntryDrawOrder(entry)),
-          };
-        }),
+        entries: expandRunsToEntryDrawOrders(itemsToSave),
       };
 
       await updateGroupEntriesDrawOrder(payload);

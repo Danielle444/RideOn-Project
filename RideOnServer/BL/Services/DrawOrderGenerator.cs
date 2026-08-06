@@ -1,4 +1,4 @@
-﻿using RideOnServer.BL.DTOs.Competition.Entry;
+using RideOnServer.BL.DTOs.Competition.Entry;
 
 namespace RideOnServer.BL.Services
 {
@@ -6,11 +6,17 @@ namespace RideOnServer.BL.Services
     {
         private const int MaxAttempts = 2500;
 
+        // Candidate unit is a physical run (rider+horse+classDate+orderInDay),
+        // not a raw entry row -- a run covering several classifications is one
+        // arena pass and must occupy exactly one slot, so two classifications of
+        // the same run are never scored as two separate rider/horse appearances.
+        // Every active entry linked to a run receives that run's shared
+        // DrawOrder when the candidate is expanded back into preview rows.
         public static GroupDrawOrderPreviewResponse GeneratePreview(
-            List<SecretaryCompetitionEntryItem> entries,
+            List<PhysicalRunGroup> runs,
             short minimumGap)
         {
-            if (entries == null || entries.Count == 0)
+            if (runs == null || runs.Count == 0)
             {
                 throw new Exception("No entries found for draw group");
             }
@@ -20,10 +26,10 @@ namespace RideOnServer.BL.Services
                 minimumGap = 7;
             }
 
-            List<SecretaryCompetitionEntryItem> orderedBase =
-                entries
-                    .OrderBy(item => item.CreatedAt)
-                    .ThenBy(item => item.EntryId)
+            List<PhysicalRunGroup> orderedBase =
+                runs
+                    .OrderBy(run => run.CreatedAt)
+                    .ThenBy(run => run.MinEntryId)
                     .ToList();
 
             DrawCandidate bestCandidate =
@@ -33,8 +39,8 @@ namespace RideOnServer.BL.Services
 
             for (int attempt = 0; attempt < MaxAttempts; attempt++)
             {
-                List<SecretaryCompetitionEntryItem> shuffled =
-                    ShuffleEntries(orderedBase, random);
+                List<PhysicalRunGroup> shuffled =
+                    ShuffleRuns(orderedBase, random);
 
                 DrawCandidate candidate =
                     BuildCandidate(shuffled, minimumGap);
@@ -53,18 +59,18 @@ namespace RideOnServer.BL.Services
             return BuildResponse(bestCandidate, minimumGap);
         }
 
-        private static List<SecretaryCompetitionEntryItem> ShuffleEntries(
-            List<SecretaryCompetitionEntryItem> entries,
+        private static List<PhysicalRunGroup> ShuffleRuns(
+            List<PhysicalRunGroup> runs,
             Random random)
         {
-            List<SecretaryCompetitionEntryItem> shuffled =
-                entries.ToList();
+            List<PhysicalRunGroup> shuffled =
+                runs.ToList();
 
             for (int i = shuffled.Count - 1; i > 0; i--)
             {
                 int randomIndex = random.Next(i + 1);
 
-                SecretaryCompetitionEntryItem temp = shuffled[i];
+                PhysicalRunGroup temp = shuffled[i];
                 shuffled[i] = shuffled[randomIndex];
                 shuffled[randomIndex] = temp;
             }
@@ -73,7 +79,7 @@ namespace RideOnServer.BL.Services
         }
 
         private static DrawCandidate BuildCandidate(
-            List<SecretaryCompetitionEntryItem> orderedEntries,
+            List<PhysicalRunGroup> orderedRuns,
             short minimumGap)
         {
             DrawCandidate candidate = new DrawCandidate();
@@ -87,59 +93,36 @@ namespace RideOnServer.BL.Services
             Dictionary<int, int> violationsByEntity =
                 new Dictionary<int, int>();
 
-            for (int index = 0; index < orderedEntries.Count; index++)
+            for (int index = 0; index < orderedRuns.Count; index++)
             {
-                SecretaryCompetitionEntryItem entry = orderedEntries[index];
+                PhysicalRunGroup run = orderedRuns[index];
 
                 short drawOrder = Convert.ToInt16(index + 1);
 
-                GroupDrawOrderPreviewEntryItem previewItem =
-                    new GroupDrawOrderPreviewEntryItem
-                    {
-                        EntryId = entry.EntryId,
-                        ClassInCompId = entry.ClassInCompId,
-                        ClassName = entry.ClassName,
-                        ClassDate = entry.ClassDate,
-                        OrderInDay = entry.OrderInDay,
-                        DrawOrder = drawOrder,
-                        HorseId = entry.HorseId,
-                        HorseName = entry.HorseName,
-                        BarnName = entry.BarnName,
-                        RiderFederationMemberId = entry.RiderFederationMemberId,
-                        RiderName = entry.RiderName,
-                        CoachFederationMemberId = entry.CoachFederationMemberId,
-                        CoachName = entry.CoachName,
-                        PayerName = entry.PayerName,
-                        PrizeRecipientName = entry.PrizeRecipientName,
-                        IsPaid = entry.IsPaid,
-                        CreatedAt = entry.CreatedAt,
-                        RiderGapFromPrevious = 0,
-                        HorseGapFromPrevious = 0,
-                        HasRiderGapWarning = false,
-                        HasHorseGapWarning = false
-                    };
+                int riderGap = 0;
+                int horseGap = 0;
+                bool hasRiderGapWarning = false;
+                bool hasHorseGapWarning = false;
 
-                if (lastRiderPosition.ContainsKey(entry.RiderFederationMemberId))
+                if (lastRiderPosition.ContainsKey(run.RiderFederationMemberId))
                 {
                     int previousPosition =
-                        lastRiderPosition[entry.RiderFederationMemberId];
+                        lastRiderPosition[run.RiderFederationMemberId];
 
-                    int actualGap = index - previousPosition;
+                    riderGap = index - previousPosition;
 
-                    previewItem.RiderGapFromPrevious = actualGap;
-
-                    if (actualGap < minimumGap)
+                    if (riderGap < minimumGap)
                     {
-                        previewItem.HasRiderGapWarning = true;
+                        hasRiderGapWarning = true;
 
-                        int shortage = minimumGap - actualGap;
+                        int shortage = minimumGap - riderGap;
 
                         candidate.TotalViolations += 1;
                         candidate.TotalShortage += shortage;
 
                         AddEntityViolation(
                             violationsByEntity,
-                            entry.RiderFederationMemberId,
+                            run.RiderFederationMemberId,
                             shortage
                         );
 
@@ -147,18 +130,18 @@ namespace RideOnServer.BL.Services
                             new GroupDrawOrderWarningItem
                             {
                                 WarningType = "Rider",
-                                EntityId = entry.RiderFederationMemberId,
-                                EntityName = entry.RiderName,
+                                EntityId = run.RiderFederationMemberId,
+                                EntityName = run.RiderName,
                                 FirstDrawOrder =
                                     Convert.ToInt16(previousPosition + 1),
                                 SecondDrawOrder = drawOrder,
-                                ActualGap = actualGap,
+                                ActualGap = riderGap,
                                 RequiredGap = minimumGap,
                                 Message =
                                     "הרוכב/ת " +
-                                    entry.RiderName +
+                                    run.RiderName +
                                     " קיבל/ה רווח של " +
-                                    actualGap +
+                                    riderGap +
                                     " כניסות במקום " +
                                     minimumGap
                             }
@@ -166,27 +149,25 @@ namespace RideOnServer.BL.Services
                     }
                 }
 
-                if (lastHorsePosition.ContainsKey(entry.HorseId))
+                if (lastHorsePosition.ContainsKey(run.HorseId))
                 {
                     int previousPosition =
-                        lastHorsePosition[entry.HorseId];
+                        lastHorsePosition[run.HorseId];
 
-                    int actualGap = index - previousPosition;
+                    horseGap = index - previousPosition;
 
-                    previewItem.HorseGapFromPrevious = actualGap;
-
-                    if (actualGap < minimumGap)
+                    if (horseGap < minimumGap)
                     {
-                        previewItem.HasHorseGapWarning = true;
+                        hasHorseGapWarning = true;
 
-                        int shortage = minimumGap - actualGap;
+                        int shortage = minimumGap - horseGap;
 
                         candidate.TotalViolations += 1;
                         candidate.TotalShortage += shortage;
 
                         AddEntityViolation(
                             violationsByEntity,
-                            entry.HorseId * -1,
+                            run.HorseId * -1,
                             shortage
                         );
 
@@ -194,18 +175,18 @@ namespace RideOnServer.BL.Services
                             new GroupDrawOrderWarningItem
                             {
                                 WarningType = "Horse",
-                                EntityId = entry.HorseId,
-                                EntityName = entry.HorseName,
+                                EntityId = run.HorseId,
+                                EntityName = run.HorseName,
                                 FirstDrawOrder =
                                     Convert.ToInt16(previousPosition + 1),
                                 SecondDrawOrder = drawOrder,
-                                ActualGap = actualGap,
+                                ActualGap = horseGap,
                                 RequiredGap = minimumGap,
                                 Message =
                                     "הסוס " +
-                                    entry.HorseName +
+                                    run.HorseName +
                                     " קיבל רווח של " +
-                                    actualGap +
+                                    horseGap +
                                     " כניסות במקום " +
                                     minimumGap
                             }
@@ -213,10 +194,41 @@ namespace RideOnServer.BL.Services
                     }
                 }
 
-                lastRiderPosition[entry.RiderFederationMemberId] = index;
-                lastHorsePosition[entry.HorseId] = index;
+                lastRiderPosition[run.RiderFederationMemberId] = index;
+                lastHorsePosition[run.HorseId] = index;
 
-                candidate.Entries.Add(previewItem);
+                // Expand: every active entry linked to this run gets the same
+                // DrawOrder and the same gap/warning values -- they are one
+                // arena pass, not separate rider/horse appearances.
+                foreach (SecretaryCompetitionEntryItem entry in run.Entries)
+                {
+                    candidate.Entries.Add(
+                        new GroupDrawOrderPreviewEntryItem
+                        {
+                            EntryId = entry.EntryId,
+                            ClassInCompId = entry.ClassInCompId,
+                            ClassName = entry.ClassName,
+                            ClassDate = entry.ClassDate,
+                            OrderInDay = entry.OrderInDay,
+                            DrawOrder = drawOrder,
+                            HorseId = entry.HorseId,
+                            HorseName = entry.HorseName,
+                            BarnName = entry.BarnName,
+                            RiderFederationMemberId = entry.RiderFederationMemberId,
+                            RiderName = entry.RiderName,
+                            CoachFederationMemberId = entry.CoachFederationMemberId,
+                            CoachName = entry.CoachName,
+                            PayerName = entry.PayerName,
+                            PrizeRecipientName = entry.PrizeRecipientName,
+                            IsPaid = entry.IsPaid,
+                            CreatedAt = entry.CreatedAt,
+                            RiderGapFromPrevious = riderGap,
+                            HorseGapFromPrevious = horseGap,
+                            HasRiderGapWarning = hasRiderGapWarning,
+                            HasHorseGapWarning = hasHorseGapWarning
+                        }
+                    );
+                }
             }
 
             candidate.WorstEntityShortage =
