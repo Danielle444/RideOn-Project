@@ -3,9 +3,9 @@
 -- a pending stall/shavings change or cancellation (Stage: change-request-answer-scoping,
 -- 2026-08-03)
 -- ============================================================================
--- NEW FUNCTION, added alongside the existing (unmodified, still deployed)
--- 4-argument public.usp_answerproductchangerequest (211_usp_AnswerProductChangeRequest.sql).
--- 211 is deliberately left untouched in this slice to avoid an unavoidable
+-- Added alongside the existing (unmodified) 4-argument
+-- public.usp_answerproductchangerequest (211_usp_AnswerProductChangeRequest.sql).
+-- 211 was deliberately left untouched in that slice to avoid an unavoidable
 -- deployment break: the old Render server calls it with 4 arguments, and a
 -- DROP+CREATE with 5 arguments would break that server for the window between
 -- the DB deploy and the code deploy. This function is additive only.
@@ -40,12 +40,29 @@
 -- requestId exists under a different competition.
 --
 -- CLEANUP: the old 4-argument public.usp_answerproductchangerequest (211)
--- will be dropped in a SEPARATE later stage, only after the new server is
--- deployed and a repository-wide plus live dependency check proves it has no
--- remaining callers.
+-- was left in place per the original plan pending a live dependency check;
+-- not revisited by this file.
+--
+-- WHOLE-SHEKEL SPLIT CORRECTION (2026-08-06, approved business rule): same
+-- fix as 211 -- the stalls branch previously computed ONE value,
+-- round(v_new_totalamount / v_payercount, 2), applied identically to every
+-- payer. Replaced with the shared public.usp_splitwholeshekels(total,
+-- payercount) helper, allocating whole-shekel shares ordered by
+-- paidbypersonid ascending across the same existing payer set. See 211's
+-- header for the full rationale (identical in both procs). No
+-- duplicate-payer guard needed here either, for the same reason as 211: no
+-- JSON payer list is accepted, only existing billproductrequest rows whose
+-- primary key already prevents a duplicate payer.
+--
+-- SYNTAX NOTE: this function is now DEPLOYED LIVE (added 2026-08-03,
+-- confirmed present via pg_get_functiondef 2026-08-06), so this file is
+-- updated from the original plain `CREATE FUNCTION` to `CREATE OR REPLACE
+-- FUNCTION` -- a plain CREATE would fail with "already exists" against live.
+-- The signature is unchanged, so CREATE OR REPLACE applies cleanly with no
+-- DROP required.
 -- ============================================================================
 
-CREATE FUNCTION public.usp_answerproductchangerequestsecured(
+CREATE OR REPLACE FUNCTION public.usp_answerproductchangerequestsecured(
     p_productchangerequestid integer,
     p_answerstatus           text,
     p_answeredbysystemuserid integer,
@@ -69,8 +86,9 @@ declare
     v_new_enddate date;
     v_new_staydays integer;
     v_new_totalamount numeric(10,2);
-    v_payercount numeric;
-    v_new_amountperpayer numeric(10,2);
+    v_payercount integer;
+    v_baseshare integer;
+    v_remainder integer;
 begin
     if p_productchangerequestid is null or p_productchangerequestid <= 0 then
         raise exception 'Invalid product change request id';
@@ -215,7 +233,7 @@ begin
                 raise exception 'Invalid new stall stay days';
             end if;
 
-            select count(*)::numeric
+            select count(*)
             into v_payercount
             from public.billproductrequest old_bpr
             where old_bpr.prequestid = v_originalprequestid;
@@ -225,8 +243,14 @@ begin
             end if;
 
             v_new_totalamount := v_new_itemprice * v_new_staydays;
-            v_new_amountperpayer := round(v_new_totalamount / v_payercount, 2);
 
+            select o_baseshare, o_remainder
+            into v_baseshare, v_remainder
+            from public.usp_splitwholeshekels(v_new_totalamount, v_payercount);
+
+            -- WHOLE-SHEKEL SPLIT CORRECTION: deterministic remainder
+            -- allocation, ordered by paidbypersonid ascending (joined via
+            -- bill, since billproductrequest carries no payer column).
             insert into public.billproductrequest
             (
                 billid,
@@ -234,17 +258,22 @@ begin
                 amounttopay
             )
             select
-                old_bpr.billid,
+                ordered.billid,
                 v_newprequestid,
-                v_new_amountperpayer
-            from public.billproductrequest old_bpr
-            where old_bpr.prequestid = v_originalprequestid
-              and not exists (
-                  select 1
-                  from public.billproductrequest existing_bpr
-                  where existing_bpr.billid = old_bpr.billid
-                    and existing_bpr.prequestid = v_newprequestid
-              );
+                v_baseshare + case when ordered.rn <= v_remainder then 1 else 0 end
+            from (
+                select old_bpr.billid,
+                       row_number() over (order by b.paidbypersonid asc) as rn
+                from public.billproductrequest old_bpr
+                inner join public.bill b on b.billid = old_bpr.billid
+                where old_bpr.prequestid = v_originalprequestid
+            ) ordered
+            where not exists (
+                select 1
+                from public.billproductrequest existing_bpr
+                where existing_bpr.billid = ordered.billid
+                  and existing_bpr.prequestid = v_newprequestid
+            );
 
             insert into public.billcharge
             (
@@ -367,4 +396,4 @@ begin
 
     return p_productchangerequestid;
 end;
-$function$
+$function$;
