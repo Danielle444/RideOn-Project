@@ -68,6 +68,25 @@ function getAllShavingsOrderDetailsForCompetitionAndRanch(
   });
 }
 
+// Standalone shavings cancellation, Payer-gated: creates a Pending request,
+// secretary must approve via the existing Change Tracking page. Payload
+// object, matching the sibling payer-gated functions above
+// (cancelStallBookingByPayer, createStallChangeRequestByPayer) rather than
+// the admin-direct functions' positional-argument style.
+function createShavingsOrderCancelRequest(payload) {
+  return axios.post("/ShavingsOrders/cancel-request", payload);
+}
+
+// Standalone shavings cancellation, RanchAdmin-direct: cancels immediately,
+// no secretary approval step.
+function adminCancelShavingsOrder(shavingsOrderId, ranchId) {
+  return axios.delete("/ShavingsOrders/admin-cancel/" + shavingsOrderId, {
+    params: {
+      ranchId: ranchId,
+    },
+  });
+}
+
 export {
   getWorkerShavingsOrders,
   getWorkerShavingsOrdersByCompetition,
@@ -79,4 +98,6 @@ export {
   getShavingsOrdersForCompetitionAndRanch,
   createShavingsOrder,
   getAllShavingsOrderDetailsForCompetitionAndRanch,
+  createShavingsOrderCancelRequest,
+  adminCancelShavingsOrder,
 };

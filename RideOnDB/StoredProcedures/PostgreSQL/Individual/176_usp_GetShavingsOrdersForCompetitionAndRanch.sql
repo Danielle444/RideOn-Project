@@ -11,6 +11,16 @@
 -- migrations/add_stallbooking_requestingranchid.sql). Return shape and
 -- every other column/behavior unchanged -- no DROP+CREATE needed this time
 -- since the parameter list itself is unchanged from the prior signature.
+-- STANDALONE SHAVINGS CANCELLATION (2026-08-06): appends IsCancelled and
+-- HasPendingCancellation (own-order state, computed from the shavings
+-- order's own productchangerequest via originalprequestid -- same
+-- technique already used for usp_getpayercompetitionaccount's
+-- stall_items/shavings_items). Before this, the secretary web shavings page
+-- had NO way to know a shavings order had been cancelled -- neither this
+-- proc nor any consumer column expressed it -- so a standalone-cancelled
+-- order would have kept rendering as a normal active row. Another DROP +
+-- CREATE (two new output columns), appended LAST per the established
+-- convention; every existing column/behavior is otherwise unchanged.
 DROP FUNCTION IF EXISTS public.usp_getshavingsordersforcompetitionandranch(integer, integer);
 
 CREATE OR REPLACE FUNCTION public.usp_getshavingsordersforcompetitionandranch(
@@ -31,7 +41,9 @@ CREATE OR REPLACE FUNCTION public.usp_getshavingsordersforcompetitionandranch(
     "Seen" timestamp without time zone,             -- responsetime
     "Delivered" timestamp without time zone,        -- arrivaltime
     "PrequestDatetime" timestamp with time zone,    -- SLA source (pr.prequestdatetime)
-    "DeliveryPhotoUrl" text                         -- DEP-1: appended LAST
+    "DeliveryPhotoUrl" text,                        -- DEP-1: appended LAST
+    "IsCancelled" boolean,                          -- standalone shavings cancellation: appended LAST
+    "HasPendingCancellation" boolean                -- standalone shavings cancellation: appended LAST
  )
  LANGUAGE plpgsql
 AS $function$
@@ -51,7 +63,19 @@ BEGIN
         so.responsetime AS "Seen",
         so.arrivaltime  AS "Delivered",
         pr.prequestdatetime AS "PrequestDatetime",
-        so.deliveryphotourl AS "DeliveryPhotoUrl"
+        so.deliveryphotourl AS "DeliveryPhotoUrl",
+        EXISTS (
+            SELECT 1 FROM productchangerequest pcr
+            WHERE pcr.originalprequestid = pr.prequestid
+              AND pcr.iscancelled = true
+              AND pcr.status = 'Approved'
+        ) AS "IsCancelled",
+        EXISTS (
+            SELECT 1 FROM productchangerequest pcr
+            WHERE pcr.originalprequestid = pr.prequestid
+              AND pcr.iscancelled = true
+              AND pcr.status = 'Pending'
+        ) AS "HasPendingCancellation"
     FROM shavingsorder so
     INNER JOIN productrequest pr ON pr.prequestid = so.shavingsorderid
     INNER JOIN pricecatalog pc  ON pc.pricecatalogid = pr.pricecatalogid

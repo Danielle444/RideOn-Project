@@ -63,10 +63,26 @@ function getGroupLabel(group) {
 // the deployed proc-212 shavings[] shape - bagQuantity, amountToPay,
 // paidAmount, unpaidAmount, deliveryStatus, requestedDeliveryTime,
 // stallBookingIds - nothing invented.
-function renderShavingsOrderRow(order) {
+//
+// Standalone shavings cancellation: the cancel action is opt-in via
+// onCancelOrder, passed by the caller ONLY for groups it renders from the
+// active band - cancelled/pending/needsReview groups are never given the
+// prop, so they render with no button at all (same "no action on a
+// non-active item" convention already used for stalls/paidTimes/classes on
+// both screens, rather than reintroducing a duplicate isCancelled/
+// hasPendingCancellation check here). A Paid order shows the same locked
+// footer style as every other paid item on these screens instead of a
+// button, since Policy A and the server both already refuse to cancel a
+// paid order - this is purely a UX short-circuit, not the source of truth.
+function renderShavingsOrderRow(order, actions) {
   var linkedStallCount = Array.isArray(order.stallBookingIds)
     ? order.stallBookingIds.length
     : 0;
+
+  var canShowCancel = actions && typeof actions.onCancelOrder === "function";
+  var isPaid = order.isPaid === true;
+  var busyKey = "shavings:" + order.shavingsOrderId;
+  var isBusy = !!actions && actions.cancellingId === busyKey;
 
   return (
     <View
@@ -104,6 +120,47 @@ function renderShavingsOrderRow(order) {
           משויך ל-{linkedStallCount} תאים
         </Text>
       ) : null}
+
+      {canShowCancel && isPaid ? (
+        <View
+          style={{
+            marginTop: 10,
+            padding: 8,
+            backgroundColor: "#F0E5DC",
+            borderRadius: 8,
+          }}
+        >
+          <Text
+            style={{
+              color: "#8A7268",
+              fontSize: 12,
+              textAlign: "right",
+            }}
+          >
+            כבר שולם — לא ניתן לבטל
+          </Text>
+        </View>
+      ) : null}
+
+      {canShowCancel && !isPaid ? (
+        <Pressable
+          onPress={function () {
+            actions.onCancelOrder(order);
+          }}
+          disabled={isBusy}
+          style={{
+            marginTop: 10,
+            backgroundColor: isBusy ? "#C9B7AC" : "#A0522D",
+            borderRadius: 10,
+            paddingVertical: 9,
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ color: "#FFFFFF", fontWeight: "800" }}>
+            {isBusy ? "שולח..." : "בטל"}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -117,6 +174,11 @@ export default function ShavingsGroupCard(props) {
       return !prev;
     });
   }
+
+  var actions = {
+    onCancelOrder: props.onCancelOrder,
+    cancellingId: props.cancellingId,
+  };
 
   return (
     <View style={styles.itemCard}>
@@ -137,7 +199,7 @@ export default function ShavingsGroupCard(props) {
 
       {!isCollapsed
         ? group.entries.map(function (order) {
-            return renderShavingsOrderRow(order);
+            return renderShavingsOrderRow(order, actions);
           })
         : null}
     </View>

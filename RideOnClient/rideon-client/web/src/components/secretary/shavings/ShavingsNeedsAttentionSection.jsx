@@ -29,7 +29,11 @@ export default function ShavingsNeedsAttentionSection(props) {
         </div>
       </div>
 
-      <ShavingsOrdersTable orders={orders} />
+      <ShavingsOrdersTable
+        orders={orders}
+        onCancelOrder={props.onCancelOrder}
+        cancellingId={props.cancellingId}
+      />
     </div>
   );
 }

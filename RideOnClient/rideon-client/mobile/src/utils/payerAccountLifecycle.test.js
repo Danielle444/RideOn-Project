@@ -128,29 +128,76 @@ describe("resolvePaidTimeLifecycleState", () => {
 });
 
 describe("resolveShavingsLifecycleState", () => {
-  it("inherits each of the four known parent stall states verbatim", () => {
-    expect(resolveShavingsLifecycleState(LIFECYCLE_STATE.ACTIVE)).toBe(
+  it("inherits each of the four known parent stall states verbatim when the order has no own cancellation flags", () => {
+    expect(resolveShavingsLifecycleState({}, LIFECYCLE_STATE.ACTIVE)).toBe(
       LIFECYCLE_STATE.ACTIVE,
     );
-    expect(resolveShavingsLifecycleState(LIFECYCLE_STATE.PENDING_CHANGE)).toBe(
-      LIFECYCLE_STATE.PENDING_CHANGE,
-    );
     expect(
-      resolveShavingsLifecycleState(LIFECYCLE_STATE.PENDING_CANCELLATION),
+      resolveShavingsLifecycleState({}, LIFECYCLE_STATE.PENDING_CHANGE),
+    ).toBe(LIFECYCLE_STATE.PENDING_CHANGE);
+    expect(
+      resolveShavingsLifecycleState(
+        {},
+        LIFECYCLE_STATE.PENDING_CANCELLATION,
+      ),
     ).toBe(LIFECYCLE_STATE.PENDING_CANCELLATION);
-    expect(resolveShavingsLifecycleState(LIFECYCLE_STATE.CANCELLED)).toBe(
+    expect(resolveShavingsLifecycleState({}, LIFECYCLE_STATE.CANCELLED)).toBe(
       LIFECYCLE_STATE.CANCELLED,
     );
   });
 
-  it("is unknown for a missing or unrecognized parent state (caller misuse, not real data)", () => {
-    expect(resolveShavingsLifecycleState(undefined)).toBe(
+  it("is unknown for a missing or unrecognized parent state and no own flags (caller misuse, not real data)", () => {
+    expect(resolveShavingsLifecycleState({}, undefined)).toBe(
       LIFECYCLE_STATE_UNKNOWN,
     );
-    expect(resolveShavingsLifecycleState(null)).toBe(LIFECYCLE_STATE_UNKNOWN);
-    expect(resolveShavingsLifecycleState("notARealState")).toBe(
+    expect(resolveShavingsLifecycleState({}, null)).toBe(
       LIFECYCLE_STATE_UNKNOWN,
     );
+    expect(resolveShavingsLifecycleState({}, "notARealState")).toBe(
+      LIFECYCLE_STATE_UNKNOWN,
+    );
+  });
+
+  it("standalone cancellation: own isCancelled wins over an Active parent stall", () => {
+    expect(
+      resolveShavingsLifecycleState(
+        { isCancelled: true },
+        LIFECYCLE_STATE.ACTIVE,
+      ),
+    ).toBe(LIFECYCLE_STATE.CANCELLED);
+  });
+
+  it("standalone pending cancellation: own hasPendingCancellation wins over an Active parent stall", () => {
+    expect(
+      resolveShavingsLifecycleState(
+        { hasPendingCancellation: true },
+        LIFECYCLE_STATE.ACTIVE,
+      ),
+    ).toBe(LIFECYCLE_STATE.PENDING_CANCELLATION);
+  });
+
+  it("own isCancelled outranks own hasPendingCancellation when both are somehow set", () => {
+    expect(
+      resolveShavingsLifecycleState(
+        { isCancelled: true, hasPendingCancellation: true },
+        LIFECYCLE_STATE.ACTIVE,
+      ),
+    ).toBe(LIFECYCLE_STATE.CANCELLED);
+  });
+
+  it("own isCancelled wins even with no resolvable parent state", () => {
+    expect(
+      resolveShavingsLifecycleState({ isCancelled: true }, undefined),
+    ).toBe(LIFECYCLE_STATE.CANCELLED);
+  });
+
+  it("falls back to the parent stall state when own flags are explicitly false", () => {
+    expect(
+      resolveShavingsLifecycleState(
+        { isCancelled: false, hasPendingCancellation: false },
+        LIFECYCLE_STATE.PENDING_CHANGE,
+      ),
+    ).toBe(LIFECYCLE_STATE.PENDING_CHANGE);
   });
 });
 
@@ -235,6 +282,16 @@ describe("resolvePayerAccountItemLifecycleState", () => {
         { parentStallLifecycleState: LIFECYCLE_STATE.PENDING_CANCELLATION },
       ),
     ).toBe(LIFECYCLE_STATE.PENDING_CANCELLATION);
+  });
+
+  it("dispatches shavings items' own isCancelled ahead of an Active parent stall", () => {
+    expect(
+      resolvePayerAccountItemLifecycleState(
+        PAYER_ACCOUNT_ITEM_TYPE.SHAVINGS,
+        { isCancelled: true },
+        { parentStallLifecycleState: LIFECYCLE_STATE.ACTIVE },
+      ),
+    ).toBe(LIFECYCLE_STATE.CANCELLED);
   });
 
   it("dispatches class items to resolveClassLifecycleState", () => {

@@ -36,5 +36,11 @@ namespace RideOnServer.BL.DTOs.ShavingsOrders
         // DEP-1 (Spec 2): delivery photo URL, appended LAST to #176. Lets the secretary page flag a
         // "delivered without photo" (unverified) order. Null when no photo was uploaded.
         public string? DeliveryPhotoUrl { get; set; }
+
+        // Standalone shavings cancellation: own-order state, appended LAST to #176 (own
+        // productchangerequest, not inherited from any linked stall).
+        public bool IsCancelled { get; set; }
+
+        public bool HasPendingCancellation { get; set; }
     }
 }

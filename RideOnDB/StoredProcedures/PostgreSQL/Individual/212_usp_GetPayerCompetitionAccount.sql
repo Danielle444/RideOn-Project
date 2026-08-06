@@ -32,6 +32,26 @@
 -- the class/paid-time filtering already in this same query. No other
 -- behavior changed.
 --
+-- STANDALONE SHAVINGS CANCELLATION (2026-08-06): shavings_items gains its
+-- own iscancelled/haspendingcancellation, computed from the shavings
+-- order's OWN productchangerequest (originalprequestid = the shavings
+-- order's prequestid) -- exact same technique already used for stall_items'
+-- si.iscancelled/si.haspendingcancellation just above it. Before this,
+-- a shavings order's cancellation state was only ever inherited from its
+-- linked stall's lifecycle (mobile payerAccountLifecycle.js
+-- resolveShavingsLifecycleState) because no independent cancellation path
+-- existed for shavings; now that usp_admincancelshavingsorder (241) /
+-- usp_cancelshavingsorderbypayer (240) / usp_secretarycancelshavingsorder
+-- (242) can cancel a shavings order on its own, the order needs to expose
+-- its own state too. Surfaced on BOTH JSON shapes that carry a shavings
+-- item -- the nested one inside each stalls[] entry's shavingsOrders[], and
+-- the top-level shavings[] array -- so a standalone-cancelled order renders
+-- correctly regardless of which tab reads it. No existing key removed or
+-- renamed; return type is still a single jsonb scalar, so no signature
+-- change. hasPendingChange is deliberately NOT added here: unlike stalls,
+-- nothing in this system ever creates a non-cancel ("change") request
+-- against a shavings order, so there is no live case for it to cover yet.
+--
 -- CAP-8 PROC-212 ENRICHMENT (2026-08-06, Phase 3B, validated via a
 -- rollback-only smoke test against a fully isolated fixture -- proven by
 -- BEGIN ... ROLLBACK with zero residual rows, pre/post proc-definition hash
@@ -631,7 +651,23 @@ begin
             pcs.amounttopay,
             pcs.paidamount,
             pcs.unpaidamount,
-            pcs.ispaid
+            pcs.ispaid,
+
+            exists (
+                select 1
+                from public.productchangerequest pcr
+                where pcr.originalprequestid = pr.prequestid
+                  and pcr.iscancelled = true
+                  and pcr.status = 'Approved'
+            ) as iscancelled,
+
+            exists (
+                select 1
+                from public.productchangerequest pcr
+                where pcr.originalprequestid = pr.prequestid
+                  and pcr.iscancelled = true
+                  and pcr.status = 'Pending'
+            ) as haspendingcancellation
 
         from product_charge_summary pcs
         inner join public.productrequest pr
@@ -919,7 +955,9 @@ begin
                                         'amountToPay', shi.amounttopay,
                                         'paidAmount', shi.paidamount,
                                         'unpaidAmount', shi.unpaidamount,
-                                        'isPaid', shi.ispaid
+                                        'isPaid', shi.ispaid,
+                                        'isCancelled', shi.iscancelled,
+                                        'hasPendingCancellation', shi.haspendingcancellation
                                     )
                                     order by
                                         shi.requesteddeliverytime nulls last,
@@ -961,6 +999,8 @@ begin
                         'paidAmount', shi.paidamount,
                         'unpaidAmount', shi.unpaidamount,
                         'isPaid', shi.ispaid,
+                        'isCancelled', shi.iscancelled,
+                        'hasPendingCancellation', shi.haspendingcancellation,
                         'stallBookingIds',
                         coalesce(
                             (
