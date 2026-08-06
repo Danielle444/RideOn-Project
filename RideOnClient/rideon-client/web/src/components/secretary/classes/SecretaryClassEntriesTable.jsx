@@ -230,7 +230,16 @@ function SortableEntryRow(props) {
 
       <td className="px-4 py-3 font-semibold">
         <div className="flex flex-col gap-1">
-          <span>{getValue(item, "className", "ClassName", "-")}</span>
+          {/* Shared physical runs: a draw-draft row may cover several
+              classifications entered together as one arena pass -- show
+              every active classification label, not just one joined string,
+              when the item carries a classNames list (run items only; plain
+              entry rows outside draw edit mode fall through unchanged). */}
+          {Array.isArray(item.classNames) && item.classNames.length > 1
+            ? item.classNames.map(function (name, nameIndex) {
+                return <span key={nameIndex}>{name}</span>;
+              })
+            : <span>{getValue(item, "className", "ClassName", "-")}</span>}
 
           {isCancelledAfterStart ? <CancelledAfterStartBadge /> : null}
         </div>

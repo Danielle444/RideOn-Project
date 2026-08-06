@@ -174,18 +174,25 @@ namespace RideOnServer.BL
                 throw new Exception("Entries contain duplicate EntryId values");
             }
 
-            var duplicateDrawOrders = request.Entries
-                .GroupBy(item => item.DrawOrder)
-                .Where(group => group.Count() > 1)
-                .Select(group => group.Key)
-                .ToList();
-
-            if (duplicateDrawOrders.Count > 0)
-            {
-                throw new Exception("Entries contain duplicate DrawOrder values");
-            }
-
             EntryDAL dal = new EntryDAL();
+
+            // Physical-run-aware validation replaces the old blanket "no two
+            // entries may share a DrawOrder" rule: two entries may share a
+            // DrawOrder only when they resolve to the same physical run
+            // (same rider+horse+classDate+orderInDay). Also blocks the save
+            // outright if an invalid same-class duplicate is present in this
+            // class, and rejects payload entryIds that are not active members
+            // of this class (inactive/cancelled/foreign).
+            List<SecretaryCompetitionEntryItem> scopeEntries =
+                dal.GetSecretaryCompetitionEntries(request.CompetitionId)
+                    .Where(item => item.ClassInCompId == request.ClassInCompId)
+                    .ToList();
+
+            DrawOrderSaveValidator.ValidateSave(
+                scopeEntries,
+                request.Entries
+                    .Select(item => (item.EntryId, item.DrawOrder))
+                    .ToList());
 
             dal.UpdateClassEntriesDrawOrder(request);
         }
@@ -244,18 +251,29 @@ namespace RideOnServer.BL
                 throw new Exception("Entries contain duplicate EntryId values");
             }
 
-            var duplicateDrawOrders = request.Entries
-                .GroupBy(item => item.DrawOrder)
-                .Where(group => group.Count() > 1)
-                .Select(group => group.Key)
-                .ToList();
-
-            if (duplicateDrawOrders.Count > 0)
-            {
-                throw new Exception("Entries contain duplicate DrawOrder values");
-            }
-
             EntryDAL dal = new EntryDAL();
+
+            // Physical-run-aware validation replaces the old blanket "no two
+            // entries may share a DrawOrder" rule: a shared DrawOrder is only
+            // valid when every entry sharing it resolves to the same physical
+            // run (same rider+horse+classDate+orderInDay). Also blocks the
+            // save outright if an invalid same-class duplicate is present in
+            // this group, and rejects payload entryIds that are not active
+            // members of this classDate+orderInDay group.
+            List<SecretaryCompetitionEntryItem> scopeEntries =
+                dal.GetSecretaryCompetitionEntries(request.CompetitionId)
+                    .Where(item =>
+                        item.ClassDate.HasValue &&
+                        item.ClassDate.Value.Date == request.ClassDate.Date &&
+                        item.OrderInDay.HasValue &&
+                        item.OrderInDay.Value == request.OrderInDay)
+                    .ToList();
+
+            DrawOrderSaveValidator.ValidateSave(
+                scopeEntries,
+                request.Entries
+                    .Select(item => (item.EntryId, item.DrawOrder))
+                    .ToList());
 
             dal.UpdateGroupEntriesDrawOrder(request);
         }
@@ -298,17 +316,20 @@ namespace RideOnServer.BL
             List<SecretaryCompetitionEntryItem> allEntries =
                 dal.GetSecretaryCompetitionEntries(request.CompetitionId);
 
-            // CAP-9: Cancelled and CancelledAfterStart entries never receive or retain
-            // a draw position, so they must never reach the generator -- it assigns a
-            // sequential DrawOrder to every item it's given, with no status awareness.
+            // CAP-9: Cancelled and CancelledAfterStart entries never receive or
+            // retain a draw position. Status filtering now happens inside
+            // PhysicalRunGrouper.Group (which also detects invalid same-class
+            // duplicates), so this filter only narrows to the requested
+            // classDate+orderInDay group -- both statuses are passed through so
+            // a run with one active and one cancelled classification is still
+            // recognized as one run with only its active classification kept.
             List<SecretaryCompetitionEntryItem> groupEntries =
                 allEntries
                     .Where(item =>
                         item.ClassDate.HasValue &&
                         item.ClassDate.Value.Date == request.ClassDate.Date &&
                         item.OrderInDay.HasValue &&
-                        item.OrderInDay.Value == request.OrderInDay &&
-                        item.EntryStatus == "Active"
+                        item.OrderInDay.Value == request.OrderInDay
                     )
                     .ToList();
 
@@ -317,8 +338,32 @@ namespace RideOnServer.BL
                 throw new Exception("No entries found for selected draw group");
             }
 
+            // 1. Filter inactive/cancelled entries first, 2. detect invalid
+            // same-class duplicates, 3. group valid entries into physical runs
+            // -- all inside PhysicalRunGrouper.Group.
+            PhysicalRunGroupingResult grouping = PhysicalRunGrouper.Group(groupEntries);
+
+            if (grouping.Duplicates.Count > 0)
+            {
+                // Refuse to silently assign separate draw positions to invalid
+                // same-class duplicates -- block generation entirely and
+                // identify the exact duplicate entry ids.
+                throw new ValidationException(
+                    PhysicalRunGrouper.FormatDuplicateMessage(grouping.Duplicates));
+            }
+
+            if (grouping.PhysicalRuns.Count == 0)
+            {
+                // Every classification in this group was cancelled -- no
+                // physical run remains to draw.
+                throw new Exception("No entries found for selected draw group");
+            }
+
+            // 4-6: one candidate per physical run, one generated position per
+            // run, expanded back to every linked active entryId with a shared
+            // DrawOrder -- all inside DrawOrderGenerator.
             return DrawOrderGenerator.GeneratePreview(
-                groupEntries,
+                grouping.PhysicalRuns,
                 request.MinimumGap
             );
         }

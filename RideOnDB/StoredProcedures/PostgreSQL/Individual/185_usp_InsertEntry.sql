@@ -142,6 +142,18 @@
 --     competitions with no paid charges. Their repair is deliberately
 --     deferred and is NOT part of this file or the DAL fix.
 -- ============================================================================
+--
+-- DUPLICATE-ENTRY GUARD (shared physical runs)
+-- ---------------------------------------------
+-- One guard, placed after every existence check and before any write: an
+-- Active entry for the same rider+horse+classincompid may not be created
+-- twice. Physical runs (one rider+horse arena pass entered into several
+-- classifications) are expressed as several DIFFERENT classincompid values
+-- sharing rider+horse+classDate+orderInDay -- never the same classincompid
+-- twice, so this guard cannot reject a legitimate physical run. Scoped by
+-- Active status only (`coalesce(entrystatus,'Active')='Active'`), so
+-- Cancelled/CancelledAfterStart/Replaced history never blocks a new entry.
+-- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_insertentry(p_classincompid integer, p_orderedbysystemuserid integer, p_ranchid integer, p_horseid integer, p_riderfederationmemberid integer, p_coachfederationmemberid integer, p_paidbypersonid integer, p_prizerecipientname character varying)
  RETURNS integer
@@ -217,6 +229,21 @@ begin
         where p.personid = p_paidbypersonid
     ) then
         raise exception 'Payer not found';
+    end if;
+
+    -- Multiple Active entries for the same rider+horse+class are an invalid
+    -- duplicate registration, never a legitimate second physical run -- see
+    -- this file's header note.
+    if exists (
+        select 1
+        from public.entry e
+        join public.servicerequest sr on sr.srequestid = e.entryid
+        where e.classincompid = p_classincompid
+          and sr.riderfederationmemberid = p_riderfederationmemberid
+          and sr.horseid = p_horseid
+          and coalesce(e.entrystatus, 'Active') = 'Active'
+    ) then
+        raise exception 'An active entry already exists for this rider, horse and class' using errcode = 'RN001';
     end if;
 
     v_billid := public.usp_getorcreateopenbillforpayerandcompetition(

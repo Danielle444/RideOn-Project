@@ -56,6 +56,15 @@
 -- entry is not already in a terminal status and has no existing Pending
 -- change request, matching the exact guard convention already used by
 -- usp_secretarydeleteentry (145) and usp_cancelentrybypayer (139).
+--
+-- DUPLICATE-ENTRY GUARD: same guard as usp_insertentry (185), applied to the
+-- class-changed replacement-entry branches (Case 2/3) -- a replacement into a
+-- class that already has another Active entry for the same rider+horse is
+-- rejected. Self-match is structurally impossible: the guard only runs after
+-- Case 1 (p_classincompid = v_current_classincompid) has already returned, so
+-- by the time it runs p_classincompid is always DIFFERENT from the entry
+-- being replaced's own current class -- the entry being replaced can never
+-- appear in its own guard's match set.
 CREATE OR REPLACE FUNCTION public.usp_admineditentry(
     p_personid integer,
     p_entryid integer,
@@ -268,6 +277,23 @@ begin
 
     if v_new_actual_competitionid <> p_competitionid then
         raise exception 'Competition id does not match the class''s actual competition' using errcode = 'RN001';
+    end if;
+
+    -- Only reached when p_classincompid <> v_current_classincompid (Case 1,
+    -- unchanged class, already returned above), so the entry being replaced
+    -- can never match this class itself -- no self-exclusion needed. Same
+    -- guard as usp_insertentry (185): an Active entry for the same
+    -- rider+horse+class may not exist twice.
+    if exists (
+        select 1
+        from public.entry e
+        join public.servicerequest sr on sr.srequestid = e.entryid
+        where e.classincompid = p_classincompid
+          and sr.riderfederationmemberid = p_riderfederationmemberid
+          and sr.horseid = p_horseid
+          and coalesce(e.entrystatus, 'Active') = 'Active'
+    ) then
+        raise exception 'An active entry already exists for this rider, horse and class' using errcode = 'RN001';
     end if;
 
     insert into public.servicerequest
