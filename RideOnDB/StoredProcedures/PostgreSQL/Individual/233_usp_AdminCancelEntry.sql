@@ -122,10 +122,14 @@ begin
     where e.entryid = p_entryid;
 
     -- Retry-safety guard, same convention as 145/139: an already-cancelled
-    -- entry rejects cleanly, so a retry never reaches 219/221 a second time
-    -- and can never double-cancel a charge or double-release a Federation
-    -- allocation.
-    if v_current_entrystatus in ('Cancelled', 'CancelledAfterStart') then
+    -- or already-superseded entry rejects cleanly, so a retry never reaches
+    -- 219/221 a second time and can never double-cancel a charge or
+    -- double-release a Federation allocation. 'Replaced' added to match
+    -- usp_admineditentry's (232) complete terminal-state list -- a Replaced
+    -- entry was already superseded by an edit and must reject here exactly
+    -- like Cancelled/CancelledAfterStart, not fall through to a live
+    -- cancellation of a row nobody sees as active anymore.
+    if v_current_entrystatus in ('Cancelled', 'CancelledAfterStart', 'Replaced') then
         raise exception 'Entry already cancelled' using errcode = 'RN001';
     end if;
 

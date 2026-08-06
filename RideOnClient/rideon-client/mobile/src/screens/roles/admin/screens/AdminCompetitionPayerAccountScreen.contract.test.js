@@ -448,6 +448,147 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
   });
 });
 
+describe("AdminCompetitionPayerAccountScreen - CE-4/PT-8 entry and paid-time in-flight guards", () => {
+  it("imports createInFlightGuard and lazily initializes independent entryCancelGuardRef and paidTimeCancelGuardRef, alongside the existing stallCancelGuardRef", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { createInFlightGuard } from "../../../../utils/inFlightGuard";',
+    );
+
+    expect(source).toContain("var entryCancelGuardRef = useRef(null);");
+    expect(source).toContain(
+      "if (entryCancelGuardRef.current === null) {\n    entryCancelGuardRef.current = createInFlightGuard();\n  }",
+    );
+
+    expect(source).toContain("var paidTimeCancelGuardRef = useRef(null);");
+    expect(source).toContain(
+      "if (paidTimeCancelGuardRef.current === null) {\n    paidTimeCancelGuardRef.current = createInFlightGuard();\n  }",
+    );
+
+    expect(source).toContain("var stallCancelGuardRef = useRef(null);");
+  });
+
+  describe("doCancelEntry guard (CE-4)", () => {
+    it("acquires the guard synchronously, key 'entry:' + entryId, before setCancellingId and before the service call - a failed acquire returns immediately", () => {
+      var block = getDoCancelEntryBlock(readSource());
+
+      var guardKeyIndex = block.indexOf(
+        'var guardKey = "entry:" + item.entryId;',
+      );
+      var guardCheckIndex = block.indexOf(
+        "if (!entryCancelGuardRef.current.tryAcquire(guardKey)) {",
+      );
+      var returnIndex = block.indexOf("return;", guardCheckIndex);
+      var setCancellingIdIndex = block.indexOf("setCancellingId(guardKey);");
+      var serviceCallIndex = block.indexOf("await adminCancelEntry(");
+
+      expect(guardKeyIndex).toBeGreaterThan(-1);
+      expect(guardCheckIndex).toBeGreaterThan(guardKeyIndex);
+      expect(returnIndex).toBeGreaterThan(guardCheckIndex);
+      expect(returnIndex).toBeLessThan(setCancellingIdIndex);
+      expect(setCancellingIdIndex).toBeLessThan(serviceCallIndex);
+    });
+
+    it("on mutation failure, releases the guard inside the catch block, before the alert's outer finally resets cancellingId", () => {
+      var block = getDoCancelEntryBlock(readSource());
+
+      var catchStart = block.indexOf("} catch (err) {");
+      var finallyStart = block.indexOf("} finally {", catchStart);
+      var catchBlock = block.slice(catchStart, finallyStart);
+
+      expect(catchBlock).toContain(
+        'Alert.alert("שגיאה", extractErrorMessage(err));',
+      );
+      expect(catchBlock).toContain(
+        "entryCancelGuardRef.current.release(guardKey);",
+      );
+      expect(catchBlock).toContain("return;");
+    });
+
+    it("on success, releases the guard only after the refresh attempt settles - not immediately when the mutation resolves", () => {
+      var block = getDoCancelEntryBlock(readSource());
+      var refreshBlock = getRefreshStepBlock(block);
+
+      expect(refreshBlock).toContain(
+        "} finally {\n      entryCancelGuardRef.current.release(guardKey);\n    }",
+      );
+    });
+
+    it("the guard releases exactly twice - once on the failure path, once after refresh settles - never a stray third release", () => {
+      var block = getDoCancelEntryBlock(readSource());
+
+      expect(
+        countOccurrences(
+          block,
+          "entryCancelGuardRef.current.release(guardKey);",
+        ),
+      ).toBe(2);
+    });
+
+    it("a different entry's guard key is independent - the guard is keyed per entryId, not a single shared key", () => {
+      var block = getDoCancelEntryBlock(readSource());
+
+      expect(block).toContain('"entry:" + item.entryId');
+    });
+  });
+
+  describe("doCancelPaidTime guard (PT-8, AdminCompetitionPayerAccountScreen)", () => {
+    function getDoCancelPaidTimeBlock(source) {
+      return getFunctionBlock(
+        source,
+        "async function doCancelPaidTime(item) {",
+        "function confirmCancelStall(item) {",
+      );
+    }
+
+    it("acquires the guard synchronously, key 'paidTime:' + paidTimeRequestId, before setCancellingId and before the service call", () => {
+      var block = getDoCancelPaidTimeBlock(readSource());
+
+      var guardKeyIndex = block.indexOf(
+        'var guardKey = "paidTime:" + item.paidTimeRequestId;',
+      );
+      var guardCheckIndex = block.indexOf(
+        "if (!paidTimeCancelGuardRef.current.tryAcquire(guardKey)) {",
+      );
+      var returnIndex = block.indexOf("return;", guardCheckIndex);
+      var setCancellingIdIndex = block.indexOf("setCancellingId(guardKey);");
+      var serviceCallIndex = block.indexOf("await cancelPaidTimeRequest(");
+
+      expect(guardKeyIndex).toBeGreaterThan(-1);
+      expect(guardCheckIndex).toBeGreaterThan(guardKeyIndex);
+      expect(returnIndex).toBeGreaterThan(guardCheckIndex);
+      expect(returnIndex).toBeLessThan(setCancellingIdIndex);
+      expect(setCancellingIdIndex).toBeLessThan(serviceCallIndex);
+    });
+
+    it("releases the guard in the outer finally, alongside setCancellingId(null), on both success and failure", () => {
+      var block = getDoCancelPaidTimeBlock(readSource());
+
+      var finallyIndex = block.lastIndexOf("} finally {");
+      var finallyBlock = block.slice(finallyIndex);
+
+      expect(finallyBlock).toContain("setCancellingId(null);");
+      expect(finallyBlock).toContain(
+        "paidTimeCancelGuardRef.current.release(guardKey);",
+      );
+
+      expect(
+        countOccurrences(
+          block,
+          "paidTimeCancelGuardRef.current.release(guardKey);",
+        ),
+      ).toBe(1);
+    });
+
+    it("is entirely independent of the entry cancel guard - different ref, different key namespace", () => {
+      var block = getDoCancelPaidTimeBlock(readSource());
+
+      expect(block).not.toContain("entryCancelGuardRef");
+    });
+  });
+});
+
 function getRenderFinesSectionBlock(source) {
   return getFunctionBlock(
     source,
