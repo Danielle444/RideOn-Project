@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.Auth;
+using RideOnServer.RateLimiting;
 
 namespace RideOnServer.Controllers
 {
@@ -9,6 +11,7 @@ namespace RideOnServer.Controllers
     public class PersonsController : ControllerBase
     {
         [HttpGet("by-national-id")]
+        [EnableRateLimiting(RegistrationLookupRateLimiting.PolicyName)]
         public IActionResult GetPersonByNationalIdForRegistration([FromQuery] string nationalId)
         {
             try

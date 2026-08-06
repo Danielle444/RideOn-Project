@@ -170,7 +170,7 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin
                 );
 
-                PotentialPayerLookupResponse? payer =
+                PotentialPayerExistenceResponse? payer =
                     Payer.FindPotentialPayerByContact(email, cellPhone);
 
                 return Ok(payer);

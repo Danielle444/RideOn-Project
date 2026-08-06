@@ -25,8 +25,6 @@ namespace RideOnServer.DAL
                         {
                             return new PersonRegistrationLookupResponse
                             {
-                                PersonId = Convert.ToInt32(reader["PersonId"]),
-                                NationalId = reader["NationalId"].ToString() ?? string.Empty,
                                 FirstName = reader["FirstName"].ToString() ?? string.Empty,
                                 LastName = reader["LastName"].ToString() ?? string.Empty,
                                 Gender = reader["Gender"] == DBNull.Value ? null : reader["Gender"].ToString(),
