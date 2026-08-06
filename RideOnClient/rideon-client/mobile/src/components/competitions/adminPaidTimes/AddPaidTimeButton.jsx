@@ -4,6 +4,8 @@ import { View } from "react-native";
 import Button from "../../ui/Button";
 import PaidTimeBookingModeModal from "./PaidTimeBookingModeModal";
 
+import { BULK_PAID_TIME_ENTRY_ENABLED } from "../../../utils/paidTimeBulkEntryFlag";
+
 // כפתור "הוסף פייד טיים" במסך הפייד טיימים של אדמין.
 // בלחיצה נפתח PaidTimeBookingModeModal עם שתי אפשרויות גלויות:
 // "הזמנה אחת" ו-"כמה הזמנות יחד". קודם זה היה Alert של המערכת.
@@ -29,6 +31,15 @@ export default function AddPaidTimeButton(props) {
   }
 
   function handlePress() {
+    // הזמנה מרוכזת (bulk) מושבתת כרגע מאחורי BULK_PAID_TIME_ENTRY_ENABLED
+    // (CAP-8). כל עוד היא כבויה, מדלגים על בורר האחת/מרוכזת לגמרי ועוברים ישר
+    // לזרימת ההזמנה הבודדת - כדי שלא תוצג אפשרות "כמה הזמנות יחד" מתה. כשהדגל
+    // יידלק מחדש, הבורר יחזור.
+    if (!BULK_PAID_TIME_ENTRY_ENABLED) {
+      navigateToRegistration(false);
+      return;
+    }
+
     setIsModeModalOpen(true);
   }
 
