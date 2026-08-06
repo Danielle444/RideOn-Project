@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -42,8 +42,12 @@ import { LIFECYCLE_STATE } from "../../../../utils/payerAccountLifecycle";
 
 import {
   getLifecycleBandHeader,
+  getCancellationConfirmationText,
+  PAYER_ACCOUNT_ITEM_LABEL,
   DIRECT_CANCELLATION_COPY,
 } from "../../../../utils/payerAccountCopy";
+
+import { createInFlightGuard } from "../../../../utils/inFlightGuard";
 
 import styles from "../../../../styles/adminCompetitionPayerAccountStyles";
 
@@ -51,7 +55,7 @@ import { adminCancelEntry } from "../../../../services/entriesService";
 
 import { cancelPaidTimeRequest } from "../../../../services/paidTimeRequestsService";
 
-import { createStallBookingCancelRequest } from "../../../../services/stallBookingsService";
+import { adminCancelStallBooking } from "../../../../services/stallBookingsService";
 
 import CompetitionEntryCreateModal from "../../../../components/competitions/CompetitionEntryCreateModal";
 
@@ -266,6 +270,16 @@ export default function AdminCompetitionPayerAccountScreen(props) {
 
   var [cancellingId, setCancellingId] = useState(null);
 
+  // Synchronous in-flight guard for direct stall cancellation - cancellingId
+  // above is UI feedback only (async state), not a correctness guard against
+  // two rapid invocations of the same handler. Initialized lazily so
+  // createInFlightGuard() runs once, not on every render (useRef(x) would
+  // still evaluate x on each render even though only the first value sticks).
+  var stallCancelGuardRef = useRef(null);
+  if (stallCancelGuardRef.current === null) {
+    stallCancelGuardRef.current = createInFlightGuard();
+  }
+
   var [searchText, setSearchText] = useState("");
 
   var [dateFilter, setDateFilter] = useState("all");
@@ -405,34 +419,63 @@ export default function AdminCompetitionPayerAccountScreen(props) {
   }
 
   function confirmCancelStall(item) {
-    Alert.alert("ביטול תא", "האם לשלוח בקשת ביטול למזכירה?", [
-      { text: "לא", style: "cancel" },
-      {
-        text: "כן",
-        style: "destructive",
-        onPress: function () {
-          doCancelStall(item);
+    Alert.alert(
+      "ביטול תא",
+      getCancellationConfirmationText(PAYER_ACCOUNT_ITEM_LABEL.stall),
+      [
+        { text: "לא", style: "cancel" },
+        {
+          text: "כן",
+          style: "destructive",
+          onPress: function () {
+            doCancelStall(item);
+          },
         },
-      },
-    ]);
+      ],
+    );
   }
 
+  // Direct admin cancellation via usp_admincancelstallbooking - no
+  // ProductChangeRequest is created from mobile for this screen anymore.
+  //
+  // The synchronous guard (stallCancelGuardRef) is acquired BEFORE anything
+  // else, including setCancellingId - a second rapid invocation for the same
+  // stallBookingId must return before the service is ever called. It stays
+  // held for the mutation's full lifetime, INCLUDING the refresh attempt:
+  // releasing it as soon as the mutation settles (rather than only in the
+  // outer finally) would let a second cancel through while the stale row is
+  // still visible and the refresh hasn't completed yet.
   async function doCancelStall(item) {
+    var guardKey = "stall:" + item.stallBookingId;
+
+    if (!stallCancelGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
-      setCancellingId("stall:" + item.stallBookingId);
+      setCancellingId(guardKey);
 
-      await createStallBookingCancelRequest({
-        stallBookingId: item.stallBookingId,
-        ranchId: activeRole?.ranchId,
-      });
+      await adminCancelStallBooking(item.stallBookingId, activeRole?.ranchId);
 
-      Alert.alert("נשלח", "בקשת הביטול נשלחה למזכירה");
+      // The cancel succeeded - everything below is refresh, not mutation
+      // outcome, and must not be able to turn this into a reported failure.
+      Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);
 
-      await account.reload();
+      // account.reload() already owns its own failure UX (sets its own
+      // screenError and shows its own Alert internally) and never rejects -
+      // this try/catch is a defensive backstop only, so a refresh failure
+      // can never be misreported as a failed cancel and can never suppress
+      // the success alert that already ran above.
+      try {
+        await account.reload();
+      } catch (refreshError) {
+        console.log("CANCEL STALL REFRESH ERROR", refreshError);
+      }
     } catch (err) {
       Alert.alert("שגיאה", extractErrorMessage(err));
     } finally {
       setCancellingId(null);
+      stallCancelGuardRef.current.release(guardKey);
     }
   }
 

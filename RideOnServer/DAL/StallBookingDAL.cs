@@ -561,6 +561,54 @@ namespace RideOnServer.DAL
             return Convert.ToInt32(result);
         }
 
+        public static NpgsqlCommand BuildAdminCancelStallBookingCommand(
+            int stallBookingId,
+            int ranchId,
+            int personId,
+            NpgsqlConnection? connection
+        )
+        {
+            NpgsqlCommand cmd = new NpgsqlCommand(
+                @"SELECT public.usp_admincancelstallbooking(
+                    p_personid       := @personId,
+                    p_stallbookingid := @stallBookingId,
+                    p_ranchid        := @ranchId
+                );",
+                connection
+            );
+
+            cmd.Parameters.AddWithValue("@personId", personId);
+            cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
+            cmd.Parameters.AddWithValue("@ranchId", ranchId);
+
+            return cmd;
+        }
+
+        public static int AdminCancelStallBooking(int stallBookingId, int ranchId, int personId)
+        {
+            try
+            {
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
+
+                using NpgsqlCommand cmd = BuildAdminCancelStallBookingCommand(stallBookingId, ranchId, personId, conn);
+
+                object? result = cmd.ExecuteScalar();
+                if (result == null || result == DBNull.Value)
+                {
+                    throw new Exception("Failed to cancel stall booking");
+                }
+                return Convert.ToInt32(result);
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_admincancelstallbooking (ranch mismatch, unauthorized
+                // caller, already-resolved request, paid booking, etc.).
+                throw new BL.ValidationException(ex.MessageText);
+            }
+        }
+
         public static void SecretaryUpdateStallBooking(
             int stallBookingId,
             int secretarySystemUserId,

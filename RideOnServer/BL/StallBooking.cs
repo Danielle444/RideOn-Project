@@ -64,6 +64,26 @@ namespace RideOnServer.BL
             return StallBookingDAL.SecretaryDeleteStallBooking(stallBookingId, secretarySystemUserId);
         }
 
+        public static int AdminCancelStallBooking(int stallBookingId, int ranchId, int personId)
+        {
+            if (stallBookingId <= 0)
+            {
+                throw new Exception("Invalid StallBookingId");
+            }
+
+            if (ranchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            if (personId <= 0)
+            {
+                throw new Exception("Invalid PersonId");
+            }
+
+            return StallBookingDAL.AdminCancelStallBooking(stallBookingId, ranchId, personId);
+        }
+
         public static void SecretaryUpdateStallBooking(
             int stallBookingId,
             int secretarySystemUserId,

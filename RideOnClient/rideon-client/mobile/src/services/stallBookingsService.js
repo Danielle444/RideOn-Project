@@ -59,6 +59,14 @@ function adminEditStallBooking(payload) {
   return axios.post("/StallBookings/admin-edit", payload);
 }
 
+function adminCancelStallBooking(stallBookingId, ranchId) {
+  return axios.delete("/StallBookings/admin-cancel/" + stallBookingId, {
+    params: {
+      ranchId: ranchId,
+    },
+  });
+}
+
 function cancelStallBookingByPayer(payload) {
   return axios.post("/StallBookings/cancel-by-payer", payload);
 }
@@ -77,6 +85,7 @@ export {
   createStallBookingCancelRequest,
   createStallBookingChangeRequest,
   adminEditStallBooking,
+  adminCancelStallBooking,
   cancelStallBookingByPayer,
   createStallChangeRequestByPayer,
 };

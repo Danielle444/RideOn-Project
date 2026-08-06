@@ -45,6 +45,22 @@ function getDoCancelEntryBlock(source) {
   );
 }
 
+function getConfirmCancelStallBlock(source) {
+  return getFunctionBlock(
+    source,
+    "function confirmCancelStall(item) {",
+    "async function doCancelStall(item) {",
+  );
+}
+
+function getDoCancelStallBlock(source) {
+  return getFunctionBlock(
+    source,
+    "async function doCancelStall(item) {",
+    "function renderActions(",
+  );
+}
+
 // The mutation itself: setCancellingId(busy), the API call, and its own
 // try/catch/finally. Ends right after the finally block closes.
 function getMutationStepBlock(doCancelEntryBlock) {
@@ -146,14 +162,11 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
     expect(source).toContain("disabled={isBusy}");
   });
 
-  it("stall and paid-time cancellation flows are untouched by this change (out of scope)", () => {
+  it("paid-time cancellation flow is untouched by the admin-direct-stall-cancellation slice (out of scope)", () => {
     var source = readSource();
 
     expect(source).toContain(
       'import { cancelPaidTimeRequest } from "../../../../services/paidTimeRequestsService";',
-    );
-    expect(source).toContain(
-      'import { createStallBookingCancelRequest } from "../../../../services/stallBookingsService";',
     );
 
     var paidTimeBlock = getFunctionBlock(
@@ -162,15 +175,18 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
       "function confirmCancelStall(item) {",
     );
     expect(paidTimeBlock).toContain('Alert.alert("בוטל", "הבקשה בוטלה");');
+  });
 
-    var stallBlock = getFunctionBlock(
-      source,
-      "async function doCancelStall(item) {",
-      "function renderActions(",
-    );
-    expect(stallBlock).toContain(
-      'Alert.alert("נשלח", "בקשת הביטול נשלחה למזכירה");',
-    );
+  // The stall flow was the "untouched/out of scope" case Phase 3C locked in
+  // (createStallBookingCancelRequest, "נשלח"/"בקשת הביטול נשלחה למזכירה").
+  // The admin-direct-stall-cancellation slice deliberately supersedes that -
+  // see the "admin direct stall cancellation" describe block below for its
+  // replacement coverage.
+  it("the old request-based stall path is gone from this screen", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("createStallBookingCancelRequest");
+    expect(source).not.toContain("בקשת הביטול נשלחה למזכירה");
   });
 
   describe("copy-selection boundary (Blocker 2)", () => {
@@ -181,11 +197,11 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
       expect(source).not.toContain("ההרשמה בוטלה בהצלחה");
     });
 
-    it("imports DIRECT_CANCELLATION_COPY from payerAccountCopy.js", () => {
+    it("imports DIRECT_CANCELLATION_COPY, getCancellationConfirmationText and PAYER_ACCOUNT_ITEM_LABEL from payerAccountCopy.js", () => {
       var source = readSource();
 
       expect(source).toContain(
-        'import {\n  getLifecycleBandHeader,\n  DIRECT_CANCELLATION_COPY,\n} from "../../../../utils/payerAccountCopy";',
+        'import {\n  getLifecycleBandHeader,\n  getCancellationConfirmationText,\n  PAYER_ACCOUNT_ITEM_LABEL,\n  DIRECT_CANCELLATION_COPY,\n} from "../../../../utils/payerAccountCopy";',
       );
     });
 
@@ -284,6 +300,143 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
       var block = getPostMutationBlock(getDoCancelEntryBlock(source));
 
       expect(block).toContain("account.reload() already owns its own failure UX");
+    });
+  });
+
+  describe("admin direct stall cancellation", () => {
+    it("imports adminCancelStallBooking from stallBookingsService, and createInFlightGuard", () => {
+      var source = readSource();
+
+      expect(source).toContain(
+        'import { adminCancelStallBooking } from "../../../../services/stallBookingsService";',
+      );
+      expect(source).toContain(
+        'import { createInFlightGuard } from "../../../../utils/inFlightGuard";',
+      );
+    });
+
+    it("the guard ref is lazily initialized - createInFlightGuard() is only called inside a current === null check, never as the useRef argument itself", () => {
+      var source = readSource();
+
+      expect(source).not.toContain("useRef(createInFlightGuard())");
+      expect(source).toContain("var stallCancelGuardRef = useRef(null);");
+      expect(source).toContain(
+        "if (stallCancelGuardRef.current === null) {\n    stallCancelGuardRef.current = createInFlightGuard();\n  }",
+      );
+    });
+
+    it("confirmCancelStall's dialog uses getCancellationConfirmationText/PAYER_ACCOUNT_ITEM_LABEL.stall, never the send-to-secretary wording", () => {
+      var block = getConfirmCancelStallBlock(readSource());
+
+      expect(block).toContain(
+        "getCancellationConfirmationText(PAYER_ACCOUNT_ITEM_LABEL.stall)",
+      );
+      expect(block).not.toContain("האם לשלוח בקשת ביטול למזכירה");
+    });
+
+    it("doCancelStall calls adminCancelStallBooking(item.stallBookingId, activeRole?.ranchId) directly, not a cancel request", () => {
+      var block = getDoCancelStallBlock(readSource());
+
+      expect(block).toContain(
+        "await adminCancelStallBooking(item.stallBookingId, activeRole?.ranchId);",
+      );
+      expect(block).not.toContain("createStallBookingCancelRequest");
+      expect(block).not.toContain("stallBookingId: item.stallBookingId,");
+    });
+
+    it("the guard key is 'stall:' + item.stallBookingId, matching the cancellingId UI key", () => {
+      var block = getDoCancelStallBlock(readSource());
+
+      expect(block).toContain(
+        'var guardKey = "stall:" + item.stallBookingId;',
+      );
+      expect(block).toContain("setCancellingId(guardKey);");
+    });
+
+    it("the guard is acquired synchronously before the service call, and before setCancellingId - a failed acquire returns immediately", () => {
+      var block = getDoCancelStallBlock(readSource());
+
+      var guardCheckIndex = block.indexOf(
+        "if (!stallCancelGuardRef.current.tryAcquire(guardKey)) {",
+      );
+      var returnIndex = block.indexOf("return;", guardCheckIndex);
+      var setCancellingIdIndex = block.indexOf("setCancellingId(guardKey);");
+      var serviceCallIndex = block.indexOf("await adminCancelStallBooking(");
+
+      expect(guardCheckIndex).toBeGreaterThan(-1);
+      expect(returnIndex).toBeGreaterThan(guardCheckIndex);
+      expect(returnIndex).toBeLessThan(setCancellingIdIndex);
+      expect(setCancellingIdIndex).toBeLessThan(serviceCallIndex);
+    });
+
+    it("the guard is released only in the outer finally, alongside setCancellingId(null) - never released between mutation success and refresh completion", () => {
+      var block = getDoCancelStallBlock(readSource());
+
+      var outerFinallyIndex = block.lastIndexOf("} finally {");
+      var outerFinallyBlock = block.slice(outerFinallyIndex);
+
+      expect(outerFinallyBlock).toContain("setCancellingId(null);");
+      expect(outerFinallyBlock).toContain(
+        "stallCancelGuardRef.current.release(guardKey);",
+      );
+
+      // The release call appears exactly once in the whole function - not
+      // duplicated into the mutation catch or the refresh's nested catch.
+      var releaseCount = block.split(
+        "stallCancelGuardRef.current.release(guardKey);",
+      ).length - 1;
+      expect(releaseCount).toBe(1);
+    });
+
+    it("the success alert (DIRECT_CANCELLATION_COPY) fires strictly after the mutation resolves and before the refresh attempt starts", () => {
+      var block = getDoCancelStallBlock(readSource());
+
+      var serviceCallIndex = block.indexOf("await adminCancelStallBooking(");
+      var alertIndex = block.indexOf(
+        'Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);',
+      );
+      var reloadIndex = block.indexOf("await account.reload();");
+
+      expect(alertIndex).toBeGreaterThan(serviceCallIndex);
+      expect(reloadIndex).toBeGreaterThan(alertIndex);
+    });
+
+    it("account.reload() runs in its own nested try/catch inside the mutation's try - a refresh failure only logs, never alerts, never rethrows, and cannot suppress the success alert that already ran", () => {
+      var block = getDoCancelStallBlock(readSource());
+
+      var reloadTryIndex = block.indexOf("try {\n        await account.reload();");
+      expect(reloadTryIndex).toBeGreaterThan(-1);
+
+      var reloadCatchIndex = block.indexOf("} catch (refreshError) {", reloadTryIndex);
+      var outerCatchIndex = block.indexOf("} catch (err) {");
+
+      expect(reloadCatchIndex).toBeGreaterThan(reloadTryIndex);
+      // The nested reload catch closes before the outer mutation catch opens.
+      expect(outerCatchIndex).toBeGreaterThan(reloadCatchIndex);
+
+      var reloadCatchBlock = block.slice(
+        reloadCatchIndex,
+        outerCatchIndex,
+      );
+      expect(reloadCatchBlock).toContain(
+        'console.log("CANCEL STALL REFRESH ERROR", refreshError);',
+      );
+      expect(reloadCatchBlock).not.toContain("Alert.alert");
+      expect(reloadCatchBlock).not.toContain("throw");
+    });
+
+    it("on mutation failure: shows the mapped error alert, and setCancellingId/guard release still happen via the outer finally", () => {
+      var block = getDoCancelStallBlock(readSource());
+
+      var outerCatchIndex = block.indexOf("} catch (err) {");
+      var outerFinallyIndex = block.indexOf("} finally {", outerCatchIndex);
+      var outerCatchBlock = block.slice(outerCatchIndex, outerFinallyIndex);
+
+      expect(outerCatchBlock).toContain(
+        'Alert.alert("שגיאה", extractErrorMessage(err));',
+      );
+      expect(outerCatchBlock).not.toContain("DIRECT_CANCELLATION_COPY");
+      expect(outerCatchBlock).not.toContain("account.reload");
     });
   });
 });
