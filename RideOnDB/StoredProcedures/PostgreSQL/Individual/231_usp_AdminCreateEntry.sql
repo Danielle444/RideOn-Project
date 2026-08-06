@@ -60,6 +60,28 @@
 -- depth/completeness, consistent with protecting every relevant active-entry
 -- creation path.
 --
+-- LATE-REGISTRATION FINE BILLING (added on fix/entry-creation-fine-billing):
+-- the Direct branch below reuses usp_insertentry's billcharge block verbatim
+-- (per this header's own claim above), so it carries the identical gap that
+-- proc had -- trg_autoapplyfine_entry_insert (154) stamps entry.fineid but
+-- nothing turned that into a billcharge. Fixed here the same way, same
+-- shape, same idempotency guard; see 185_usp_InsertEntry.sql's header for
+-- the full design note (charge shape, sourceid choice, idempotency
+-- rationale) -- not repeated here to avoid the two copies drifting in
+-- wording. The Proposed/PendingCreateApproval branch is untouched: it
+-- creates no charges of any kind today and stays that way.
+--
+-- CORRECTED 2026-08-07: the Fine billcharge is scoped by categorykey='fine'
+-- in addition to sourcetype='Fine' and sourceid=<entryid>. entry.entryid
+-- and changeentryrequest.changeentryrequestid are independent sequences
+-- confirmed to already overlap in live data (entryid 1,2,3,4,5,93,118,120
+-- each also exist as a real changeentryrequestid, with live Fine rows
+-- already sitting at sourceid 1/2/5 from the change-request path) -- a
+-- guard keyed on sourcetype+sourceid alone would have matched an unrelated
+-- change-request fine and silently skipped billing this entry's own fine.
+-- See 185_usp_InsertEntry.sql's header for the full collision evidence and
+-- the categorykey partitioning rationale (Option B); identical here.
+--
 -- Brand-new proc: CREATE OR REPLACE, no prior version to DROP.
 CREATE OR REPLACE FUNCTION public.usp_admincreateentry(
     p_operationid text,
@@ -113,6 +135,8 @@ declare
     v_entryid integer;
     v_createentryrequestid integer;
     v_resulttype text;
+    v_fineid integer;
+    v_fineamount numeric(10,2);
 begin
     -- Canonical OperationId rule: null rejects, empty rejects,
     -- whitespace-only rejects (trim reduces it to length 0, same branch as
@@ -366,6 +390,33 @@ begin
             values
                 (v_billid, v_actual_competitionid, p_paidbypersonid, 'Federation', 'classes', 'Entry', v_entryid,
                  v_federationcost, 'Open', null, now(), 'Created from Entry federation cost');
+        end if;
+
+        -- Late-registration fine billing -- see this file's header note and
+        -- 185_usp_InsertEntry.sql's header for the full design rationale.
+        select e.fineid, f.fineamount
+        into v_fineid, v_fineamount
+        from public.entry e
+        join public.fine f on f.fineid = e.fineid
+        where e.entryid = v_entryid;
+
+        if v_fineid is not null
+           and v_fineamount is not null
+           and v_fineamount > 0
+           and not exists (
+               select 1
+               from public.billcharge bc
+               where bc.sourcetype = 'Fine'
+                 and bc.categorykey = 'fine'
+                 and bc.sourceid = v_entryid
+           )
+        then
+            insert into public.billcharge
+                (billid, competitionid, paidbypersonid, chargeowner, categorykey, sourcetype, sourceid,
+                 amounttopay, chargestatus, paymentbatchid, createdat, notes)
+            values
+                (v_billid, v_actual_competitionid, p_paidbypersonid, 'Organizer', 'fine', 'Fine', v_entryid,
+                 v_fineamount, 'Open', null, now(), 'Created from Entry fine. FineId=' || v_fineid::text);
         end if;
 
         perform public.usp_recalculatebillamount(v_billid);
