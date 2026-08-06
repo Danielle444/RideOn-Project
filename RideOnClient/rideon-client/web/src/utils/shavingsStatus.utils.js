@@ -40,6 +40,10 @@ export function getCreated(order) {
   return getValue(order, "prequestDatetime", "PrequestDatetime", null);
 }
 
+export function getRequestedDeliveryTime(order) {
+  return getValue(order, "requestedDeliveryTime", "RequestedDeliveryTime", null);
+}
+
 export function getDeliveryPhotoUrl(order) {
   return getValue(order, "deliveryPhotoUrl", "DeliveryPhotoUrl", null);
 }

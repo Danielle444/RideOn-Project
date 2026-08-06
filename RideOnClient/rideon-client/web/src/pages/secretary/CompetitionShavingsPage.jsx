@@ -98,7 +98,8 @@ function ShavingsContent(props) {
           />
 
           <ShavingsNeedsAttentionSection
-            orders={shavings.needsAttention}
+            overdueOrders={shavings.needsAttentionOverdue}
+            dueTodayOrders={shavings.needsAttentionDueToday}
             onCancelOrder={handleCancelOrder}
             cancellingId={shavings.cancellingId}
           />
