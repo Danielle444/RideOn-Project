@@ -21,6 +21,12 @@ import {
   resolveStallAmount,
 } from "../utils/stallBookingAmounts";
 
+import {
+  resolveStallLifecycleState,
+  resolveShavingsLifecycleState,
+  LIFECYCLE_STATE,
+} from "../utils/payerAccountLifecycle";
+
 function normalizeAssignedPrice(item) {
   if (!item) return null;
   return {
@@ -293,6 +299,18 @@ function normalizeShavingsOrder(item) {
     totalAmount:
       Number(item.totalAmount || item.TotalAmount || item.totalamount || 0) ||
       0,
+
+    // Standalone shavings cancellation (proc 176 IsCancelled/HasPendingCancellation):
+    // own-order state, independent of the delivery-status pipeline above.
+    isCancelled: normalizeBoolean(
+      item.isCancelled ?? item.IsCancelled ?? item.iscancelled,
+    ),
+
+    hasPendingCancellation: normalizeBoolean(
+      item.hasPendingCancellation ??
+        item.HasPendingCancellation ??
+        item.haspendingcancellation,
+    ),
   };
 }
 
@@ -535,6 +553,11 @@ export default function useAdminCompetitionStallsOverview(params) {
           );
         });
 
+        // Own-order cancellation state (proc 176) takes precedence, falling back to
+        // the parent booking's lifecycle only when the order has no independent
+        // cancellation signal of its own - see resolveShavingsLifecycleState.
+        var stallLifecycleState = resolveStallLifecycleState(booking);
+
         var relatedOrders = relatedDetails
           .map(function (detail) {
             var order = safeOrders.find(function (item) {
@@ -559,6 +582,11 @@ export default function useAdminCompetitionStallsOverview(params) {
               amountForThisStall: amountForThisStall,
 
               totalAmount: amountForThisStall,
+
+              lifecycleState: resolveShavingsLifecycleState(
+                order,
+                stallLifecycleState,
+              ),
             };
           })
           .filter(Boolean);
@@ -583,7 +611,14 @@ export default function useAdminCompetitionStallsOverview(params) {
           effectivePerDayPrice: effectivePerDayPrice,
         });
 
+        // SH-2: a terminally cancelled shavings order is no longer a live financial
+        // obligation, so its amount is excluded here. Pending cancellation is NOT
+        // terminal and stays included, matching the existing live financial state.
         var shavingsTotalAmount = relatedOrders.reduce(function (sum, order) {
+          if (order.lifecycleState === LIFECYCLE_STATE.CANCELLED) {
+            return sum;
+          }
+
           return sum + Number(order.amountForThisStall || 0);
         }, 0);
 
