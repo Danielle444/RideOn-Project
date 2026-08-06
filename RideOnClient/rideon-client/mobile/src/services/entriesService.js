@@ -47,6 +47,19 @@ function createChangeEntryRequest(payload) {
   );
 }
 
+function adminEditEntry(payload) {
+  return axios.post("/Entries/admin-edit", payload);
+}
+
+function adminCancelEntry(entryId, competitionId, ranchId) {
+  return axios.delete("/Entries/admin-cancel/" + entryId, {
+    params: {
+      competitionId: competitionId,
+      ranchId: ranchId,
+    },
+  });
+}
+
 function getMyPastCompetitionsWithEntries(excludeCompetitionId, ranchId) {
   return axios.get("/Entries/my-past-competitions", {
     params: {
@@ -84,6 +97,8 @@ export {
   getMyCompetitionEntries,
   getCompetitionEntriesView,
   createChangeEntryRequest,
+  adminEditEntry,
+  adminCancelEntry,
   getMyPastCompetitionsWithEntries,
   getDuplicatableEntriesFromCompetition,
   bulkDuplicateEntries,

@@ -31,6 +31,39 @@
 -- migrations/add_stallbooking_requestingranchid.sql) for consistency with
 -- the class/paid-time filtering already in this same query. No other
 -- behavior changed.
+--
+-- CAP-8 PROC-212 ENRICHMENT (2026-08-06, Phase 3B, validated via a
+-- rollback-only smoke test against a fully isolated fixture -- proven by
+-- BEGIN ... ROLLBACK with zero residual rows, pre/post proc-definition hash
+-- equality, and pre/post sequence equality on every touched identity/serial
+-- column -- proc212_phase3b_smoketest.sql, SHA-256
+-- 1453b15af0be282b55ae211d276f711507ee03c133d63f4b881695294940c4ae):
+-- classes[] gains classInCompId, riderFederationMemberId,
+-- coachFederationMemberId, paidByPersonId, prizeRecipientName, paidAmount,
+-- unpaidAmount, historicalOrganizerAmount, historicalFederationAmount,
+-- historicalAmount, organizerChargeStatus, federationChargeStatus, and
+-- entryStatus -- no existing classes[] key removed or renamed. A new
+-- class_charge_history CTE surfaces finalized-history Entry/classes charges
+-- (chargestatus Open/Paid/Cancelled/Replaced, excluding PendingApproval) so
+-- approved-cancelled and approved-replaced entries now appear as historical
+-- rows (totalAmount=0, since current totals still come from class_items'
+-- existing Open/Paid-only class_charge_summary join) carrying their
+-- historical amounts and per-owner charge statuses; class_items additionally
+-- excludes entrystatus='Rejected' so a rejected replacement candidate (whose
+-- own charge is flipped to 'Cancelled' by usp_answerchangeentryrequestsecured,
+-- making the chargestatus filter alone unable to distinguish it from a real
+-- cancellation) never surfaces. fine_items is corrected to filter
+-- categorykey='classes' (previously 'fine', which never matched any live
+-- billcharge row -- see ck_billcharge_categorykey) and joins through
+-- changeentryrequest to the original entry, so fines[] gains
+-- originalEntryId, classInCompId, className, paidAmount, and unpaidAmount
+-- (sourceId is retained). shavings[] top-level objects gain stallBookingIds
+-- (a sorted, distinct jsonb array of every stall the order is linked to)
+-- without duplicating bagQuantity/amountToPay/paidAmount/unpaidAmount across
+-- multi-stall links. No other behavior changed: payer, authorization,
+-- paid-time, stall, and financial-summary logic are unchanged, apart from
+-- fines now correctly contributing to fineTotal/grandTotal since the
+-- categorykey fix makes fine_items non-empty for the first time.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_getpayercompetitionaccount(p_competitionid integer, p_ranchid integer, p_payerpersonid integer, p_adminsystemuserid integer)
@@ -106,6 +139,32 @@ begin
         where bc.competitionid = p_competitionid
           and bc.paidbypersonid = p_payerpersonid
           and bc.chargestatus in ('Open', 'Paid')
+    ),
+
+    class_charge_history as (
+        select
+            bc.sourceid as entryid,
+
+            max(case when bc.chargeowner = 'Organizer' then bc.amounttopay end) as historicalorganizeramount,
+            max(case when bc.chargeowner = 'Federation' then bc.amounttopay end) as historicalfederationamount,
+
+            max(case when bc.chargeowner = 'Organizer' then bc.chargestatus end) as organizerchargestatus,
+            max(case when bc.chargeowner = 'Federation' then bc.chargestatus end) as federationchargestatus
+
+        from public.billcharge bc
+        where bc.competitionid = p_competitionid
+          and bc.paidbypersonid = p_payerpersonid
+          and bc.sourcetype = 'Entry'
+          and bc.categorykey = 'classes'
+          -- Blocker 2: exclude unresolved PendingApproval replacement charges.
+          -- 'Open'/'Paid' are the only statuses a finalized entry's own charge
+          -- can carry; 'Cancelled'/'Replaced' are the finalized-history
+          -- statuses set by usp_answerchangeentryrequestsecured. Excluding
+          -- 'PendingApproval' here is what keeps an unapproved replacement
+          -- candidate out of the payer's visible history entirely.
+          and bc.chargestatus in ('Open', 'Paid', 'Cancelled', 'Replaced')
+        group by
+            bc.sourceid
     ),
 
     class_charge_summary as (
@@ -230,21 +289,32 @@ begin
     class_items as (
         select
             e.entryid,
-            ccs.billid,
+            coalesce(ccs.billid, sr.billid) as billid,
             ct.classname::text as classname,
             cic.classdatetime,
             cic.starttime,
             cic.orderinday,
+            cic.classincompid,
 
-            ccs.organizercost,
-            ccs.federationcost,
-            ccs.totalamount,
-            ccs.paidamount,
-            ccs.unpaidamount,
+            coalesce(ccs.organizercost, 0)::numeric as organizercost,
+            coalesce(ccs.federationcost, 0)::numeric as federationcost,
+            coalesce(ccs.totalamount, 0)::numeric as totalamount,
+            coalesce(ccs.paidamount, 0)::numeric as paidamount,
+            coalesce(ccs.unpaidamount, 0)::numeric as unpaidamount,
+            coalesce(ccs.ispaid, false)::boolean as ispaid,
+
+            cch.historicalorganizeramount,
+            cch.historicalfederationamount,
+            (coalesce(cch.historicalorganizeramount, 0) + coalesce(cch.historicalfederationamount, 0))::numeric as historicaltotalamount,
+            cch.organizerchargestatus,
+            cch.federationchargestatus,
 
             h.horseid,
             h.horsename::text as horsename,
             h.barnname::text as barnname,
+
+            sr.riderfederationmemberid,
+            sr.coachfederationmemberid,
 
             concat_ws(' ', rider_person.firstname, rider_person.lastname)::text as ridername,
 
@@ -253,11 +323,14 @@ begin
                 else concat_ws(' ', coach_person.firstname, coach_person.lastname)::text
             end as coachname,
 
-            ccs.ispaid
+            e.entrystatus::text as entrystatus,
+            e.prizerecipientname::text as prizerecipientname
 
-        from class_charge_summary ccs
+        from class_charge_history cch
         inner join public.entry e
-            on e.entryid = ccs.entryid
+            on e.entryid = cch.entryid
+        left join class_charge_summary ccs
+            on ccs.entryid = cch.entryid
         inner join public.servicerequest sr
             on sr.srequestid = e.entryid
         inner join public.classincompetition cic
@@ -276,6 +349,12 @@ begin
             on coach_person.personid = coach_fm.federationmemberid
         where cic.competitionid = p_competitionid
           and h.ranchid = p_ranchid
+          -- Blocker 2: a Rejected replacement candidate's charge is flipped to
+          -- 'Cancelled' by usp_answerchangeentryrequestsecured (same status as
+          -- a genuine cancellation), so the chargestatus filter above cannot
+          -- distinguish it. entrystatus is the only field that can -- this is
+          -- the raw e.entrystatus::text value, never a guessed/defaulted one.
+          and e.entrystatus <> 'Rejected'
     ),
 
     paidtime_charge_summary as (
@@ -580,11 +659,22 @@ begin
             bc.billchargeid,
             bc.billid,
             bc.sourceid,
+            cer.originalentryid,
+            e.classincompid,
+            ct.classname::text as classname,
             bc.amounttopay,
             bc.chargestatus,
             bc.notes
         from payer_charges bc
-        where bc.categorykey = 'fine'
+        inner join public.changeentryrequest cer
+            on cer.changeentryrequestid = bc.sourceid
+        inner join public.entry e
+            on e.entryid = cer.originalentryid
+        inner join public.classincompetition cic
+            on cic.classincompid = e.classincompid
+        inner join public.classtype ct
+            on ct.classtypeid = cic.classtypeid
+        where bc.categorykey = 'classes'
           and bc.sourcetype = 'Fine'
     ),
 
@@ -712,14 +802,27 @@ begin
                         'classDateTime', ci.classdatetime,
                         'startTime', ci.starttime,
                         'orderInDay', ci.orderinday,
+                        'classInCompId', ci.classincompid,
                         'horseId', ci.horseid,
                         'horseName', ci.horsename,
                         'barnName', ci.barnname,
                         'riderName', ci.ridername,
+                        'riderFederationMemberId', ci.riderfederationmemberid,
                         'coachName', ci.coachname,
+                        'coachFederationMemberId', ci.coachfederationmemberid,
+                        'paidByPersonId', p_payerpersonid,
+                        'prizeRecipientName', ci.prizerecipientname,
                         'organizerCost', ci.organizercost,
                         'federationCost', ci.federationcost,
                         'totalAmount', ci.totalamount,
+                        'paidAmount', ci.paidamount,
+                        'unpaidAmount', ci.unpaidamount,
+                        'historicalOrganizerAmount', ci.historicalorganizeramount,
+                        'historicalFederationAmount', ci.historicalfederationamount,
+                        'historicalAmount', ci.historicaltotalamount,
+                        'organizerChargeStatus', ci.organizerchargestatus,
+                        'federationChargeStatus', ci.federationchargestatus,
+                        'entryStatus', ci.entrystatus,
                         'isPaid', ci.ispaid
                     )
                     order by
@@ -857,7 +960,19 @@ begin
                         'amountToPay', shi.amounttopay,
                         'paidAmount', shi.paidamount,
                         'unpaidAmount', shi.unpaidamount,
-                        'isPaid', shi.ispaid
+                        'isPaid', shi.ispaid,
+                        'stallBookingIds',
+                        coalesce(
+                            (
+                                select jsonb_agg(distinct sofsb.stallbookingid order by sofsb.stallbookingid)
+                                from public.shavingsorderforstallbooking sofsb
+                                inner join public.stallbooking sb
+                                    on sb.stallbookingid = sofsb.stallbookingid
+                                where sofsb.shavingsorderid = shi.shavingsorderid
+                                  and sb.requestingranchid = p_ranchid
+                            ),
+                            '[]'::jsonb
+                        )
                     )
                     order by
                         shi.requesteddeliverytime nulls last,
@@ -876,7 +991,12 @@ begin
                         'billChargeId', fi.billchargeid,
                         'billId', fi.billid,
                         'sourceId', fi.sourceid,
+                        'originalEntryId', fi.originalentryid,
+                        'classInCompId', fi.classincompid,
+                        'className', fi.classname,
                         'amountToPay', fi.amounttopay,
+                        'paidAmount', case when fi.chargestatus = 'Paid' then fi.amounttopay else 0 end,
+                        'unpaidAmount', case when fi.chargestatus = 'Open' then fi.amounttopay else 0 end,
                         'chargeStatus', fi.chargestatus,
                         'notes', fi.notes
                     )
