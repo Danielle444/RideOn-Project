@@ -26,6 +26,7 @@ import useRegistrationStepStatus from "../../../../hooks/useRegistrationStepStat
 
 import { cancelPaidTimeRequest } from "../../../../services/paidTimeRequestsService";
 import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
+import { createInFlightGuard } from "../../../../utils/inFlightGuard";
 
 import { LIFECYCLE_STATE } from "../../../../utils/payerAccountLifecycle";
 import { bandAndSortPaidTimes } from "../../../../utils/payerAccountBands";
@@ -146,6 +147,18 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   var [expandedIds, setExpandedIds] = useState({});
   var [viewingSlotId, setViewingSlotId] = useState(null);
 
+  // Synchronous in-flight guard for paid-time cancellation on this screen -
+  // cancellingId above is UI feedback only (async state), not a correctness
+  // guard: two rapid taps can both pass a "busy?" check before either render
+  // reflects the first one. Own ref/key-space, independent of any guard on
+  // AdminCompetitionPayerAccountScreen's own paid-time cancel handler - a
+  // different screen instance, so the two can never interfere. Initialized
+  // lazily so createInFlightGuard() runs once, not on every render.
+  var paidTimeCancelGuardRef = useRef(null);
+  if (paidTimeCancelGuardRef.current === null) {
+    paidTimeCancelGuardRef.current = createInFlightGuard();
+  }
+
   var bandedPaidTimes = useMemo(
     function () {
       return bandAndSortPaidTimes(paidTimes.filteredItems);
@@ -255,8 +268,14 @@ export default function AdminCompetitionPaidTimesScreen(props) {
       return;
     }
 
+    var guardKey = item.paidTimeRequestId;
+
+    if (!paidTimeCancelGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
-      setCancellingId(item.paidTimeRequestId);
+      setCancellingId(guardKey);
       await cancelPaidTimeRequest({
         paidTimeRequestId: item.paidTimeRequestId,
         ranchId: activeRole?.ranchId,
@@ -267,6 +286,7 @@ export default function AdminCompetitionPaidTimesScreen(props) {
       Alert.alert("שגיאה", String(msg));
     } finally {
       setCancellingId(null);
+      paidTimeCancelGuardRef.current.release(guardKey);
     }
   }
 

@@ -376,16 +376,21 @@ namespace RideOnServer.Tests
         }
 
         [Fact]
-        public void Cancel_proc_rejects_an_already_cancelled_entry_before_composing()
+        public void Cancel_proc_rejects_an_already_cancelled_or_replaced_entry_before_composing()
         {
+            // CE-2 fix: 'Replaced' added to match usp_admineditentry's (232)
+            // complete terminal-state list -- a Replaced entry (already
+            // superseded by an edit) must reject here exactly like
+            // Cancelled/CancelledAfterStart, not fall through to a live
+            // cancellation of a row nobody sees as active anymore.
             string source = CancelProcSource();
 
             int guardAt = source.IndexOf(
-                "if v_current_entrystatus in ('Cancelled', 'CancelledAfterStart') then", StringComparison.Ordinal);
+                "if v_current_entrystatus in ('Cancelled', 'CancelledAfterStart', 'Replaced') then", StringComparison.Ordinal);
             int insertAt = source.IndexOf("usp_insertchangeentryrequestadminranchsecured(", StringComparison.Ordinal);
 
             guardAt.Should().BeGreaterThan(-1);
-            insertAt.Should().BeGreaterThan(guardAt, "the already-cancelled guard must run before 234 is ever called");
+            insertAt.Should().BeGreaterThan(guardAt, "the already-cancelled/replaced guard must run before 234 is ever called");
 
             source.Should().Contain("'Entry already cancelled' using errcode = 'RN001'");
         }

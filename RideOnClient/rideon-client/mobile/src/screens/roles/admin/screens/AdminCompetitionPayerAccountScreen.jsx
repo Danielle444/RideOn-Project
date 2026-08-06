@@ -280,11 +280,25 @@ export default function AdminCompetitionPayerAccountScreen(props) {
 
   var [cancellingId, setCancellingId] = useState(null);
 
-  // Synchronous in-flight guard for direct stall cancellation - cancellingId
-  // above is UI feedback only (async state), not a correctness guard against
-  // two rapid invocations of the same handler. Initialized lazily so
-  // createInFlightGuard() runs once, not on every render (useRef(x) would
-  // still evaluate x on each render even though only the first value sticks).
+  // Synchronous in-flight guards, one per action/target namespace (same
+  // pattern PayerCompetitionAccountScreen.jsx uses) - cancellingId above is
+  // UI feedback only (async state), not a correctness guard: two rapid taps
+  // on the same or different actions can both pass a "busy?" check before
+  // either render reflects the first one. A separate ref per action means an
+  // in-flight entry cancel can never be released by, e.g., a paid-time
+  // cancel completing. Initialized lazily so createInFlightGuard() runs
+  // once, not on every render (useRef(x) would still evaluate x on each
+  // render even though only the first value sticks).
+  var entryCancelGuardRef = useRef(null);
+  if (entryCancelGuardRef.current === null) {
+    entryCancelGuardRef.current = createInFlightGuard();
+  }
+
+  var paidTimeCancelGuardRef = useRef(null);
+  if (paidTimeCancelGuardRef.current === null) {
+    paidTimeCancelGuardRef.current = createInFlightGuard();
+  }
+
   var stallCancelGuardRef = useRef(null);
   if (stallCancelGuardRef.current === null) {
     stallCancelGuardRef.current = createInFlightGuard();
@@ -373,9 +387,23 @@ export default function AdminCompetitionPayerAccountScreen(props) {
   // gated on account.reload(). Refresh runs afterward, best-effort, in its
   // own try/catch, so a refresh failure can never be misreported as a failed
   // cancel or leave cancellingId stuck.
+  // The synchronous guard (entryCancelGuardRef) is acquired BEFORE anything
+  // else, including setCancellingId - a second rapid invocation for the same
+  // entryId must return before the service is ever called. It stays held
+  // through the refresh attempt, same lifecycle as doCancelStall's own
+  // guard: on mutation failure there is no refresh to wait for, so it
+  // releases immediately in the catch; on success it releases only after
+  // the refresh attempt settles, so a second cancel can never race the
+  // still-stale row on screen.
   async function doCancelEntry(item) {
+    var guardKey = "entry:" + item.entryId;
+
+    if (!entryCancelGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
-      setCancellingId("entry:" + item.entryId);
+      setCancellingId(guardKey);
 
       await adminCancelEntry(
         item.entryId,
@@ -384,6 +412,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
       );
     } catch (err) {
       Alert.alert("שגיאה", extractErrorMessage(err));
+      entryCancelGuardRef.current.release(guardKey);
       return;
     } finally {
       setCancellingId(null);
@@ -402,6 +431,8 @@ export default function AdminCompetitionPayerAccountScreen(props) {
       await account.reload();
     } catch (refreshError) {
       console.log("CANCEL ENTRY REFRESH ERROR", refreshError);
+    } finally {
+      entryCancelGuardRef.current.release(guardKey);
     }
   }
 
@@ -418,9 +449,18 @@ export default function AdminCompetitionPayerAccountScreen(props) {
     ]);
   }
 
+  // Same synchronous in-flight guard pattern as doCancelEntry/doCancelStall -
+  // acquired before setCancellingId, released in the outer finally alongside
+  // it, so it stays held through the refresh just like the other guards.
   async function doCancelPaidTime(item) {
+    var guardKey = "paidTime:" + item.paidTimeRequestId;
+
+    if (!paidTimeCancelGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
-      setCancellingId("paidTime:" + item.paidTimeRequestId);
+      setCancellingId(guardKey);
 
       await cancelPaidTimeRequest({
         paidTimeRequestId: item.paidTimeRequestId,
@@ -434,6 +474,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
       Alert.alert("שגיאה", extractErrorMessage(err));
     } finally {
       setCancellingId(null);
+      paidTimeCancelGuardRef.current.release(guardKey);
     }
   }
 
