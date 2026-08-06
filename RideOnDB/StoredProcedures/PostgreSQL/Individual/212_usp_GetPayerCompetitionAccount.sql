@@ -110,6 +110,33 @@
 -- read path. No JSON key added, removed or renamed on shavings[] or
 -- stalls[].shavingsOrders[].
 -- ============================================================================
+--
+-- ENTRY-CREATION FINES (added on fix/entry-creation-fine-billing, 2026-08-07):
+-- 185_usp_InsertEntry.sql / 231_usp_AdminCreateEntry.sql now bill a second,
+-- disjoint kind of Fine billcharge: (sourcetype='Fine', categorykey='fine',
+-- sourceid=entryid), separate by design from the change-request convention
+-- this proc's fine_items CTE already recognized
+-- (sourcetype='Fine', categorykey='classes', sourceid=changeentryrequestid).
+-- The two conventions are DELIBERATELY not merged into one lookup: entryid
+-- and changeentryrequestid are independent, uncoordinated sequences already
+-- proven to collide live (entryid 1,2,3,4,5,93,118,120 each also exist as a
+-- real changeentryrequestid) -- joining an entry-creation fine through
+-- changeentryrequest the way the existing branch does would risk matching
+-- the wrong, unrelated request and misattributing the fine's entry/class/
+-- amount. fine_items is now a UNION ALL of the two, kept disjoint by
+-- categorykey ('classes' vs 'fine') on the SAME underlying billcharge rows
+-- -- a real column, not a heuristic on sourceid's numeric range -- each
+-- producing the identical column shape so every consumer below (finetotal,
+-- finepaidamount, grandtotal, organizertotal, paidamount, remainingamount,
+-- paymentstatus, and the fines[] JSON block) needed NO changes at all.
+-- Traced every consumer of the resulting fines[] JSON (server: PayerDAL.cs
+-- passes the jsonb result through as a raw string, no typed C# DTO exists
+-- for it anywhere; mobile: PayerCompetitionAccountScreen.jsx and
+-- AdminCompetitionPayerAccountScreen.jsx render only billChargeId (key),
+-- className (falls back to "קנס" if null), amountToPay, chargeStatus, and
+-- notes) -- the existing shape already carries everything needed, so no
+-- field was added and no DTO/DAL/mobile/test file needed changing.
+-- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_getpayercompetitionaccount(p_competitionid integer, p_ranchid integer, p_payerpersonid integer, p_adminsystemuserid integer)
  RETURNS jsonb
@@ -732,6 +759,8 @@ begin
     ),
 
     fine_items as (
+        -- A. Change/cancellation fines -- unchanged. sourceid is a
+        -- changeentryrequestid; resolve the original entry through it.
         select
             bc.billchargeid,
             bc.billid,
@@ -752,6 +781,31 @@ begin
         inner join public.classtype ct
             on ct.classtypeid = cic.classtypeid
         where bc.categorykey = 'classes'
+          and bc.sourcetype = 'Fine'
+
+        union all
+
+        -- B. Entry-creation fines -- new. sourceid IS the entryid directly;
+        -- never joined through changeentryrequest (that id space is
+        -- unrelated and already proven to collide numerically with entryid).
+        select
+            bc.billchargeid,
+            bc.billid,
+            bc.sourceid,
+            bc.sourceid as originalentryid,
+            e.classincompid,
+            ct.classname::text as classname,
+            bc.amounttopay,
+            bc.chargestatus,
+            bc.notes
+        from payer_charges bc
+        inner join public.entry e
+            on e.entryid = bc.sourceid
+        inner join public.classincompetition cic
+            on cic.classincompid = e.classincompid
+        inner join public.classtype ct
+            on ct.classtypeid = cic.classtypeid
+        where bc.categorykey = 'fine'
           and bc.sourcetype = 'Fine'
     ),
 

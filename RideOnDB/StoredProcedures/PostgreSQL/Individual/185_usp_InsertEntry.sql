@@ -154,6 +154,84 @@
 -- Active status only (`coalesce(entrystatus,'Active')='Active'`), so
 -- Cancelled/CancelledAfterStart/Replaced history never blocks a new entry.
 -- ============================================================================
+--
+-- LATE-REGISTRATION FINE BILLING (added on fix/entry-creation-fine-billing)
+-- ---------------------------------------------------------------------------
+-- trg_autoapplyfine_entry_insert (repo file 154, BEFORE INSERT ON entry)
+-- stamps entry.fineid when the entry lands inside an active LateRegistration
+-- fine's window -- it ONLY sets the column. Nothing downstream ever turned
+-- that stamp into money owed: this proc created the Organizer/Federation
+-- entry charges and called usp_recalculatebillamount without ever reading
+-- entry.fineid back. Confirmed live 2026-08-06: 4 entries system-wide
+-- (10103-10105, 10675) carry a stamped fineid with zero matching billcharge.
+--
+-- Fix: re-select the just-inserted entry's fineid (a plain re-read -- the
+-- trigger runs BEFORE INSERT, inside the same statement, so v_entryid's row
+-- already reflects it) and, if set, insert one Fine billcharge before the
+-- existing usp_recalculatebillamount call.
+--
+-- SOURCEID COLLISION -- CONFIRMED LIVE, NOT HYPOTHETICAL (2026-08-07).
+-- A first version of this fix used sourcetype='Fine', sourceid=<entryid>,
+-- distinguished from the change-request Fine path only by sourcetype. That
+-- is unsafe: entry.entryid and changeentryrequest.changeentryrequestid are
+-- two independent sequences (entry 1..10675+, changeentryrequest 1..124)
+-- that already overlap in live data -- entryid 1,2,3,4,5,93,118,120 each
+-- also exist as a real changeentryrequestid, and billcharge already has
+-- Fine rows at sourceid 1, 2 and 5 from the change-request path
+-- (billchargeid 505/128/127). A NOT EXISTS guard keyed only on
+-- (sourcetype='Fine', sourceid=<entryid>) would silently find one of those
+-- unrelated rows for entry 1/2/5 and conclude the entry's own late fine was
+-- "already billed" -- it would never be charged. billcharge has no other
+-- namespacing: sourcetype is not a per-source-table sequence guarantee, and
+-- there is no FK from billcharge.sourceid to any single table.
+--
+-- Fix: partition by categorykey too. Every existing Fine row (the
+-- change-request path, 210/221) hardcodes categorykey='classes' -- verified
+-- against all 3 live rows and both procs' INSERT literals. categorykey
+-- ALREADY permits 'fine' (ck_billcharge_categorykey) and it has never once
+-- been used live. This proc's entry-creation fines use categorykey='fine'
+-- exclusively, making the two Fine sources disjoint by a real column
+-- rather than by hoping two unrelated id spaces never collide:
+--   change-request fine  = (sourcetype='Fine', categorykey='classes', sourceid=changeentryrequestid)
+--   entry-creation fine  = (sourcetype='Fine', categorykey='fine',    sourceid=entryid)
+-- "has entry X's fine been billed" is therefore:
+--   sourcetype='Fine' AND categorykey='fine' AND sourceid=<entryid>
+-- No schema change needed (categorykey='fine' was already a legal value),
+-- and no other proc needed changing: 203/206 (payer/category summaries)
+-- already branch on categorykey='fine' -> 'קנסות', so this also fixes a
+-- pre-existing display gap for these charges specifically, as a side
+-- effect -- the change-request path's own categorykey='classes' rows are
+-- untouched and still fall into 203/206's 'classes' bucket, unchanged.
+-- Chose this (Option B: reuse an existing, permitted, correctly-scoped
+-- column) over introducing a new sourcetype value like 'EntryFine'
+-- (Option A): that would need an ALTER on ck_billcharge_sourcetype plus an
+-- audit of every proc that switches on sourcetype='Fine' for display
+-- (at least 209, 212, 203, 206) to recognize the new value -- broader than
+-- this fix's stated scope. No dedicated link table exists (Option C). The
+-- change-request convention itself is untouched (Option D excluded by
+-- explicit scope).
+--
+-- Idempotency: confirmed live 2026-08-06/07 that billcharge carries no
+-- unique constraint on (sourcetype, sourceid) or any other combination
+-- (only billchargeid PK, plus a non-unique index on (sourcetype, sourceid))
+-- -- so this proc guards explicitly with a NOT EXISTS check (now scoped by
+-- categorykey too, per the collision fix above) rather than assuming it is
+-- only ever called once per entry, matching this codebase's own convention
+-- of guarding schema-permitted states explicitly (see the "still in
+-- progress" branch note in usp_admincreateentry, repo file 231).
+--
+-- Amount guard (fineamount > 0, not just fineid is not null) mirrors
+-- usp_answerchangeentryrequest's own `v_effectivefineamount > 0` check --
+-- fine.fineamount only carries a >= 0 check (ck_fine_fineamount), so this
+-- also makes a misconfigured zero-amount fine a safe no-op instead of an
+-- empty billcharge row.
+--
+-- Deliberately NOT touched: trigger 154 itself, the change-entry-request
+-- fine path (210/221), and the Proposed/PendingCreateApproval branch of
+-- usp_admincreateentry (231) -- that branch creates no charges at all today
+-- and defers billing to a not-yet-built "Stage E" answer proc; out of scope
+-- here.
+-- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_insertentry(p_classincompid integer, p_orderedbysystemuserid integer, p_ranchid integer, p_horseid integer, p_riderfederationmemberid integer, p_coachfederationmemberid integer, p_paidbypersonid integer, p_prizerecipientname character varying)
  RETURNS integer
@@ -168,6 +246,8 @@ declare
     v_srequestid integer;
     v_entryid integer;
     v_horse_ranchid integer;
+    v_fineid integer;
+    v_fineamount numeric(10,2);
 begin
     select
         cic.competitionid,
@@ -352,6 +432,56 @@ begin
             null,
             now(),
             'Created from Entry federation cost'
+        );
+    end if;
+
+    -- Late-registration fine billing -- see header note above.
+    select e.fineid, f.fineamount
+    into v_fineid, v_fineamount
+    from public.entry e
+    join public.fine f on f.fineid = e.fineid
+    where e.entryid = v_entryid;
+
+    if v_fineid is not null
+       and v_fineamount is not null
+       and v_fineamount > 0
+       and not exists (
+           select 1
+           from public.billcharge bc
+           where bc.sourcetype = 'Fine'
+             and bc.categorykey = 'fine'
+             and bc.sourceid = v_entryid
+       )
+    then
+        insert into public.billcharge
+        (
+            billid,
+            competitionid,
+            paidbypersonid,
+            chargeowner,
+            categorykey,
+            sourcetype,
+            sourceid,
+            amounttopay,
+            chargestatus,
+            paymentbatchid,
+            createdat,
+            notes
+        )
+        values
+        (
+            v_billid,
+            v_competitionid,
+            p_paidbypersonid,
+            'Organizer',
+            'fine',
+            'Fine',
+            v_entryid,
+            v_fineamount,
+            'Open',
+            null,
+            now(),
+            'Created from Entry fine. FineId=' || v_fineid::text
         );
     end if;
 
