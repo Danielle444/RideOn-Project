@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
@@ -27,6 +27,10 @@ import useRegistrationStepStatus from "../../../../hooks/useRegistrationStepStat
 import { cancelPaidTimeRequest } from "../../../../services/paidTimeRequestsService";
 import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
 
+import { LIFECYCLE_STATE } from "../../../../utils/payerAccountLifecycle";
+import { bandAndSortPaidTimes } from "../../../../utils/payerAccountBands";
+import { getLifecycleBandHeader } from "../../../../utils/payerAccountCopy";
+
 import PaidTimeListItemCard from "../../../../components/competitions/adminPaidTimes/PaidTimeListItemCard";
 import PaidTimeScheduleView from "../../../../components/competitions/adminPaidTimes/PaidTimeScheduleView";
 import PaidTimeEditModal from "../../../../components/competitions/adminPaidTimes/PaidTimeEditModal";
@@ -36,6 +40,61 @@ import PublishedSlotsModal from "../../../../components/competitions/adminPaidTi
 import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
 
 import styles from "../../../../styles/adminCompetitionPaidTimesStyles";
+
+// CAP-10: this admin surface's items carry a `status` field straight off
+// usp_getmypaidtimerequestsforcompetition (verified live 2026-08-06) - the
+// exact shape resolvePaidTimeLifecycleState and bandAndSortPaidTimes were
+// already built for, so both are reused directly with no adapter. Applied
+// only to the "list" view mode below - the "schedule" mode is a day/slot
+// grid built by PaidTimeScheduleView (out of scope here) and stays exactly
+// as it was.
+function renderBandDivider(headerText, keyValue) {
+  if (!headerText) {
+    return null;
+  }
+
+  return (
+    <Text key={keyValue} style={styles.filterTitle}>
+      {headerText}
+    </Text>
+  );
+}
+
+// Renders one non-empty divider per lifecycle band, in Active / pending /
+// cancelled order, using the caller's existing per-item card renderer
+// unchanged.
+function renderBandedSections(banded, renderCard) {
+  var sections = [
+    {
+      key: "active",
+      items: banded.active,
+      header: getLifecycleBandHeader(LIFECYCLE_STATE.ACTIVE),
+    },
+    {
+      key: "pending",
+      items: banded.pending,
+      header: getLifecycleBandHeader(LIFECYCLE_STATE.PENDING_CHANGE),
+    },
+    {
+      key: "cancelled",
+      items: banded.cancelled,
+      header: getLifecycleBandHeader(LIFECYCLE_STATE.CANCELLED),
+    },
+  ];
+
+  return sections.map(function (section) {
+    if (section.items.length === 0) {
+      return null;
+    }
+
+    return (
+      <View key={"band-" + section.key}>
+        {renderBandDivider(section.header, "band-header-" + section.key)}
+        {section.items.map(renderCard)}
+      </View>
+    );
+  });
+}
 
 export default function AdminCompetitionPaidTimesScreen(props) {
   var activeRoleContext = useActiveRole();
@@ -88,6 +147,13 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   var [expandedIds, setExpandedIds] = useState({});
   var [viewingSlotId, setViewingSlotId] = useState(null);
   var [publishedSlotsOpen, setPublishedSlotsOpen] = useState(false);
+
+  var bandedPaidTimes = useMemo(
+    function () {
+      return bandAndSortPaidTimes(paidTimes.filteredItems);
+    },
+    [paidTimes.filteredItems],
+  );
 
   // Force-closes an already-open edit modal the moment Paid Time becomes
   // disabled or read-only - a still-open modal must not remain a live
@@ -369,7 +435,7 @@ export default function AdminCompetitionPaidTimesScreen(props) {
       );
     }
 
-    return paidTimes.filteredItems.map(function (item) {
+    return renderBandedSections(bandedPaidTimes, function (item) {
       return (
         <PaidTimeListItemCard
           key={String(item.paidTimeRequestId)}
