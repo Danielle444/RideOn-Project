@@ -101,6 +101,20 @@ function isOrderDelivered(order) {
   return order.deliveryStatus === "Delivered" || !!order.arrivalTime;
 }
 
+// A terminal-cancelled order (own productchangerequest, Approved) is resolved and
+// non-actionable exactly like a delivered one - the card renders it collapsed with no
+// claim/deliver/photo action either way (see WorkerShavingsOrderCard's deriveState, where
+// isCancelled short-circuits ahead of the delivered check). For this screen's past-date
+// bucketing, a resolved-past order (delivered OR cancelled) belongs in the same
+// non-actionable grouping - there is no separate "cancelled" history area on this screen,
+// and business rule 2 only requires reusing an existing historical/non-actionable area, not
+// inventing a new one. A PENDING cancellation is NOT resolved: it still needs a human
+// decision (secretary approve/reject), so it stays out of this grouping and renders in its
+// normal date bucket with the locked "ממתין לביטול" state instead.
+function isOrderResolved(order) {
+  return isOrderDelivered(order) || order.isCancelled === true;
+}
+
 // Local (not UTC) Y-M-D as a single comparable integer, e.g. 2026-08-05 ->
 // 20260805. RequestedDeliveryTime is a `timestamp without time zone` and
 // parses as local time in JS - comparing local calendar components (not UTC
@@ -134,11 +148,14 @@ function compareByRequestedTimeAscending(a, b) {
  *   today  - RequestedDeliveryTime local date === today's local date, sorted
  *            time-ascending.
  *   older  - three concatenated groups, in this exact order: (1) past-date,
- *            not-yet-delivered orders, time-ascending; (2) null/undefined-time
- *            orders (delivery status irrelevant - there is no date to bucket
- *            them by); (3) past-date, delivered orders, time-ascending. Locked
- *            business rule: past delivered orders stay visible here, never
- *            dropped, and render collapsed by default (see the card).
+ *            unresolved orders (not delivered, not terminal-cancelled),
+ *            time-ascending; (2) null/undefined-time orders (delivery status
+ *            irrelevant - there is no date to bucket them by); (3) past-date,
+ *            resolved orders (delivered OR terminal-cancelled), time-ascending.
+ *            Locked business rule: past resolved orders stay visible here,
+ *            never dropped, and render collapsed by default (see the card).
+ *            A PENDING cancellation is not resolved and stays in group (1),
+ *            visible and locked via the card's own state, not collapsed here.
  *   future - local date > today, sorted ascending (a single timestamp compare
  *            already orders by date then time together).
  *
@@ -154,7 +171,7 @@ export function bucketWorkerCompetitionOrders(orders, now) {
   var today = [];
   var pastUndelivered = [];
   var nullTime = [];
-  var pastDelivered = [];
+  var pastResolved = [];
   var future = [];
 
   safeOrders.forEach(function (order, index) {
@@ -171,8 +188,8 @@ export function bucketWorkerCompetitionOrders(orders, now) {
     if (dateKey === todayKey) {
       today.push(entry);
     } else if (dateKey < todayKey) {
-      if (isOrderDelivered(order)) {
-        pastDelivered.push(entry);
+      if (isOrderResolved(order)) {
+        pastResolved.push(entry);
       } else {
         pastUndelivered.push(entry);
       }
@@ -183,7 +200,7 @@ export function bucketWorkerCompetitionOrders(orders, now) {
 
   today.sort(compareByRequestedTimeAscending);
   pastUndelivered.sort(compareByRequestedTimeAscending);
-  pastDelivered.sort(compareByRequestedTimeAscending);
+  pastResolved.sort(compareByRequestedTimeAscending);
   future.sort(compareByRequestedTimeAscending);
 
   function unwrap(entries) {
@@ -194,7 +211,7 @@ export function bucketWorkerCompetitionOrders(orders, now) {
 
   return {
     today: unwrap(today),
-    older: unwrap(pastUndelivered).concat(unwrap(nullTime)).concat(unwrap(pastDelivered)),
+    older: unwrap(pastUndelivered).concat(unwrap(nullTime)).concat(unwrap(pastResolved)),
     future: unwrap(future),
   };
 }

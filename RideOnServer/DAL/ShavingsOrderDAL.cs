@@ -195,6 +195,8 @@ namespace RideOnServer.DAL
                     WorkerSystemUserId = reader["WorkerSystemUserId"] == DBNull.Value ? null : Convert.ToInt32(reader["WorkerSystemUserId"]),
                     WorkerFirstName = reader["WorkerFirstName"] as string,
                     WorkerLastName = reader["WorkerLastName"] as string,
+                    IsCancelled = Convert.ToBoolean(reader["IsCancelled"]),
+                    HasPendingCancellation = Convert.ToBoolean(reader["HasPendingCancellation"]),
                 });
             }
 
@@ -244,6 +246,8 @@ namespace RideOnServer.DAL
                     WorkerSystemUserId = reader["WorkerSystemUserId"] == DBNull.Value ? null : Convert.ToInt32(reader["WorkerSystemUserId"]),
                     WorkerFirstName = reader["WorkerFirstName"] as string,
                     WorkerLastName = reader["WorkerLastName"] as string,
+                    IsCancelled = Convert.ToBoolean(reader["IsCancelled"]),
+                    HasPendingCancellation = Convert.ToBoolean(reader["HasPendingCancellation"]),
                 });
             }
 

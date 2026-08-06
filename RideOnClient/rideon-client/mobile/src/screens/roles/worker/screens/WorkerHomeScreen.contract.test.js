@@ -153,3 +153,31 @@ describe("WorkerHomeScreen - startup dual-failure alert dedup wiring", () => {
     );
   });
 });
+
+describe("WorkerHomeScreen - shavings cancellation lifecycle wiring", () => {
+  it("passes isCancelled and hasPendingCancellation through to the shared order card", () => {
+    var source = readSource();
+
+    expect(source).toContain("isCancelled={order.isCancelled}");
+    expect(source).toContain(
+      "hasPendingCancellation={order.hasPendingCancellation}",
+    );
+  });
+
+  it("passes the two cancellation fields on the same card instance that renders the home feed", () => {
+    var source = readSource();
+
+    var cardBlockStart = source.indexOf("<WorkerShavingsOrderCard");
+    expect(cardBlockStart).toBeGreaterThan(-1);
+
+    var cardBlockEnd = source.indexOf("/>", cardBlockStart);
+    expect(cardBlockEnd).toBeGreaterThan(-1);
+
+    var cardBlock = source.substring(cardBlockStart, cardBlockEnd);
+
+    expect(cardBlock).toContain("isCancelled={order.isCancelled}");
+    expect(cardBlock).toContain(
+      "hasPendingCancellation={order.hasPendingCancellation}",
+    );
+  });
+});
