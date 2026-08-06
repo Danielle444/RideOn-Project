@@ -1032,7 +1032,17 @@ export default function useSecretaryCompetitionClassesPage(options) {
     setDrawOrderSummaryMessage("");
     setSearchText("");
     setPaymentFilter("all");
-    setDrawOrderDraftEntries(normalizeDraftEntries(selectedEntriesBase));
+
+    // CAP-9: Cancelled and CancelledAfterStart entries never receive or retain a
+    // draw position, so they must never enter the draft -- normalizeDraftEntries
+    // assigns every item a sequential position with no status awareness, and
+    // whatever ends up in the draft is exactly what gets sent to the save endpoint.
+    var activeEntries = selectedEntriesBase.filter(function (entry) {
+      var status = entry.entryStatus || entry.EntryStatus || "Active";
+      return status === "Active";
+    });
+
+    setDrawOrderDraftEntries(normalizeDraftEntries(activeEntries));
     setDrawOrderEditMode(true);
   }
 

@@ -298,13 +298,17 @@ namespace RideOnServer.BL
             List<SecretaryCompetitionEntryItem> allEntries =
                 dal.GetSecretaryCompetitionEntries(request.CompetitionId);
 
+            // CAP-9: Cancelled and CancelledAfterStart entries never receive or retain
+            // a draw position, so they must never reach the generator -- it assigns a
+            // sequential DrawOrder to every item it's given, with no status awareness.
             List<SecretaryCompetitionEntryItem> groupEntries =
                 allEntries
                     .Where(item =>
                         item.ClassDate.HasValue &&
                         item.ClassDate.Value.Date == request.ClassDate.Date &&
                         item.OrderInDay.HasValue &&
-                        item.OrderInDay.Value == request.OrderInDay
+                        item.OrderInDay.Value == request.OrderInDay &&
+                        item.EntryStatus == "Active"
                     )
                     .ToList();
 
