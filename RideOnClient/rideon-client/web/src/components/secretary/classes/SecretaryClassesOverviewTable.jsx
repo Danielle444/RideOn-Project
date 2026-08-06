@@ -79,6 +79,32 @@ function getStartTime(item) {
   return item.startTime || item.StartTime;
 }
 
+// Consecutive rows sharing the same orderInDay are one visual group -- the number cell renders
+// once per group, spanning all of that group's rows, and doubles as the grouped-navigation
+// control. A number that reappears later, non-consecutively, starts a new group rather than
+// extending the old one.
+function getNumberGroupRowSpans(items) {
+  var rowSpans = new Array(items.length).fill(0);
+  var i = 0;
+
+  while (i < items.length) {
+    var groupNumber = getOrderInDay(items[i]);
+    var groupSize = 1;
+
+    while (
+      i + groupSize < items.length &&
+      getOrderInDay(items[i + groupSize]) === groupNumber
+    ) {
+      groupSize += 1;
+    }
+
+    rowSpans[i] = groupSize;
+    i += groupSize;
+  }
+
+  return rowSpans;
+}
+
 function formatPredictionNumber(value) {
   if (value === null || value === undefined) {
     return "-";
@@ -149,6 +175,7 @@ function renderScheduleCell(cell) {
 
 export default function SecretaryClassesOverviewTable(props) {
   var items = Array.isArray(props.items) ? props.items : [];
+  var numberGroupRowSpans = getNumberGroupRowSpans(items);
   var [predictionViewMode, setPredictionViewMode] = useState("value");
   var activeView = props.activeView || CLASSES_VIEW_PLANNING;
 
@@ -292,8 +319,9 @@ export default function SecretaryClassesOverviewTable(props) {
           ) : null}
 
           {!props.loading
-            ? items.map(function (item) {
+            ? items.map(function (item, index) {
                 var orderInDay = getOrderInDay(item);
+                var groupRowSpan = numberGroupRowSpans[index];
                 var classEntriesCount = props.getEntriesCountForClass(item);
                 var status = props.getClassStatus
                   ? props.getClassStatus(item)
@@ -333,29 +361,26 @@ export default function SecretaryClassesOverviewTable(props) {
                       </td>
                     ) : null}
 
-                    <td className="px-4 py-3 font-bold">
-                      <button
-                        type="button"
-                        onClick={function () {
-                          props.onOpenGroupEntries(item);
-                        }}
-                        className="rounded-full px-3 py-1 font-bold text-[#7B5A4D] transition-colors hover:bg-[#F5EDE8]"
-                        title="צפייה בכל הכניסות של אותו מספר מקצה ביום זה"
-                      >
-                        {orderInDay || "-"}
-                      </button>
-                    </td>
+                    {groupRowSpan > 0 ? (
+                      <td rowSpan={groupRowSpan} className="relative p-1">
+                        <button
+                          type="button"
+                          onClick={function () {
+                            props.onOpenGroupEntries(item);
+                          }}
+                          className="absolute inset-1 flex min-h-10 min-w-[40px] items-center justify-center rounded-xl border border-[#BCAAA4] bg-white text-base font-bold text-[#7B5A4D] shadow-sm transition-colors hover:bg-[#F8F5F2]"
+                          title="צפייה בכל הכניסות של אותו מספר מקצה ביום זה"
+                          aria-label="פתיחת כל הכניסות המקובצות למספר מקצה זה"
+                        >
+                          {orderInDay || "-"}
+                        </button>
+                      </td>
+                    ) : null}
 
                     <td className="px-4 py-3 font-semibold">
-                      <button
-                        type="button"
-                        onClick={function () {
-                          props.onOpenClassEntries(item);
-                        }}
-                        className="font-bold text-[#3F312B] underline-offset-4 transition-colors hover:text-[#8B6352] hover:underline"
-                      >
+                      <span className="font-bold text-[#3F312B]">
                         {getClassName(item)}
-                      </button>
+                      </span>
                     </td>
 
                     {showColumn("status") ? (
