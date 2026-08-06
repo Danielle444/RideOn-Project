@@ -32,6 +32,18 @@ function getLifecycleBandHeader(lifecycleState) {
   return LIFECYCLE_BAND_HEADER[lifecycleState] || null;
 }
 
+// --- Shavings "needs review" fallback (CAP-4) ------------------------------
+// Used only for a shavings order whose linked stallBookingIds resolve to no
+// stall in the payer's own account.stalls[] - a real, reachable shape (a
+// shavings order can be billed to one payer while every stall it links to is
+// billed to another). Deliberately does not say "פעיל"/"מבוטל"/"ממתין
+// לאישור" - none of those would be true; this says plainly that the state is
+// unverified instead of guessing one.
+var SHAVINGS_NEEDS_REVIEW_COPY = {
+  bandHeader: "דורש בדיקה",
+  stallLabel: "לא ניתן לאמת את סטטוס התא המקושר",
+};
+
 // --- Row lifecycle chips --------------------------------------------------
 // Shorter, per-row text. pendingChange/pendingCancellation get distinct chip
 // text even though CAP-3 bands them under one shared header. All proposed.
@@ -138,4 +150,5 @@ export {
   getResultTypeCopy,
   DIRECT_CANCELLATION_COPY,
   UNKNOWN_RESULT_TYPE_COPY,
+  SHAVINGS_NEEDS_REVIEW_COPY,
 };
