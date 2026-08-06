@@ -348,6 +348,8 @@ export default function WorkerHomeScreen(props) {
                   payerLastName={order.payerLastName}
                   workerFirstName={order.workerFirstName}
                   workerLastName={order.workerLastName}
+                  isCancelled={order.isCancelled}
+                  hasPendingCancellation={order.hasPendingCancellation}
                   isMyOrder={flags.isMyOrder}
                   isUnclaimed={flags.isUnclaimed}
                   isTakenByOther={flags.isTakenByOther}

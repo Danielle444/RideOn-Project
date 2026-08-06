@@ -237,6 +237,8 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
         payerLastName={order.payerLastName}
         workerFirstName={order.workerFirstName}
         workerLastName={order.workerLastName}
+        isCancelled={order.isCancelled}
+        hasPendingCancellation={order.hasPendingCancellation}
         isMyOrder={isMyOrder}
         isTakenByOther={isTakenByOther}
         isUnclaimed={isUnclaimed}

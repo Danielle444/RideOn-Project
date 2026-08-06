@@ -382,20 +382,31 @@ namespace RideOnServer.Tests
         }
 
         [Fact]
-        public void The_sql_uses_the_business_date_for_delivery_and_both_competition_bounds()
+        public void The_sql_uses_the_business_date_for_delivery_and_the_competition_end_bound()
         {
             string sql = SqlSource();
 
             sql.Should().Contain("so.requesteddeliverytime::date = v_businessdate");
-            sql.Should().Contain("c.competitionstartdate <= v_businessdate");
             sql.Should().Contain("c.competitionenddate >= v_businessdate");
+        }
+
+        // Shavings/stall prep legitimately happens before a competition's
+        // official start date (live evidence: shavingsorderid 519, 65 live
+        // orders with requesteddeliverytime before competitionstartdate) - an
+        // order due today must not be hidden just because "today" is still
+        // before the competition's own start date. Only the upper bound
+        // (competitionenddate) still gates the feed, so an order stops
+        // appearing once its competition has actually ended.
+        [Fact]
+        public void The_sql_no_longer_gates_on_the_competition_start_date()
+        {
+            SqlSource().Should().NotContain("c.competitionstartdate <= v_businessdate");
         }
 
         [Theory]
         [InlineData("c.hostranchid = p_RanchId")]
         [InlineData("(so.workersystemuserid = p_WorkerSystemUserId OR so.workersystemuserid IS NULL)")]
         [InlineData("so.requesteddeliverytime::date = v_businessdate")]
-        [InlineData("c.competitionstartdate <= v_businessdate")]
         [InlineData("c.competitionenddate >= v_businessdate")]
         [InlineData("(c.competitionstatus IS NULL OR c.competitionstatus NOT IN ('טיוטה','בוטלה'))")]
         [InlineData("so.arrivaltime IS NULL")]
@@ -455,6 +466,116 @@ namespace RideOnServer.Tests
 
             SqlSource().Should().Contain(
                 "ORDER BY so.shavingsorderid, so.requesteddeliverytime ASC NULLS LAST;");
+        }
+
+        // =================================================================
+        // 9. RanchWorker shavings cancellation lifecycle (own productchangerequest).
+        // =================================================================
+
+        [Fact]
+        public void The_sql_return_shape_appends_IsCancelled_and_HasPendingCancellation_last()
+        {
+            SqlSource().Should().Contain(
+                "\"ResponseTime\" timestamp without time zone, \"IsCancelled\" boolean, \"HasPendingCancellation\" boolean)");
+        }
+
+        [Fact]
+        public void The_sql_derives_IsCancelled_from_an_approved_cancellation_request_on_the_orders_own_id()
+        {
+            string sql = SqlSource();
+
+            sql.Should().Contain(
+                ("EXISTS (\n            SELECT 1 FROM public.productchangerequest pcr\n" +
+                "            WHERE pcr.originalprequestid = so.shavingsorderid\n" +
+                "              AND pcr.iscancelled = true\n" +
+                "              AND pcr.status = 'Approved'\n" +
+                "        ) AS \"IsCancelled\",").Replace("\n", Environment.NewLine));
+        }
+
+        [Fact]
+        public void The_sql_derives_HasPendingCancellation_from_a_pending_cancellation_request_on_the_orders_own_id()
+        {
+            string sql = SqlSource();
+
+            sql.Should().Contain(
+                ("EXISTS (\n            SELECT 1 FROM public.productchangerequest pcr\n" +
+                "            WHERE pcr.originalprequestid = so.shavingsorderid\n" +
+                "              AND pcr.iscancelled = true\n" +
+                "              AND pcr.status = 'Pending'\n" +
+                "        ) AS \"HasPendingCancellation\"").Replace("\n", Environment.NewLine));
+        }
+
+        [Fact]
+        public void The_sql_excludes_a_terminal_cancelled_order_from_the_home_feed_entirely()
+        {
+            string sql = SqlSource();
+
+            // The home feed has no historical/non-actionable area (unlike the
+            // competition-scoped list, 114), so a terminal-cancelled order is excluded
+            // the same way an already-delivered one already is above it.
+            sql.Should().Contain(
+                ("AND NOT EXISTS (\n          SELECT 1 FROM public.productchangerequest pcr\n" +
+                "          WHERE pcr.originalprequestid = so.shavingsorderid\n" +
+                "            AND pcr.iscancelled = true\n" +
+                "            AND pcr.status = 'Approved'\n" +
+                "      )").Replace("\n", Environment.NewLine));
+        }
+
+        [Fact]
+        public void The_sql_does_not_exclude_a_pending_cancellation_from_the_home_feed()
+        {
+            // Only one terminal-exclusion EXISTS clause should exist (status = 'Approved'),
+            // never a second one gated on status = 'Pending' - a pending cancellation must
+            // stay visible per business rule 1, locked on the client instead.
+            string sql = SqlSource();
+
+            int approvedExclusionCount = 0;
+            int index = sql.IndexOf("AND NOT EXISTS (", StringComparison.Ordinal);
+            while (index > -1)
+            {
+                approvedExclusionCount++;
+                index = sql.IndexOf("AND NOT EXISTS (", index + 1, StringComparison.Ordinal);
+            }
+
+            approvedExclusionCount.Should().Be(1);
+        }
+
+        [Fact]
+        public void A_rejected_cancellation_request_is_neither_a_status_the_sql_special_cases_nor_an_exclusion_reason()
+        {
+            // IsCancelled/HasPendingCancellation/the terminal exclusion only ever
+            // branch on 'Approved' or 'Pending' (pinned above) - a 'Rejected'
+            // productchangerequest row therefore matches none of the three EXISTS/
+            // NOT EXISTS clauses, so a rejected-cancellation order falls through to
+            // the same predicates as an order with no cancellation request at all:
+            // included, IsCancelled=false, HasPendingCancellation=false. Pinning the
+            // literal's absence here means introducing a 'Rejected' special case
+            // later would be a deliberate, reviewed change, not a silent drift.
+            SqlSource().Should().NotContain("'Rejected'");
+        }
+
+        [Fact]
+        public void The_dto_exposes_IsCancelled_and_HasPendingCancellation_as_non_nullable_bools()
+        {
+            PropertyInfo? isCancelled = typeof(WorkerShavingsOrderItem).GetProperty("IsCancelled");
+            PropertyInfo? hasPendingCancellation =
+                typeof(WorkerShavingsOrderItem).GetProperty("HasPendingCancellation");
+
+            isCancelled.Should().NotBeNull();
+            isCancelled!.PropertyType.Should().Be(typeof(bool));
+
+            hasPendingCancellation.Should().NotBeNull();
+            hasPendingCancellation!.PropertyType.Should().Be(typeof(bool));
+        }
+
+        [Fact]
+        public void The_dal_maps_IsCancelled_and_HasPendingCancellation_from_the_reader()
+        {
+            string body = GetWorkerHomeShavingsFeedBody();
+
+            body.Should().Contain("IsCancelled = Convert.ToBoolean(reader[\"IsCancelled\"]),");
+            body.Should().Contain(
+                "HasPendingCancellation = Convert.ToBoolean(reader[\"HasPendingCancellation\"]),");
         }
     }
 }

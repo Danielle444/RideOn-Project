@@ -460,6 +460,116 @@ describe("bucketWorkerCompetitionOrders", function () {
     expect(idsOf(buckets.older)).toEqual([1, 2]);
   });
 
+  // Standalone shavings cancellation lifecycle: a terminal-cancelled (isCancelled=true)
+  // past order is resolved exactly like a delivered one, folding into the same
+  // non-actionable "older" grouping rather than the "needs treatment" one. A PENDING
+  // cancellation is NOT resolved and stays in the unresolved group.
+  describe("cancellation lifecycle bucketing", function () {
+    it("buckets a past terminal-cancelled order into the older section", function () {
+      var order = makeOrder({
+        shavingsOrderId: 1,
+        requestedDeliveryTime: "2026-08-03T10:00:00Z",
+        deliveryStatus: "Pending",
+        isCancelled: true,
+      });
+
+      var buckets = bucketWorkerCompetitionOrders([order], NOW);
+
+      expect(idsOf(buckets.older)).toEqual([1]);
+    });
+
+    it("places a past terminal-cancelled order after past-undelivered and null-time orders, same tier as delivered", function () {
+      var pastUndelivered = makeOrder({
+        shavingsOrderId: 1,
+        requestedDeliveryTime: "2026-08-03T10:00:00Z",
+        deliveryStatus: "Pending",
+      });
+      var nullTime = makeOrder({
+        shavingsOrderId: 2,
+        requestedDeliveryTime: null,
+      });
+      var pastCancelled = makeOrder({
+        shavingsOrderId: 3,
+        requestedDeliveryTime: "2026-08-02T10:00:00Z",
+        deliveryStatus: "Pending",
+        isCancelled: true,
+      });
+
+      var buckets = bucketWorkerCompetitionOrders(
+        [pastCancelled, nullTime, pastUndelivered],
+        NOW,
+      );
+
+      expect(idsOf(buckets.older)).toEqual([1, 2, 3]);
+    });
+
+    it("sorts a past-delivered order and a past-cancelled order together, by requested time ascending, within the resolved group", function () {
+      var pastCancelledLate = makeOrder({
+        shavingsOrderId: 1,
+        requestedDeliveryTime: "2026-08-03T18:00:00Z",
+        isCancelled: true,
+      });
+      var pastDeliveredEarly = makeOrder({
+        shavingsOrderId: 2,
+        requestedDeliveryTime: "2026-08-02T08:00:00Z",
+        deliveryStatus: "Delivered",
+      });
+
+      var buckets = bucketWorkerCompetitionOrders(
+        [pastCancelledLate, pastDeliveredEarly],
+        NOW,
+      );
+
+      expect(idsOf(buckets.older)).toEqual([2, 1]);
+    });
+
+    it("keeps a past order with only a PENDING cancellation in the unresolved (not-yet-treated) group, not the resolved one", function () {
+      var pastPendingCancellation = makeOrder({
+        shavingsOrderId: 1,
+        requestedDeliveryTime: "2026-08-03T10:00:00Z",
+        deliveryStatus: "Pending",
+        hasPendingCancellation: true,
+        isCancelled: false,
+      });
+      var pastDelivered = makeOrder({
+        shavingsOrderId: 2,
+        requestedDeliveryTime: "2026-08-02T10:00:00Z",
+        deliveryStatus: "Delivered",
+      });
+
+      var buckets = bucketWorkerCompetitionOrders(
+        [pastDelivered, pastPendingCancellation],
+        NOW,
+      );
+
+      // Pending-cancellation order (1) is unresolved -> first tier; delivered (2) -> resolved
+      // tier at the end - the two must not collapse into one group.
+      expect(idsOf(buckets.older)).toEqual([1, 2]);
+    });
+
+    it("buckets a today or future terminal-cancelled order into its normal date section, not a special one", function () {
+      var todayCancelled = makeOrder({
+        shavingsOrderId: 1,
+        requestedDeliveryTime: "2026-08-05T09:00:00Z",
+        isCancelled: true,
+      });
+      var futureCancelled = makeOrder({
+        shavingsOrderId: 2,
+        requestedDeliveryTime: "2026-08-07T09:00:00Z",
+        isCancelled: true,
+      });
+
+      var buckets = bucketWorkerCompetitionOrders(
+        [todayCancelled, futureCancelled],
+        NOW,
+      );
+
+      expect(idsOf(buckets.today)).toEqual([1]);
+      expect(idsOf(buckets.future)).toEqual([2]);
+      expect(buckets.older).toEqual([]);
+    });
+  });
+
   it("does not mutate the input orders array", function () {
     var first = makeOrder({
       shavingsOrderId: 1,

@@ -19,5 +19,10 @@ namespace RideOnServer.BL.DTOs.ShavingsOrders
         public int? WorkerSystemUserId { get; set; }
         public string? WorkerFirstName { get; set; }
         public string? WorkerLastName { get; set; }
+
+        // RanchWorker cancellation lifecycle: own-order state, computed from the shavings
+        // order's own productchangerequest (same technique as CompetitionShavingsOrderListItem).
+        public bool IsCancelled { get; set; }
+        public bool HasPendingCancellation { get; set; }
     }
 }
