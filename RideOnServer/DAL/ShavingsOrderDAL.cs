@@ -57,13 +57,18 @@ namespace RideOnServer.DAL
             }
         }
 
-        public void SaveDeliveryPhoto(int shavingsOrderId, string photoUrl, DateTime photoDate)
+        // Returns rows-affected as bool, matching ClaimShavingsOrder/MarkDelivered's convention:
+        // >0 means "recorded", 0 means the authorization guard blocked it (not the caller's claim,
+        // or a photo was already recorded) -- see usp_savedeliveryphoto's own RN001 guards for the
+        // ownership/cancellation/competition-ended cases, which surface as ValidationException instead.
+        public bool SaveDeliveryPhoto(int shavingsOrderId, string photoUrl, DateTime photoDate, int workerSystemUserId)
         {
             Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
                 { "@ShavingsOrderId", shavingsOrderId },
                 { "@DeliveryPhotoUrl", photoUrl },
-                { "@DeliveryPhotoDate", photoDate }
+                { "@DeliveryPhotoDate", photoDate },
+                { "@WorkerSystemUserId", workerSystemUserId }
             };
 
             try
@@ -76,7 +81,9 @@ namespace RideOnServer.DAL
                     connection,
                     paramDic))
                 {
-                    command.ExecuteNonQuery();
+                    object? result = command.ExecuteScalar();
+                    int rowsAffected = result == null || result == DBNull.Value ? 0 : Convert.ToInt32(result);
+                    return rowsAffected > 0;
                 }
             }
             catch (Exception ex)
@@ -88,13 +95,14 @@ namespace RideOnServer.DAL
 
         // No-photo delivery fallback (CAP-4). Mirrors ClaimShavingsOrder: the SP returns
         // rows-affected, so >0 means "recorded", 0 means "no open order matched".
-        public static bool MarkDelivered(int shavingsOrderId)
+        public static bool MarkDelivered(int shavingsOrderId, int workerSystemUserId)
         {
             ShavingsOrderDAL dal = new ShavingsOrderDAL();
 
             Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
-                { "@shavingsOrderId", shavingsOrderId }
+                { "@shavingsOrderId", shavingsOrderId },
+                { "@workerSystemUserId", workerSystemUserId }
             };
 
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();
@@ -108,6 +116,42 @@ namespace RideOnServer.DAL
             object? result = cmd.ExecuteScalar();
             int rowsAffected = result == null || result == DBNull.Value ? 0 : Convert.ToInt32(result);
             return rowsAffected > 0;
+        }
+
+        // Worker shavings-mutation authorization fix: resolves the order's REAL competition/
+        // host ranch server-side (never trust a client-supplied ranchId -- these three mutation
+        // endpoints receive none anyway). Returns null when the order does not exist; the caller
+        // deliberately does not turn that into a distinct 404 -- the mutating proc's own RN001
+        // "not found" guard stays the single source of truth for that message.
+        public static ShavingsOrderCompetitionContext? GetShavingsOrderCompetitionContext(int shavingsOrderId)
+        {
+            ShavingsOrderDAL dal = new ShavingsOrderDAL();
+
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@shavingsOrderId", shavingsOrderId }
+            };
+
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = dal.CreateCommandWithStoredProcedure(
+                "usp_getshavingsordercompetitioncontext",
+                conn,
+                paramDic);
+
+            using NpgsqlDataReader reader = cmd.ExecuteReader();
+
+            if (!reader.Read())
+            {
+                return null;
+            }
+
+            return new ShavingsOrderCompetitionContext
+            {
+                CompetitionId = Convert.ToInt32(reader["CompetitionId"]),
+                HostRanchId = Convert.ToInt32(reader["HostRanchId"])
+            };
         }
 
         public static List<WorkerShavingsOrderItem> GetShavingsOrdersByCompetitionForWorker(int competitionId, int ranchId)

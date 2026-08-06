@@ -94,6 +94,8 @@ namespace RideOnServer.Controllers
             {
                 int workerSystemUserId = UserAccessValidator.GetPersonIdFromClaims(User);
 
+                EnsureCallerIsApprovedRanchWorkerForShavingsOrder(workerSystemUserId, request.ShavingsOrderId);
+
                 bool claimed = ShavingsOrderDAL.ClaimShavingsOrder(request.ShavingsOrderId, workerSystemUserId);
 
                 if (!claimed)
@@ -106,6 +108,12 @@ namespace RideOnServer.Controllers
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Ownership/state guard raised inside usp_claimshavingsorder (not found,
+                // competition ended, order cancelled, caller not an approved worker here).
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
             }
             catch (Exception ex)
             {
@@ -121,13 +129,15 @@ namespace RideOnServer.Controllers
             {
                 int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                // TODO:
-                // לחזק בהמשך:
-                // לוודא שה-currentPersonId הוא העובד שההזמנה משויכת אליו
-                // או שהוא עובד חווה מורשה להזמנה הזו.
-                // כרגע אין ב-request ranchId ואין כאן בדיקת שיוך להזמנה.
+                EnsureCallerIsApprovedRanchWorkerForShavingsOrder(currentPersonId, request.ShavingsOrderId);
 
-                ShavingsOrder.SaveDeliveryPhoto(request);
+                bool saved = ShavingsOrder.SaveDeliveryPhoto(request, currentPersonId);
+
+                if (!saved)
+                {
+                    return Conflict("לא ניתן לשמור את התמונה עבור הזמנה זו");
+                }
+
                 return Ok(new { message = "התמונה נשמרה בהצלחה" });
             }
             catch (UnauthorizedAccessException ex)
@@ -137,6 +147,13 @@ namespace RideOnServer.Controllers
             catch (ArgumentException ex)
             {
                 return BadRequest(ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Ownership/state guard raised inside usp_savedeliveryphoto (not found,
+                // competition ended, order cancelled, not claimed by this worker, or a
+                // delivery photo was already recorded and must not be silently replaced).
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
             }
             catch (Exception ex)
             {
@@ -152,10 +169,9 @@ namespace RideOnServer.Controllers
             {
                 int workerSystemUserId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                // TODO (parity with save-delivery-photo):
-                // אין כאן בדיקת שיוך ההזמנה לעובד הנוכחי. לחזק בהמשך כמו ב-save-delivery-photo.
+                EnsureCallerIsApprovedRanchWorkerForShavingsOrder(workerSystemUserId, request.ShavingsOrderId);
 
-                bool delivered = ShavingsOrder.MarkDelivered(request);
+                bool delivered = ShavingsOrder.MarkDelivered(request, workerSystemUserId);
 
                 if (!delivered)
                 {
@@ -171,6 +187,12 @@ namespace RideOnServer.Controllers
             catch (ArgumentException ex)
             {
                 return BadRequest(ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Ownership/state guard raised inside usp_markdelivered (not found,
+                // competition ended, order cancelled, or not claimed by this worker).
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
             }
             catch (Exception ex)
             {
@@ -602,6 +624,62 @@ namespace RideOnServer.Controllers
 
             throw new UnauthorizedAccessException(
                 "אין לך הרשאה לבצע פעולה זו עבור החווה שנבחרה");
+        }
+
+        // Worker shavings-mutation authorization fix (P0). claim / save-delivery-photo /
+        // mark-delivered receive no ranchId from the client at all, so the real host ranch is
+        // resolved server-side via ShavingsOrderDAL.GetShavingsOrderCompetitionContext -- never
+        // trusted from the request -- before UserAccessValidator runs. This is defense layer 1
+        // (role/ranch -> 403); usp_claimshavingsorder / usp_savedeliveryphoto / usp_markdelivered
+        // each independently re-derive and re-check the same host ranch plus ownership/state as
+        // defense layer 2 (-> 409 via RN001), so a direct DB/API call bypassing this controller
+        // cannot skip authorization either.
+        //
+        // An order that does not resolve to a competition (does not exist) is deliberately let
+        // through here -- ResolveShavingsMutationAuthorization returns Authorized for a null host
+        // ranch -- so the mutating stored procedure's own "Shavings order not found" RN001 guard
+        // stays the single source of truth for that message, instead of duplicating it here.
+        private static void EnsureCallerIsApprovedRanchWorkerForShavingsOrder(int personId, int shavingsOrderId)
+        {
+            ShavingsOrderCompetitionContext? context =
+                ShavingsOrderDAL.GetShavingsOrderCompetitionContext(shavingsOrderId);
+
+            bool isApprovedRanchWorkerAtHostRanch =
+                context != null &&
+                UserAccessValidator.HasUserRoleInRanch(personId, context.HostRanchId, RoleNames.RanchWorker);
+
+            ShavingsMutationAuthorization authorization = ResolveShavingsMutationAuthorization(
+                context?.HostRanchId,
+                isApprovedRanchWorkerAtHostRanch);
+
+            if (authorization == ShavingsMutationAuthorization.Denied)
+            {
+                throw new UnauthorizedAccessException(
+                    "אין לך הרשאה לבצע פעולה זו עבור החווה שנבחרה");
+            }
+        }
+
+        private enum ShavingsMutationAuthorization
+        {
+            Authorized,
+            Denied
+        }
+
+        // Pure decision, reachable by reflection from RideOnServer.Tests without a DB
+        // (see StallBookingRanchModelAuthorizationTests / HealthCertificateAuthorizationTests
+        // for the established pattern this project uses for authorization coverage).
+        private static ShavingsMutationAuthorization ResolveShavingsMutationAuthorization(
+            int? hostRanchId,
+            bool isApprovedRanchWorkerAtHostRanch)
+        {
+            if (hostRanchId == null)
+            {
+                return ShavingsMutationAuthorization.Authorized;
+            }
+
+            return isApprovedRanchWorkerAtHostRanch
+                ? ShavingsMutationAuthorization.Authorized
+                : ShavingsMutationAuthorization.Denied;
         }
     }
 }
