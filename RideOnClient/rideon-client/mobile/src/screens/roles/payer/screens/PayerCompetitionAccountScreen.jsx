@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -25,6 +25,17 @@ import { useActiveRole } from "../../../../context/ActiveRoleContext";
 import { useCompetition } from "../../../../context/CompetitionContext";
 
 import usePayerMyCompetitionAccount from "../../../../hooks/usePayerMyCompetitionAccount";
+
+import {
+  bandAndSortPaidTimes,
+  bandAndSortStalls,
+  sortShavingsOrders,
+  sortClassesByVerifiedDate,
+} from "../../../../utils/payerAccountBands";
+
+import { LIFECYCLE_STATE } from "../../../../utils/payerAccountLifecycle";
+
+import { getLifecycleBandHeader } from "../../../../utils/payerAccountCopy";
 
 import styles from "../../../../styles/adminCompetitionPayerAccountStyles";
 
@@ -147,6 +158,45 @@ function renderEmpty(text) {
   );
 }
 
+// CAP-3: one divider per non-empty lifecycle band, reusing the existing
+// sectionTitle style (already used for "סיכום לפי סוג חיוב" in the summary
+// tab) rather than introducing new styling.
+function renderBandDivider(headerText, keyValue) {
+  if (!headerText) {
+    return null;
+  }
+
+  return (
+    <Text key={keyValue} style={styles.sectionTitle}>
+      {headerText}
+    </Text>
+  );
+}
+
+// CAP-3: renders one item type's three lifecycle bands (active / pending /
+// cancelled) in the required order, each under its own divider only when
+// non-empty, using the caller's existing per-item card renderer unchanged.
+function renderBandedSections(banded, renderCard) {
+  var sections = [
+    { key: "active", items: banded.active, header: getLifecycleBandHeader(LIFECYCLE_STATE.ACTIVE) },
+    { key: "pending", items: banded.pending, header: getLifecycleBandHeader(LIFECYCLE_STATE.PENDING_CHANGE) },
+    { key: "cancelled", items: banded.cancelled, header: getLifecycleBandHeader(LIFECYCLE_STATE.CANCELLED) },
+  ];
+
+  return sections.map(function (section) {
+    if (section.items.length === 0) {
+      return null;
+    }
+
+    return (
+      <React.Fragment key={"band-" + section.key}>
+        {renderBandDivider(section.header, "band-header-" + section.key)}
+        {section.items.map(renderCard)}
+      </React.Fragment>
+    );
+  });
+}
+
 function resolveInitialTab(routeParams) {
   var requested = String(routeParams?.initialTab || "").toLowerCase();
 
@@ -194,6 +244,35 @@ export default function PayerCompetitionAccountScreen(props) {
 
   var payer = account.payer;
   var summary = account.summary || {};
+
+  // CAP-3: classes have no verified lifecycle field yet (CAP-8 has not
+  // added one to usp_getpayercompetitionaccount's classes[] array) - they
+  // are deliberately NOT banded, only given the same deterministic
+  // date/time ordering every other list gets. See
+  // payerAccountBands.js/payerAccountLifecycle.js for why.
+  var sortedClasses = useMemo(
+    function () {
+      return sortClassesByVerifiedDate(account.classes);
+    },
+    [account.classes],
+  );
+
+  // CAP-3: paid time and stalls DO carry verified lifecycle signals, so they
+  // are grouped into active / pendingChange+pendingCancellation / cancelled
+  // and sorted within each band, mirroring the server's own ORDER BY.
+  var bandedPaidTimes = useMemo(
+    function () {
+      return bandAndSortPaidTimes(account.paidTimes);
+    },
+    [account.paidTimes],
+  );
+
+  var bandedStalls = useMemo(
+    function () {
+      return bandAndSortStalls(account.stalls);
+    },
+    [account.stalls],
+  );
 
   var [cancellingId, setCancellingId] = useState(null);
 
@@ -602,7 +681,10 @@ export default function PayerCompetitionAccountScreen(props) {
       return renderEmpty("אין לך הרשמות למקצים בתחרות זו");
     }
 
-    return account.classes.map(function (item) {
+    // CAP-3: date/time ordered only, deliberately not banded into
+    // active/pending/cancelled - see sortedClasses' own comment above for
+    // why (no verified class lifecycle field until CAP-8).
+    return sortedClasses.map(function (item) {
       var isLocked =
         item.isPaid === true ||
         item.hasPendingCancellation === true ||
@@ -670,7 +752,7 @@ export default function PayerCompetitionAccountScreen(props) {
       return renderEmpty("אין לך הרשמות לפייד טיים בתחרות זו");
     }
 
-    return account.paidTimes.map(function (item) {
+    function renderPaidTimeCard(item) {
       var status = String(item.status || "").toLowerCase();
 
       var isLocked =
@@ -773,7 +855,9 @@ export default function PayerCompetitionAccountScreen(props) {
           )}
         </View>
       );
-    });
+    }
+
+    return renderBandedSections(bandedPaidTimes, renderPaidTimeCard);
   }
 
   function renderStallsTab() {
@@ -781,10 +865,10 @@ export default function PayerCompetitionAccountScreen(props) {
       return renderEmpty("אין לך הזמנות תאים בתחרות זו");
     }
 
-    return account.stalls.map(function (item) {
-      var shavingsOrders = Array.isArray(item.shavingsOrders)
-        ? item.shavingsOrders
-        : [];
+    function renderStallCard(item) {
+      // CAP-3: nested shavings sub-lines are sorted (never banded - they
+      // all share this stall's one inherited lifecycle state already).
+      var shavingsOrders = sortShavingsOrders(item.shavingsOrders);
 
       var isLocked =
         item.isPaid === true ||
@@ -911,7 +995,9 @@ export default function PayerCompetitionAccountScreen(props) {
           )}
         </View>
       );
-    });
+    }
+
+    return renderBandedSections(bandedStalls, renderStallCard);
   }
 
   function renderActiveTab() {

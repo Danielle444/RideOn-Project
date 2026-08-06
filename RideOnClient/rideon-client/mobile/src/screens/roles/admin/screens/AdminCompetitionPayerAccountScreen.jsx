@@ -31,6 +31,17 @@ import { canEditPaidTimeRow } from "../../../../utils/paidTimeEditAvailability";
 
 import { getAvailableDatesForTab } from "../../../../utils/payerAccountAvailableDates";
 
+import {
+  bandAndSortPaidTimes,
+  bandAndSortStalls,
+  sortShavingsOrders,
+  sortClassesByVerifiedDate,
+} from "../../../../utils/payerAccountBands";
+
+import { LIFECYCLE_STATE } from "../../../../utils/payerAccountLifecycle";
+
+import { getLifecycleBandHeader } from "../../../../utils/payerAccountCopy";
+
 import styles from "../../../../styles/adminCompetitionPayerAccountStyles";
 
 import { createChangeEntryRequest } from "../../../../services/entriesService";
@@ -175,6 +186,45 @@ function renderEmpty(text) {
       <Text style={styles.emptyText}>{text}</Text>
     </View>
   );
+}
+
+// CAP-3: one divider per non-empty lifecycle band, reusing the existing
+// sectionTitle style (already used for "סיכום לפי סוג חיוב" in the summary
+// tab) rather than introducing new styling.
+function renderBandDivider(headerText, keyValue) {
+  if (!headerText) {
+    return null;
+  }
+
+  return (
+    <Text key={keyValue} style={styles.sectionTitle}>
+      {headerText}
+    </Text>
+  );
+}
+
+// CAP-3: renders one item type's three lifecycle bands (active / pending /
+// cancelled) in the required order, each under its own divider only when
+// non-empty, using the caller's existing per-item card renderer unchanged.
+function renderBandedSections(banded, renderCard) {
+  var sections = [
+    { key: "active", items: banded.active, header: getLifecycleBandHeader(LIFECYCLE_STATE.ACTIVE) },
+    { key: "pending", items: banded.pending, header: getLifecycleBandHeader(LIFECYCLE_STATE.PENDING_CHANGE) },
+    { key: "cancelled", items: banded.cancelled, header: getLifecycleBandHeader(LIFECYCLE_STATE.CANCELLED) },
+  ];
+
+  return sections.map(function (section) {
+    if (section.items.length === 0) {
+      return null;
+    }
+
+    return (
+      <React.Fragment key={"band-" + section.key}>
+        {renderBandDivider(section.header, "band-header-" + section.key)}
+        {section.items.map(renderCard)}
+      </React.Fragment>
+    );
+  });
 }
 
 export default function AdminCompetitionPayerAccountScreen(props) {
@@ -527,6 +577,35 @@ export default function AdminCompetitionPayerAccountScreen(props) {
       });
     },
     [account.stalls, searchText, dateFilter, paymentFilter],
+  );
+
+  // CAP-3: classes have no verified lifecycle field yet (CAP-8 has not
+  // added one to usp_getpayercompetitionaccount's classes[] array) - they
+  // are deliberately NOT banded, only given the same deterministic
+  // date/time ordering every other list gets. See
+  // payerAccountBands.js/payerAccountLifecycle.js for why.
+  var sortedClasses = useMemo(
+    function () {
+      return sortClassesByVerifiedDate(filteredClasses);
+    },
+    [filteredClasses],
+  );
+
+  // CAP-3: paid time and stalls DO carry verified lifecycle signals, so they
+  // are grouped into active / pendingChange+pendingCancellation / cancelled
+  // and sorted within each band, mirroring the server's own ORDER BY.
+  var bandedPaidTimes = useMemo(
+    function () {
+      return bandAndSortPaidTimes(filteredPaidTimes);
+    },
+    [filteredPaidTimes],
+  );
+
+  var bandedStalls = useMemo(
+    function () {
+      return bandAndSortStalls(filteredStalls);
+    },
+    [filteredStalls],
   );
 
   // CAP-4: date chips are scoped to whichever tab is active, using that
@@ -960,7 +1039,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
       );
     }
 
-    if (filteredClasses.length === 0) {
+    if (sortedClasses.length === 0) {
       return (
         <>
           {renderAddEntryButton()}
@@ -969,7 +1048,10 @@ export default function AdminCompetitionPayerAccountScreen(props) {
       );
     }
 
-    var listContent = filteredClasses.map(function (item) {
+    // CAP-3: date/time ordered only, deliberately not banded into
+    // active/pending/cancelled - see sortedClasses' own comment above for
+    // why (no verified class lifecycle field until CAP-8).
+    var listContent = sortedClasses.map(function (item) {
       var isLocked =
         item.isPaid === true ||
         item.hasPendingCancellation === true ||
@@ -1064,7 +1146,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
       );
     }
 
-    var paidTimeContent = filteredPaidTimes.map(function (item) {
+    function renderPaidTimeCard(item) {
       var status = String(item.status || "").toLowerCase();
       var isLocked = item.isPaid === true || status === "cancelled";
       var lockedLabel = item.isPaid
@@ -1120,12 +1202,12 @@ export default function AdminCompetitionPayerAccountScreen(props) {
           )}
         </View>
       );
-    });
+    }
 
     return (
       <>
         {renderAddPaidTimeButton()}
-        {paidTimeContent}
+        {renderBandedSections(bandedPaidTimes, renderPaidTimeCard)}
       </>
     );
   }
@@ -1149,10 +1231,10 @@ export default function AdminCompetitionPayerAccountScreen(props) {
       );
     }
 
-    var stallsContent = filteredStalls.map(function (item) {
-      var shavingsOrders = Array.isArray(item.shavingsOrders)
-        ? item.shavingsOrders
-        : [];
+    function renderStallCard(item) {
+      // CAP-3: nested shavings sub-lines are sorted (never banded - they
+      // all share this stall's one inherited lifecycle state already).
+      var shavingsOrders = sortShavingsOrders(item.shavingsOrders);
 
       var isLocked =
         item.isPaid === true ||
@@ -1178,7 +1260,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
             </Text>
 
             <Text style={styles.itemAmount}>
-              {formatCurrency(item.stallAmountToPay)}
+              {formatCurrency(item.amountToPay)}
             </Text>
           </View>
 
@@ -1194,7 +1276,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
             תא: {item.stallId ? "#" + item.stallId : "טרם שובץ"}
           </Text>
 
-          {renderPaymentBadge(item.isPaid, item.stallAmountToPay)}
+          {renderPaymentBadge(item.isPaid, item.amountToPay)}
 
           {shavingsOrders.length > 0 ? (
             <View style={{ marginTop: 12 }}>
@@ -1206,8 +1288,8 @@ export default function AdminCompetitionPayerAccountScreen(props) {
                     key={String(order.shavingsOrderId)}
                     style={styles.itemText}
                   >
-                    {order.bagQuantityPerStall} שקים ·{" "}
-                    {formatCurrency(order.estimatedAmountToPay)} ·{" "}
+                    {order.bagQuantity} שקים ·{" "}
+                    {formatCurrency(order.amountToPay)} ·{" "}
                     {order.deliveryStatus || "-"}
                   </Text>
                 );
@@ -1228,12 +1310,12 @@ export default function AdminCompetitionPayerAccountScreen(props) {
           )}
         </View>
       );
-    });
+    }
 
     return (
       <>
         {renderAddStallButton()}
-        {stallsContent}
+        {renderBandedSections(bandedStalls, renderStallCard)}
       </>
     );
   }

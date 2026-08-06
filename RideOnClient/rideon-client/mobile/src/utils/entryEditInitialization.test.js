@@ -129,3 +129,106 @@ describe("resolveEntryEditInitialization", () => {
     expect(result.prizeRecipientName).toBe("");
   });
 });
+
+// CAP-5 (Phase 2, payer-account-cohesion): documents the exact, verified
+// current behavior when editItem originates from
+// usp_getpayercompetitionaccount's classes[] array (opened via "ערוך" from
+// AdminCompetitionPayerAccountScreen.jsx's מקצים tab), rather than from the
+// richer usp_getsecretarycompetitionentries-shaped item other edit entry
+// points use. Read live during Phase 0 (2026-08-06) and re-confirmed
+// unchanged in Phase 2: that proc's classes[] objects carry only entryId,
+// billId, className, classDateTime, startTime, orderInDay, horseId,
+// horseName, barnName, riderName, coachName, organizerCost, federationCost,
+// totalAmount, isPaid - none of classInCompId, riderFederationMemberId,
+// coachFederationMemberId, paidByPersonId, or prizeRecipientName exist on
+// it. These tests exist to lock in and document that gap, not to fix it -
+// fixing it means proc 212 gaining those ids, which is CAP-8 work, out of
+// scope here. No production code changed for this describe block.
+describe("resolveEntryEditInitialization - payer-account classes[] item shape (CAP-5 boundary)", () => {
+  function buildPayerAccountClassItem(overrides) {
+    return Object.assign(
+      {
+        entryId: 42,
+        className: "Open NRHA",
+        classDateTime: "2026-09-15T00:00:00Z",
+        startTime: "09:00:00",
+        orderInDay: 6,
+        horseId: 360,
+        horseName: "SPECIAL ROYAL GUN",
+        barnName: "ספשייל רויאל גאן",
+        riderName: "דור ברבר",
+        coachName: "מאמן",
+        organizerCost: 100,
+        federationCost: 20,
+        totalAmount: 120,
+        isPaid: false,
+      },
+      overrides,
+    );
+  }
+
+  it("does not block/return null - a payer-account class item has none of the ids that would block it", () => {
+    var result = resolveEntryEditInitialization(
+      buildPayerAccountClassItem(),
+      buildFullLists(),
+    );
+
+    expect(result).not.toBeNull();
+  });
+
+  it("selectedClass, selectedRider, and selectedTrainer resolve to null - never a guessed/name-matched selection", () => {
+    var result = resolveEntryEditInitialization(
+      buildPayerAccountClassItem(),
+      buildFullLists(),
+    );
+
+    expect(result.selectedClass).toBeNull();
+    expect(result.selectedRider).toBeNull();
+    expect(result.selectedTrainer).toBeNull();
+  });
+
+  it("selectedHorse still resolves correctly - horseId/horseName/barnName ARE present on this shape", () => {
+    var result = resolveEntryEditInitialization(
+      buildPayerAccountClassItem(),
+      buildFullLists(),
+    );
+
+    expect(result.selectedHorse).toEqual({
+      horseId: 360,
+      horseName: "SPECIAL ROYAL GUN",
+      barnName: "ספשייל רויאל גאן",
+      federationNumber: "",
+    });
+  });
+
+  it("this remains true even when riders/trainers/classes lists loaded with an exact display-name match present - no name-based fallback is ever used", () => {
+    var lists = {
+      classes: [{ classInCompId: 999, className: "Open NRHA" }],
+      riders: [{ federationMemberId: 999, fullName: "דור ברבר" }],
+      trainers: [{ federationMemberId: 999, fullName: "מאמן" }],
+      payers: [],
+    };
+
+    var result = resolveEntryEditInitialization(
+      buildPayerAccountClassItem(),
+      lists,
+    );
+
+    // Same className/riderName/coachName text exists in the lists above,
+    // but with no classInCompId/riderFederationMemberId/
+    // coachFederationMemberId on the item to match by, none of them may be
+    // inferred from the matching display text.
+    expect(result.selectedClass).toBeNull();
+    expect(result.selectedRider).toBeNull();
+    expect(result.selectedTrainer).toBeNull();
+  });
+
+  it("prizeRecipientName defaults to empty - this shape has no such field", () => {
+    var result = resolveEntryEditInitialization(
+      buildPayerAccountClassItem(),
+      buildFullLists(),
+    );
+
+    expect(result.prizeRecipientName).toBe("");
+  });
+});
