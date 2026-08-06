@@ -5,6 +5,7 @@ import {
   getDeliveryUrgency,
   isActionRequired,
   groupActionRequiredOrders,
+  getHoursSinceDue,
 } from "./shavingsDueDate.utils";
 
 // A UTC instant chosen so the UTC calendar date and the Israel calendar date DISAGREE:
@@ -192,6 +193,41 @@ describe("isActionRequired", () => {
         TZ_BOUNDARY_NOW,
       ),
     ).toBe(false);
+  });
+});
+
+describe("getHoursSinceDue — elapsed time anchored to the due moment, not creation", () => {
+  const NOW = new Date("2026-08-07T12:00:00+03:00").getTime();
+
+  it("is positive once the due moment has passed", () => {
+    expect(
+      getHoursSinceDue({ requestedDeliveryTime: "2026-08-07T08:00:00" }, NOW),
+    ).toBeCloseTo(4, 5);
+  });
+
+  it("is negative before the due moment arrives (future order)", () => {
+    expect(
+      getHoursSinceDue({ requestedDeliveryTime: "2026-08-07T18:00:00" }, NOW),
+    ).toBeCloseTo(-6, 5);
+  });
+
+  it("is large and positive for a long-overdue order, independent of when it was created", () => {
+    expect(
+      getHoursSinceDue({ requestedDeliveryTime: "2026-07-20T09:00:00" }, NOW),
+    ).toBeGreaterThan(24 * 17);
+  });
+
+  it("returns null for a missing/malformed requestedDeliveryTime", () => {
+    expect(getHoursSinceDue({ requestedDeliveryTime: null }, NOW)).toBeNull();
+    expect(
+      getHoursSinceDue({ requestedDeliveryTime: "not-a-date" }, NOW),
+    ).toBeNull();
+  });
+
+  it("is casing-tolerant (PascalCase fallback)", () => {
+    expect(
+      getHoursSinceDue({ RequestedDeliveryTime: "2026-08-07T08:00:00" }, NOW),
+    ).toBeCloseTo(4, 5);
   });
 });
 
