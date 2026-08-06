@@ -35,7 +35,10 @@ import {
 
 import { groupAndBandShavingsByStall } from "../../../../utils/payerAccountShavingsGrouping";
 
-import { LIFECYCLE_STATE } from "../../../../utils/payerAccountLifecycle";
+import {
+  LIFECYCLE_STATE,
+  resolveClassLifecycleState,
+} from "../../../../utils/payerAccountLifecycle";
 
 import {
   getLifecycleBandHeader,
@@ -298,10 +301,33 @@ export default function PayerCompetitionAccountScreen(props) {
 
   var [cancellingId, setCancellingId] = useState(null);
 
-  // Synchronous in-flight guard for the standalone shavings cancel request
-  // only (see AdminCompetitionPayerAccountScreen.jsx's own stall/shavings
-  // guards for the identical pattern) - cancellingId above is UI feedback
-  // only, not a correctness guard against two rapid taps.
+  // Synchronous in-flight guards, one per action/target namespace (same
+  // pattern as AdminCompetitionPayerAccountScreen.jsx's stall/shavings
+  // guards) - cancellingId above is UI feedback only (async state), not a
+  // correctness guard: two rapid taps on the same or different actions can
+  // both pass a "busy?" check before either render reflects the first one.
+  // A separate ref per action means an in-flight entry cancel can never be
+  // released by, e.g., a paid-time cancel completing.
+  var entryCancelGuardRef = useRef(null);
+  if (entryCancelGuardRef.current === null) {
+    entryCancelGuardRef.current = createInFlightGuard();
+  }
+
+  var paidTimeCancelGuardRef = useRef(null);
+  if (paidTimeCancelGuardRef.current === null) {
+    paidTimeCancelGuardRef.current = createInFlightGuard();
+  }
+
+  var stallCancelGuardRef = useRef(null);
+  if (stallCancelGuardRef.current === null) {
+    stallCancelGuardRef.current = createInFlightGuard();
+  }
+
+  var stallChangeGuardRef = useRef(null);
+  if (stallChangeGuardRef.current === null) {
+    stallChangeGuardRef.current = createInFlightGuard();
+  }
+
   var shavingsCancelGuardRef = useRef(null);
   if (shavingsCancelGuardRef.current === null) {
     shavingsCancelGuardRef.current = createInFlightGuard();
@@ -362,8 +388,14 @@ export default function PayerCompetitionAccountScreen(props) {
   }
 
   async function doStallChangeRequest(item) {
+    var guardKey = "stall-change:" + item.stallBookingId;
+
+    if (!stallChangeGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
-      setCancellingId("stall-change:" + item.stallBookingId);
+      setCancellingId(guardKey);
 
       await createStallChangeRequestByPayer({
         stallBookingId: item.stallBookingId,
@@ -376,6 +408,7 @@ export default function PayerCompetitionAccountScreen(props) {
       Alert.alert("שגיאה", extractErrorMessage(err));
     } finally {
       setCancellingId(null);
+      stallChangeGuardRef.current.release(guardKey);
     }
   }
 
@@ -397,8 +430,14 @@ export default function PayerCompetitionAccountScreen(props) {
   }
 
   async function doCancelEntry(item) {
+    var guardKey = "entry:" + item.entryId;
+
+    if (!entryCancelGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
-      setCancellingId("entry:" + item.entryId);
+      setCancellingId(guardKey);
 
       await cancelEntryByPayer({
         entryId: item.entryId,
@@ -412,6 +451,7 @@ export default function PayerCompetitionAccountScreen(props) {
       Alert.alert("שגיאה", extractErrorMessage(err));
     } finally {
       setCancellingId(null);
+      entryCancelGuardRef.current.release(guardKey);
     }
   }
 
@@ -433,8 +473,14 @@ export default function PayerCompetitionAccountScreen(props) {
   }
 
   async function doCancelPaidTime(item) {
+    var guardKey = "paidTime:" + item.paidTimeRequestId;
+
+    if (!paidTimeCancelGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
-      setCancellingId("paidTime:" + item.paidTimeRequestId);
+      setCancellingId(guardKey);
 
       await cancelPaidTimeRequestByPayer({
         paidTimeRequestId: item.paidTimeRequestId,
@@ -448,6 +494,7 @@ export default function PayerCompetitionAccountScreen(props) {
       Alert.alert("שגיאה", extractErrorMessage(err));
     } finally {
       setCancellingId(null);
+      paidTimeCancelGuardRef.current.release(guardKey);
     }
   }
 
@@ -469,8 +516,14 @@ export default function PayerCompetitionAccountScreen(props) {
   }
 
   async function doCancelStall(item) {
+    var guardKey = "stall:" + item.stallBookingId;
+
+    if (!stallCancelGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
-      setCancellingId("stall:" + item.stallBookingId);
+      setCancellingId(guardKey);
 
       await cancelStallBookingByPayer({
         stallBookingId: item.stallBookingId,
@@ -484,6 +537,7 @@ export default function PayerCompetitionAccountScreen(props) {
       Alert.alert("שגיאה", extractErrorMessage(err));
     } finally {
       setCancellingId(null);
+      stallCancelGuardRef.current.release(guardKey);
     }
   }
 
@@ -804,9 +858,7 @@ export default function PayerCompetitionAccountScreen(props) {
     function renderClassCard(item) {
       var isLocked =
         item.isPaid === true ||
-        item.hasPendingCancellation === true ||
-        item.isCancelled === true ||
-        String(item.entryStatus || "").toLowerCase() === "cancelled";
+        resolveClassLifecycleState(item) === LIFECYCLE_STATE.CANCELLED;
 
       var lockedLabel = item.isPaid
         ? "כבר שולם — לא ניתן לבטל"

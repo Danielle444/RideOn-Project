@@ -40,7 +40,10 @@ import {
 
 import { groupAndBandShavingsByStall } from "../../../../utils/payerAccountShavingsGrouping";
 
-import { LIFECYCLE_STATE } from "../../../../utils/payerAccountLifecycle";
+import {
+  LIFECYCLE_STATE,
+  resolveClassLifecycleState,
+} from "../../../../utils/payerAccountLifecycle";
 
 import {
   getLifecycleBandHeader,
@@ -1236,9 +1239,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
     function renderClassCard(item) {
       var isLocked =
         item.isPaid === true ||
-        item.hasPendingCancellation === true ||
-        item.isCancelled === true ||
-        String(item.entryStatus || "").toLowerCase() === "cancelled";
+        resolveClassLifecycleState(item) === LIFECYCLE_STATE.CANCELLED;
 
       var lockedLabel = item.isPaid
         ? "כבר שולם — לא ניתן לבטל"

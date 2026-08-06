@@ -563,18 +563,62 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3E Slice D class banding + 
     expect(hookSource).toContain("fines: normalized.fines,");
   });
 
-  it("existing class edit/cancel action wiring is untouched - same isLocked/lockedLabel logic and renderActions call as before this slice", () => {
+  it("existing class edit/cancel action wiring is untouched - same renderActions call as before this slice", () => {
     var source = readSource();
 
-    expect(source).toContain(
-      'String(item.entryStatus || "").toLowerCase() === "cancelled"',
-    );
     expect(source).toContain(
       'renderActions(\n            "entry:" + item.entryId,',
     );
     expect(source).toContain(
       "setEditEntryItem(item);",
     );
+  });
+});
+
+describe("AdminCompetitionPayerAccountScreen - terminal class-entry cancellation lock", () => {
+  function getFunctionBlock(source, signature, nextSignature) {
+    var start = source.indexOf(signature);
+    var end = source.indexOf(nextSignature, start);
+
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+
+    return source.slice(start, end);
+  }
+
+  it("imports resolveClassLifecycleState alongside LIFECYCLE_STATE", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import {\n  LIFECYCLE_STATE,\n  resolveClassLifecycleState,\n} from "../../../../utils/payerAccountLifecycle";',
+    );
+  });
+
+  it("renderClassCard's isLocked uses the shared lifecycle resolver, not the dead isCancelled/hasPendingCancellation fields or a lowercase literal compare", () => {
+    var source = readSource();
+    var block = getFunctionBlock(
+      source,
+      "function renderClassCard(item) {",
+      "var lockedLabel",
+    );
+
+    expect(block).toContain(
+      "resolveClassLifecycleState(item) === LIFECYCLE_STATE.CANCELLED",
+    );
+    expect(block).not.toContain("item.hasPendingCancellation");
+    expect(block).not.toContain("item.isCancelled");
+    expect(block).not.toContain('.toLowerCase() === "cancelled"');
+  });
+
+  it("isLocked still locks a paid entry regardless of lifecycle state", () => {
+    var source = readSource();
+    var block = getFunctionBlock(
+      source,
+      "function renderClassCard(item) {",
+      "var lockedLabel",
+    );
+
+    expect(block).toContain("item.isPaid === true");
   });
 });
 
