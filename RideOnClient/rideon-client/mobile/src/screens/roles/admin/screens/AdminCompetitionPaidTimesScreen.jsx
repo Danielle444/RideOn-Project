@@ -36,7 +36,6 @@ import PaidTimeScheduleView from "../../../../components/competitions/adminPaidT
 import PaidTimeEditModal from "../../../../components/competitions/adminPaidTimes/PaidTimeEditModal";
 import AddPaidTimeButton from "../../../../components/competitions/adminPaidTimes/AddPaidTimeButton";
 import SlotScheduleModal from "../../../../components/competitions/adminPaidTimes/SlotScheduleModal";
-import PublishedSlotsModal from "../../../../components/competitions/adminPaidTimes/PublishedSlotsModal";
 import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
 
 import styles from "../../../../styles/adminCompetitionPaidTimesStyles";
@@ -146,7 +145,6 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   var [viewMode, setViewMode] = useState("list");
   var [expandedIds, setExpandedIds] = useState({});
   var [viewingSlotId, setViewingSlotId] = useState(null);
-  var [publishedSlotsOpen, setPublishedSlotsOpen] = useState(false);
 
   var bandedPaidTimes = useMemo(
     function () {
@@ -540,29 +538,6 @@ export default function AdminCompetitionPaidTimesScreen(props) {
           />
         )}
 
-        <Pressable
-          onPress={function () {
-            setPublishedSlotsOpen(true);
-          }}
-          style={{
-            flexDirection: "row-reverse",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "#FFFFFF",
-            borderWidth: 1,
-            borderColor: "#7B5A4D",
-            paddingVertical: 10,
-            paddingHorizontal: 14,
-            borderRadius: 10,
-            gap: 8,
-            marginBottom: 12,
-          }}
-        >
-          <Text style={{ color: "#7B5A4D", fontWeight: "700", fontSize: 14 }}>
-            כל הסלוטים שפורסמו
-          </Text>
-        </Pressable>
-
         <View style={styles.searchCard}>
           <Text style={styles.fieldLabel}>חיפוש</Text>
           <TextInput
@@ -582,9 +557,7 @@ export default function AdminCompetitionPaidTimesScreen(props) {
               setShowFilters(!showFilters);
             }}
           >
-            <Text style={styles.filterToggleText}>
-              {showFilters ? "הסתר סינונים" : "הצג סינונים"}
-            </Text>
+            <Text style={styles.filterToggleText}>סינון</Text>
             <Text style={styles.filterToggleIcon}>
               {showFilters ? "▲" : "▼"}
             </Text>
@@ -707,14 +680,6 @@ export default function AdminCompetitionPaidTimesScreen(props) {
         />
       ) : null}
 
-      <PublishedSlotsModal
-        isOpen={publishedSlotsOpen}
-        competitionId={activeCompetition?.competitionId}
-        ranchId={activeRole?.ranchId}
-        onClose={function () {
-          setPublishedSlotsOpen(false);
-        }}
-      />
     </MobileScreenLayout>
   );
 }
