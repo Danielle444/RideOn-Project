@@ -13,7 +13,7 @@ import { getCompetitionEntriesView } from "../../services/entriesService";
 import { groupClassesByDay } from "../../utils/entriesViewGrouping";
 import {
   computeClassDrawState,
-  isCancelledAfterStartRow,
+  isActiveEntryForDraw,
 } from "../../utils/entriesDrawState";
 
 function fmtDate(value) {
@@ -36,18 +36,16 @@ function fmtDayBandHeading(value) {
   return fmtDate(value).replace(", ", " • ");
 }
 
-// Shared by the day band and the class header: mine/total over rows that
-// are not cancelled-after-start. Reuses isCancelledAfterStartRow rather than
-// re-implementing the exclusion so the count and the draw gate never drift.
+// Shared by the day band and the class header: mine/total over the rows
+// passed in. CAP-9: Cancelled/CancelledAfterStart rows are filtered out of
+// `groups` before any of this runs (see the `groups` useMemo below), so
+// every row reaching this function is already Active -- no per-row status
+// check is needed here.
 function countRanchStats(rows, ranchId) {
   var mine = 0;
   var total = 0;
 
   rows.forEach(function (it) {
-    if (isCancelledAfterStartRow(it)) {
-      return;
-    }
-
     total += 1;
 
     if (Number(it.horseRanchId) === Number(ranchId)) {
@@ -150,6 +148,12 @@ export default function EntriesViewModal(props) {
             return Number(it.classInCompId) === Number(focusClassInCompId);
           })
         : items;
+
+      // CAP-9: Cancelled and CancelledAfterStart entries never appear in the
+      // running order - filtered out here, before grouping, so nothing
+      // downstream (sorting, day bands, rendering, mine/total counts) ever
+      // sees one.
+      filtered = filtered.filter(isActiveEntryForDraw);
 
       var byClass = {};
       filtered.forEach(function (it) {
@@ -524,7 +528,6 @@ function EntryRow(props) {
   var isDrawn = props.isDrawn;
 
   var isMine = Number(it.horseRanchId) === Number(ranchId);
-  var isCancelledAfterStart = isCancelledAfterStartRow(it);
 
   // CAP-4: horse name is the primary line; רוכב/ת and מאמן/ת render lighter
   // and muted on their own line beneath it, so the row reads horse-first
@@ -533,16 +536,14 @@ function EntryRow(props) {
     fontSize: 14,
     fontWeight: "700",
     textAlign: "right",
-    color: isCancelledAfterStart ? "#8A7A6E" : "#3F312B",
-    textDecorationLine: isCancelledAfterStart ? "line-through" : "none",
+    color: "#3F312B",
   };
 
   var secondaryTextStyle = {
     fontSize: 13,
     fontWeight: "400",
     textAlign: "right",
-    color: isCancelledAfterStart ? "#8A7A6E" : "#8D6E63",
-    textDecorationLine: isCancelledAfterStart ? "line-through" : "none",
+    color: "#8D6E63",
   };
 
   return (
@@ -588,25 +589,6 @@ function EntryRow(props) {
             {it.horseName}
             {it.barnName ? " (" + it.barnName + ")" : ""}
           </Text>
-
-          {isCancelledAfterStart ? (
-            <View
-              style={{
-                paddingHorizontal: 6,
-                paddingVertical: 2,
-                borderRadius: 8,
-                backgroundColor: "#EFE4DD",
-                borderWidth: 1,
-                borderColor: "#C9B7AC",
-              }}
-            >
-              <Text
-                style={{ color: "#6B5448", fontSize: 10, fontWeight: "700" }}
-              >
-                בוטל
-              </Text>
-            </View>
-          ) : null}
         </View>
 
         <View

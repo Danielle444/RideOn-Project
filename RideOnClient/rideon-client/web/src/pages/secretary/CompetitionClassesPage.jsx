@@ -142,27 +142,33 @@ export default function CompetitionClassesPage() {
                   disabled={page.savingDrawOrder || page.generatingDrawPreview}
                 />
 
-                <button
-                  type="button"
-                  onClick={function () {
-                    if (page.cancelledFilter === "only") {
-                      page.setCancelledFilter("hide");
-                    } else {
-                      page.setCancelledFilter("only");
+                {/* CAP-9: this toggle is for out-of-order inspection of cancelled entries
+                    only -- it has no effect during draw-order editing (selectedEntries
+                    short-circuits to the draft, ignoring cancelledFilter), so it stays
+                    hidden while editing instead of rendering as a dead control. */}
+                {!page.drawOrderEditMode ? (
+                  <button
+                    type="button"
+                    onClick={function () {
+                      if (page.cancelledFilter === "only") {
+                        page.setCancelledFilter("hide");
+                      } else {
+                        page.setCancelledFilter("only");
+                      }
+                    }}
+                    className={
+                      "rounded-2xl border px-4 py-2 text-sm font-bold transition-colors " +
+                      (page.cancelledFilter === "only"
+                        ? "border-[#A54848] bg-[#F9E5E5] text-[#A54848]"
+                        : "border-[#E2D5CE] bg-white text-[#6B574F] hover:bg-[#FAF5F1]")
                     }
-                  }}
-                  className={
-                    "rounded-2xl border px-4 py-2 text-sm font-bold transition-colors " +
-                    (page.cancelledFilter === "only"
-                      ? "border-[#A54848] bg-[#F9E5E5] text-[#A54848]"
-                      : "border-[#E2D5CE] bg-white text-[#6B574F] hover:bg-[#FAF5F1]")
-                  }
-                  title="הצג רק הרשמות שבוטלו"
-                >
-                  {page.cancelledFilter === "only"
-                    ? "הצג רק פעילות"
-                    : "הצג הרשמות מבוטלות"}
-                </button>
+                    title="הצג רק הרשמות שבוטלו"
+                  >
+                    {page.cancelledFilter === "only"
+                      ? "הצג רק פעילות"
+                      : "הצג הרשמות מבוטלות"}
+                  </button>
+                ) : null}
               </>
             ) : null}
 
