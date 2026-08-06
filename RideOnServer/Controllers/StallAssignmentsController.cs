@@ -12,7 +12,9 @@ namespace RideOnServer.Controllers
     public class StallAssignmentsController : ControllerBase
     {
         [HttpGet("compounds")]
-        public IActionResult GetCompounds([FromQuery] int ranchId)
+        public IActionResult GetCompounds(
+            [FromQuery] int ranchId,
+            [FromQuery] int? competitionId = null)
         {
             try
             {
@@ -25,8 +27,30 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin
                 );
 
+                // Ranch-model fix (Bug 2): stall compounds are physical venue data
+                // that belongs to the competition's HOST ranch, not the caller's
+                // own active ranch -- a non-host RanchAdmin's ranchId only proves
+                // WHO is asking, never WHERE the physical stalls are. When
+                // competitionId is supplied, resolve the venue ranch server-side
+                // and query against it instead. Callers that omit competitionId
+                // (older clients, ranch-level compound setup with no competition
+                // in scope) keep the pre-fix ranch-scoped behavior unchanged.
+                int venueRanchId = ranchId;
+
+                if (competitionId.HasValue)
+                {
+                    Competition? competition = Competition.GetCompetitionById(competitionId.Value);
+
+                    if (competition == null)
+                    {
+                        return NotFound("התחרות לא נמצאה");
+                    }
+
+                    venueRanchId = competition.HostRanchId;
+                }
+
                 var dal = new StallAssignmentDAL();
-                return Ok(dal.GetCompoundsWithLayout(ranchId));
+                return Ok(dal.GetCompoundsWithLayout(venueRanchId));
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -114,8 +138,21 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin
                 );
 
+                // Ranch-model fix (Bug 3): stallassignment.ranchid is the
+                // PHYSICAL stall's ranch (= the competition's host ranch), not
+                // the caller's own active ranch. Resolve the host ranch
+                // server-side so a non-host RanchAdmin still receives the real
+                // assigned price instead of a silent empty result that falls
+                // back to the stale booking price.
+                Competition? competition = Competition.GetCompetitionById(competitionId);
+
+                if (competition == null)
+                {
+                    return NotFound("התחרות לא נמצאה");
+                }
+
                 var dal = new StallAssignmentDAL();
-                return Ok(dal.GetAssignedStallPrices(competitionId, ranchId));
+                return Ok(dal.GetAssignedStallPrices(competitionId, competition.HostRanchId));
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -225,8 +262,19 @@ namespace RideOnServer.Controllers
                     RoleNames.RanchAdmin
                 );
 
+                // Ranch-model fix (Bug 4): usp_getstallmappublishstatus filters
+                // on the competition's HOST ranch, not the caller's own active
+                // ranch -- resolve it server-side so a non-host RanchAdmin gets
+                // the real publish status instead of a ranch-mismatch NotFound.
+                Competition? competition = Competition.GetCompetitionById(competitionId);
+
+                if (competition == null)
+                {
+                    return NotFound("התחרות לא נמצאה");
+                }
+
                 var dal = new StallAssignmentDAL();
-                var status = dal.GetPublishStatus(competitionId, ranchId);
+                var status = dal.GetPublishStatus(competitionId, competition.HostRanchId);
 
                 if (status == null)
                 {
