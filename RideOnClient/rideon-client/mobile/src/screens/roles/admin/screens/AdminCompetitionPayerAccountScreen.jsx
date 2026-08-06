@@ -38,6 +38,8 @@ import {
   sortShavingsOrders,
 } from "../../../../utils/payerAccountBands";
 
+import { groupAndBandShavingsByStall } from "../../../../utils/payerAccountShavingsGrouping";
+
 import { LIFECYCLE_STATE } from "../../../../utils/payerAccountLifecycle";
 
 import {
@@ -45,9 +47,12 @@ import {
   getCancellationConfirmationText,
   PAYER_ACCOUNT_ITEM_LABEL,
   DIRECT_CANCELLATION_COPY,
+  SHAVINGS_NEEDS_REVIEW_COPY,
 } from "../../../../utils/payerAccountCopy";
 
 import { createInFlightGuard } from "../../../../utils/inFlightGuard";
+
+import ShavingsGroupCard from "../../../../components/payerAccount/ShavingsGroupCard";
 
 import styles from "../../../../styles/adminCompetitionPayerAccountStyles";
 
@@ -673,6 +678,18 @@ export default function AdminCompetitionPayerAccountScreen(props) {
       return bandAndSortStalls(filteredStalls);
     },
     [filteredStalls],
+  );
+
+  // CAP-4 (shavings tab): account.shavings[] is the top-level, one-row-per-
+  // shavingsOrderId list (distinct from the nested per-stall shavingsOrders[]
+  // already rendered inside the stalls tab below) - grouped/banded by the
+  // lifecycle of the stall(s) it links to, not filtered by dateFilter/
+  // searchText/paymentFilter like the other tabs.
+  var bandedShavings = useMemo(
+    function () {
+      return groupAndBandShavingsByStall(account.shavings, account.stalls);
+    },
+    [account.shavings, account.stalls],
   );
 
   // CAP-4: date chips are scoped to whichever tab is active, using that
@@ -1427,6 +1444,56 @@ export default function AdminCompetitionPayerAccountScreen(props) {
     );
   }
 
+  // CAP-4: renders the top-level account.shavings[] tab - each band's
+  // header comes from getLifecycleBandHeader for active/pending/cancelled,
+  // and from SHAVINGS_NEEDS_REVIEW_COPY for the fourth, needsReview band
+  // (never a guessed lifecycle). No add/edit/cancel actions here - this tab
+  // is read-only, same as the nested shavings lines inside the stalls tab.
+  function renderShavingsTab() {
+    if (!account.shavings || account.shavings.length === 0) {
+      return renderEmpty("לא נמצאו הזמנות נסורת בחשבון של משלם זה");
+    }
+
+    var sections = [
+      {
+        key: "active",
+        groups: bandedShavings.active,
+        header: getLifecycleBandHeader(LIFECYCLE_STATE.ACTIVE),
+      },
+      {
+        key: "pending",
+        groups: bandedShavings.pending,
+        header: getLifecycleBandHeader(LIFECYCLE_STATE.PENDING_CHANGE),
+      },
+      {
+        key: "cancelled",
+        groups: bandedShavings.cancelled,
+        header: getLifecycleBandHeader(LIFECYCLE_STATE.CANCELLED),
+      },
+      {
+        key: "needsReview",
+        groups: bandedShavings.needsReview,
+        header: SHAVINGS_NEEDS_REVIEW_COPY.bandHeader,
+      },
+    ];
+
+    return sections.map(function (section) {
+      if (section.groups.length === 0) {
+        return null;
+      }
+
+      return (
+        <React.Fragment key={"shavings-band-" + section.key}>
+          {renderBandDivider(section.header, "shavings-band-header-" + section.key)}
+
+          {section.groups.map(function (group) {
+            return <ShavingsGroupCard key={group.key} group={group} />;
+          })}
+        </React.Fragment>
+      );
+    });
+  }
+
   function renderActiveTab() {
     if (activeTab === "summary") {
       return renderSummaryTab();
@@ -1442,6 +1509,10 @@ export default function AdminCompetitionPayerAccountScreen(props) {
 
     if (activeTab === "stalls") {
       return renderStallsTab();
+    }
+
+    if (activeTab === "shavings") {
+      return renderShavingsTab();
     }
 
     return null;
@@ -1484,6 +1555,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
           {renderTabButton("classes", "מקצים")}
           {renderTabButton("paidTimes", "פייד")}
           {renderTabButton("stalls", "תאים")}
+          {renderTabButton("shavings", "נסורת")}
         </View>
 
         {showFiltersForTab ? renderFiltersBlock() : null}
