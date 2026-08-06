@@ -38,8 +38,14 @@ import DuplicateEntriesModal from "../../../../components/competitions/Duplicate
 
 import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
 
-import { createChangeEntryRequest } from "../../../../services/entriesService";
+import { adminCancelEntry } from "../../../../services/entriesService";
 import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
+import {
+  getCancellationConfirmationText,
+  PAYER_ACCOUNT_ITEM_LABEL,
+  DIRECT_CANCELLATION_COPY,
+} from "../../../../utils/payerAccountCopy";
+import { createInFlightGuard } from "../../../../utils/inFlightGuard";
 
 // Duplicate-from-previous-competition is hidden (off-design modal, escape-trap).
 // Flip to true to restore. Modal + utils remain in the repo.
@@ -102,6 +108,15 @@ export default function AdminCompetitionClassesScreen(props) {
   var [entriesViewFocusClass, setEntriesViewFocusClass] = useState(null);
 
   var [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+
+  // Synchronous in-flight guard for direct entry cancellation - same
+  // reusable helper and per-key-held-through-refresh pattern as
+  // AdminCompetitionPayerAccountScreen's stall cancellation. Initialized
+  // lazily so createInFlightGuard() runs once, not on every render.
+  var cancelGuardRef = useRef(null);
+  if (cancelGuardRef.current === null) {
+    cancelGuardRef.current = createInFlightGuard();
+  }
 
   // Force-closes an already-open create/edit/duplicate modal the moment
   // Classes becomes disabled or read-only (e.g. the competition ends) - a
@@ -166,49 +181,66 @@ export default function AdminCompetitionClassesScreen(props) {
     setShowCreateModal(true);
   }
 
+  // Phase 3C/CAP-6: direct admin cancellation via usp_admincancelentry
+  // (same endpoint/copy AdminCompetitionPayerAccountScreen already uses) -
+  // no ChangeEntryRequest is created from this screen anymore.
   function handleCancelEntry(item) {
     if (!availability.classes.isEnabled) {
       return;
     }
 
-    Alert.alert("ביטול הרשמה", "האם לשלוח בקשת ביטול למזכירה?", [
-      {
-        text: "לא",
-        style: "cancel",
-      },
-
-      {
-        text: "כן",
-        style: "destructive",
-
-        onPress: async function () {
-          if (!availability.classes.isEnabled) {
-            return;
-          }
-
-          try {
-            await createChangeEntryRequest({
-              competitionId: activeCompetition?.competitionId,
-
-              originalEntryId: item.entryId,
-
-              newEntryId: null,
-
-              isCancelled: true,
-            });
-
-            await entries.handleRefresh();
-            reloadRegistrationStepStatus();
-
-            Alert.alert("נשלח", "בקשת הביטול נשלחה למזכירה");
-          } catch (error) {
-            Alert.alert("שגיאה", "אירעה שגיאה בשליחת בקשת הביטול");
-
-            console.log(error);
-          }
+    Alert.alert(
+      "ביטול הרשמה",
+      getCancellationConfirmationText(PAYER_ACCOUNT_ITEM_LABEL.entry),
+      [
+        {
+          text: "לא",
+          style: "cancel",
         },
-      },
-    ]);
+
+        {
+          text: "כן",
+          style: "destructive",
+
+          onPress: async function () {
+            if (!availability.classes.isEnabled) {
+              return;
+            }
+
+            var guardKey = "entry:" + item.entryId;
+
+            if (!cancelGuardRef.current.tryAcquire(guardKey)) {
+              return;
+            }
+
+            try {
+              await adminCancelEntry(
+                item.entryId,
+                activeCompetition?.competitionId,
+                activeRole?.ranchId,
+              );
+
+              // The cancel succeeded - refresh is best-effort and must not
+              // be able to turn this into a reported failure.
+              Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);
+
+              try {
+                await entries.handleRefresh();
+                reloadRegistrationStepStatus();
+              } catch (refreshError) {
+                console.log("CANCEL ENTRY REFRESH ERROR", refreshError);
+              }
+            } catch (error) {
+              Alert.alert("שגיאה", "אירעה שגיאה בביטול ההרשמה");
+
+              console.log(error);
+            } finally {
+              cancelGuardRef.current.release(guardKey);
+            }
+          },
+        },
+      ],
+    );
   }
 
   function renderFilterChip(label, isActive, onPress, keyValue) {
@@ -522,6 +554,7 @@ export default function AdminCompetitionClassesScreen(props) {
         <CompetitionEntryCreateModal
           visible={showCreateModal && availability.classes.isEnabled}
           editItem={editingItem}
+          useDirectAdminEdit={true}
           onClose={function () {
             setShowCreateModal(false);
 
