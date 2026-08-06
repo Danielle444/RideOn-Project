@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -35,6 +35,8 @@ import {
   HOME_TEASER_ALLOWED_STATUSES,
 } from "../../../../../../shared/auth/utils/competitions/competitionHomeShortlist";
 import { MOBILE_COMPETITION_STATUS_ORDER } from "../../../../../../shared/auth/utils/competitions/competitionStatusOrder";
+import { withTransientRetry } from "../../../../utils/transientRequestRetry";
+import { createStartupAlertGuard } from "../../../../utils/startupAlertGuard";
 
 export default function WorkerHomeScreen(props) {
   var userContext = useUser();
@@ -51,23 +53,47 @@ export default function WorkerHomeScreen(props) {
   var [claimingOrderId, setClaimingOrderId] = useState(null);
   var [refreshing, setRefreshing] = useState(false);
 
+  // One instance for the screen's lifetime, held in a ref (not state) so a
+  // synchronous check-and-set is possible from either loader's catch block.
+  var startupAlertGuardRef = useRef(null);
+  if (startupAlertGuardRef.current === null) {
+    startupAlertGuardRef.current = createStartupAlertGuard();
+  }
+
   useEffect(
     function () {
       if (!activeRole || !activeRole.ranchId) {
         return;
       }
 
-      loadHomeCompetitions();
-      loadShavingsFeed();
+      loadWorkerHome();
     },
     [activeRole],
   );
+
+  // Runs both startup requests together. Each one retries and fails on its
+  // own via withTransientRetry, but the two share startupAlertGuardRef so
+  // that if both fail in the same cycle, only the first alert is shown -
+  // not two generic alerts back to back. The guard is reset before AND
+  // after the cycle, so it never suppresses a later, unrelated call to
+  // loadShavingsFeed (e.g. from handleClaimShavingsOrder below).
+  async function loadWorkerHome() {
+    startupAlertGuardRef.current.reset();
+
+    try {
+      await Promise.all([loadHomeCompetitions(), loadShavingsFeed()]);
+    } finally {
+      startupAlertGuardRef.current.reset();
+    }
+  }
 
   async function loadHomeCompetitions() {
     try {
       setLoading(true);
 
-      var response = await getMobileWorkerCompetitionsBoard(activeRole.ranchId);
+      var response = await withTransientRetry(function () {
+        return getMobileWorkerCompetitionsBoard(activeRole.ranchId);
+      });
       setCompetitions(
         selectCompetitionsShortlist(
           response.data,
@@ -79,7 +105,9 @@ export default function WorkerHomeScreen(props) {
     } catch (error) {
       console.error(error);
       setCompetitions([]);
-      Alert.alert("שגיאה", "אירעה שגיאה בטעינת דף הבית");
+      if (startupAlertGuardRef.current.shouldAlert()) {
+        Alert.alert("שגיאה", "אירעה שגיאה בטעינת דף הבית");
+      }
     } finally {
       setLoading(false);
     }
@@ -93,13 +121,17 @@ export default function WorkerHomeScreen(props) {
     try {
       setLoadingFeed(true);
 
-      var response = await getWorkerHomeShavingsFeed(activeRole.ranchId);
+      var response = await withTransientRetry(function () {
+        return getWorkerHomeShavingsFeed(activeRole.ranchId);
+      });
       var items = Array.isArray(response.data?.data) ? response.data.data : [];
       setShavingsFeed(sortWorkerHomeFeed(items, user?.personId));
     } catch (error) {
       console.error(error);
       setShavingsFeed([]);
-      Alert.alert("שגיאה", "אירעה שגיאה בטעינת הזמנות הנסורת להיום");
+      if (startupAlertGuardRef.current.shouldAlert()) {
+        Alert.alert("שגיאה", "אירעה שגיאה בטעינת הזמנות הנסורת להיום");
+      }
     } finally {
       setLoadingFeed(false);
     }
@@ -132,7 +164,7 @@ export default function WorkerHomeScreen(props) {
   async function handleRefresh() {
     try {
       setRefreshing(true);
-      await Promise.all([loadHomeCompetitions(), loadShavingsFeed()]);
+      await loadWorkerHome();
     } finally {
       setRefreshing(false);
     }

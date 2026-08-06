@@ -21,6 +21,7 @@ import { getMobilePayerCompetitionsBoard } from "../../../../services/competitio
 import { canPayerEnterCompetition } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
 import { useCompetition } from "../../../../context/CompetitionContext";
 import { selectHomeCompetitions } from "../utils/selectPayerHomeCompetitions";
+import { withTransientRetry } from "../../../../utils/transientRequestRetry";
 
 export default function PayerHomeScreen(props) {
   var userContext = useUser();
@@ -50,7 +51,9 @@ export default function PayerHomeScreen(props) {
     try {
       setLoading(true);
 
-      var response = await getMobilePayerCompetitionsBoard(activeRole.ranchId);
+      var response = await withTransientRetry(function () {
+        return getMobilePayerCompetitionsBoard(activeRole.ranchId);
+      });
       var items = Array.isArray(response.data) ? response.data : [];
       setCompetitions(selectHomeCompetitions(items));
     } catch (error) {
