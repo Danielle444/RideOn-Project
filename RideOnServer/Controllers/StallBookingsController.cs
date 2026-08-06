@@ -537,6 +537,53 @@ namespace RideOnServer.Controllers
             }
         }
 
+        // Admin-payer direct-changes feature: RanchAdmin direct stall
+        // booking cancel, the stall sibling of EntriesController.AdminCancelEntry
+        // and the cancel-side counterpart to AdminEditStallBooking below.
+        // Deliberately a NEW, separate endpoint -- the existing
+        // POST /cancel-request (payer-style pending change request) is left
+        // completely unchanged.
+        [HttpDelete("admin-cancel/{stallBookingId}")]
+        public IActionResult AdminCancelStallBooking(
+            int stallBookingId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (stallBookingId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                int requestId = StallBooking.AdminCancelStallBooking(stallBookingId, ranchId, personId);
+
+                return Ok(new { ChangeRequestId = requestId, Message = "Stall booking cancelled" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_admincancelstallbooking.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in AdminCancelStallBooking: {ex.Message}");
+                return BadRequest("אירעה שגיאה בביטול הזמנת התא");
+            }
+        }
+
         [HttpPut("secretary/{stallBookingId}")]
         public IActionResult SecretaryUpdateStallBooking(
             int stallBookingId,
