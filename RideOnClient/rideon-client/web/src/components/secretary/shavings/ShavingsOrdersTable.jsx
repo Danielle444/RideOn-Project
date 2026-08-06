@@ -6,10 +6,13 @@ import {
   getSeen,
   getDelivered,
   getCreated,
+  getIsCancelled,
+  getHasPendingCancellation,
 } from "../../../utils/shavingsStatus.utils";
 import { getDelayRule } from "../../../utils/shavingsSla.utils";
 import ShavingsStatusChip from "./ShavingsStatusChip";
 import ShavingsSlaBadge from "./ShavingsSlaBadge";
+import ShavingsCancellationBadge from "./ShavingsCancellationBadge";
 
 const HEADERS = [
   "מס׳ הזמנה",
@@ -22,6 +25,7 @@ const HEADERS = [
   "הוזמן ע״י",
   "סכום",
   "התראה",
+  "ביטול",
 ];
 
 function formatMoney(value) {
@@ -44,6 +48,8 @@ function formatDateTime(value) {
 
 export default function ShavingsOrdersTable(props) {
   const orders = Array.isArray(props.orders) ? props.orders : [];
+  const onCancelOrder = props.onCancelOrder;
+  const cancellingId = props.cancellingId;
 
   if (orders.length === 0) {
     return (
@@ -87,7 +93,10 @@ export default function ShavingsOrdersTable(props) {
                   {getValue(order, "shavingsOrderId", "ShavingsOrderId", "-")}
                 </td>
                 <td className="px-4 py-4 align-top">
-                  <ShavingsStatusChip order={order} />
+                  <div className="flex flex-col items-start gap-1">
+                    <ShavingsStatusChip order={order} />
+                    <ShavingsCancellationBadge order={order} />
+                  </div>
                 </td>
                 <td className="px-4 py-4 align-top">
                   {getValue(order, "bagQuantity", "BagQuantity", 0)}
@@ -121,6 +130,39 @@ export default function ShavingsOrdersTable(props) {
                 </td>
                 <td className="px-4 py-4 align-top">
                   {delayed ? <ShavingsSlaBadge rule={rule} /> : null}
+                </td>
+                <td className="px-4 py-4 align-top">
+                  {(function () {
+                    const shavingsOrderId = getValue(
+                      order,
+                      "shavingsOrderId",
+                      "ShavingsOrderId",
+                      index,
+                    );
+                    const isLocked =
+                      getIsCancelled(order) || getHasPendingCancellation(order);
+                    const isBusy = cancellingId === shavingsOrderId;
+
+                    if (isLocked || typeof onCancelOrder !== "function") {
+                      return <span className="text-xs text-[#8A7268]">-</span>;
+                    }
+
+                    return (
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={function () {
+                          onCancelOrder(order);
+                        }}
+                        className={
+                          "rounded-lg px-3 py-1.5 text-xs font-bold text-white " +
+                          (isBusy ? "bg-[#C9B7AC]" : "bg-[#A0522D] hover:bg-[#8A4526]")
+                        }
+                      >
+                        {isBusy ? "מבטל..." : "בטל"}
+                      </button>
+                    );
+                  })()}
                 </td>
               </tr>
             );

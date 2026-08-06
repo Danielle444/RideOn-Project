@@ -7,7 +7,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { getCompetitionSummaryShavingsDetails } from "../../services/competitionSummaryService";
-import { getShavingsOrdersForCompetitionAndRanch } from "../../services/shavingsOrderService";
+import {
+  getShavingsOrdersForCompetitionAndRanch,
+  secretaryCancelShavingsOrder,
+} from "../../services/shavingsOrderService";
 import {
   deriveShavingsStatus,
   getValue,
@@ -38,6 +41,8 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
   const [orders, setOrders] = useState([]);
   const [ranchRollup, setRanchRollup] = useState([]);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [cancellingId, setCancellingId] = useState(null);
+  const [cancelError, setCancelError] = useState(null);
 
   // ---- URL state (CAP-2) ----
   const rawGroup = searchParams.get("group");
@@ -269,6 +274,57 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
     [reload],
   );
 
+  // Standalone shavings cancellation, HostSecretary-direct: mirrors
+  // useCompetitionStallsPage.js's handleDeleteStallBooking shape exactly
+  // (confirm -> call -> reload). ranchId here is the participating/booking
+  // ranch the order itself belongs to (order.participatingRanchId, stamped
+  // onto every row during the R2 per-ranch loop above) — NOT the page's own
+  // ranchId, since a host secretary's shavings list spans every
+  // participating guest ranch, not just her own.
+  const handleCancelOrder = useCallback(
+    async function (order) {
+      const shavingsOrderId = getValue(
+        order,
+        "shavingsOrderId",
+        "ShavingsOrderId",
+        null,
+      );
+      const orderRanchId = getValue(
+        order,
+        "participatingRanchId",
+        "ParticipatingRanchId",
+        ranchId,
+      );
+
+      if (!shavingsOrderId) {
+        return null;
+      }
+
+      const confirmed = window.confirm(
+        "האם לבטל את הזמנת הנסורת? פעולה זו תעדכן גם את החיובים.",
+      );
+
+      if (!confirmed) {
+        return null;
+      }
+
+      setCancelError(null);
+      setCancellingId(shavingsOrderId);
+
+      try {
+        await secretaryCancelShavingsOrder(shavingsOrderId, orderRanchId);
+        await reload();
+        return true;
+      } catch (err) {
+        setCancelError(err);
+        return false;
+      } finally {
+        setCancellingId(null);
+      }
+    },
+    [ranchId, reload],
+  );
+
   return {
     loading: loading,
     error: error,
@@ -293,5 +349,10 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
     openAdd: openAdd,
     closeAdd: closeAdd,
     handleOrderCreated: handleOrderCreated,
+
+    cancellingId: cancellingId,
+    cancelError: cancelError,
+    cancelErrorMessage: getErrorMessage(cancelError, "שגיאה בביטול הזמנת הנסורת"),
+    handleCancelOrder: handleCancelOrder,
   };
 }

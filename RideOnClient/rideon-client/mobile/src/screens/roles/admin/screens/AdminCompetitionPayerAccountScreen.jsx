@@ -62,6 +62,8 @@ import { cancelPaidTimeRequest } from "../../../../services/paidTimeRequestsServ
 
 import { adminCancelStallBooking } from "../../../../services/stallBookingsService";
 
+import { adminCancelShavingsOrder } from "../../../../services/shavingsOrderService";
+
 import CompetitionEntryCreateModal from "../../../../components/competitions/CompetitionEntryCreateModal";
 
 import PaidTimeCreateModal from "../../../../components/competitions/PaidTimeCreateModal";
@@ -285,6 +287,15 @@ export default function AdminCompetitionPayerAccountScreen(props) {
     stallCancelGuardRef.current = createInFlightGuard();
   }
 
+  // Same synchronous in-flight guard pattern for standalone shavings
+  // cancellation, kept as its own ref/key-space so a rapid double-tap on a
+  // shavings order can never race with, or be blocked by, an unrelated
+  // in-flight stall cancellation.
+  var shavingsCancelGuardRef = useRef(null);
+  if (shavingsCancelGuardRef.current === null) {
+    shavingsCancelGuardRef.current = createInFlightGuard();
+  }
+
   var [searchText, setSearchText] = useState("");
 
   var [dateFilter, setDateFilter] = useState("all");
@@ -481,6 +492,54 @@ export default function AdminCompetitionPayerAccountScreen(props) {
     } finally {
       setCancellingId(null);
       stallCancelGuardRef.current.release(guardKey);
+    }
+  }
+
+  function confirmCancelShavings(order) {
+    Alert.alert(
+      "ביטול הזמנת נסורת",
+      getCancellationConfirmationText(PAYER_ACCOUNT_ITEM_LABEL.shavings),
+      [
+        { text: "לא", style: "cancel" },
+        {
+          text: "כן",
+          style: "destructive",
+          onPress: function () {
+            doCancelShavings(order);
+          },
+        },
+      ],
+    );
+  }
+
+  // Direct admin cancellation via usp_admincancelshavingsorder - standalone,
+  // independent of the linked stall booking's own state. Same shape as
+  // doCancelStall above: synchronous guard acquired first, held through the
+  // refresh, success alert never gated on account.reload().
+  async function doCancelShavings(order) {
+    var guardKey = "shavings:" + order.shavingsOrderId;
+
+    if (!shavingsCancelGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
+    try {
+      setCancellingId(guardKey);
+
+      await adminCancelShavingsOrder(order.shavingsOrderId, activeRole?.ranchId);
+
+      Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);
+
+      try {
+        await account.reload();
+      } catch (refreshError) {
+        console.log("CANCEL SHAVINGS REFRESH ERROR", refreshError);
+      }
+    } catch (err) {
+      Alert.alert("שגיאה", extractErrorMessage(err));
+    } finally {
+      setCancellingId(null);
+      shavingsCancelGuardRef.current.release(guardKey);
     }
   }
 
@@ -1482,12 +1541,26 @@ export default function AdminCompetitionPayerAccountScreen(props) {
         return null;
       }
 
+      // Standalone shavings cancellation: the cancel action is only ever
+      // offered on the active band. A cancelled/pending/needsReview group
+      // renders exactly as before this feature (read-only) - no button, no
+      // locked-label footer, since those bands already communicate their
+      // own state via the section header/chip.
+      var isActiveSection = section.key === "active";
+
       return (
         <React.Fragment key={"shavings-band-" + section.key}>
           {renderBandDivider(section.header, "shavings-band-header-" + section.key)}
 
           {section.groups.map(function (group) {
-            return <ShavingsGroupCard key={group.key} group={group} />;
+            return (
+              <ShavingsGroupCard
+                key={group.key}
+                group={group}
+                onCancelOrder={isActiveSection ? confirmCancelShavings : undefined}
+                cancellingId={isActiveSection ? cancellingId : undefined}
+              />
+            );
           })}
         </React.Fragment>
       );
