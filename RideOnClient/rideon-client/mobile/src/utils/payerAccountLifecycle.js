@@ -109,16 +109,22 @@ function resolveShavingsLifecycleState(parentStallLifecycleState) {
   return parentStallLifecycleState;
 }
 
-// Classes carry NO lifecycle field today - usp_getpayercompetitionaccount's
-// classes[] array has no isCancelled/hasPendingCancellation/entryStatus key
-// at all (verified live, Phase 0, 2026-08-06). CAP-8 is expected to add an
-// entryStatus-shaped field, but its exact name and value vocabulary are NOT
-// yet verified against a deployed proc - this mapping is provisional and
-// must be re-checked once CAP-8 ships. Only the three entry-status values
-// already confirmed elsewhere in this system (Active / Cancelled /
-// CancelledAfterStart, e.g. in usp_answerchangeentryrequestsecured and
-// usp_getsecretarycompetitionentries) are mapped; anything else - including
-// a missing field, which is every real class item today - resolves to
+// CAP-8 (proc 212) has shipped and now returns a real entryStatus on every
+// classes[] row (verified live and via deployment, 2026-08-06). The deployed
+// proc's own filters establish the complete, exhaustive vocabulary that can
+// ever reach this function: class_charge_history only surfaces billcharge
+// rows with chargestatus Open/Paid/Cancelled/Replaced (PendingApproval is
+// excluded there), and class_items additionally excludes
+// entrystatus='Rejected'. So entryStatus is always one of Active / Cancelled
+// / CancelledAfterStart / Replaced - Rejected can never appear here, so it
+// is deliberately left unhandled below rather than given a guessed mapping;
+// it falls through to the same UNKNOWN default as any other unrecognized
+// value. Replaced groups into the same CANCELLED lifecycle bucket as
+// Cancelled/CancelledAfterStart - like those two, it means "this specific
+// registration is no longer the active one," which is exactly what
+// LIFECYCLE_STATE.CANCELLED represents for every other item type in this
+// file; there is no separate "replaced" bucket in LIFECYCLE_STATE and this
+// file adds none. Anything else - including a missing field - resolves to
 // LIFECYCLE_STATE_UNKNOWN rather than a guessed "active". This is the
 // deliberate difference from resolveStallLifecycleState/
 // resolvePaidTimeLifecycleState above: those default a missing signal to
@@ -136,7 +142,8 @@ function resolveClassLifecycleState(classItem) {
 
   if (
     classItem.entryStatus === "Cancelled" ||
-    classItem.entryStatus === "CancelledAfterStart"
+    classItem.entryStatus === "CancelledAfterStart" ||
+    classItem.entryStatus === "Replaced"
   ) {
     return LIFECYCLE_STATE.CANCELLED;
   }

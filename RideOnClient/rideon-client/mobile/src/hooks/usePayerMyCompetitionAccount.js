@@ -18,6 +18,7 @@ function normalizeAccountResponse(response) {
     paidTimes: [],
     stalls: [],
     shavings: [],
+    fines: [],
   };
 }
 
@@ -78,6 +79,21 @@ function safeArray(value) {
  */
 
 /**
+ * @typedef {Object} PayerFineRow
+ * @property {number} billChargeId
+ * @property {number} billId
+ * @property {number} sourceId
+ * @property {number|null} originalEntryId
+ * @property {number|null} classInCompId
+ * @property {string|null} className
+ * @property {number} amountToPay
+ * @property {number} paidAmount
+ * @property {number} unpaidAmount
+ * @property {string|null} chargeStatus
+ * @property {string|null} notes
+ */
+
+/**
  * @typedef {Object} PayerSummary
  * @property {number} classGrandTotal
  * @property {number} classOrganizerTotal
@@ -101,6 +117,7 @@ function safeArray(value) {
  * @property {PayerPaidTimeRow[]} paidTimes
  * @property {PayerStallRow[]} stalls
  * @property {PayerShavingsOrder[]} shavings
+ * @property {PayerFineRow[]} fines
  */
 
 // Guardrail (CAP-3): the deployed proc's money-bearing fields (amountToPay on a
@@ -174,6 +191,7 @@ function normalizePayerAccount(raw) {
     paidTimes: safeArray(safeRaw.paidTimes),
     stalls: stalls,
     shavings: shavings,
+    fines: safeArray(safeRaw.fines),
   };
 }
 
@@ -273,6 +291,9 @@ export default function usePayerMyCompetitionAccount(params) {
         shavings: dedupBy(typedAccount.shavings, function (it) {
           return it.shavingsOrderId;
         }),
+        fines: dedupBy(typedAccount.fines, function (it) {
+          return it.billChargeId;
+        }),
       };
     },
     [account],
@@ -289,5 +310,6 @@ export default function usePayerMyCompetitionAccount(params) {
     paidTimes: normalized.paidTimes,
     stalls: normalized.stalls,
     shavings: normalized.shavings,
+    fines: normalized.fines,
   };
 }

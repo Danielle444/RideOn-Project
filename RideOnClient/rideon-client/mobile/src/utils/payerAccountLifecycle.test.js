@@ -155,7 +155,7 @@ describe("resolveShavingsLifecycleState", () => {
 });
 
 describe("resolveClassLifecycleState", () => {
-  it("is unknown for today's real shape - no entryStatus field at all", () => {
+  it("is unknown for a class item missing the entryStatus field", () => {
     expect(
       resolveClassLifecycleState({
         entryId: 1,
@@ -172,19 +172,22 @@ describe("resolveClassLifecycleState", () => {
     );
   });
 
-  it("maps the anticipated Active value once CAP-8 adds entryStatus", () => {
+  it("maps the deployed proc-212 Active value", () => {
     expect(resolveClassLifecycleState({ entryStatus: "Active" })).toBe(
       LIFECYCLE_STATE.ACTIVE,
     );
   });
 
-  it("maps Cancelled and CancelledAfterStart to the cancelled band", () => {
+  it("maps Cancelled, CancelledAfterStart, and Replaced to the cancelled band", () => {
     expect(resolveClassLifecycleState({ entryStatus: "Cancelled" })).toBe(
       LIFECYCLE_STATE.CANCELLED,
     );
     expect(
       resolveClassLifecycleState({ entryStatus: "CancelledAfterStart" }),
     ).toBe(LIFECYCLE_STATE.CANCELLED);
+    expect(resolveClassLifecycleState({ entryStatus: "Replaced" })).toBe(
+      LIFECYCLE_STATE.CANCELLED,
+    );
   });
 
   it("is unknown for an unrecognized entryStatus value rather than guessing", () => {

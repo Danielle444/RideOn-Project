@@ -18,6 +18,7 @@ function normalizeAccountResponse(response) {
     paidTimes: [],
     stalls: [],
     shavings: [],
+    fines: [],
   };
 }
 
@@ -140,6 +141,9 @@ export default function useAdminCompetitionPayerAccount(params) {
         shavings: dedupBy(safeArray(safeAccount.shavings), function (it) {
           return it.shavingsOrderId;
         }),
+        fines: dedupBy(safeArray(safeAccount.fines), function (it) {
+          return it.billChargeId;
+        }),
       };
     },
     [account, routePayer],
@@ -156,5 +160,6 @@ export default function useAdminCompetitionPayerAccount(params) {
     paidTimes: normalized.paidTimes,
     stalls: normalized.stalls,
     shavings: normalized.shavings,
+    fines: normalized.fines,
   };
 }
