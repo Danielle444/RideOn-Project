@@ -47,6 +47,28 @@ function getEntryStatus(item) {
   return getValue(item, "entryStatus", "EntryStatus", "Active");
 }
 
+function NeedsRedrawBadge() {
+  return (
+    <span
+      className="inline-flex w-fit rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-800"
+      title="לכניסות של ריצה פיזית זו יש מספרי הגרלה שונים בנתונים הקיימים -- יש להריץ הגרלה מחדש"
+    >
+      דורש הגרלה מחדש
+    </span>
+  );
+}
+
+function DuplicateEntryBadge() {
+  return (
+    <span
+      className="inline-flex w-fit rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-bold text-red-800"
+      title="נמצאה יותר מכניסה פעילה אחת לאותו רוכב, סוס ומקצה -- יש לטפל בכפילות לפני הגרלה"
+    >
+      כניסה כפולה
+    </span>
+  );
+}
+
 function getIsCancelledAfterStart(item) {
   var status = String(getEntryStatus(item) || "").toLowerCase();
 
@@ -242,6 +264,8 @@ function SortableEntryRow(props) {
             : <span>{getValue(item, "className", "ClassName", "-")}</span>}
 
           {isCancelledAfterStart ? <CancelledAfterStartBadge /> : null}
+          {item.hasInconsistentDrawOrder ? <NeedsRedrawBadge /> : null}
+          {item.isInvalidDuplicate ? <DuplicateEntryBadge /> : null}
         </div>
       </td>
 
