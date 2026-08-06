@@ -41,10 +41,33 @@ function getStallMapPublishStatus(competitionId, ranchId) {
   });
 }
 
+function parseCompoundLayout(compound) {
+  var raw =
+    compound &&
+    (compound.layoutJson != null
+      ? compound.layoutJson
+      : compound.layout != null
+        ? compound.layout
+        : compound.Layout);
+
+  if (!raw) return null;
+
+  try {
+    if (typeof raw === "string") {
+      return JSON.parse(raw);
+    }
+
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
 export {
   getCompounds,
   getAssignments,
   getHorses,
   getAssignedStallPrices,
   getStallMapPublishStatus,
+  parseCompoundLayout,
 };

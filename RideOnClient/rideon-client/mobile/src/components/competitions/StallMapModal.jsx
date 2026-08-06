@@ -12,6 +12,7 @@ import {
 import {
   getCompounds,
   getAssignments,
+  parseCompoundLayout,
 } from "../../services/stallMapService";
 
 var CELL_SIZE = 56;
@@ -323,7 +324,7 @@ function LegendItem(props) {
 
 function CompoundGrid(props) {
   var compound = props.compound;
-  var layout = compound.layout || compound.Layout || null;
+  var layout = parseCompoundLayout(compound);
   var assignmentsByStallNumber = props.assignmentsByStallNumber;
   var focusStallNumber = props.focusStallNumber;
 
