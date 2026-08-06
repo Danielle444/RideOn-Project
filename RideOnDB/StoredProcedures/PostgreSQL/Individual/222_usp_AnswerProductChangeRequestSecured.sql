@@ -60,6 +60,34 @@
 -- FUNCTION` -- a plain CREATE would fail with "already exists" against live.
 -- The signature is unchanged, so CREATE OR REPLACE applies cleanly with no
 -- DROP required.
+--
+-- SHAVINGS-ORPHAN CASCADE FIX (2026-08-06, CAP-11 financial correctness):
+-- an approved stall cancellation through this path cancelled the stall's own
+-- billcharge but left any linked shavings order's Open/PendingApproval
+-- billcharge rows untouched, and the shavings order itself active -- a
+-- confirmed live gap (verified against usp_admincancelstallbooking, 239,
+-- which already got this right for its own direct-cancel path). Fix adds
+-- ONE new block inside the existing `if v_iscancelled = true` branch, gated
+-- on `v_categorykey = 'stalls'`: it reuses 239's proven eligibility CTEs
+-- verbatim (adapted only for variable names -- p_stallbookingid ->
+-- v_originalprequestid), which already encode:
+--   - the active-link rule (a linked stall only stops keeping a shared
+--     shavings order alive when it has an Approved+iscancelled=true request
+--     AND no Open/Paid/PendingApproval charge remaining -- any inconsistent
+--     state keeps the order alive, conservatively)
+--   - Policy A (any Paid row anywhere on the shavings sourceId blocks
+--     cancellation of the WHOLE order, not just that row)
+-- Physical shavingsorderforstallbooking rows are never touched, matching
+-- 239's own header guarantee. The stall's own charge-cancel condition above
+-- (chargestatus = 'Open' and paymentbatchid is null) is UNCHANGED -- this
+-- fix only adds the missing shavings cascade, nothing else. Cancelled
+-- shavings bills are captured via UPDATE...RETURNING into v_shavings_bill_ids
+-- (239's technique) and recalculated in a second small loop after the
+-- existing billproductrequest-derived recalculation loop, which already
+-- covers the stall's own bill(s) unchanged; usp_recalculatebillamount is a
+-- full recompute per bill, so any overlap between the two loops is harmless.
+-- The non-cancellation (change/replace) branch below is entirely untouched --
+-- the verified gap is cancellation-only.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_answerproductchangerequestsecured(
@@ -89,6 +117,8 @@ declare
     v_payercount integer;
     v_baseshare integer;
     v_remainder integer;
+
+    v_shavings_bill_ids integer[];
 begin
     if p_productchangerequestid is null or p_productchangerequestid <= 0 then
         raise exception 'Invalid product change request id';
@@ -181,6 +211,63 @@ begin
           and sourceid = v_originalprequestid
           and chargestatus = 'Open'
           and paymentbatchid is null;
+
+        if v_categorykey = 'stalls' then
+            -- Reused verbatim from usp_admincancelstallbooking (239), only
+            -- the anchor id changed (p_stallbookingid -> v_originalprequestid).
+            with eligible_shavings_orders as (
+                select sofb.shavingsorderid
+                from public.shavingsorderforstallbooking sofb
+                where sofb.stallbookingid = v_originalprequestid
+                  and not exists (
+                      select 1
+                      from public.shavingsorderforstallbooking other
+                      where other.shavingsorderid = sofb.shavingsorderid
+                        and other.stallbookingid <> v_originalprequestid
+                        and not (
+                            exists (
+                                select 1
+                                from public.productchangerequest pcr
+                                where pcr.originalprequestid = other.stallbookingid
+                                  and pcr.status = 'Approved'
+                                  and pcr.iscancelled = true
+                            )
+                            and not exists (
+                                select 1
+                                from public.billcharge bc
+                                where bc.sourcetype = 'ProductRequest'
+                                  and bc.sourceid = other.stallbookingid
+                                  and bc.chargestatus in ('Open', 'Paid', 'PendingApproval')
+                            )
+                        )
+                  )
+            ),
+            payable_shavings_orders as (
+                -- Policy A: any Paid row anywhere on this shavings sourceId
+                -- excludes the WHOLE order, not just that one payer's row.
+                select eso.shavingsorderid
+                from eligible_shavings_orders eso
+                where not exists (
+                    select 1
+                    from public.billcharge bc
+                    where bc.sourcetype = 'ProductRequest'
+                      and bc.sourceid = eso.shavingsorderid
+                      and bc.chargestatus = 'Paid'
+                )
+            ),
+            cancelled_shavings_charges as (
+                update public.billcharge
+                set chargestatus = 'Cancelled',
+                    cancelledat = now()
+                where sourcetype = 'ProductRequest'
+                  and chargestatus in ('Open', 'PendingApproval')
+                  and sourceid in (select shavingsorderid from payable_shavings_orders)
+                returning billid
+            )
+            select coalesce(array_agg(distinct billid), array[]::integer[])
+            into v_shavings_bill_ids
+            from cancelled_shavings_charges;
+        end if;
 
     else
         if v_newprequestid is null then
@@ -393,6 +480,13 @@ begin
     loop
         perform public.usp_recalculatebillamount(v_bill_id);
     end loop;
+
+    if v_shavings_bill_ids is not null then
+        foreach v_bill_id in array v_shavings_bill_ids
+        loop
+            perform public.usp_recalculatebillamount(v_bill_id);
+        end loop;
+    end if;
 
     return p_productchangerequestid;
 end;
