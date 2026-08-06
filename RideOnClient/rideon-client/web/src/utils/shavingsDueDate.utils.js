@@ -28,10 +28,105 @@ const israelDateFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: ISRAEL_TIME_ZONE,
 });
 
+const israelDateTimeFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: ISRAEL_TIME_ZONE,
+  hourCycle: "h23",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+});
+
+const MS_PER_HOUR = 1000 * 60 * 60;
+
 // {year, month, day} for "now" as seen on an Israel wall clock.
 export function getIsraelToday(now = Date.now()) {
   const formatted = israelDateFormatter.format(new Date(now));
   return parseDateOnly(formatted);
+}
+
+// {year, month, day, hour, minute, second} for "now" as seen on an Israel wall clock -- the
+// time-of-day companion to getIsraelToday, used by getHoursSinceDue below.
+function getIsraelNowParts(now) {
+  const lookup = {};
+  israelDateTimeFormatter.formatToParts(new Date(now)).forEach(function (part) {
+    lookup[part.type] = part.value;
+  });
+
+  return {
+    year: Number(lookup.year),
+    month: Number(lookup.month),
+    day: Number(lookup.day),
+    hour: Number(lookup.hour),
+    minute: Number(lookup.minute),
+    second: Number(lookup.second),
+  };
+}
+
+// Full literal (date + time) parse of a naive `requestedDeliveryTime` string -- same "read the
+// digits, never `new Date(str)`" approach as getRequestedDeliveryDateOnly, extended with
+// hour/minute/second so elapsed-hours math can anchor to the actual due moment.
+function parseNaiveDateTime(raw) {
+  if (!raw || typeof raw !== "string") {
+    return null;
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/.exec(raw);
+
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = match[6] ? Number(match[6]) : 0;
+
+  if (
+    month < 1 || month > 12 ||
+    day < 1 || day > 31 ||
+    hour > 23 || minute > 59 || second > 59
+  ) {
+    return null;
+  }
+
+  return { year, month, day, hour, minute, second };
+}
+
+// Both sides are naive Israel wall-clock readings (never a real UTC instant), so this is a plain
+// calendar-arithmetic diff -- Date.UTC here is just an arithmetic scratchpad, not a real-world
+// timezone conversion. Mirrors how getIsraelToday/compareDateOnly treat dates: no device-timezone
+// or DST reinterpretation risk, because neither side is ever fed through `new Date(str)`.
+function wallClockPartsToComparableMs(parts) {
+  return Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+  );
+}
+
+// Hours elapsed since the order's actual requested delivery MOMENT (date and time-of-day), not
+// just its calendar date. Null when requestedDeliveryTime is missing/malformed. Callers should
+// only trust this once getDeliveryUrgency has already confirmed the order is due (dueToday or
+// overdue) -- it does not itself check urgency.
+export function getHoursSinceDue(order, now = Date.now()) {
+  const due = parseNaiveDateTime(getRequestedDeliveryTime(order));
+
+  if (!due) {
+    return null;
+  }
+
+  const dueMs = wallClockPartsToComparableMs(due);
+  const nowMs = wallClockPartsToComparableMs(getIsraelNowParts(now));
+
+  return (nowMs - dueMs) / MS_PER_HOUR;
 }
 
 // {year, month, day} of the order's requested delivery date, or null when the value is
