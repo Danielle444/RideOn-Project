@@ -31,6 +31,18 @@
 -- untouched -- shavings repricing is not part of this change-request path,
 -- only stall date changes are. All authorization, status, paid-guard, and
 -- cancel/replace behavior is unchanged.
+--
+-- SHAVINGS-ORPHAN CASCADE FIX (2026-08-06, CAP-11 financial correctness):
+-- same fix as usp_answerproductchangerequestsecured (222) -- see 222's own
+-- header for the full rationale, identical in both procs. This proc has
+-- NO repository or live callers as of 2026-08-06 (ChangeTrackingDAL calls
+-- only the secured 222 function; no other function in the live database
+-- references this one by name) -- confirmed dead code, kept only for
+-- behavioral parity with 222, matching the precedent already set by the
+-- whole-shekel split correction above, which was applied to both procs for
+-- the same reason. Applying the fix here too means a future revival of this
+-- 4-argument path does not silently reintroduce a bug already fixed in its
+-- secured sibling.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_answerproductchangerequest(p_productchangerequestid integer, p_answerstatus text, p_answeredbysystemuserid integer, p_notes text DEFAULT NULL::text)
@@ -54,6 +66,8 @@ declare
     v_payercount integer;
     v_baseshare integer;
     v_remainder integer;
+
+    v_shavings_bill_ids integer[];
 begin
     if p_productchangerequestid is null or p_productchangerequestid <= 0 then
         raise exception 'Invalid product change request id';
@@ -145,6 +159,63 @@ begin
           and sourceid = v_originalprequestid
           and chargestatus = 'Open'
           and paymentbatchid is null;
+
+        if v_categorykey = 'stalls' then
+            -- Reused verbatim from usp_admincancelstallbooking (239), only
+            -- the anchor id changed (p_stallbookingid -> v_originalprequestid).
+            with eligible_shavings_orders as (
+                select sofb.shavingsorderid
+                from public.shavingsorderforstallbooking sofb
+                where sofb.stallbookingid = v_originalprequestid
+                  and not exists (
+                      select 1
+                      from public.shavingsorderforstallbooking other
+                      where other.shavingsorderid = sofb.shavingsorderid
+                        and other.stallbookingid <> v_originalprequestid
+                        and not (
+                            exists (
+                                select 1
+                                from public.productchangerequest pcr
+                                where pcr.originalprequestid = other.stallbookingid
+                                  and pcr.status = 'Approved'
+                                  and pcr.iscancelled = true
+                            )
+                            and not exists (
+                                select 1
+                                from public.billcharge bc
+                                where bc.sourcetype = 'ProductRequest'
+                                  and bc.sourceid = other.stallbookingid
+                                  and bc.chargestatus in ('Open', 'Paid', 'PendingApproval')
+                            )
+                        )
+                  )
+            ),
+            payable_shavings_orders as (
+                -- Policy A: any Paid row anywhere on this shavings sourceId
+                -- excludes the WHOLE order, not just that one payer's row.
+                select eso.shavingsorderid
+                from eligible_shavings_orders eso
+                where not exists (
+                    select 1
+                    from public.billcharge bc
+                    where bc.sourcetype = 'ProductRequest'
+                      and bc.sourceid = eso.shavingsorderid
+                      and bc.chargestatus = 'Paid'
+                )
+            ),
+            cancelled_shavings_charges as (
+                update public.billcharge
+                set chargestatus = 'Cancelled',
+                    cancelledat = now()
+                where sourcetype = 'ProductRequest'
+                  and chargestatus in ('Open', 'PendingApproval')
+                  and sourceid in (select shavingsorderid from payable_shavings_orders)
+                returning billid
+            )
+            select coalesce(array_agg(distinct billid), array[]::integer[])
+            into v_shavings_bill_ids
+            from cancelled_shavings_charges;
+        end if;
 
     else
         if v_newprequestid is null then
@@ -357,6 +428,13 @@ begin
     loop
         perform public.usp_recalculatebillamount(v_bill_id);
     end loop;
+
+    if v_shavings_bill_ids is not null then
+        foreach v_bill_id in array v_shavings_bill_ids
+        loop
+            perform public.usp_recalculatebillamount(v_bill_id);
+        end loop;
+    end if;
 
     return p_productchangerequestid;
 end;
