@@ -7,6 +7,28 @@ namespace RideOnServer.DAL
 {
     public class ShavingsOrderDAL : DBServices
     {
+        // Delivery destination (Slice 1). DBNull/null/empty is a normal, expected shape (an
+        // order with zero linked bookings, or every linked booking unassigned) and maps to an
+        // empty list -- never an exception. A non-empty but malformed JSON payload is NOT
+        // caught here: it propagates as a JsonException, mirroring the one existing precedent
+        // for DB-sourced JSON in this codebase (AutoSchedulerDAL.GetAutoSchedulerData, which
+        // likewise does not special-case deserialization failures) and relying on the same
+        // generic controller-level catch every other unexpected DAL failure already goes
+        // through. Swallowing a malformed payload into an empty list would silently hide a
+        // real data/query bug behind a UI state ("no destination assigned yet") that looks
+        // identical to a legitimate one -- worse than a loud 500.
+        private static List<ShavingsDestinationCompound> ParseDeliveryDestinations(object rawValue)
+        {
+            string json = rawValue == DBNull.Value ? "[]" : rawValue?.ToString() ?? "[]";
+
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return new List<ShavingsDestinationCompound>();
+            }
+
+            return JsonSerializer.Deserialize<List<ShavingsDestinationCompound>>(json)
+                ?? new List<ShavingsDestinationCompound>();
+        }
         public List<WorkerShavingsOrderItem> GetWorkerShavingsOrders(int workerSystemUserId)
         {
             Dictionary<string, object?> paramDic = new Dictionary<string, object?>
@@ -197,6 +219,8 @@ namespace RideOnServer.DAL
                     WorkerLastName = reader["WorkerLastName"] as string,
                     IsCancelled = Convert.ToBoolean(reader["IsCancelled"]),
                     HasPendingCancellation = Convert.ToBoolean(reader["HasPendingCancellation"]),
+                    DeliveryDestinations = ParseDeliveryDestinations(reader["DeliveryDestinations"]),
+                    HasUnassignedStalls = Convert.ToBoolean(reader["HasUnassignedStalls"]),
                 });
             }
 
@@ -248,6 +272,8 @@ namespace RideOnServer.DAL
                     WorkerLastName = reader["WorkerLastName"] as string,
                     IsCancelled = Convert.ToBoolean(reader["IsCancelled"]),
                     HasPendingCancellation = Convert.ToBoolean(reader["HasPendingCancellation"]),
+                    DeliveryDestinations = ParseDeliveryDestinations(reader["DeliveryDestinations"]),
+                    HasUnassignedStalls = Convert.ToBoolean(reader["HasUnassignedStalls"]),
                 });
             }
 
@@ -470,7 +496,11 @@ namespace RideOnServer.DAL
                     // Standalone shavings cancellation: own-order state, appended LAST to #176.
                     IsCancelled = Convert.ToBoolean(reader["iscancelled"]),
 
-                    HasPendingCancellation = Convert.ToBoolean(reader["haspendingcancellation"])
+                    HasPendingCancellation = Convert.ToBoolean(reader["haspendingcancellation"]),
+
+                    DeliveryDestinations = ParseDeliveryDestinations(reader["deliverydestinations"]),
+
+                    HasUnassignedStalls = Convert.ToBoolean(reader["hasunassignedstalls"])
                 });
             }
 
