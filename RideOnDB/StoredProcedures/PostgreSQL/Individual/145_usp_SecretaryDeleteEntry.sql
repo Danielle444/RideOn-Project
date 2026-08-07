@@ -123,7 +123,7 @@ BEGIN
         RAISE EXCEPTION 'Permission denied: not the host ranch secretary';
     END IF;
 
-    IF v_entrystatus = 'Cancelled' OR v_entrystatus = 'CancelledAfterStart' THEN
+    IF v_entrystatus = 'Cancelled' OR v_entrystatus = 'CancelledAfterStart' OR v_entrystatus = 'Replaced' THEN
         RAISE EXCEPTION 'Entry already cancelled';
     END IF;
 
