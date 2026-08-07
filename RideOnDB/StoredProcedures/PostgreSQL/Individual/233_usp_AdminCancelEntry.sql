@@ -39,12 +39,26 @@
 -- never reaches 234/221 a second time, so no double fine/charge/federation
 -- mutation can occur.
 --
--- Competition-ended is intentionally NOT re-checked here beyond what 234
--- already enforces (reused verbatim from 219): 234 unconditionally blocks
--- once the competition itself has ended (inherited, unchanged behavior),
--- while the locked design's
--- "direct regardless of registration-ended state" applies specifically to
--- registration having ended, not the competition itself having ended.
+-- Competition-ended: 234 already unconditionally blocks once the
+-- competition itself has ended (see above) -- this proc was flagged by a
+-- 2026-08-07 audit as "missing the guard", but that check only grepped this
+-- proc's OWN body text and missed the guard enforced one call-frame deeper,
+-- inside 234. Confirmed live via pg_get_functiondef before assuming a gap.
+--
+-- An EXPLICIT copy of the same guard was added directly here anyway
+-- (fix/competition-ended-and-delivery-guards, 2026-08-07), immediately
+-- after the entry-exists/competition-match check, deliberately BEFORE the
+-- ranch-admin-role and ownership checks. This is defense-in-depth, not a
+-- correctness fix -- the end result (rejection, same message, same RN001
+-- code) is unchanged; the only observable difference is that an
+-- unauthorized caller now sees "Competition has already ended" before
+-- "not authorized" for an ended competition, rather than after. Kept for
+-- consistency with the other 7 procs patched in the same slice
+-- (usp_admineditstallbooking, usp_admincancelstallbooking,
+-- usp_cancelstallbookingbypayer, usp_createstallchangerequestbypayer,
+-- usp_admincancelshavingsorder, usp_cancelshavingsorderbypayer,
+-- usp_secretarycancelshavingsorder), all of which genuinely lacked any
+-- competition-ended guard before this change.
 CREATE OR REPLACE FUNCTION public.usp_admincancelentry(
     p_personid integer,
     p_entryid integer,
@@ -98,6 +112,10 @@ begin
 
     if v_ctx.actualcompetitionid <> p_competitionid then
         raise exception 'Competition id does not match the entry''s actual competition' using errcode = 'RN001';
+    end if;
+
+    if v_ctx.iscompetitionended then
+        raise exception 'Competition has already ended' using errcode = 'RN001';
     end if;
 
     if not exists (

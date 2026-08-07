@@ -40,15 +40,19 @@ import StallMapModal from "../../../../components/competitions/StallMapModal";
 
 import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
 
-import { createStallBookingCancelRequest } from "../../../../services/stallBookingsService";
+import { adminCancelStallBooking } from "../../../../services/stallBookingsService";
 import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
 
 import {
   LIFECYCLE_STATE,
   resolveStallLifecycleState,
 } from "../../../../utils/payerAccountLifecycle";
+
 import { bandAndSortStalls } from "../../../../utils/payerAccountBands";
-import { getLifecycleBandHeader } from "../../../../utils/payerAccountCopy";
+import {
+  getLifecycleBandHeader,
+  DIRECT_CANCELLATION_COPY,
+} from "../../../../utils/payerAccountCopy";
 
 import styles from "../../../../styles/adminCompetitionStallsStyles";
 
@@ -362,13 +366,18 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
       return;
     }
 
-    Alert.alert("ביטול הזמנת תא", "האם לשלוח בקשת ביטול למזכירת התחרות?", [
+    // Direct cancel, matching AdminCompetitionPayerAccountScreen's mechanism
+    // (fix/competition-ended-and-delivery-guards, 2026-08-07) -- both Admin
+    // surfaces now cancel a stall booking the same way instead of this
+    // screen routing through a Pending secretary-approval request while the
+    // other screen cancelled immediately.
+    Alert.alert("ביטול הזמנת תא", "האם לבטל את הזמנת התא?", [
       {
         text: "לא",
         style: "cancel",
       },
       {
-        text: "כן, שלחי בקשה",
+        text: "כן, בטלי",
         style: "destructive",
         onPress: async function () {
           if (!availability.stalls.isEnabled) {
@@ -376,21 +385,21 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           }
 
           try {
-            await createStallBookingCancelRequest({
-              stallBookingId: item.stallBookingId,
-              ranchId: activeRole.ranchId,
-            });
+            await adminCancelStallBooking(
+              item.stallBookingId,
+              activeRole.ranchId,
+            );
 
             await overview.reload();
             reloadRegistrationStepStatus();
 
-            Alert.alert("נשלח", "בקשת ביטול התא נשלחה בהצלחה");
+            Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);
           } catch (error) {
-            console.log("CREATE STALL CANCEL REQUEST ERROR", error);
+            console.log("ADMIN CANCEL STALL BOOKING ERROR", error);
 
             Alert.alert(
               "שגיאה",
-              getApiErrorMessage(error, "אירעה שגיאה בשליחת בקשת ביטול התא"),
+              getApiErrorMessage(error, "אירעה שגיאה בביטול הזמנת התא"),
             );
           }
         },
