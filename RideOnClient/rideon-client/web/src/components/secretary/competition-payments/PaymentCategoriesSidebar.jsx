@@ -43,7 +43,22 @@ function getIcon(categoryKey) {
 
 export default function PaymentCategoriesSidebar(props) {
   var items = (props.items || []).filter(function (item) {
-    return getValue(item, "chargeOwner", "ChargeOwner", "") === props.activeOwner;
+    var categoryKey = getValue(item, "categoryKey", "CategoryKey", "");
+
+    // categoryKey='fine' is produced exclusively by Entry-created late-entry
+    // fines (usp_insertentry / usp_admincreateentry) -- ChangeEntryRequest
+    // fines carry categoryKey='classes' and are unaffected by this filter,
+    // they stay inside the "מקצים" tile exactly as before. Entry-created
+    // fines now fold into their base Entry payable unit (see
+    // paymentEntryGrouping.utils.js), so they no longer get a standalone
+    // "קנסות" filter tile here.
+    if (categoryKey === "fine") {
+      return false;
+    }
+
+    return (
+      getValue(item, "chargeOwner", "ChargeOwner", "") === props.activeOwner
+    );
   });
 
   return (

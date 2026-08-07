@@ -291,7 +291,8 @@ namespace RideOnServer.DAL
                                         ChargeStatus = GetString(reader, "ChargeStatus"),
                                         PaymentBatchId = GetNullableInt(reader, "PaymentBatchId"),
                                         InvoiceNumber = GetNullableString(reader, "InvoiceNumber"),
-                                        CanSelectForPayment = GetBool(reader, "CanSelectForPayment")
+                                        CanSelectForPayment = GetBool(reader, "CanSelectForPayment"),
+                                        ResolvedEntryId = GetNullableInt(reader, "ResolvedEntryId")
                                     }
                                 );
                             }

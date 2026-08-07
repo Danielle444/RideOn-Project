@@ -117,13 +117,15 @@ function getStatusClass(status) {
   return "bg-[#F1ECE8] text-[#7A655C]";
 }
 
-function hasPendingChangeFlag(charge) {
+function hasPendingChangeFlag(unit) {
   // Backend may surface this either via chargeStatus='PendingApproval' or via
-  // an explicit boolean flag once Daniel adds it to the SP.
-  if (charge && (charge.hasPendingChange || charge.HasPendingChange)) {
+  // an explicit boolean flag once Daniel adds it to the SP. buildPayableEntryUnits
+  // already copies both camelCase flags onto every unit, so this reads the
+  // same way whether `unit` is a merged Entry+fine unit or a passthrough row.
+  if (unit && (unit.hasPendingChange || unit.HasPendingChange)) {
     return true;
   }
-  if (charge && (charge.hasPendingCancellation || charge.HasPendingCancellation)) {
+  if (unit && (unit.hasPendingCancellation || unit.HasPendingCancellation)) {
     return true;
   }
   return false;
@@ -406,8 +408,8 @@ export default function PaymentChargesTable(props) {
         <div>
           <h3 className="text-lg font-black text-[#3F312B]">פירוט חיובים</h3>
           <p className="mt-1 text-xs text-[#8A7268]">
-            ניתן לבחור רק חיובים פתוחים. בחירת נסורת בוחרת את כל החיוב של אותה
-            הזמנה למשלם.
+            ניתן לבחור רק חיובים פתוחים. בחירת מקצה בוחרת גם קנס הרשמה מאוחרת
+            כשקיים. בחירת נסורת בוחרת את כל החיוב של אותה הזמנה למשלם.
           </p>
         </div>
 
@@ -436,18 +438,22 @@ export default function PaymentChargesTable(props) {
           </thead>
 
           <tbody>
-            {items.map(function (charge) {
-              var chargeId = getChargeId(charge);
-              var rowKey = getDisplayRowKey(charge);
-              var isSelected = selectedChargeIds.includes(chargeId);
+            {items.map(function (unit) {
+              var billChargeIds = Array.isArray(unit.billChargeIds)
+                ? unit.billChargeIds
+                : [getChargeId(unit)];
+              var rowKey = unit.displayUnitKey || getDisplayRowKey(unit);
+              var isSelected = billChargeIds.every(function (id) {
+                return selectedChargeIds.includes(id);
+              });
               var canSelect = getValue(
-                charge,
+                unit,
                 "canSelectForPayment",
                 "CanSelectForPayment",
                 false,
               );
 
-              var status = getValue(charge, "chargeStatus", "ChargeStatus", "");
+              var status = getValue(unit, "chargeStatus", "ChargeStatus", "");
 
               return (
                 <tr
@@ -465,29 +471,29 @@ export default function PaymentChargesTable(props) {
                       checked={isSelected}
                       disabled={!canSelect}
                       onChange={function () {
-                        props.onToggleCharge(charge);
+                        props.onToggleCharge(unit);
                       }}
                       className="h-5 w-5 accent-[#8B5E4C]"
                     />
                   </td>
 
                   <td className="px-4 py-4 text-sm font-bold text-[#7A655C]">
-                    {getDateCellContent(charge)}
+                    {getDateCellContent(unit)}
                   </td>
 
                   <td className="px-4 py-4">
                     <div className="font-black text-[#3F312B]">
-                      {getMainTitle(charge)}
+                      {getMainTitle(unit)}
                     </div>
 
                     <div className="mt-1 text-xs font-semibold text-[#8A7268]">
-                      {getValue(charge, "payerName", "PayerName", "")}
+                      {getValue(unit, "payerName", "PayerName", "")}
                     </div>
                   </td>
 
                   <td className="max-w-[390px] px-4 py-4">
                     <div className="whitespace-normal break-words">
-                      {getDetailsContent(charge)}
+                      {getDetailsContent(unit)}
                     </div>
                   </td>
 
@@ -497,23 +503,56 @@ export default function PaymentChargesTable(props) {
                       (canSelect ? "text-[#7B5A4D]" : "")
                     }
                   >
-                    {formatMoney(
-                      getValue(charge, "amountToPay", "AmountToPay", 0),
+                    {unit.hasIntegrityViolation ? (
+                      <span className="text-xs font-black text-red-700">
+                        לא ניתן לחשב סכום
+                      </span>
+                    ) : unit.hasFine ? (
+                      <div className="space-y-1 text-left">
+                        <div className="text-xs font-semibold text-[#8A7268]">
+                          מחיר כניסה: {formatMoney(unit.baseAmount)}
+                        </div>
+                        <div className="text-xs font-semibold text-[#8A7268]">
+                          קנס הרשמה מאוחרת: {formatMoney(unit.fineAmount)}
+                        </div>
+                        <div>{formatMoney(unit.amountToPay)}</div>
+                      </div>
+                    ) : (
+                      formatMoney(
+                        getValue(unit, "amountToPay", "AmountToPay", 0),
+                      )
                     )}
                   </td>
 
                   <td className="px-4 py-4">
                     <div className="flex flex-col gap-1 items-end">
-                      <span
-                        className={
-                          "inline-flex rounded-full px-3 py-1 text-xs font-black " +
-                          getStatusClass(status)
-                        }
-                      >
-                        {getStatusLabel(status)}
-                      </span>
+                      {unit.hasIntegrityViolation ? (
+                        <span
+                          className="inline-flex rounded-full border border-red-300 bg-red-50 px-3 py-1 text-xs font-black text-red-700"
+                          title={
+                            "בעיית נתונים: יותר מקנס אחד משויך לאותה הרשמה (billChargeIds: " +
+                            (Array.isArray(unit.integrityViolationBillChargeIds)
+                              ? unit.integrityViolationBillChargeIds.join(", ")
+                              : "") +
+                            "). יש לפנות לתמיכה טכנית."
+                          }
+                        >
+                          בעיית נתונים — לא ניתן לתשלום
+                        </span>
+                      ) : (
+                        <span
+                          className={
+                            "inline-flex rounded-full px-3 py-1 text-xs font-black " +
+                            getStatusClass(status)
+                          }
+                        >
+                          {getStatusLabel(status)}
+                        </span>
+                      )}
 
-                      {status !== "PendingApproval" && hasPendingChangeFlag(charge) ? (
+                      {!unit.hasIntegrityViolation &&
+                      status !== "PendingApproval" &&
+                      hasPendingChangeFlag(unit) ? (
                         <span
                           className="inline-flex rounded-full border border-[#E6C681] bg-[#FFF7E0] px-2 py-0.5 text-[10px] font-black text-[#8A5A00]"
                           title="קיימת בקשת שינוי/ביטול ממתינה — הסכום עלול להשתנות"
@@ -525,7 +564,7 @@ export default function PaymentChargesTable(props) {
                   </td>
 
                   <td className="px-4 py-4 text-sm">
-                    {getValue(charge, "invoiceNumber", "InvoiceNumber", "-") ||
+                    {getValue(unit, "invoiceNumber", "InvoiceNumber", "-") ||
                       "-"}
                   </td>
                 </tr>

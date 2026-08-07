@@ -258,13 +258,18 @@ function EntriesTable(props) {
           "מאמן",
           "משלם",
           "מקבל פרס",
-          "קנס",
+          "מחיר כניסה",
+          "קנס הרשמה מאוחרת",
+          "סה״כ",
           "סטטוס",
-          "סכום",
         ]}
         items={items}
         renderRow={function (item) {
           var isPaid = getValue(item, "isPaid", "IsPaid", false);
+          var baseAmount = Number(getValue(item, "amount", "Amount", 0)) || 0;
+          var fineAmount =
+            Number(getValue(item, "fineAmount", "FineAmount", 0)) || 0;
+          var combinedTotal = baseAmount + fineAmount;
 
           return [
             getValue(item, "drawOrder", "DrawOrder", "-") || "-",
@@ -274,9 +279,10 @@ function EntriesTable(props) {
             getValue(item, "payerName", "PayerName", "-"),
             getValue(item, "prizeRecipientName", "PrizeRecipientName", "-") ||
               "-",
-            getValue(item, "fineName", "FineName", "-") || "-",
+            formatMoney(baseAmount),
+            fineAmount > 0 ? formatMoney(fineAmount) : "-",
+            formatMoney(combinedTotal),
             <StatusBadge isPaid={isPaid} />,
-            formatMoney(getValue(item, "amount", "Amount", 0)),
           ];
         }}
       />

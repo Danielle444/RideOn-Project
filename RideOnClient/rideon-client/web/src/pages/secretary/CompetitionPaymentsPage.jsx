@@ -192,9 +192,9 @@ function PaymentsPageContent(props) {
                 </h2>
 
                 <p className="mt-2 text-sm text-[#8A7268]">
-                  בחירת שורת מקצה תבחר אוטומטית גם את חלק המארגן וגם את חלק
-                  ההתאחדות של אותו מקצה. בנסורת, בחירת שורה אחת בוחרת את כל
-                  חיוב הנסורת של אותו משלם.
+                  מחיר הכניסה וקנס הרשמה מאוחרת (כשקיים) מוצגים כשורה אחת
+                  ונבחרים יחד. בנסורת, בחירת שורה אחת בוחרת את כל חיוב הנסורת
+                  של אותו משלם.
                 </p>
               </div>
 
@@ -231,7 +231,7 @@ function PaymentsPageContent(props) {
 
               <div className="min-w-0 overflow-hidden">
                 <PaymentChargesTable
-                  items={page.visibleCharges}
+                  items={page.visibleChargeUnits}
                   selectedChargeIds={page.selectedChargeIds}
                   visibleSelectableChargeIds={page.visibleSelectableChargeIds}
                   allVisibleChargesSelected={page.allVisibleChargesSelected}
@@ -249,7 +249,7 @@ function PaymentsPageContent(props) {
       <CreatePaymentModal
         open={page.paymentModalOpen}
         chargeOwner={page.selectedOwner}
-        selectedCharges={page.selectedCharges}
+        selectedCharges={page.selectedChargeUnits}
         selectedTotal={page.selectedTotal}
         paymentMethods={page.paymentMethods}
         loading={page.creatingPayment}
