@@ -206,11 +206,7 @@ export default function useProfileScreen() {
 
       Alert.alert(
         "שגיאה",
-        String(
-          err?.response?.data ||
-            err?.message ||
-            "אירעה שגיאה בטעינת רשימת המנהלים",
-        ),
+        getApiErrorMessage(err, "אירעה שגיאה בטעינת רשימת המנהלים"),
       );
     } finally {
       setLoadingManagers(false);
@@ -242,11 +238,7 @@ export default function useProfileScreen() {
 
       Alert.alert(
         "שגיאה",
-        String(
-          err?.response?.data ||
-            err?.message ||
-            "אירעה שגיאה בטעינת המנהלים הזמינים",
-        ),
+        getApiErrorMessage(err, "אירעה שגיאה בטעינת המנהלים הזמינים"),
       );
     } finally {
       setLoadingAvailableManagers(false);

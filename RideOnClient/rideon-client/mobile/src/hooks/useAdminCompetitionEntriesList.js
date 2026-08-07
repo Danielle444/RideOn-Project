@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 
 import { getMyCompetitionEntries } from "../services/entriesService";
+import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -134,12 +135,7 @@ export default function useAdminCompetitionEntriesList(
       });
       setItems(deduped);
     } catch (error) {
-      setScreenError(
-        String(
-          error?.response?.data ||
-            "אירעה שגיאה בטעינת המקצים",
-        ),
-      );
+      setScreenError(getApiErrorMessage(error, "אירעה שגיאה בטעינת המקצים"));
 
       setItems([]);
     } finally {

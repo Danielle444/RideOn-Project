@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
+import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 import { getTrainersByRanch } from "../services/federationMembersService";
 import { getCompetitionInvitationDetails } from "../services/competitionService";
 import { getPaidTimeCandidatesByRanch } from "../services/entriesService";
@@ -512,7 +513,7 @@ export default function useAdminCompetitionPaidTimes(params) {
       }
     } catch (error) {
       setScreenError(
-        String(error?.response?.data || "אירעה שגיאה בטעינת נתוני פייד טיים"),
+        getApiErrorMessage(error, "אירעה שגיאה בטעינת נתוני פייד טיים"),
       );
     } finally {
       setLoading(false);

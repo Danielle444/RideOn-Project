@@ -5,6 +5,7 @@ import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 
 import { getPayerCompetitionAccount } from "../services/payerService";
+import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 
 function normalizeAccountResponse(response) {
   if (response && response.data) {
@@ -99,12 +100,12 @@ export default function useAdminCompetitionPayerAccount(params) {
         setAccount(null);
 
         setScreenError(
-          String(error?.response?.data || "אירעה שגיאה בטעינת חשבון המשלם"),
+          getApiErrorMessage(error, "אירעה שגיאה בטעינת חשבון המשלם"),
         );
 
         Alert.alert(
           "שגיאה",
-          String(error?.response?.data || "אירעה שגיאה בטעינת חשבון המשלם"),
+          getApiErrorMessage(error, "אירעה שגיאה בטעינת חשבון המשלם"),
         );
       } finally {
         setLoading(false);

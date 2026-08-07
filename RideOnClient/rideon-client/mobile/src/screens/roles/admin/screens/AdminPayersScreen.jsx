@@ -17,6 +17,7 @@ import styles from "../../../../styles/adminPayersStyles";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import { getAdminMenuItems } from "../../../../navigation/sideMenuConfigs";
@@ -103,7 +104,7 @@ export default function AdminPayersScreen(props) {
     } catch (error) {
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה בהסרת המשלם"),
+        getApiErrorMessage(error, "אירעה שגיאה בהסרת המשלם"),
       );
     }
   }

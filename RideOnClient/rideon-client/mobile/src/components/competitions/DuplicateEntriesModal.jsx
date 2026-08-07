@@ -12,6 +12,7 @@ import {
 } from "react-native";
 
 import { Ionicons } from "@expo/vector-icons";
+import { getApiErrorMessage } from "../../../../shared/auth/utils/authApiErrors";
 
 import {
   getMyPastCompetitionsWithEntries,
@@ -41,22 +42,13 @@ function formatDateRange(start, end) {
   return formatDate(start) + " - " + formatDate(end);
 }
 
+// Consolidated onto the shared, hardened extractor (RideOn notification
+// audit, 2026-08-07, Slice 2) - the local version used to JSON.stringify an
+// unrecognized object body as a last resort, which could leak raw backend
+// shape to the user. Name/signature kept so every call site below is
+// untouched.
 function extractErrorMessage(err) {
-  if (!err) return "אירעה שגיאה";
-  if (typeof err === "string") return err;
-  var data = err.response && err.response.data;
-  if (data) {
-    if (typeof data === "string") return data;
-    if (data.message) return String(data.message);
-    if (data.error) return String(data.error);
-    try {
-      return JSON.stringify(data);
-    } catch {
-      return "אירעה שגיאה";
-    }
-  }
-  if (err.message) return err.message;
-  return "אירעה שגיאה";
+  return getApiErrorMessage(err, "אירעה שגיאה");
 }
 
 export default function DuplicateEntriesModal(props) {

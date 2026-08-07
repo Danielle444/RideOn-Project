@@ -17,6 +17,7 @@ import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import styles from "../../../../styles/adminCompetitionPayersStyles";
 
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 import { getAdminCompetitionMenuItems } from "../../../../navigation/competitionMenuConfigs";
 
 import { useUser } from "../../../../context/UserContext";
@@ -80,7 +81,7 @@ export default function AdminCompetitionPayersScreen(props) {
 
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה בטעינת משלמי התחרות"),
+        getApiErrorMessage(error, "אירעה שגיאה בטעינת משלמי התחרות"),
       );
 
       setPayers([]);

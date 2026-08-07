@@ -22,6 +22,7 @@ import {
   buildMineCountByCompoundId,
   resolveInitialCompoundId,
 } from "../../utils/stallMapViewer";
+import { getApiErrorMessage } from "../../../../shared/auth/utils/authApiErrors";
 
 var CELL_SIZE = 56;
 var CELL_GAP = 4;
@@ -92,7 +93,7 @@ export default function StallMapModal(props) {
           if (!cancelled) {
             console.log("STALL MAP LOAD ERROR", err);
             setError(
-              String(err?.response?.data || err?.message || "טעינה נכשלה"),
+              getApiErrorMessage(err, "טעינה נכשלה"),
             );
           }
         } finally {

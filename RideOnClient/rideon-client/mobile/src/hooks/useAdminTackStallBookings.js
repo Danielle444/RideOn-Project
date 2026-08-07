@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert } from "react-native";
 import { createTackStallBookings } from "../services/stallBookingsService";
+import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 import {
   resolveEffectiveTackPayers,
   isTackPayerSelectionLocked,
@@ -343,7 +344,7 @@ export default function useAdminTackStallBookings(params) {
     } catch (error) {
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה בשמירת תאי הציוד"),
+        getApiErrorMessage(error, "אירעה שגיאה בשמירת תאי הציוד"),
       );
 
       return false;

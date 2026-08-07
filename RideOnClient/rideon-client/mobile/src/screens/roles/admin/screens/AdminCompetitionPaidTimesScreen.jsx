@@ -22,6 +22,7 @@ import { useActiveRole } from "../../../../context/ActiveRoleContext";
 import { useCompetition } from "../../../../context/CompetitionContext";
 
 import useAdminCompetitionPaidTimesList from "../../../../hooks/useAdminCompetitionPaidTimesList";
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 import useRegistrationStepStatus from "../../../../hooks/useRegistrationStepStatus";
 
 import { cancelPaidTimeRequest } from "../../../../services/paidTimeRequestsService";
@@ -326,7 +327,7 @@ export default function AdminCompetitionPaidTimesScreen(props) {
       });
       await paidTimes.handleRefresh();
     } catch (err) {
-      var msg = err?.response?.data || err?.message || "אירעה שגיאה";
+      var msg = getApiErrorMessage(err, "אירעה שגיאה");
       Alert.alert("שגיאה", String(msg));
     } finally {
       setCancellingId(null);

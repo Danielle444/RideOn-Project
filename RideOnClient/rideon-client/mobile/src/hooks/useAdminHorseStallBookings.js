@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert } from "react-native";
 import { createStallBooking } from "../services/stallBookingsService";
+import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 
 function uniqByPersonId(items) {
   var map = {};
@@ -320,7 +321,7 @@ export default function useAdminHorseStallBookings(params) {
     } catch (error) {
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה בשמירת הזמנת התאים"),
+        getApiErrorMessage(error, "אירעה שגיאה בשמירת הזמנת התאים"),
       );
 
       return false;

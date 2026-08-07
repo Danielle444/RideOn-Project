@@ -9,6 +9,7 @@ import {
 } from "react-native";
 
 import { getSlotScheduleForViewing } from "../../../services/paidTimeRequestsService";
+import { getApiErrorMessage } from "../../../../../shared/auth/utils/authApiErrors";
 
 function pad2(n) {
   return String(n).padStart(2, "0");
@@ -70,7 +71,7 @@ export default function SlotScheduleModal(props) {
         } catch (err) {
           if (!cancelled) {
             setError(
-              String(err?.response?.data || err?.message || "טעינה נכשלה")
+              getApiErrorMessage(err, "טעינה נכשלה")
             );
           }
         } finally {

@@ -12,6 +12,7 @@ import {
 } from "react-native";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
 
@@ -75,21 +76,13 @@ import StallBookingCreateModal from "../../../../components/competitions/StallBo
 
 import StallBookingEditModal from "../../../../components/competitions/StallBookingEditModal";
 
+// Consolidated onto the shared, hardened extractor (RideOn notification
+// audit, 2026-08-07, Slice 2) - the local version used to JSON.stringify an
+// unrecognized object body as a last resort, which could leak raw backend
+// shape to the user. Name/signature kept so every Alert.alert call site
+// below is untouched.
 function extractErrorMessage(err) {
-  if (!err) return "אירעה שגיאה";
-  var data = err.response && err.response.data;
-  if (data) {
-    if (typeof data === "string") return data;
-    if (data.message) return String(data.message);
-    if (data.error) return String(data.error);
-    try {
-      return JSON.stringify(data);
-    } catch {
-      return "אירעה שגיאה";
-    }
-  }
-  if (err.message) return err.message;
-  return "אירעה שגיאה";
+  return getApiErrorMessage(err, "אירעה שגיאה");
 }
 
 function pickDateKey(dateValue) {
