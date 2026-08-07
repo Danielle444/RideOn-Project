@@ -12,18 +12,7 @@ import {
   deleteCompound,
 } from "../../services/arenasAndStallsService";
 import { saveLayout } from "../../services/stallMapService";
-
-function getErrorText(error, fallbackMessage) {
-  if (typeof error?.response?.data === "string") {
-    return error.response.data;
-  }
-
-  if (typeof error?.message === "string" && error.message.trim()) {
-    return error.message;
-  }
-
-  return fallbackMessage;
-}
+import { getErrorMessage as getErrorText } from "../../utils/competitionForm.utils";
 
 export default function useArenasAndStallsPage() {
   const activeRole = getActiveRole();

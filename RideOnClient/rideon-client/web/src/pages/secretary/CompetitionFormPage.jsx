@@ -264,6 +264,22 @@ export default function CompetitionFormPage(props) {
         onConfirm={page.confirmDateChange}
       />
 
+      <ConfirmDialog
+        isOpen={page.classDeleteConfirm.isOpen}
+        title={page.classDeleteConfirm.title}
+        message={page.classDeleteConfirm.message}
+        onCancel={page.closeClassDeleteConfirm}
+        onConfirm={page.classDeleteConfirm.onConfirm}
+      />
+
+      <ConfirmDialog
+        isOpen={page.paidTimeDeleteConfirm.isOpen}
+        title={page.paidTimeDeleteConfirm.title}
+        message={page.paidTimeDeleteConfirm.message}
+        onCancel={page.closePaidTimeDeleteConfirm}
+        onConfirm={page.paidTimeDeleteConfirm.onConfirm}
+      />
+
       <ToastMessage
         isOpen={page.toast.isOpen}
         type={page.toast.type}

@@ -17,6 +17,7 @@ import {
 
 import CompetitionWorkspaceLayout from "../../components/secretary/competition-workspace/CompetitionWorkspaceLayout";
 import ToastMessage from "../../components/common/ToastMessage";
+import ConfirmDialog from "../../components/superuser/ConfirmDialog";
 import StallMapGrid from "../../components/secretary/stall-map/StallMapGrid";
 import StallMapUploader from "../../components/secretary/stall-map/StallMapUploader";
 import StallBookingsOverviewTable from "../../components/secretary/stall-map/StallBookingsOverviewTable";
@@ -85,16 +86,30 @@ export default function CompetitionStallsPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
 
-  async function handleDeleteBooking(item) {
-    try {
-      await page.handleDeleteStallBooking(item.stallBookingId);
-    } catch (err) {
-      setToast({
-        isOpen: true,
-        type: "error",
-        message: getErrorMessage(err, "שגיאה בביטול תא"),
-      });
-    }
+  function handleDeleteBooking(item) {
+    setConfirmDialog({
+      isOpen: true,
+      title: "ביטול תא",
+      message: "האם לבטל את התא? פעולה זו תעדכן גם את החיובים.",
+      onConfirm: async function () {
+        try {
+          await page.handleDeleteStallBooking(item.stallBookingId);
+          closeConfirmDialog();
+          setToast({
+            isOpen: true,
+            type: "success",
+            message: "התא בוטל בהצלחה",
+          });
+        } catch (err) {
+          closeConfirmDialog();
+          setToast({
+            isOpen: true,
+            type: "error",
+            message: getErrorMessage(err, "שגיאה בביטול תא"),
+          });
+        }
+      },
+    });
   }
 
   function handleEditBooking(item) {
@@ -113,6 +128,22 @@ export default function CompetitionStallsPage() {
     type: "success",
     message: "",
   });
+
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+  });
+
+  function closeConfirmDialog() {
+    setConfirmDialog({
+      isOpen: false,
+      title: "",
+      message: "",
+      onConfirm: null,
+    });
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -394,6 +425,14 @@ export default function CompetitionStallsPage() {
             return { ...current, isOpen: false };
           });
         }}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onCancel={closeConfirmDialog}
+        onConfirm={confirmDialog.onConfirm}
       />
 
       <SecretaryCreateStallBookingModal
