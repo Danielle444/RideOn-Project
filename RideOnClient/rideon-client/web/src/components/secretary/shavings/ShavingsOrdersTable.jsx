@@ -15,6 +15,7 @@ import { getDeliveryUrgency } from "../../../utils/shavingsDueDate.utils";
 import ShavingsStatusChip from "./ShavingsStatusChip";
 import ShavingsSlaBadge from "./ShavingsSlaBadge";
 import ShavingsCancellationBadge from "./ShavingsCancellationBadge";
+import ShavingsDestinationCell from "./ShavingsDestinationCell";
 
 // Overdue/due-today label — opt-in (showUrgencyBadge), used only inside the "requires attention"
 // section, which only ever passes overdue/dueToday orders (a null/empty/malformed due date is
@@ -47,6 +48,7 @@ const HEADERS = [
   "סטטוס",
   "שקים",
   "מועד אספקה",
+  "יעד אספקה",
   "נוצר",
   "נצפה",
   "סופק",
@@ -132,6 +134,9 @@ export default function ShavingsOrdersTable(props) {
                 <td className="px-4 py-4 align-top">
                   {formatDateTime(getRequestedDeliveryTime(order))}
                   {props.showUrgencyBadge ? <UrgencyBadge order={order} /> : null}
+                </td>
+                <td className="px-4 py-4 align-top text-sm">
+                  <ShavingsDestinationCell order={order} />
                 </td>
                 <td className="px-4 py-4 align-top text-[#7B5A4D]">
                   {formatDateTime(getCreated(order))}
