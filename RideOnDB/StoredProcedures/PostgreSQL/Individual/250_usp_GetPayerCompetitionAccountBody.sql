@@ -121,6 +121,32 @@
 -- arithmetic client-side. Proc 203/204/206/212/247/248/251 and Proc 200 are
 -- untouched by this change.
 -- ============================================================================
+--
+-- CHANGEENTRYREQUEST FINE ATTRIBUTION (fix/change-entry-fine-attribution,
+-- 2026-08-07): business decision -- when a ChangeEntryRequest both replaces
+-- an entry (originalEntryId) and creates a new one (newEntryId), the late/
+-- change fine belongs to the NEW entry, never the old one. fine_items below
+-- previously joined unconditionally on cer.originalentryid, so an approved
+-- replacement's fine kept showing under the OLD class forever. Fixed to
+-- coalesce(cer.newentryid, cer.originalentryid), matching the resolution
+-- rule already used by usp_getcompetitionpayercharges (204),
+-- usp_getcompetitionsummaryclassdetails (247), and
+-- usp_getcompetitionsummaryclassentries (248) -- those three were already
+-- correct and are untouched. A pure cancellation (no newentryid) still
+-- falls back to originalentryid exactly as before. Only the CLASSES[] JOIN
+-- TARGET (classIncompId/className shown for the fine row) changes --
+-- amounts, totals, and the exposed originalEntryId JSON field are
+-- unaffected. Live-verified against competition 7 / ranch 11: payer 2241's
+-- CER #5 (newentryid 296) moved from class 176 to class 142 "Open NRHA";
+-- CER #1 (newentryid 294) moved from class 176 to class 155 "נונ פרו 50+";
+-- summary.fineTotal stayed 150.00 and summary.grandTotal was unchanged
+-- before/after. Negative control confirmed: payer 300's CER #2 (pure
+-- cancellation, newentryid NULL) still resolves to originalentryid=46,
+-- class 176, unchanged. Proc 203/204/212/247/248/251 and Proc 200 are
+-- untouched by this change; proc 156 (usp_GetEntryFineDetails) has the same
+-- bug pattern but zero live callers (verified by full-repo grep) and was
+-- deliberately left out of this fix's scope.
+-- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_getpayercompetitionaccount_body(p_competitionid integer, p_ranchid integer, p_payerpersonid integer)
  RETURNS jsonb
@@ -781,8 +807,20 @@ begin
 
     fine_items as (
         -- Change/cancellation fines only. sourceid is a changeentryrequestid;
-        -- resolve the original entry through it. The entry-creation-fine
-        -- branch that used to live here (sourceid = entryid directly,
+        -- resolve to the NEW entry when one exists (approved replacement),
+        -- falling back to the original entry only when there is no new
+        -- entry (cancellation, or rejected/pending). Fixed 2026-08-07
+        -- (fix/change-entry-fine-attribution): previously joined on
+        -- cer.originalentryid unconditionally, which kept an approved
+        -- change/cancellation fine attributed to the OLD class forever --
+        -- live-verified against competition 7 / payer 2241 (CER #5 -> class
+        -- 142, CER #1 -> class 155, both previously shown under class 176)
+        -- and the cancellation-only negative control (CER #2, no newentryid,
+        -- still correctly resolves to originalentryid=46). originalentryid
+        -- stays exposed under its existing JSON key, informational only --
+        -- no consumer reads it. Amounts/totals unaffected; only which
+        -- class/entry the fine displays against changes. The entry-creation-
+        -- fine branch that used to live here (sourceid = entryid directly,
         -- categorykey='fine') was removed 2026-08-07 -- that money is now
         -- folded into class_items via class_charge_source above instead of
         -- being listed as a separate fine row (see the header note).
@@ -800,7 +838,7 @@ begin
         inner join public.changeentryrequest cer
             on cer.changeentryrequestid = bc.sourceid
         inner join public.entry e
-            on e.entryid = cer.originalentryid
+            on e.entryid = coalesce(cer.newentryid, cer.originalentryid)
         inner join public.classincompetition cic
             on cic.classincompid = e.classincompid
         inner join public.classtype ct
