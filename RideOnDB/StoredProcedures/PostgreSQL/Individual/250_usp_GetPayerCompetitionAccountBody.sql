@@ -84,6 +84,43 @@
 -- post-deploy. Proc 203/204/206/212/247/248/251 and Proc 200 are untouched by
 -- this change.
 -- ============================================================================
+--
+-- ENTRY-CREATED FINE METADATA (fix/payer-proc250-fine-metadata, 2026-08-07):
+-- follow-up UX gap found in real Payer QA -- the fold above correctly hides
+-- the fine as a separate line, but left the Payer with no way to see that a
+-- class card's organizerCost/totalAmount now INCLUDES a late-entry fine.
+-- Fully additive, informational-only extension, no existing sum/column
+-- changed:
+--
+-- class_charge_source now passes bc.sourcetype through both UNION branches
+-- (previously dropped once categorykey was rewritten to 'classes'), so
+-- class_charge_summary can still tell which rows came in via the fine-fold
+-- branch. A new aggregate, entrycreationfineamount, sums only sourcetype=
+-- 'Fine' rows (same Open/Paid filter as organizercost). class_items exposes
+-- it plus a derived hasentrycreationfine boolean. Both surface on each
+-- classes[] item as 'hasEntryCreationFine' / 'entryCreationFineAmount'.
+--
+-- organizerCost/federationCost/totalAmount and every summary total are
+-- computed by the exact same expressions as before -- this is a second,
+-- independent aggregate over the same class_charge_source rows, never a
+-- rederivation or a replacement. Federation is untouched (the fine
+-- convention is Organizer-only by construction, same guard as the fold).
+--
+-- Live-verified for competition 78 / payer 79 / entry 10675 (ranch 11) via
+-- rollback-only smoke test then live re-read: entry 10675 now carries
+-- hasEntryCreationFine=true, entryCreationFineAmount=50.00, while
+-- organizerCost (300), federationCost (50), totalAmount (350), and every
+-- summary field (classGrandTotal 350, organizerTotal 1060, federationTotal
+-- 50, grandTotal 1110, remainingAmount 1110, fineTotal 0) are byte-identical
+-- before and after. fines[] is unaffected (still empty for this entry).
+--
+-- Consumed by PayerCompetitionAccountScreen.jsx and
+-- AdminCompetitionPayerAccountScreen.jsx (both mobile, share this proc via
+-- proc 212/251), which render "כולל קנס הרשמה מאוחרת: ₪X" inside the class
+-- card only when hasEntryCreationFine is true -- never re-derived from
+-- arithmetic client-side. Proc 203/204/206/212/247/248/251 and Proc 200 are
+-- untouched by this change.
+-- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_getpayercompetitionaccount_body(p_competitionid integer, p_ranchid integer, p_payerpersonid integer)
  RETURNS jsonb
@@ -170,7 +207,10 @@ begin
     -- untouched -- this fine convention is Organizer-only by construction,
     -- and the second branch is filtered to chargeowner = 'Organizer'
     -- defensively, matching the same guard already live on proc 203's
-    -- folded_charges CTE.
+    -- folded_charges CTE. sourcetype is passed through (2026-08-07, fine
+    -- metadata follow-up) so class_charge_summary can still tell which rows
+    -- were folded in, purely for read-side disclosure -- never used to
+    -- change any sum.
     class_charge_source as (
         select
             bc.sourceid,
@@ -179,7 +219,8 @@ begin
             bc.categorykey,
             bc.chargestatus,
             bc.amounttopay,
-            bc.federationcoveredamount
+            bc.federationcoveredamount,
+            bc.sourcetype
         from payer_charges bc
         where bc.sourcetype = 'Entry'
           and bc.categorykey = 'classes'
@@ -193,7 +234,8 @@ begin
             'classes' as categorykey,
             bc.chargestatus,
             bc.amounttopay,
-            bc.federationcoveredamount
+            bc.federationcoveredamount,
+            bc.sourcetype
         from payer_charges bc
         where bc.sourcetype = 'Fine'
           and bc.categorykey = 'fine'
@@ -278,6 +320,23 @@ begin
                 end
             ), 0)::numeric as unpaidamount,
 
+            -- Entry-creation fine metadata (2026-08-07, read-only disclosure):
+            -- sums only the rows that entered class_charge_source via the
+            -- fine-fold UNION branch above (sourcetype='Fine'), so the payer
+            -- UI can show "includes a late-entry fine of X" without ever
+            -- re-deriving the amount from arithmetic on the client. Purely
+            -- additive -- organizercost/federationcost/totalamount above are
+            -- unchanged, this is a separate aggregate over the same rows.
+            coalesce(sum(
+                case
+                    when bc.sourcetype = 'Fine'
+                     and bc.categorykey = 'classes'
+                     and bc.chargestatus in ('Open', 'Paid')
+                    then bc.amounttopay
+                    else 0
+                end
+            ), 0)::numeric as entrycreationfineamount,
+
             (
                 coalesce(sum(
                     case
@@ -333,6 +392,9 @@ begin
             coalesce(ccs.paidamount, 0)::numeric as paidamount,
             coalesce(ccs.unpaidamount, 0)::numeric as unpaidamount,
             coalesce(ccs.ispaid, false)::boolean as ispaid,
+
+            coalesce(ccs.entrycreationfineamount, 0)::numeric as entrycreationfineamount,
+            (coalesce(ccs.entrycreationfineamount, 0) > 0)::boolean as hasentrycreationfine,
 
             cch.historicalorganizeramount,
             cch.historicalfederationamount,
@@ -892,7 +954,9 @@ begin
                         'organizerChargeStatus', ci.organizerchargestatus,
                         'federationChargeStatus', ci.federationchargestatus,
                         'entryStatus', ci.entrystatus,
-                        'isPaid', ci.ispaid
+                        'isPaid', ci.ispaid,
+                        'hasEntryCreationFine', ci.hasentrycreationfine,
+                        'entryCreationFineAmount', ci.entrycreationfineamount
                     )
                     order by
                         ci.classdatetime nulls last,
