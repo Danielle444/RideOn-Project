@@ -36,7 +36,7 @@
 -- stallid), and every booking linked to one shavingsorder shares the same
 -- competitionid.
 --
--- LEGACY STallNumber (Slice 1): kept as a typed NULL literal in its
+-- LEGACY StallNumber (Slice 1): kept as a typed NULL literal in its
 -- original output position, not backed by any join. It was already NULL for
 -- every live row via the old broken join (proven), so this is byte-for-byte
 -- identical behavior for the currently-deployed server/client, without
@@ -44,10 +44,36 @@
 -- superseded by DeliveryDestinations and is a candidate for removal in a
 -- later cleanup migration once the new server+client are fully rolled out --
 -- not done here.
+--
+-- REQUESTING RANCH NAME (2026-08-07): appends RequestingRanchName, resolved
+-- from stallbooking.requestingranchid -- the GUEST/requesting ranch, NOT the
+-- host. Deliberately a NEW column rather than reusing the existing RanchName
+-- field: RanchName's one live producer (usp_getworkershavingsorders) joins
+-- ranch via competition.hostranchid, i.e. host-ranch semantics, and this
+-- proc never populated RanchName at all -- overloading it here would give
+-- the same field name two different meanings depending on which endpoint
+-- served it. requestingranchid is carried through the EXISTING
+-- destination_rows CTE (added to its SELECT list) rather than a second join
+-- to shavingsorderforstallbooking/stallbooking -- a repo-level invariant
+-- test (The_sql_keeps_StallNumber_as_a_typed_null_literal_with_no_backing_
+-- join) pins the stallbooking table to a single join site in this file,
+-- guarding against the same row-multiplication risk the destination-CTE
+-- rewrite above was built to eliminate; a second independent join would
+-- have passed functionally but violated that invariant. requesting_ranch then
+-- aggregates from destination_rows exactly like destination_flags does.
+-- Confirmed live that no shavingsorder ever links stallbooking rows with
+-- more than one distinct requestingranchid, so MAX() is a safe single-value
+-- pick, not a lossy collapse. Adding an output column changes the return
+-- type => DROP + CREATE; appended LAST. The explicit ::character varying
+-- cast on MAX(rr.ranchname) is required: a rollback-only dry run caught
+-- MAX() over a varchar column resolving to text at RETURN QUERY time, which
+-- 42804's against the declared "character varying" column (same class of
+-- bug documented for usp_GetPaidTimeRequestsForAssignment) -- without the
+-- cast this DROP+CREATE would have deployed and failed on first real call.
 DROP FUNCTION IF EXISTS public.usp_getshavingsordersforworkerbycompetition(integer, integer);
 
 CREATE OR REPLACE FUNCTION public.usp_getshavingsordersforworkerbycompetition(p_competitionid integer, p_ranchid integer)
- RETURNS TABLE("ShavingsOrderId" integer, "BagQuantity" smallint, "Notes" character varying, "RequestedDeliveryTime" timestamp without time zone, "ArrivalTime" timestamp without time zone, "DeliveryStatus" character varying, "DeliveryPhotoUrl" text, "DeliveryPhotoDate" timestamp with time zone, "PayerFirstName" character varying, "PayerLastName" character varying, "StallNumber" character varying, "WorkerSystemUserId" integer, "WorkerFirstName" character varying, "WorkerLastName" character varying, "ResponseTime" timestamp without time zone, "IsCancelled" boolean, "HasPendingCancellation" boolean, "DeliveryDestinations" jsonb, "HasUnassignedStalls" boolean)
+ RETURNS TABLE("ShavingsOrderId" integer, "BagQuantity" smallint, "Notes" character varying, "RequestedDeliveryTime" timestamp without time zone, "ArrivalTime" timestamp without time zone, "DeliveryStatus" character varying, "DeliveryPhotoUrl" text, "DeliveryPhotoDate" timestamp with time zone, "PayerFirstName" character varying, "PayerLastName" character varying, "StallNumber" character varying, "WorkerSystemUserId" integer, "WorkerFirstName" character varying, "WorkerLastName" character varying, "ResponseTime" timestamp without time zone, "IsCancelled" boolean, "HasPendingCancellation" boolean, "DeliveryDestinations" jsonb, "HasUnassignedStalls" boolean, "RequestingRanchName" character varying)
  LANGUAGE plpgsql
 AS $function$
 BEGIN
@@ -60,7 +86,8 @@ BEGIN
             sc.compoundname,
             sa.stallid,
             s.stallnumber,
-            sb.isfortack
+            sb.isfortack,
+            sb.requestingranchid
         FROM public.shavingsorderforstallbooking sofb
         JOIN public.stallbooking sb
             ON sb.stallbookingid = sofb.stallbookingid
@@ -111,6 +138,15 @@ BEGIN
             bool_or(compoundid IS NULL) AS hasunassignedstalls
         FROM destination_rows
         GROUP BY shavingsorderid
+    ),
+    requesting_ranch AS (
+        SELECT
+            dr.shavingsorderid,
+            MAX(rr.ranchname)::character varying AS requestingranchname
+        FROM destination_rows dr
+        LEFT JOIN public.ranch rr
+            ON rr.ranchid = dr.requestingranchid
+        GROUP BY dr.shavingsorderid
     )
     SELECT
         so.shavingsorderid,
@@ -141,7 +177,8 @@ BEGIN
               AND pcr.status = 'Pending'
         ) AS "HasPendingCancellation",
         COALESCE(dj.deliverydestinations, '[]'::jsonb) AS "DeliveryDestinations",
-        COALESCE(df.hasunassignedstalls, false) AS "HasUnassignedStalls"
+        COALESCE(df.hasunassignedstalls, false) AS "HasUnassignedStalls",
+        rq.requestingranchname AS "RequestingRanchName"
     FROM public.shavingsorder so
     INNER JOIN public.productrequest pr ON pr.prequestid = so.shavingsorderid
     INNER JOIN public.person payer ON payer.personid = pr.orderedbysystemuserid
@@ -149,6 +186,7 @@ BEGIN
     LEFT JOIN public.person worker ON worker.personid = so.workersystemuserid
     LEFT JOIN destination_json dj ON dj.shavingsorderid = so.shavingsorderid
     LEFT JOIN destination_flags df ON df.shavingsorderid = so.shavingsorderid
+    LEFT JOIN requesting_ranch rq ON rq.shavingsorderid = so.shavingsorderid
     WHERE pr.competitionid = p_CompetitionId
       AND c.hostranchid = p_RanchId
     ORDER BY so.shavingsorderid;

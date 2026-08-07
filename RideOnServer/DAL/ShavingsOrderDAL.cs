@@ -221,6 +221,7 @@ namespace RideOnServer.DAL
                     HasPendingCancellation = Convert.ToBoolean(reader["HasPendingCancellation"]),
                     DeliveryDestinations = ParseDeliveryDestinations(reader["DeliveryDestinations"]),
                     HasUnassignedStalls = Convert.ToBoolean(reader["HasUnassignedStalls"]),
+                    RequestingRanchName = reader["RequestingRanchName"] as string,
                 });
             }
 
@@ -274,6 +275,7 @@ namespace RideOnServer.DAL
                     HasPendingCancellation = Convert.ToBoolean(reader["HasPendingCancellation"]),
                     DeliveryDestinations = ParseDeliveryDestinations(reader["DeliveryDestinations"]),
                     HasUnassignedStalls = Convert.ToBoolean(reader["HasUnassignedStalls"]),
+                    RequestingRanchName = reader["RequestingRanchName"] as string,
                 });
             }
 

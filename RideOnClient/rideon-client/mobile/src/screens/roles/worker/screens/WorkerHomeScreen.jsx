@@ -343,6 +343,7 @@ export default function WorkerHomeScreen(props) {
                   arrivalTime={order.arrivalTime}
                   workerSystemUserId={order.workerSystemUserId}
                   stallNumber={order.stallNumber}
+                  requestingRanchName={order.requestingRanchName}
                   deliveryDestinations={order.deliveryDestinations}
                   hasUnassignedStalls={order.hasUnassignedStalls}
                   bagQuantity={order.bagQuantity}

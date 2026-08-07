@@ -179,6 +179,18 @@ export default function WorkerShavingsOrderCard(props) {
               {props.payerFirstName} {props.payerLastName}
             </Text>
           </View>
+
+          {/* Requesting (guest) ranch — never the host ranch. Absent when the proc can't
+              resolve a requester (no linked stall booking), so the row is omitted entirely
+              rather than showing a blank/dash. */}
+          {props.requestingRanchName && (
+            <View style={workerStyles.orderDetailRow}>
+              <Text style={workerStyles.orderDetailLabel}>חווה מבקשת:</Text>
+              <Text style={workerStyles.orderDetailValue}>
+                {props.requestingRanchName}
+              </Text>
+            </View>
+          )}
         </View>
       )}
 

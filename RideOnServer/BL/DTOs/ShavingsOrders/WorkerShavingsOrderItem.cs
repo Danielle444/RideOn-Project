@@ -14,6 +14,14 @@ namespace RideOnServer.BL.DTOs.ShavingsOrders
         public string PayerLastName { get; set; } = string.Empty;
         public string? StallNumber { get; set; }
         public string? RanchName { get; set; }
+
+        // The REQUESTING (guest) ranch, resolved from stallbooking.requestingranchid via
+        // usp_getshavingsordersforworkerbycompetition (114) / usp_getworkerhomeshavingsfeed
+        // (190). Deliberately separate from RanchName above: RanchName's only populated
+        // source (the legacy usp_getworkershavingsorders) joins ranch via
+        // competition.hostranchid, i.e. the HOST ranch -- overloading RanchName here would
+        // silently flip its meaning depending on which endpoint served it.
+        public string? RequestingRanchName { get; set; }
         public int? CompetitionId { get; set; }
         public string? CompetitionName { get; set; }
         public int? WorkerSystemUserId { get; set; }
