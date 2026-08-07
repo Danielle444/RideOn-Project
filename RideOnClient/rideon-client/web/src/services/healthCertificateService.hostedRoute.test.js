@@ -24,6 +24,7 @@ import axios from "./axiosInstance";
 import {
   getHealthCertificates,
   approveHealthCertificate,
+  rejectHealthCertificate,
 } from "./healthCertificateService";
 
 describe("getHealthCertificates", function () {
@@ -79,5 +80,35 @@ describe("approveHealthCertificate", function () {
     var body = axios.post.mock.calls[0][1];
 
     expect(body).toEqual({ horseId: 4021, competitionId: 78, ranchId: 11 });
+  });
+});
+
+describe("rejectHealthCertificate", function () {
+  beforeEach(function () {
+    vi.clearAllMocks();
+    axios.post.mockResolvedValue({ data: {} });
+  });
+
+  it("posts to the new reject route", async function () {
+    await rejectHealthCertificate(4021, 78, 11, "התעודה לא קריאה");
+
+    expect(axios.post).toHaveBeenCalledTimes(1);
+
+    var url = axios.post.mock.calls[0][0];
+
+    expect(url).toMatch(/\/Horses\/health-certificates\/reject$/);
+  });
+
+  it("sends horseId, competitionId, ranchId and reason, matching the finalized contract", async function () {
+    await rejectHealthCertificate(4021, 78, 11, "התעודה לא קריאה");
+
+    var body = axios.post.mock.calls[0][1];
+
+    expect(body).toEqual({
+      horseId: 4021,
+      competitionId: 78,
+      ranchId: 11,
+      reason: "התעודה לא קריאה",
+    });
   });
 });

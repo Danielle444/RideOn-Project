@@ -26,4 +26,16 @@ function approveHealthCertificate(horseId, competitionId, ranchId) {
   );
 }
 
-export { getHealthCertificates, approveHealthCertificate };
+function rejectHealthCertificate(horseId, competitionId, ranchId, reason) {
+  return axios.post(
+    `${API}/Horses/health-certificates/reject`,
+    { horseId, competitionId, ranchId, reason },
+    getAuthHeaders()
+  );
+}
+
+export {
+  getHealthCertificates,
+  approveHealthCertificate,
+  rejectHealthCertificate,
+};
