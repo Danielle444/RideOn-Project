@@ -119,6 +119,13 @@ namespace RideOnServer.Controllers
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
+            catch (ValidationException ex)
+            {
+                // Business-rule guard raised inside usp_DeleteCompound
+                // (compound still in use, or not found). Surface its exact
+                // message.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in Delete: {ex.Message}");

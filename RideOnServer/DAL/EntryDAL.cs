@@ -971,9 +971,45 @@ namespace RideOnServer.DAL
                 }
                 return Convert.ToInt32(result);
             }
+            catch (PostgresException ex) when (ex.SqlState == "P0001")
+            {
+                // Business-rule/authorization guard raised inside
+                // usp_secretarydeleteentry. The proc has no custom ERRCODE,
+                // so Postgres's default RAISE EXCEPTION SQLSTATE (P0001) is
+                // what's actually thrown -- same convention the RN001
+                // siblings elsewhere in this file use. Message text is in
+                // English at the DB layer; translate the known guard
+                // phrases before surfacing them to the (Hebrew) UI.
+                throw new BL.ValidationException(TranslateSecretaryDeleteEntryError(ex.MessageText));
+            }
             catch (NpgsqlException ex)
             {
                 throw new Exception(ex.Message);
+            }
+        }
+
+        // Fixed, exhaustive translation of usp_secretarydeleteentry's known
+        // English guard messages. Anything unrecognized (including the
+        // internal-invariant "Multiple Federation entry charges..." message,
+        // which is a data-integrity signal, not a user-actionable business
+        // rule) falls to the generic line rather than leaking English or an
+        // internal detail to the secretary.
+        private static string TranslateSecretaryDeleteEntryError(string message)
+        {
+            switch (message)
+            {
+                case "Entry not found":
+                    return "ההרשמה לא נמצאה";
+                case "Permission denied: not the host ranch secretary":
+                    return "אין לך הרשאה לבצע פעולה זו";
+                case "Entry already cancelled":
+                    return "ההרשמה כבר בוטלה";
+                case "A pending change request exists for this entry — resolve it first":
+                    return "קיימת בקשת שינוי ממתינה עבור הרשמה זו — יש לטפל בה תחילה";
+                case "Cannot delete a paid entry":
+                    return "לא ניתן למחוק הרשמה ששולמה";
+                default:
+                    return "לא ניתן לבטל את ההרשמה";
             }
         }
 

@@ -842,10 +842,17 @@ namespace RideOnServer.Controllers
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
+            catch (ValidationException ex)
+            {
+                // Business-rule/authorization guard raised inside
+                // usp_secretarydeleteentry, already translated to Hebrew by
+                // EntryDAL.TranslateSecretaryDeleteEntryError.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in SecretaryDeleteEntry: {ex.Message}");
-                return BadRequest(ex.Message);
+                return BadRequest("אירעה שגיאה בביטול ההרשמה");
             }
         }
 

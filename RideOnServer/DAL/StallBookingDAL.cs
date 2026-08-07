@@ -572,26 +572,70 @@ namespace RideOnServer.DAL
 
         public static int SecretaryDeleteStallBooking(int stallBookingId, int secretarySystemUserId)
         {
-            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
-            conn.Open();
-
-            using NpgsqlCommand cmd = new NpgsqlCommand(
-                @"SELECT public.usp_secretarydeletestallbooking(
-                    p_stallbookingid        := @stallBookingId,
-                    p_secretarysystemuserid := @secretaryId
-                );",
-                conn
-            );
-
-            cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
-            cmd.Parameters.AddWithValue("@secretaryId", secretarySystemUserId);
-
-            object? result = cmd.ExecuteScalar();
-            if (result == null || result == DBNull.Value)
+            try
             {
-                throw new Exception("Failed to delete stall booking");
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
+
+                using NpgsqlCommand cmd = new NpgsqlCommand(
+                    @"SELECT public.usp_secretarydeletestallbooking(
+                        p_stallbookingid        := @stallBookingId,
+                        p_secretarysystemuserid := @secretaryId
+                    );",
+                    conn
+                );
+
+                cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
+                cmd.Parameters.AddWithValue("@secretaryId", secretarySystemUserId);
+
+                object? result = cmd.ExecuteScalar();
+                if (result == null || result == DBNull.Value)
+                {
+                    throw new Exception("Failed to delete stall booking");
+                }
+                return Convert.ToInt32(result);
             }
-            return Convert.ToInt32(result);
+            catch (PostgresException ex) when (ex.SqlState == "P0001")
+            {
+                // Business-rule/authorization guard raised inside
+                // usp_secretarydeletestallbooking. No custom ERRCODE in the
+                // proc, so Postgres's default RAISE EXCEPTION SQLSTATE
+                // (P0001) is what's actually thrown -- same convention the
+                // RN001 guards elsewhere in this file use. Message text is
+                // in English at the DB layer; translate before surfacing.
+                throw new BL.ValidationException(TranslateSecretaryDeleteStallBookingError(ex.MessageText));
+            }
+            catch (NpgsqlException ex)
+            {
+                // This method previously had no catch at all, so any other
+                // Postgres/connection failure propagated with a raw native
+                // .NET exception message. Route it through the same
+                // "Database error: " DAL convention as the rest of this
+                // file so the controller's generic catch has a safe,
+                // fixed fallback to fall back to instead of echoing this.
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        // Fixed, exhaustive translation of
+        // usp_secretarydeletestallbooking's known English guard messages.
+        // Anything unrecognized falls to the generic line rather than
+        // leaking English to the secretary.
+        private static string TranslateSecretaryDeleteStallBookingError(string message)
+        {
+            switch (message)
+            {
+                case "Stall booking not found":
+                    return "הזמנת התא לא נמצאה";
+                case "Permission denied: not the host ranch secretary":
+                    return "אין לך הרשאה לבצע פעולה זו";
+                case "Cannot delete a paid stall booking":
+                    return "לא ניתן למחוק הזמנת תא ששולמה";
+                case "A pending change request exists — resolve it first":
+                    return "קיימת בקשת שינוי ממתינה — יש לטפל בה תחילה";
+                default:
+                    return "לא ניתן לבטל את הזמנת התא";
+            }
         }
 
         public static NpgsqlCommand BuildAdminCancelStallBookingCommand(
