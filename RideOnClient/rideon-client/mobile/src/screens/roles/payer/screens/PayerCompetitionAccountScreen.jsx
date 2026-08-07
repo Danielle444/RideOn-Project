@@ -991,6 +991,13 @@ export default function PayerCompetitionAccountScreen(props) {
         ? "כבר שולם — לא ניתן לבטל"
         : "בוטל";
 
+      // Server-computed 24h cutoff (usp_getpayercompetitionaccount_body's
+      // canCancel field, mirrors the guard usp_cancelpaidtimerequestbypayer
+      // already enforces). Only meaningful when the item isn't already
+      // paid/cancelled -- those cases are handled by isLocked above. Treat a
+      // missing field defensively as still-cancellable rather than blocking.
+      var pastCancelCutoff = !isLocked && item.canCancel === false;
+
       return (
         <View key={String(item.paidTimeRequestId)} style={styles.itemCard}>
           <View style={styles.itemTopRow}>
@@ -1022,6 +1029,7 @@ export default function PayerCompetitionAccountScreen(props) {
           <Text style={styles.itemMutedText}>סטטוס: {item.status || "-"}</Text>
 
           {!isLocked ? (
+            <>
             <View
               style={{
                 flexDirection: "row-reverse",
@@ -1052,11 +1060,15 @@ export default function PayerCompetitionAccountScreen(props) {
                 onPress={function () {
                   confirmCancelPaidTime(item);
                 }}
-                disabled={cancellingId === "paidTime:" + item.paidTimeRequestId}
+                disabled={
+                  cancellingId === "paidTime:" + item.paidTimeRequestId ||
+                  pastCancelCutoff
+                }
                 style={{
                   flex: 1,
-                  backgroundColor:
-                    cancellingId === "paidTime:" + item.paidTimeRequestId
+                  backgroundColor: pastCancelCutoff
+                    ? "#C9B7AC"
+                    : cancellingId === "paidTime:" + item.paidTimeRequestId
                       ? "#C9B7AC"
                       : "#A0522D",
                   borderRadius: 10,
@@ -1065,12 +1077,20 @@ export default function PayerCompetitionAccountScreen(props) {
                 }}
               >
                 <Text style={{ color: "#FFFFFF", fontWeight: "800" }}>
-                  {cancellingId === "paidTime:" + item.paidTimeRequestId
-                    ? "שולח..."
-                    : "בטל"}
+                  {pastCancelCutoff
+                    ? "לא ניתן לבטל"
+                    : cancellingId === "paidTime:" + item.paidTimeRequestId
+                      ? "שולח..."
+                      : "בטל"}
                 </Text>
               </Pressable>
             </View>
+            {pastCancelCutoff ? (
+              <Text style={styles.itemMutedText}>
+                ניתן לבטל עד 24 שעות לפני מועד הפייד טיים
+              </Text>
+            ) : null}
+            </>
           ) : (
             renderCancelButton(
               "paidTime:" + item.paidTimeRequestId,
