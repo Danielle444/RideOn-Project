@@ -232,6 +232,46 @@
 -- and defers billing to a not-yet-built "Stage E" answer proc; out of scope
 -- here.
 -- ============================================================================
+--
+-- PAYER AUTHORIZATION (added on fix/entry-payer-authorization, deployed live
+-- 2026-08-07 via CREATE OR REPLACE -- signature and return type unchanged,
+-- no DROP needed, confirmed by post-deploy pg_get_functiondef/pg_proc read:
+-- owner=postgres, ACL unchanged, args/return type byte-identical).
+--
+-- This proc is the ONLY entry-creation path any mobile UI actually calls
+-- (usp_admincreateentry, repo file 231, is a fully-built hardened sibling
+-- with zero callers -- see its own header). It previously verified only
+-- that p_paidbypersonid referenced an EXISTING person, never that the
+-- requested payer was one the calling admin is authorized to bill. Any
+-- admin could pass an arbitrary paidByPersonId and create a real,
+-- billed entry for a stranger.
+--
+-- Fix: reuse the exact payer-authorization check already proven in
+-- usp_admincreateentry's `v_payer_authorized` block, re-keyed to this
+-- proc's own parameter names (p_orderedbysystemuserid / p_ranchid instead
+-- of p_personid / p_ranchid -- identical semantics: both are server-derived
+-- from the JWT and EnsureUserHasRoleInRanch at EntriesController.CreateEntry,
+-- never client-trusted). The requested payer must be the acting admin
+-- themself, or a payer with an Approved personmanagedbysystemuser row for
+-- that admin AND an Approved 'משלם' personranchrole at the SAME ranch.
+--
+-- Business decision (confirmed): keep this proc as the production path:
+-- do NOT rewire the mobile client onto usp_admincreateentry for this fix.
+-- Smallest safe change only.
+--
+-- Verified rollback-only before and after deployment (fabricated data,
+-- zero residue) plus live-metadata checks: Approved managed payer
+-- succeeds; an unrelated stranger is rejected with RN001 "Requested payer
+-- is not authorized for this admin"; a Pending (not yet consented)
+-- managed-payer relationship is rejected the same way; an admin billing
+-- themselves still succeeds; a real cross-ranch create (guest-ranch
+-- admin/horse/payer into a host-ranch-hosted class) is unaffected.
+-- Cross-checked against live production data: exactly 5 real
+-- both-sides-Approved relationships existed at deploy time (admin 622 ->
+-- payers 622/4012/4013/4014/79, ranch 11) -- all continue to work
+-- unchanged; every other existing personmanagedbysystemuser row (the
+-- large majority) is exactly what this fix is intended to start blocking.
+-- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_insertentry(p_classincompid integer, p_orderedbysystemuserid integer, p_ranchid integer, p_horseid integer, p_riderfederationmemberid integer, p_coachfederationmemberid integer, p_paidbypersonid integer, p_prizerecipientname character varying)
  RETURNS integer
@@ -248,6 +288,7 @@ declare
     v_horse_ranchid integer;
     v_fineid integer;
     v_fineamount numeric(10,2);
+    v_payer_authorized boolean;
 begin
     select
         cic.competitionid,
@@ -309,6 +350,34 @@ begin
         where p.personid = p_paidbypersonid
     ) then
         raise exception 'Payer not found';
+    end if;
+
+    -- Payer authorization: the requested payer must be the acting admin
+    -- themself, or an Approved managed payer holding an Approved 'משלם'
+    -- role at this same ranch. Mirrors the check already proven in
+    -- usp_admincreateentry (repo file 231) -- this proc previously had no
+    -- equivalent, so any admin could bill any existing person regardless
+    -- of the managed-payer relationship. p_orderedbysystemuserid and
+    -- p_ranchid are both server-derived (JWT personId, EnsureUserHasRoleInRanch),
+    -- never client-trusted -- see EntriesController.CreateEntry.
+    v_payer_authorized := (
+        p_paidbypersonid = p_orderedbysystemuserid
+        or exists (
+            select 1
+            from public.personmanagedbysystemuser pmsu
+            join public.personranchrole prr on prr.personid = pmsu.personid
+            join public.role r on r.roleid = prr.roleid
+            where pmsu.systemuserid = p_orderedbysystemuserid
+              and pmsu.personid = p_paidbypersonid
+              and pmsu.approvalstatus = 'Approved'
+              and prr.ranchid = p_ranchid
+              and prr.rolestatus = 'Approved'
+              and r.rolename = 'משלם'
+        )
+    );
+
+    if not v_payer_authorized then
+        raise exception 'Requested payer is not authorized for this admin' using errcode = 'RN001';
     end if;
 
     -- Multiple Active entries for the same rider+horse+class are an invalid
