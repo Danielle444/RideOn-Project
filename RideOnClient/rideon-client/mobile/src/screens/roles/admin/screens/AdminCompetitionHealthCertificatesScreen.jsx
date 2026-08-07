@@ -8,6 +8,8 @@ import CompetitionMenuTemplate from "../../../../components/mobile-nav/Competiti
 
 import HealthCertificateCard from "../../../../components/competitions/HealthCertificateCard";
 
+import HealthCertificateStatusTabs from "../../../../components/competitions/HealthCertificateStatusTabs";
+
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 
 import { getAdminCompetitionMenuItems } from "../../../../navigation/competitionMenuConfigs";
@@ -19,6 +21,15 @@ import { useCompetition } from "../../../../context/CompetitionContext";
 import useAdminCompetitionHealthCertificates from "../../../../hooks/useAdminCompetitionHealthCertificates";
 
 import horsesStyles from "../../../../styles/horsesStyles";
+
+// One empty-state message per tab, distinct from the "no horses at all"
+// message below - a tab can legitimately be empty while the competition has
+// participating horses (e.g. everyone has already uploaded).
+var TAB_EMPTY_MESSAGES = {
+  actionRequired: "כל הסוסים המשתתפים העלו תעודת בריאות.",
+  pending: "אין תעודות הממתינות לאישור המזכירות כרגע.",
+  approved: "עדיין לא אושרו תעודות בריאות.",
+};
 
 export default function AdminCompetitionHealthCertificatesScreen(props) {
   var activeRoleContext = useActiveRole();
@@ -63,6 +74,17 @@ export default function AdminCompetitionHealthCertificatesScreen(props) {
         );
       }}
     >
+      {!healthCertificates.loading &&
+      healthCertificates.certificates.length > 0 ? (
+        <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+          <HealthCertificateStatusTabs
+            tabs={healthCertificates.tabs}
+            activeKey={healthCertificates.activeTab}
+            onChange={healthCertificates.setActiveTab}
+          />
+        </View>
+      ) : null}
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
@@ -89,8 +111,18 @@ export default function AdminCompetitionHealthCertificatesScreen(props) {
           </View>
         ) : null}
 
+        {!healthCertificates.loading &&
+        healthCertificates.certificates.length > 0 &&
+        healthCertificates.visibleCertificates.length === 0 ? (
+          <View style={horsesStyles.emptyCard}>
+            <Text style={horsesStyles.emptyText}>
+              {TAB_EMPTY_MESSAGES[healthCertificates.activeTab]}
+            </Text>
+          </View>
+        ) : null}
+
         {!healthCertificates.loading
-          ? healthCertificates.certificates.map(function (cert) {
+          ? healthCertificates.visibleCertificates.map(function (cert) {
               return (
                 <HealthCertificateCard
                   key={String(cert.horseId)}

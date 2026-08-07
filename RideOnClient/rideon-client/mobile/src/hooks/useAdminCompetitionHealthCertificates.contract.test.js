@@ -89,6 +89,106 @@ describe("useAdminCompetitionHealthCertificates client-side validation", () => {
   });
 });
 
+describe("useAdminCompetitionHealthCertificates Approved re-upload confirmation", () => {
+  it("uses the approved Hebrew confirmation message, unchanged from the spec", () => {
+    var source = readSource();
+
+    expect(source).toContain("var REPLACE_APPROVED_CERTIFICATE_MESSAGE =");
+    expect(source).toContain(
+      '"החלפת תעודה מאושרת תחזיר אותה למצב ממתין לאישור המזכירות. להמשיך?";',
+    );
+  });
+
+  it("gates the confirmation on the certificate currently being Approved, nothing else", () => {
+    var body = getUploadFunctionBody(readSource());
+
+    expect(body).toContain('if (horse.hcApprovalStatus === "Approved") {');
+    expect(body).toContain("await confirmReplaceApprovedCertificate()");
+  });
+
+  it("asks for confirmation after the guard acquire but before the file picker opens", () => {
+    var body = getUploadFunctionBody(readSource());
+
+    var confirmIndex = body.indexOf("confirmReplaceApprovedCertificate()");
+    var pickerIndex = body.indexOf("DocumentPicker.getDocumentAsync(");
+
+    expect(confirmIndex).toBeGreaterThan(-1);
+    expect(pickerIndex).toBeGreaterThan(-1);
+    expect(confirmIndex).toBeLessThan(pickerIndex);
+  });
+
+  it("returns without opening the picker when the admin does not confirm", () => {
+    var body = getUploadFunctionBody(readSource());
+    var confirmBlockStart = body.indexOf(
+      'if (horse.hcApprovalStatus === "Approved") {',
+    );
+    var pickerIndex = body.indexOf("DocumentPicker.getDocumentAsync(");
+    var confirmBlock = body.slice(confirmBlockStart, pickerIndex);
+
+    expect(confirmBlock).toContain("if (!confirmedReplace) {");
+    expect(confirmBlock).toContain("return;");
+  });
+
+  it("still releases the in-flight guard when the admin cancels the confirmation", () => {
+    // The early return above lives inside the same try/finally as the rest
+    // of the flow, so the existing "releases the guard in a finally block"
+    // test already proves this - this test pins that the confirmation gate
+    // was not moved outside that try block.
+    var body = getUploadFunctionBody(readSource());
+    var tryIndex = body.indexOf("try {");
+    var confirmIndex = body.indexOf(
+      'if (horse.hcApprovalStatus === "Approved") {',
+    );
+    var financeIndex = body.indexOf("} finally {");
+
+    expect(tryIndex).toBeGreaterThan(-1);
+    expect(confirmIndex).toBeGreaterThan(tryIndex);
+    expect(financeIndex).toBeGreaterThan(confirmIndex);
+  });
+
+  it("does not confirm for a certificate that is not Approved (Pending or not-yet-uploaded)", () => {
+    var body = getUploadFunctionBody(readSource());
+
+    // The only gate on the confirmation call is the Approved check above -
+    // there must be no second unconditional call site.
+    var occurrences =
+      body.split("confirmReplaceApprovedCertificate()").length - 1;
+
+    expect(occurrences).toBe(1);
+  });
+});
+
+describe("useAdminCompetitionHealthCertificates status tabs", () => {
+  it("imports the shared tab classification helpers", () => {
+    expect(readSource()).toContain(
+      'from "../utils/healthCertificateStatus.utils"',
+    );
+  });
+
+  it("defaults to the action-required tab", () => {
+    expect(readSource()).toContain(
+      "useState(DEFAULT_HEALTH_CERTIFICATE_TAB)",
+    );
+  });
+
+  it("derives visibleCertificates from the active tab, not the raw list", () => {
+    expect(readSource()).toContain(
+      "filterCertificatesByTab(certificates, activeTab)",
+    );
+  });
+
+  it("exposes tabs, activeTab and visibleCertificates from the hook", () => {
+    var source = readSource();
+    var returnStart = source.lastIndexOf("\n  return {");
+    var returnBlock = source.slice(returnStart);
+
+    expect(returnBlock).toContain("visibleCertificates: visibleCertificates,");
+    expect(returnBlock).toContain("activeTab: activeTab,");
+    expect(returnBlock).toContain("setActiveTab: setActiveTab,");
+    expect(returnBlock).toContain("tabs: tabs,");
+  });
+});
+
 describe("useAdminCompetitionHealthCertificates error presentation", () => {
   it("never echoes the raw response body or error message into an Alert", () => {
     var source = readSource();
