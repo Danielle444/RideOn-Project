@@ -36,6 +36,15 @@ function getCompetitionById(competitionId, ranchId) {
   });
 }
 
+function getParticipatingRanches(competitionId, ranchId) {
+  return axios.get(`${API}/Competitions/${competitionId}/participating-ranches`, {
+    params: {
+      ranchId: ranchId,
+    },
+    ...getAuthHeaders(),
+  });
+}
+
 function createCompetition(data) {
   return axios.post(`${API}/Competitions`, data, getAuthHeaders());
 }
@@ -71,6 +80,7 @@ function rescheduleCompetition(competitionId, data) {
 export {
   getCompetitionsByHostRanch,
   getCompetitionById,
+  getParticipatingRanches,
   createCompetition,
   updateCompetition,
   duplicateCompetition,

@@ -116,6 +116,39 @@ namespace RideOnServer.DAL
             return horses;
         }
 
+        // HostSecretary cross-ranch service flows (2026-08-07): additive
+        // sibling read for GetHorsesForStallBooking above, which hard-filters
+        // h.ranchid = p_ranchId and is shared with the mobile RanchAdmin
+        // self-service flow (left untouched). This one is competition-scoped
+        // only, so a HostSecretary can select a horse belonging to any
+        // participating ranch, not just her own.
+        public static List<HorseForStallBookingByCompetitionItem> GetHorsesForStallBookingByCompetition(int competitionId)
+        {
+            List<HorseForStallBookingByCompetitionItem> horses = new List<HorseForStallBookingByCompetitionItem>();
+
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand("SELECT * FROM usp_gethorsesforstallbookingbycompetition(@competitionId)", conn);
+            cmd.Parameters.AddWithValue("@competitionId", competitionId);
+
+            using NpgsqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                horses.Add(new HorseForStallBookingByCompetitionItem
+                {
+                    HorseId = Convert.ToInt32(reader["horseid"]),
+                    HorseName = reader["horsename"]?.ToString() ?? string.Empty,
+                    BarnName = reader["barnname"] == DBNull.Value ? null : reader["barnname"].ToString(),
+                    FederationNumber = reader["federationnumber"] == DBNull.Value ? null : reader["federationnumber"].ToString(),
+                    RanchId = Convert.ToInt32(reader["ranchid"]),
+                    RanchName = reader["ranchname"]?.ToString() ?? string.Empty
+                });
+            }
+
+            return horses;
+        }
+
         public static List<HorsePayerOptionItem> GetHorsePayersForCompetition(int competitionId, int ranchId)
         {
             List<HorsePayerOptionItem> payers = new List<HorsePayerOptionItem>();
