@@ -271,7 +271,7 @@ export default function PayerCompetitionsBoardScreen(props) {
         );
       }}
     >
-      <Text style={roleSharedStyles.sectionTitle}>התחרויות שלי</Text>
+      <Text style={roleSharedStyles.sectionTitle}>כל התחרויות</Text>
 
       <CompetitionsFilterBar
         searchText={searchText}
