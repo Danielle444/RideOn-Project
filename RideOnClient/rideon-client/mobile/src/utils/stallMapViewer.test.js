@@ -175,6 +175,34 @@ describe("buildAssignmentsByCompoundAndStall - CompoundId + StallNumber keying",
 
     expect(map["1::1"].bookingRanchId).toBeNull();
   });
+
+  it("forwards isForTack:true through to the map entry (ranch mode)", () => {
+    var tackStall = ranchAssignment({
+      isForTack: true,
+      horseName: null,
+      barnName: null,
+    });
+    var viewer = { ranchId: 11 };
+    var map = buildAssignmentsByCompoundAndStall([tackStall], viewer);
+
+    expect(map["1::1"].isForTack).toBe(true);
+  });
+
+  it("forwards isForTack:true through to the map entry (payer mode)", () => {
+    var tackStall = payerAssignment({ isForTack: true, isMine: true });
+    var viewer = { trustServerIsMine: true };
+    var map = buildAssignmentsByCompoundAndStall([tackStall], viewer);
+
+    expect(map["1::1"].isForTack).toBe(true);
+  });
+
+  it("keeps isForTack:false for an ordinary horse stall", () => {
+    var horseStall = ranchAssignment({ isForTack: false });
+    var viewer = { ranchId: 11 };
+    var map = buildAssignmentsByCompoundAndStall([horseStall], viewer);
+
+    expect(map["1::1"].isForTack).toBe(false);
+  });
 });
 
 describe("buildMineCountByCompoundId - compound tab counts", () => {
@@ -290,6 +318,7 @@ describe("readAssignmentFields - defensive wire-casing", () => {
       compoundId: 1,
       bookingRanchId: 11,
       isMine: true,
+      isForTack: true,
     });
 
     expect(fields).toEqual(
@@ -298,6 +327,7 @@ describe("readAssignmentFields - defensive wire-casing", () => {
         compoundId: 1,
         bookingRanchId: 11,
         isMine: true,
+        isForTack: true,
       }),
     );
   });
@@ -308,6 +338,7 @@ describe("readAssignmentFields - defensive wire-casing", () => {
       CompoundId: 2,
       BookingRanchId: 22,
       IsMine: false,
+      IsForTack: true,
     });
 
     expect(fields).toEqual(
@@ -316,6 +347,7 @@ describe("readAssignmentFields - defensive wire-casing", () => {
         compoundId: 2,
         bookingRanchId: 22,
         isMine: false,
+        isForTack: true,
       }),
     );
   });
@@ -324,5 +356,11 @@ describe("readAssignmentFields - defensive wire-casing", () => {
     var fields = readAssignmentFields({ stallNumber: "3", compoundId: 3 });
 
     expect(fields.isMine).toBeNull();
+  });
+
+  it("defaults isForTack to false when the field is entirely absent", () => {
+    var fields = readAssignmentFields({ stallNumber: "3", compoundId: 3 });
+
+    expect(fields.isForTack).toBe(false);
   });
 });

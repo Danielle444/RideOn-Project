@@ -26,6 +26,11 @@ function readAssignmentFields(assignment) {
     barnName: assignment.barnName || assignment.BarnName || assignment.barnname || "",
     isMine:
       assignment.isMine ?? assignment.IsMine ?? assignment.ismine ?? null,
+    isForTack:
+      assignment.isForTack ??
+      assignment.IsForTack ??
+      assignment.isfortack ??
+      false,
   };
 }
 
@@ -68,6 +73,7 @@ function buildAssignmentsByCompoundAndStall(assignments, viewer) {
       horseName: fields.horseName,
       barnName: fields.barnName,
       bookingRanchId: fields.bookingRanchId,
+      isForTack: fields.isForTack,
       isMine: resolveIsMine(a, viewer),
     };
   });

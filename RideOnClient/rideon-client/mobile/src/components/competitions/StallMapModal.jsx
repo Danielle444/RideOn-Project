@@ -222,7 +222,11 @@ export default function StallMapModal(props) {
 
               <CompoundLegend />
 
-              <View style={{ marginTop: 10 }}>
+              <ScrollView
+                style={{ marginTop: 10, flexShrink: 1 }}
+                contentContainerStyle={{ flexGrow: 1 }}
+                showsVerticalScrollIndicator={true}
+              >
                 {activeCompound ? (
                   <CompoundGrid
                     compound={activeCompound}
@@ -234,7 +238,7 @@ export default function StallMapModal(props) {
                     בחר מתחם
                   </Text>
                 )}
-              </View>
+              </ScrollView>
             </>
           )}
 
@@ -544,7 +548,9 @@ function StallCell(props) {
           }}
           numberOfLines={1}
         >
-          {assignment.barnName || assignment.horseName}
+          {assignment.isForTack
+            ? "תא ציוד"
+            : assignment.barnName || assignment.horseName}
         </Text>
       ) : null}
     </View>
