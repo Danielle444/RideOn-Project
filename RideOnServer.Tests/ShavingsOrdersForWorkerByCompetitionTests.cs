@@ -74,10 +74,159 @@ namespace RideOnServer.Tests
         }
 
         [Fact]
-        public void The_sql_return_shape_appends_IsCancelled_and_HasPendingCancellation_last()
+        public void The_sql_return_shape_appends_IsCancelled_and_HasPendingCancellation_before_the_destination_columns()
         {
             SqlSource().Should().Contain(
-                "\"ResponseTime\" timestamp without time zone, \"IsCancelled\" boolean, \"HasPendingCancellation\" boolean)");
+                "\"ResponseTime\" timestamp without time zone, \"IsCancelled\" boolean, \"HasPendingCancellation\" boolean, \"DeliveryDestinations\" jsonb, \"HasUnassignedStalls\" boolean)");
+        }
+
+        // =================================================================
+        // Delivery destination (Slice 1).
+        // =================================================================
+
+        [Fact]
+        public void The_sql_return_shape_appends_DeliveryDestinations_and_HasUnassignedStalls_last()
+        {
+            string sql = SqlSource();
+
+            int destinationsAt = sql.IndexOf("\"DeliveryDestinations\" jsonb", StringComparison.Ordinal);
+            int unassignedAt = sql.IndexOf("\"HasUnassignedStalls\" boolean)", StringComparison.Ordinal);
+
+            destinationsAt.Should().BeGreaterThan(-1);
+            unassignedAt.Should().BeGreaterThan(-1);
+            destinationsAt.Should().BeLessThan(unassignedAt);
+        }
+
+        // Scoped to the function body (from AS $function$ onward), not the whole file - the
+        // header comments deliberately narrate what was REMOVED ("DISTINCT ON is no longer
+        // needed") and would otherwise trip a naive whole-file NotContain("DISTINCT ON") check.
+        private static string FunctionBody()
+        {
+            string sql = SqlSource();
+            int at = sql.IndexOf("AS $function$", StringComparison.Ordinal);
+            at.Should().BeGreaterThan(-1);
+            return sql.Substring(at);
+        }
+
+        [Fact]
+        public void The_sql_resolves_the_physical_stall_via_stallassignment_ranchid_not_stallbooking()
+        {
+            // Proven join key (Blocker 1): stallassignment.ranchid, matching the deployed
+            // sibling proc usp_GetAssignedStallPrices (135) - never stallbooking.ranchid or
+            // stallbooking.requestingranchid, which are a different ranch concept entirely.
+            string sql = SqlSource();
+
+            sql.Should().Contain(
+                "LEFT JOIN public.stall s\n            ON s.ranchid = sa.ranchid\n           AND s.compoundid = sa.compoundid\n           AND s.stallid = sa.stallid");
+
+            FunctionBody().Should().NotContain("s.ranchid = sb.ranchid");
+            FunctionBody().Should().NotContain("s.ranchid = sb.requestingranchid");
+        }
+
+        [Fact]
+        public void The_sql_does_not_use_distinct_anywhere_as_a_multiplying_join_workaround()
+        {
+            string body = FunctionBody();
+
+            body.Should().NotContain("DISTINCT ON");
+            body.Should().NotContain("SELECT DISTINCT ");
+        }
+
+        [Fact]
+        public void The_sql_pre_aggregates_destinations_to_one_row_per_shavingsorderid_before_the_main_query()
+        {
+            string sql = SqlSource();
+
+            sql.Should().Contain("destination_json AS (");
+            sql.Should().Contain("destination_flags AS (");
+            sql.Should().Contain("GROUP BY shavingsorderid");
+        }
+
+        [Fact]
+        public void The_sql_coalesces_destinations_to_an_empty_array_and_the_flag_to_false()
+        {
+            string sql = SqlSource();
+
+            sql.Should().Contain("COALESCE(dj.deliverydestinations, '[]'::jsonb) AS \"DeliveryDestinations\"");
+            sql.Should().Contain("COALESCE(df.hasunassignedstalls, false) AS \"HasUnassignedStalls\"");
+        }
+
+        [Fact]
+        public void The_sql_keeps_StallNumber_as_a_typed_null_literal_with_no_backing_join()
+        {
+            string sql = SqlSource();
+
+            sql.Should().Contain("NULL::character varying AS \"StallNumber\"");
+
+            // The legacy single-stall lookup (a second stallbooking/stall join kept only to
+            // populate StallNumber) must not exist alongside the new aggregation - it would
+            // reintroduce the exact row-multiplication the destination CTEs were built to fix.
+            int stallBookingJoins = 0;
+            int index = sql.IndexOf("JOIN public.stallbooking", StringComparison.Ordinal);
+            while (index > -1)
+            {
+                stallBookingJoins++;
+                index = sql.IndexOf("JOIN public.stallbooking", index + 1, StringComparison.Ordinal);
+            }
+
+            stallBookingJoins.Should().Be(1, "the only stallbooking join must be the one inside destination_rows");
+        }
+
+        [Fact]
+        public void The_sql_carries_IsForTack_through_to_IsTackStall_on_the_stall_object()
+        {
+            SqlSource().Should().Contain("'IsTackStall', isfortack");
+        }
+
+        [Fact]
+        public void The_sql_has_no_competition_date_filter_so_historical_visibility_is_unchanged()
+        {
+            // 114 has never had a date-window predicate (unlike 190) - it powers the
+            // competition-scoped screen's full history, including past competitions. This
+            // slice must not introduce one as a side effect of the destination rewrite.
+            string sql = SqlSource();
+
+            sql.Should().NotContain("v_businessdate");
+            sql.Should().NotContain("requesteddeliverytime::date");
+        }
+
+        [Fact]
+        public void The_dto_exposes_DeliveryDestinations_and_HasUnassignedStalls_with_the_correct_types()
+        {
+            PropertyInfo? destinations = typeof(WorkerShavingsOrderItem).GetProperty("DeliveryDestinations");
+            PropertyInfo? unassigned = typeof(WorkerShavingsOrderItem).GetProperty("HasUnassignedStalls");
+
+            destinations.Should().NotBeNull();
+            destinations!.PropertyType.Should().Be(typeof(List<ShavingsDestinationCompound>));
+
+            unassigned.Should().NotBeNull();
+            unassigned!.PropertyType.Should().Be(typeof(bool));
+        }
+
+        [Fact]
+        public void The_destination_dtos_expose_the_approved_contract_shape()
+        {
+            PropertyInfo[] compoundProps = typeof(ShavingsDestinationCompound).GetProperties();
+            compoundProps.Select(p => p.Name).Should().BeEquivalentTo("CompoundId", "CompoundName", "Stalls");
+            typeof(ShavingsDestinationCompound).GetProperty("CompoundId")!.PropertyType.Should().Be(typeof(int));
+            typeof(ShavingsDestinationCompound).GetProperty("CompoundName")!.PropertyType.Should().Be(typeof(string));
+            typeof(ShavingsDestinationCompound).GetProperty("Stalls")!.PropertyType
+                .Should().Be(typeof(List<ShavingsDestinationStall>));
+
+            PropertyInfo[] stallProps = typeof(ShavingsDestinationStall).GetProperties();
+            stallProps.Select(p => p.Name).Should().BeEquivalentTo("StallId", "StallNumber", "IsTackStall");
+            typeof(ShavingsDestinationStall).GetProperty("StallId")!.PropertyType.Should().Be(typeof(int));
+            typeof(ShavingsDestinationStall).GetProperty("StallNumber")!.PropertyType.Should().Be(typeof(string));
+            typeof(ShavingsDestinationStall).GetProperty("IsTackStall")!.PropertyType.Should().Be(typeof(bool));
+        }
+
+        [Fact]
+        public void The_dal_maps_DeliveryDestinations_and_HasUnassignedStalls_from_the_reader()
+        {
+            string body = GetShavingsOrdersByCompetitionForWorkerBody();
+
+            body.Should().Contain("DeliveryDestinations = ParseDeliveryDestinations(reader[\"DeliveryDestinations\"]),");
+            body.Should().Contain("HasUnassignedStalls = Convert.ToBoolean(reader[\"HasUnassignedStalls\"]),");
         }
 
         [Fact]
@@ -116,13 +265,15 @@ namespace RideOnServer.Tests
         }
 
         [Fact]
-        public void The_sql_still_dedups_by_shavingsorderid_and_keeps_its_original_ordering()
+        public void The_sql_orders_by_shavingsorderid_with_no_distinct_on_needed_anymore()
         {
-            string sql = SqlSource();
-
-            sql.Should().Contain("SELECT DISTINCT ON (so.shavingsorderid)");
-            sql.Should().Contain(
-                "ORDER BY so.shavingsorderid, so.requesteddeliverytime DESC NULLS LAST;");
+            // Superseded by the destination-aggregation rewrite (Slice 1): DISTINCT ON existed
+            // solely to dedupe the old per-order join to a single (broken) stall lookup. With
+            // that join replaced by destination CTEs pre-aggregated to one row per
+            // shavingsorderid, a plain ORDER BY cannot be multiplied by anything left in the
+            // main query, so DISTINCT ON is no longer needed - see
+            // The_sql_does_not_use_distinct_anywhere_as_a_multiplying_join_workaround.
+            SqlSource().Should().Contain("ORDER BY so.shavingsorderid;");
         }
 
         [Fact]

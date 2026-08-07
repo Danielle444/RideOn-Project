@@ -42,5 +42,11 @@ namespace RideOnServer.BL.DTOs.ShavingsOrders
         public bool IsCancelled { get; set; }
 
         public bool HasPendingCancellation { get; set; }
+
+        // Delivery destination (Slice 1): this proc previously exposed no stall/compound
+        // data at all. Empty list means no assigned destination yet, not "no data returned".
+        public List<ShavingsDestinationCompound> DeliveryDestinations { get; set; } = new();
+
+        public bool HasUnassignedStalls { get; set; }
     }
 }
