@@ -87,5 +87,33 @@ namespace RideOnServer.BL
             HorseDAL dal = new HorseDAL();
             return dal.ApproveHealthCertificate(request.HorseId, request.CompetitionId, approverSystemUserId);
         }
+
+        // Returns true only when the certificate was actually eligible and got
+        // rejected (see HorseDAL.RejectHealthCertificate / repo file 245). No
+        // eligibility logic is duplicated here - the stored procedure is the sole
+        // source of truth for what counts as a rejectable row, matching
+        // ApproveHealthCertificate above.
+        //
+        // The reason is validated and trimmed here, not in SQL - the same
+        // division of responsibility this class already uses for its other
+        // argument checks (SaveHealthCertificate's HcPath check above). The
+        // table's CHECK constraint (ck_horseparticipationincompetition_
+        // approvalconsistency) also requires a non-blank reason, but that is
+        // defense-in-depth, not the primary gate a caller is expected to hit.
+        public static bool RejectHealthCertificate(RejectHealthCertificateRequest request, int rejectedBySystemUserId)
+        {
+            if (request.HorseId <= 0 || request.CompetitionId <= 0)
+                throw new ArgumentException("מזהה סוס או תחרות לא תקין");
+
+            if (string.IsNullOrWhiteSpace(request.Reason))
+                throw new ArgumentException("יש להזין סיבת דחייה");
+
+            HorseDAL dal = new HorseDAL();
+            return dal.RejectHealthCertificate(
+                request.HorseId,
+                request.CompetitionId,
+                rejectedBySystemUserId,
+                request.Reason.Trim());
+        }
     }
 }

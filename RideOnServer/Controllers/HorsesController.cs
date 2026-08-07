@@ -396,6 +396,67 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPost("health-certificates/reject")]
+        public IActionResult RejectHealthCertificate([FromBody] RejectHealthCertificateRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    request.RanchId,
+                    RoleNames.HostSecretary
+                );
+
+                Competition? competition = Competition.GetCompetitionById(request.CompetitionId);
+
+                if (competition == null)
+                {
+                    return NotFound("Competition not found");
+                }
+
+                if (competition.HostRanchId != request.RanchId)
+                {
+                    return StatusCode(403, "אין לך הרשאה לדחות תעודות בתחרות זו");
+                }
+
+                bool rejected = HorseParticipationInCompetition.RejectHealthCertificate(request, currentPersonId);
+
+                if (!rejected)
+                {
+                    return StatusCode(409, "לא ניתן לדחות את תעודת הבריאות: היא אינה קיימת, לא הועלה עבורה קובץ, או שאינה ממתינה לאישור.");
+                }
+
+                return Ok(new { message = "תעודת הבריאות נדחתה" });
+            }
+            catch (ArgumentException ex)
+            {
+                // The new reject endpoint's own explicit validation-error branch
+                // (whitespace/empty reason, invalid ids) - ex.Message here is always
+                // a fixed Hebrew string this codebase authored itself (see
+                // HorseParticipationInCompetition.RejectHealthCertificate), never
+                // raw framework or database text, so returning it directly is safe.
+                // Deliberately not applied to ApproveHealthCertificate above - that
+                // is unchanged, out of scope for this endpoint-specific fix.
+                return BadRequest(ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in RejectHealthCertificate: {ex.Message}");
+                return StatusCode(500, "שגיאה בדחיית תעודת הבריאות");
+            }
+        }
+
         // Upload authorization: RanchAdmin-only. No HostSecretary branch exists on
         // this route (the pre-existing secretary upload branch had no caller
         // anywhere in the repo - grep-verified - and is removed rather than kept
