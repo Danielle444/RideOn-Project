@@ -2,6 +2,16 @@ import axios from "./axiosInstance";
 
 const API = import.meta.env.VITE_API_BASE_URL;
 
+function getPaidTimeCandidatesForCompetition(competitionId, ranchId) {
+  return axios.get(`${API}/Entries/paid-time-candidates-for-competition`, {
+    params: { competitionId: competitionId, ranchId: ranchId },
+  });
+}
+
+function createPaidTimeRequest(payload) {
+  return axios.post(`${API}/PaidTimeRequests`, payload);
+}
+
 function getPaidTimeRequestsForAssignment(
   competitionId,
   ranchId,
@@ -40,6 +50,8 @@ function transferPaidTimeRequestToSlot(payload) {
 }
 
 export {
+  getPaidTimeCandidatesForCompetition,
+  createPaidTimeRequest,
   getPaidTimeRequestsForAssignment,
   assignPaidTimeRequest,
   unassignPaidTimeRequest,

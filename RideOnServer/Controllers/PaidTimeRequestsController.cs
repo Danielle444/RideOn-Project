@@ -23,11 +23,7 @@ namespace RideOnServer.Controllers
 
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                UserAccessValidator.EnsureUserHasRoleInRanch(
-                    personId,
-                    request.RanchId,
-                    RoleNames.RanchAdmin
-                );
+                EnsureCanCreatePaidTimeRequest(personId, request);
 
                 request.OrderedBySystemUserId = personId;
 
@@ -48,6 +44,45 @@ namespace RideOnServer.Controllers
                 Console.WriteLine($"Error in CreatePaidTimeRequest: {ex.Message}");
                 return BadRequest("אירעה שגיאה ביצירת בקשת פייד־טיים");
             }
+        }
+
+        // HostSecretary Paid-Time creation (Slice B, 2026-08-07): OR-combined
+        // authorization, same shape as ShavingsOrdersController's
+        // EnsureCanAccessCompetitionRanchShavings.
+        //   1. Own-ranch access -- cheapest, covers the existing mobile
+        //      RanchAdmin self-service path completely unchanged: for a
+        //      valid RanchAdmin caller this returns immediately, with zero
+        //      extra DB calls and zero behavior change (including its
+        //      existing error path for a bad RequestedCompSlotId, which
+        //      still reaches proc 120 unmodified in that case).
+        //   2. Host-ranch access -- HostSecretary of the competition's own
+        //      host ranch, derived server-side from the requested slot,
+        //      never trusted from the request. Lets a HostSecretary create
+        //      a request on behalf of a guest ranch's horse/rider/coach/
+        //      payer. usp_InsertPaidTimeRequest (120) already validates
+        //      horse.ranchid = request.RanchId and pricecatalog.ranchid =
+        //      competition.hostranchid server-side -- unchanged, reused as-is.
+        private void EnsureCanCreatePaidTimeRequest(int personId, CreatePaidTimeRequestRequest request)
+        {
+            if (UserAccessValidator.HasUserRoleInRanch(personId, request.RanchId, RoleNames.RanchAdmin))
+            {
+                return;
+            }
+
+            PaidTimeSlotInCompetition? slot = PaidTimeSlotInCompetition.GetById(request.RequestedCompSlotId);
+
+            if (slot != null)
+            {
+                Competition? competition = Competition.GetCompetitionById(slot.CompetitionId);
+
+                if (competition != null &&
+                    UserAccessValidator.HasUserRoleInRanch(personId, competition.HostRanchId, RoleNames.HostSecretary))
+                {
+                    return;
+                }
+            }
+
+            throw new UnauthorizedAccessException("אין לך הרשאה ליצור בקשת פייד-טיים עבור החווה שנבחרה");
         }
 
         [HttpGet("assignment")]

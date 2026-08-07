@@ -32,6 +32,7 @@ import PaidTimeRequestCard from "../../components/secretary/paid-time/PaidTimeRe
 import PaidTimeScheduleCell from "../../components/secretary/paid-time/PaidTimeScheduleCell";
 import PaidTimeSlotInCompetitionModal from "../../components/secretary/PaidTimeSlotInCompetitionModal";
 import PaidTimeSlotRegistrationsModal from "../../components/secretary/paid-time/PaidTimeSlotRegistrationsModal";
+import SecretaryCreatePaidTimeRequestModal from "../../components/secretary/paid-time/SecretaryCreatePaidTimeRequestModal";
 import useCompetitionPaidTimePage from "../../hooks/secretary/useCompetitionPaidTimePage";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import CustomDropdown from "../../components/common/CustomDropdown";
@@ -521,6 +522,14 @@ export default function CompetitionPaidTimePage() {
               />
             ) : null}
 
+            {!page.assignmentMode ? (
+              <TableActionButton
+                label="הוספת בקשה"
+                icon={<Plus size={15} />}
+                onClick={page.openCreateRequestModal}
+              />
+            ) : null}
+
             {page.assignmentMode ? (
               <TableActionButton
                 label="פתח שיבוץ לסלוטים שנבחרו"
@@ -783,6 +792,20 @@ export default function CompetitionPaidTimePage() {
         onClose={page.closePaidTimeSlotModal}
         onSubmit={page.handleSubmitPaidTimeSlot}
         onShowToast={showToast}
+      />
+
+      <SecretaryCreatePaidTimeRequestModal
+        isOpen={page.createRequestModalOpen}
+        onClose={page.closeCreateRequestModal}
+        competitionId={Number(competitionId)}
+        // ranchId here is the page's own ranch (activeRole.ranchId), which
+        // is always the competition's host ranch for a HostSecretary. Used
+        // both to authorize the competition-wide candidates read and to
+        // scope the price lookup (paid-time pricing is host-ranch-scoped,
+        // same convention as the Shavings ranch-model fix).
+        hostRanchId={ranchId}
+        slots={page.slots}
+        onCreated={page.handlePaidTimeRequestCreated}
       />
 
       <ToastMessage

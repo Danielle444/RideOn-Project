@@ -142,6 +142,9 @@ export default function useCompetitionPaidTimePage(options) {
   var [savingPaidTimeSlot, setSavingPaidTimeSlot] = useState(false);
   var [paidTimeSlotModalError, setPaidTimeSlotModalError] = useState("");
 
+  /* ===== CREATE REQUEST MODAL STATE (Slice B, HostSecretary creation) ===== */
+  var [createRequestModalOpen, setCreateRequestModalOpen] = useState(false);
+
   /* =======================
      LOAD
   ======================= */
@@ -329,6 +332,33 @@ export default function useCompetitionPaidTimePage(options) {
         );
       }
     }
+  }
+
+  /* =======================
+     CREATE REQUEST (Slice B, HostSecretary creation)
+  ======================= */
+
+  function openCreateRequestModal() {
+    setCreateRequestModalOpen(true);
+  }
+
+  function closeCreateRequestModal() {
+    setCreateRequestModalOpen(false);
+  }
+
+  async function handlePaidTimeRequestCreated() {
+    setCreateRequestModalOpen(false);
+
+    await loadSlots();
+
+    // The assignment view's pending-requests list is only fetched for the
+    // currently selected slot(s); refresh it too so a newly-created request
+    // for an already-selected slot appears without a manual toggle.
+    if (assignmentViewOpen && selectedSlotIds.length > 0) {
+      await loadRequests();
+    }
+
+    onShowToast?.("success", "בקשת פייד-טיים נוספה בהצלחה");
   }
 
   /* =======================
@@ -702,6 +732,12 @@ export default function useCompetitionPaidTimePage(options) {
     handleSubmitPaidTimeSlot,
     handleSetPublishState,
     handleDeletePaidTimeSlot,
+
+    /* create request modal (Slice B) */
+    createRequestModalOpen,
+    openCreateRequestModal,
+    closeCreateRequestModal,
+    handlePaidTimeRequestCreated,
 
     /* assignment */
     setIncludeAllPending,

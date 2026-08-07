@@ -262,6 +262,65 @@ namespace RideOnServer.DAL
             return result;
         }
 
+        // HostSecretary Paid-Time creation (Slice B, 2026-08-07): additive
+        // sibling of GetPaidTimeCandidatesByRanch above, which is shared with
+        // the mobile RanchAdmin self-service flow and stays untouched. This
+        // one is competition-scoped only, so a HostSecretary can create a
+        // paid-time request on behalf of any participating ranch's
+        // horse/rider/coach/payer combination.
+        public List<PaidTimeCandidateForCompetitionItem> GetPaidTimeCandidatesForCompetition(int competitionId)
+        {
+            List<PaidTimeCandidateForCompetitionItem> result = new List<PaidTimeCandidateForCompetitionItem>();
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = new NpgsqlCommand(@"
+                        SELECT *
+                        FROM public.usp_getpaidtimecandidatesforcompetition(
+                            p_competitionid := @competitionId
+                        );", connection))
+                    {
+                        command.Parameters.Add("@competitionId", NpgsqlDbType.Integer).Value = competitionId;
+
+                        using (NpgsqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                result.Add(new PaidTimeCandidateForCompetitionItem
+                                {
+                                    EntryId = Convert.ToInt32(reader["EntryId"]),
+                                    ClassInCompId = Convert.ToInt32(reader["ClassInCompId"]),
+                                    HorseId = Convert.ToInt32(reader["HorseId"]),
+                                    HorseName = reader["HorseName"]?.ToString() ?? string.Empty,
+                                    BarnName = reader["BarnName"] == DBNull.Value
+                                        ? null
+                                        : reader["BarnName"].ToString(),
+                                    RanchId = Convert.ToInt32(reader["RanchId"]),
+                                    RanchName = reader["RanchName"]?.ToString() ?? string.Empty,
+                                    CoachFederationMemberId = Convert.ToInt32(reader["CoachFederationMemberId"]),
+                                    CoachName = reader["CoachName"]?.ToString() ?? string.Empty,
+                                    RiderFederationMemberId = Convert.ToInt32(reader["RiderFederationMemberId"]),
+                                    RiderName = reader["RiderName"]?.ToString() ?? string.Empty,
+                                    PaidByPersonId = Convert.ToInt32(reader["PaidByPersonId"]),
+                                    PayerName = reader["PayerName"]?.ToString() ?? string.Empty
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+
+            return result;
+        }
+
         public List<MyCompetitionEntryItem> GetMyCompetitionEntries(
     int competitionId,
     int orderedBySystemUserId)
