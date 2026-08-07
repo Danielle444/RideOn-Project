@@ -3,6 +3,8 @@ import {
   getWorkerHomeFeedCardFlags,
   sortWorkerHomeFeed,
   bucketWorkerCompetitionOrders,
+  classifyWorkerShavingsBoardOrder,
+  groupWorkerShavingsBoardOrders,
 } from "./workerHomeShavingsFeed.js";
 
 var ME = 501;
@@ -586,5 +588,139 @@ describe("bucketWorkerCompetitionOrders", function () {
     expect(idsOf(input)).toEqual([1, 2]);
     expect(input[0]).toBe(first);
     expect(input[1]).toBe(second);
+  });
+});
+
+describe("classifyWorkerShavingsBoardOrder", function () {
+  it("classifies an unclaimed order as requiresAttention", function () {
+    var order = makeOrder({ workerSystemUserId: null });
+
+    expect(classifyWorkerShavingsBoardOrder(order)).toBe("requiresAttention");
+  });
+
+  it("classifies a claimed, undelivered order as inMyCare regardless of claimant", function () {
+    var mine = makeOrder({ workerSystemUserId: ME });
+    var foreign = makeOrder({ workerSystemUserId: OTHER_WORKER });
+
+    expect(classifyWorkerShavingsBoardOrder(mine)).toBe("inMyCare");
+    expect(classifyWorkerShavingsBoardOrder(foreign)).toBe("inMyCare");
+  });
+
+  it("classifies a delivered order (by status or arrivalTime) as completed", function () {
+    var byStatus = makeOrder({ deliveryStatus: "Delivered" });
+    var byArrival = makeOrder({
+      deliveryStatus: "Pending",
+      arrivalTime: "2026-08-05T09:00:00Z",
+    });
+
+    expect(classifyWorkerShavingsBoardOrder(byStatus)).toBe("completed");
+    expect(classifyWorkerShavingsBoardOrder(byArrival)).toBe("completed");
+  });
+
+  it("classifies a terminal-cancelled order as completed, even if it was also delivered first", function () {
+    var order = makeOrder({
+      deliveryStatus: "Delivered",
+      arrivalTime: "2026-08-05T09:00:00Z",
+      isCancelled: true,
+    });
+
+    expect(classifyWorkerShavingsBoardOrder(order)).toBe("completed");
+  });
+
+  it("classifies a pending-cancellation order as inMyCare, never requiresAttention or completed, even when unclaimed", function () {
+    var order = makeOrder({
+      workerSystemUserId: null,
+      hasPendingCancellation: true,
+    });
+
+    expect(classifyWorkerShavingsBoardOrder(order)).toBe("inMyCare");
+  });
+
+  it("completed wins over a pending cancellation flag left stale on a delivered/cancelled row", function () {
+    var order = makeOrder({
+      isCancelled: true,
+      hasPendingCancellation: true,
+    });
+
+    expect(classifyWorkerShavingsBoardOrder(order)).toBe("completed");
+  });
+});
+
+describe("groupWorkerShavingsBoardOrders", function () {
+  it("splits requiresAttention, myCare, otherCare, and completed into four separate buckets", function () {
+    var unclaimed = makeOrder({ shavingsOrderId: 1, workerSystemUserId: null });
+    var mine = makeOrder({ shavingsOrderId: 2, workerSystemUserId: ME });
+    var foreign = makeOrder({ shavingsOrderId: 3, workerSystemUserId: OTHER_WORKER });
+    var delivered = makeOrder({
+      shavingsOrderId: 4,
+      workerSystemUserId: ME,
+      deliveryStatus: "Delivered",
+    });
+
+    var groups = groupWorkerShavingsBoardOrders(
+      [unclaimed, mine, foreign, delivered],
+      ME,
+    );
+
+    expect(idsOf(groups.requiresAttention)).toEqual([1]);
+    expect(idsOf(groups.myCare)).toEqual([2]);
+    expect(idsOf(groups.otherCare)).toEqual([3]);
+    expect(idsOf(groups.completed)).toEqual([4]);
+  });
+
+  it("keeps a pending-cancellation order claimed by another worker in otherCare, not myCare", function () {
+    var mineePendingCancellation = makeOrder({
+      shavingsOrderId: 1,
+      workerSystemUserId: ME,
+      hasPendingCancellation: true,
+    });
+    var foreignPendingCancellation = makeOrder({
+      shavingsOrderId: 2,
+      workerSystemUserId: OTHER_WORKER,
+      hasPendingCancellation: true,
+    });
+
+    var groups = groupWorkerShavingsBoardOrders(
+      [mineePendingCancellation, foreignPendingCancellation],
+      ME,
+    );
+
+    expect(idsOf(groups.myCare)).toEqual([1]);
+    expect(idsOf(groups.otherCare)).toEqual([2]);
+  });
+
+  it("preserves relative input order within each bucket", function () {
+    var a = makeOrder({ shavingsOrderId: 1, workerSystemUserId: null });
+    var b = makeOrder({ shavingsOrderId: 2, workerSystemUserId: null });
+    var c = makeOrder({ shavingsOrderId: 3, workerSystemUserId: null });
+
+    var groups = groupWorkerShavingsBoardOrders([c, a, b], ME);
+
+    expect(idsOf(groups.requiresAttention)).toEqual([3, 1, 2]);
+  });
+
+  it("returns four empty arrays for an empty or missing feed without throwing", function () {
+    expect(groupWorkerShavingsBoardOrders([], ME)).toEqual({
+      requiresAttention: [],
+      myCare: [],
+      otherCare: [],
+      completed: [],
+    });
+    expect(groupWorkerShavingsBoardOrders(undefined, ME)).toEqual({
+      requiresAttention: [],
+      myCare: [],
+      otherCare: [],
+      completed: [],
+    });
+  });
+
+  it("does not mutate the input orders array", function () {
+    var first = makeOrder({ shavingsOrderId: 1, workerSystemUserId: null });
+    var input = [first];
+
+    groupWorkerShavingsBoardOrders(input, ME);
+
+    expect(idsOf(input)).toEqual([1]);
+    expect(input[0]).toBe(first);
   });
 });
