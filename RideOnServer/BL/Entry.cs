@@ -86,6 +86,17 @@ namespace RideOnServer.BL
             return dal.GetPaidTimeCandidatesByRanch(competitionId, ranchId);
         }
 
+        public static List<PaidTimeCandidateForCompetitionItem> GetPaidTimeCandidatesForCompetition(int competitionId)
+        {
+            if (competitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            EntryDAL dal = new EntryDAL();
+            return dal.GetPaidTimeCandidatesForCompetition(competitionId);
+        }
+
 
         public static List<MyCompetitionEntryItem>
             GetMyCompetitionEntries(
