@@ -518,8 +518,10 @@ namespace RideOnServer.Tests
         [Fact]
         public void The_sql_return_shape_appends_IsCancelled_and_HasPendingCancellation_before_the_destination_columns()
         {
+            // Trailing ", RequestingRanchName" reflects the 2026-08-07 append (see below) --
+            // HasUnassignedStalls is no longer the final column.
             SqlSource().Should().Contain(
-                "\"ResponseTime\" timestamp without time zone, \"IsCancelled\" boolean, \"HasPendingCancellation\" boolean, \"DeliveryDestinations\" jsonb, \"HasUnassignedStalls\" boolean)");
+                "\"ResponseTime\" timestamp without time zone, \"IsCancelled\" boolean, \"HasPendingCancellation\" boolean, \"DeliveryDestinations\" jsonb, \"HasUnassignedStalls\" boolean, \"RequestingRanchName\" character varying)");
         }
 
         [Fact]
@@ -628,16 +630,82 @@ namespace RideOnServer.Tests
         // =================================================================
 
         [Fact]
-        public void The_sql_return_shape_appends_DeliveryDestinations_and_HasUnassignedStalls_last()
+        public void The_sql_return_shape_appends_DeliveryDestinations_and_HasUnassignedStalls_in_order()
         {
             string sql = SqlSource();
 
             int destinationsAt = sql.IndexOf("\"DeliveryDestinations\" jsonb", StringComparison.Ordinal);
-            int unassignedAt = sql.IndexOf("\"HasUnassignedStalls\" boolean)", StringComparison.Ordinal);
+            int unassignedAt = sql.IndexOf("\"HasUnassignedStalls\" boolean,", StringComparison.Ordinal);
 
             destinationsAt.Should().BeGreaterThan(-1);
             unassignedAt.Should().BeGreaterThan(-1);
             destinationsAt.Should().BeLessThan(unassignedAt);
+        }
+
+        // =================================================================
+        // Requesting ranch name (2026-08-07).
+        // =================================================================
+
+        [Fact]
+        public void The_sql_return_shape_appends_RequestingRanchName_last()
+        {
+            string sql = SqlSource();
+
+            int unassignedAt = sql.IndexOf("\"HasUnassignedStalls\" boolean,", StringComparison.Ordinal);
+            int requestingRanchAt = sql.IndexOf("\"RequestingRanchName\" character varying)", StringComparison.Ordinal);
+
+            unassignedAt.Should().BeGreaterThan(-1);
+            requestingRanchAt.Should().BeGreaterThan(-1);
+            unassignedAt.Should().BeLessThan(requestingRanchAt);
+        }
+
+        [Fact]
+        public void The_sql_resolves_RequestingRanchName_from_requestingranchid_not_hostranchid()
+        {
+            string body = SqlFunctionBody();
+
+            body.Should().Contain("rr.ranchid = dr.requestingranchid");
+            body.Should().NotContain("rr.ranchid = c.hostranchid");
+        }
+
+        [Fact]
+        public void The_sql_carries_requestingranchid_through_the_existing_destination_rows_cte_not_a_second_stallbooking_join()
+        {
+            string body = SqlFunctionBody();
+
+            body.Should().Contain("sb.requestingranchid");
+            body.Should().Contain("FROM destination_rows dr");
+
+            int stallBookingJoins = 0;
+            int index = body.IndexOf("JOIN public.stallbooking", StringComparison.Ordinal);
+            while (index > -1)
+            {
+                stallBookingJoins++;
+                index = body.IndexOf("JOIN public.stallbooking", index + 1, StringComparison.Ordinal);
+            }
+
+            stallBookingJoins.Should().Be(1, "requestingranchid must be carried through destination_rows, not a second join");
+        }
+
+        [Fact]
+        public void The_dto_exposes_RequestingRanchName_as_a_string_distinct_from_RanchName()
+        {
+            PropertyInfo? requestingRanchName = typeof(WorkerShavingsOrderItem).GetProperty("RequestingRanchName");
+            PropertyInfo? ranchName = typeof(WorkerShavingsOrderItem).GetProperty("RanchName");
+
+            requestingRanchName.Should().NotBeNull();
+            requestingRanchName!.PropertyType.Should().Be(typeof(string));
+
+            ranchName.Should().NotBeNull("RanchName must remain a separate field -- its one populated source means the HOST ranch");
+        }
+
+        [Fact]
+        public void The_dal_maps_RequestingRanchName_from_the_reader()
+        {
+            string body = GetWorkerHomeShavingsFeedBody();
+
+            body.Should().Contain(
+                "RequestingRanchName = reader[\"RequestingRanchName\"] as string,");
         }
 
         [Fact]

@@ -322,6 +322,7 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
         requestedDeliveryTime={order.requestedDeliveryTime}
         workerSystemUserId={order.workerSystemUserId}
         stallNumber={order.stallNumber}
+        requestingRanchName={order.requestingRanchName}
         deliveryDestinations={order.deliveryDestinations}
         hasUnassignedStalls={order.hasUnassignedStalls}
         bagQuantity={order.bagQuantity}
