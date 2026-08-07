@@ -488,11 +488,14 @@ namespace RideOnServer.Controllers
                 );
 
                 // Force payerPersonId = self. Payer can only ever see own account.
-                string accountJson = Payer.GetPayerCompetitionAccount(
+                // Routed through the dedicated self-service BL/DAL/proc path
+                // (usp_getmypayercompetitionaccount) - not the Admin method
+                // above with payerPersonId==currentPersonId. currentPersonId
+                // comes from the JWT only; nothing here is client-suppliable.
+                string accountJson = Payer.GetMyPayerCompetitionAccount(
                     currentPersonId,
                     competitionId,
-                    ranchId,
-                    currentPersonId
+                    ranchId
                 );
 
                 JsonElement account = JsonSerializer.Deserialize<JsonElement>(accountJson);
