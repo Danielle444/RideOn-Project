@@ -170,10 +170,7 @@ namespace RideOnServer.BL
             }
 
             return list
-                .Where(item =>
-                    item.CompetitionStatus == CompetitionStatuses.Active ||
-                    item.CompetitionStatus == CompetitionStatuses.Current ||
-                    item.CompetitionStatus == CompetitionStatuses.Future)
+                .Where(item => item.CompetitionStatus != CompetitionStatuses.Draft)
                 .OrderBy(item => item.CompetitionStartDate)
                 .ToList();
         }
