@@ -100,6 +100,55 @@ namespace RideOnServer.Controllers
             }
         }
 
+        // HostSecretary cross-ranch service flows (2026-08-07): additive
+        // sibling of GetHorsesForStallBooking above. That endpoint filters
+        // horses to ranchId's own ranch and is shared with the mobile
+        // RanchAdmin self-service flow, which must keep seeing only its own
+        // ranch's horses -- left untouched. This endpoint is HostSecretary-
+        // only and returns every horse entered in the competition across all
+        // participating ranches, authorized against the competition's own
+        // host ranch (never a client-supplied scope), same pattern as
+        // SecretaryCreateStallBookingForPayer below.
+        [HttpGet("horses-for-booking-by-competition")]
+        public IActionResult GetHorsesForStallBookingByCompetition(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                RideOnServer.BL.Competition? competition = new CompetitionDAL().GetCompetitionById(competitionId);
+                if (competition == null)
+                {
+                    return NotFound("התחרות לא נמצאה");
+                }
+
+                if (competition.HostRanchId != ranchId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לצפות בסוסים של תחרות זו");
+                }
+
+                var result = StallBookingDAL.GetHorsesForStallBookingByCompetition(competitionId);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetHorsesForStallBookingByCompetition: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת סוסים להזמנת תאים");
+            }
+        }
+
         [HttpGet("horse-payers")]
         public IActionResult GetHorsePayersForCompetition(
             [FromQuery] int competitionId,
@@ -467,13 +516,23 @@ namespace RideOnServer.Controllers
 
         [HttpPost("change-request-by-payer")]
         public IActionResult CreateStallChangeRequestByPayer(
-            [FromBody] CreateStallBookingCancelRequest request)
+            [FromBody] CreateStallChangeRequestByPayerRequest request)
         {
             try
             {
                 if (request == null || request.StallBookingId <= 0 || request.RanchId <= 0)
                 {
                     return BadRequest("Invalid request");
+                }
+
+                if (request.NewStartDate == default || request.NewEndDate == default)
+                {
+                    return BadRequest("Start date and end date are required.");
+                }
+
+                if (request.NewStartDate.Date > request.NewEndDate.Date)
+                {
+                    return BadRequest("Start date cannot be after end date.");
                 }
 
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
@@ -486,7 +545,10 @@ namespace RideOnServer.Controllers
 
                 int requestId = StallBooking.CreateChangeRequestByPayer(
                     request.StallBookingId,
-                    personId
+                    personId,
+                    request.NewStartDate,
+                    request.NewEndDate,
+                    request.Notes
                 );
 
                 return Ok(requestId);
@@ -494,6 +556,10 @@ namespace RideOnServer.Controllers
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
             }
             catch (Exception ex)
             {
@@ -530,10 +596,17 @@ namespace RideOnServer.Controllers
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
+            catch (ValidationException ex)
+            {
+                // Business-rule/authorization guard raised inside
+                // usp_secretarydeletestallbooking, already translated to
+                // Hebrew by StallBookingDAL.TranslateSecretaryDeleteStallBookingError.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in SecretaryDeleteStallBooking: {ex.Message}");
-                return BadRequest(ex.Message);
+                return BadRequest("אירעה שגיאה בביטול הזמנת התא");
             }
         }
 

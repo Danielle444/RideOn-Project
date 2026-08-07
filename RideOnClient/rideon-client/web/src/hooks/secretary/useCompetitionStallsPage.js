@@ -15,6 +15,7 @@ import {
   secretaryUpdateStallBooking,
   secretaryCreateStallBookingForPayer,
 } from "../../services/stallBookingsService";
+import { getParticipatingRanches } from "../../services/competitionService";
 
 function parseLayout(layoutJson) {
   if (!layoutJson) return null;
@@ -76,6 +77,7 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
   const [compounds, setCompounds] = useState([]);
   const [overviewItems, setOverviewItems] = useState([]);
   const [assignments, setAssignments] = useState([]);
+  const [participatingRanches, setParticipatingRanches] = useState([]);
 
   const [publishStatus, setPublishStatus] = useState(null);
   const [publishLoading, setPublishLoading] = useState(false);
@@ -101,6 +103,13 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
           getAssignmentOverview(competitionId, ranchId),
           getAssignments(competitionId, ranchId),
           getPublishStatus(competitionId, ranchId),
+          // Participating-ranch source for the create-booking ranch pickers
+          // (HostSecretary cross-ranch fix). Guarded with its own catch so a
+          // failure here degrades the create-modal's ranch options rather
+          // than blanking the whole stalls page.
+          getParticipatingRanches(competitionId, ranchId).catch(function () {
+            return { data: [] };
+          }),
         ]);
 
         const compoundList = normalizeCompounds(results[0].data);
@@ -111,11 +120,15 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
           ? results[2].data
           : [];
         const publishStatusData = results[3].data || null;
+        const participatingRanchesList = Array.isArray(results[4].data)
+          ? results[4].data
+          : [];
 
         setCompounds(compoundList);
         setOverviewItems(overviewList);
         setAssignments(assignmentList);
         setPublishStatus(publishStatusData);
+        setParticipatingRanches(participatingRanchesList);
 
         if (compoundList.length > 0) {
           setActiveCompoundId(function (prev) {
@@ -357,6 +370,7 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
     openOverviewMode,
 
     ranchGroups,
+    participatingRanches,
     selectedRanchId,
     setSelectedRanchId,
     selectedRanchItems,
@@ -374,9 +388,10 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
     handleCreateStallBookingForPayer,
   };
 
+  // Confirmation is owned by the page (CompetitionStallsPage.jsx), which
+  // shows the shared ConfirmDialog before calling this - this function is
+  // the unconditional action, not the confirm+action combo it used to be.
   async function handleDeleteStallBooking(stallBookingId) {
-    var ok = window.confirm("האם לבטל את התא? פעולה זו תעדכן גם את החיובים.");
-    if (!ok) return;
     await secretaryDeleteStallBooking(stallBookingId, ranchId);
     await refreshAssignmentsAndOverview();
   }

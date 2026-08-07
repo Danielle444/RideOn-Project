@@ -101,7 +101,11 @@ export function formatStallNumbers(stallNumbers) {
   return parts.join(", ");
 }
 
-// One compound's line, e.g. "מתחם B2W · תאים 10–11".
+// One compound's line, e.g. "מתחם B2W · תאים 10–11". CompoundName is rendered VERBATIM,
+// never prefixed with "מתחם" here — the live stored name already includes it
+// (stallcompound.compoundname = "מתחם B2W" / "מתחם תאי תחרות" for every compound today, and
+// no proc concatenates it either), so a hardcoded "מתחם " here used to double up into
+// "מתחם מתחם ..." on every assigned destination. Do not reintroduce the prefix.
 export function formatCompoundDestination(compound) {
   const name = getCompoundName(compound);
   const stallNumbers = getStalls(compound).map(getStallNumber);
@@ -116,7 +120,7 @@ export function formatCompoundDestination(compound) {
   ).size;
   const label = uniqueCount === 1 ? "תא" : "תאים";
 
-  return "מתחם " + name + " · " + label + " " + formatStallNumbers(stallNumbers);
+  return name + " · " + label + " " + formatStallNumbers(stallNumbers);
 }
 
 export const DELIVERY_DESTINATION_UNASSIGNED_TEXT = "טרם שובצו תאים";

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { getCompetitionPayersForSecretary } from "../../../services/secretaryPayersService";
-import { getHorsesForStallBooking } from "../../../services/stallBookingsService";
+import { getHorsesForStallBookingByCompetition } from "../../../services/stallBookingsService";
 import { getServicePricesDashboard } from "../../../services/servicePricesService";
 import DatePicker from "../../common/DatePicker";
+import { getErrorMessage } from "../../../utils/competitionForm.utils";
 
 // Secretary "+ Add stall" modal. Loads payers, horses, and stall-product
 // types on open. Posts via parent's onSubmit.
@@ -58,8 +59,12 @@ export default function SecretaryCreateStallBookingModal(props) {
           setLoadingPayers(false);
         });
 
+      // Ranch-model fix: competition-wide horse list (not ranch-filtered) so
+      // a HostSecretary can select a horse belonging to any participating
+      // guest ranch, not just her own. The server still re-derives
+      // requestingRanchId from the selected horse's own ranch on write.
       setLoadingHorses(true);
-      getHorsesForStallBooking(competitionId, ranchId)
+      getHorsesForStallBookingByCompetition(competitionId, ranchId)
         .then(function (res) {
           setHorses(Array.isArray(res.data) ? res.data : []);
         })
@@ -157,7 +162,7 @@ export default function SecretaryCreateStallBookingModal(props) {
 
       props.onClose();
     } catch (err) {
-      setError(String(err?.response?.data || err?.message || "שגיאה ביצירת תא"));
+      setError(getErrorMessage(err, "שגיאה ביצירת תא"));
     } finally {
       setSaving(false);
     }
@@ -272,6 +277,7 @@ export default function SecretaryCreateStallBookingModal(props) {
                     <option key={h.horseId} value={h.horseId}>
                       {h.horseName}
                       {h.barnName ? " (" + h.barnName + ")" : ""}
+                      {h.ranchName ? " · " + h.ranchName : ""}
                     </option>
                   );
                 })}

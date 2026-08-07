@@ -5,6 +5,7 @@ import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 
 import { getMyCompetitionAccount } from "../services/payerService";
+import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 
 function normalizeAccountResponse(response) {
   if (response && response.data) {
@@ -249,9 +250,7 @@ export default function usePayerMyCompetitionAccount(params) {
 
         setAccount(null);
 
-        var msg = String(
-          error?.response?.data || "אירעה שגיאה בטעינת החשבון שלך",
-        );
+        var msg = getApiErrorMessage(error, "אירעה שגיאה בטעינת החשבון שלך");
 
         setScreenError(msg);
 

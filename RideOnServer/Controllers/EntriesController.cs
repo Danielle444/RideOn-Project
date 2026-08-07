@@ -229,6 +229,60 @@ namespace RideOnServer.Controllers
             }
         }
 
+        // HostSecretary Paid-Time creation (Slice B, 2026-08-07): additive
+        // sibling of GetPaidTimeCandidatesByRanch above, which is shared
+        // with the mobile RanchAdmin self-service flow and stays untouched.
+        // This one is HostSecretary-only, authorized against the
+        // competition's own host ranch (never a client-supplied scope), and
+        // returns candidates across every participating ranch.
+        [HttpGet("paid-time-candidates-for-competition")]
+        public IActionResult GetPaidTimeCandidatesForCompetition(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (competitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                RideOnServer.BL.Competition? competition = RideOnServer.BL.Competition.GetCompetitionById(competitionId);
+
+                if (competition == null)
+                {
+                    return NotFound("התחרות לא נמצאה");
+                }
+
+                if (competition.HostRanchId != ranchId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לצפות במועמדים לפייד טיים של תחרות זו");
+                }
+
+                List<PaidTimeCandidateForCompetitionItem> items =
+                    Entry.GetPaidTimeCandidatesForCompetition(competitionId);
+
+                return Ok(items);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetPaidTimeCandidatesForCompetition: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת מועמדים לפייד טיים");
+            }
+        }
+
         [HttpGet("my-competition")]
         public IActionResult GetMyCompetitionEntries(
             [FromQuery] int competitionId,
@@ -788,10 +842,17 @@ namespace RideOnServer.Controllers
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
+            catch (ValidationException ex)
+            {
+                // Business-rule/authorization guard raised inside
+                // usp_secretarydeleteentry, already translated to Hebrew by
+                // EntryDAL.TranslateSecretaryDeleteEntryError.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in SecretaryDeleteEntry: {ex.Message}");
-                return BadRequest(ex.Message);
+                return BadRequest("אירעה שגיאה בביטול ההרשמה");
             }
         }
 

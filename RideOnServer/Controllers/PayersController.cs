@@ -243,6 +243,13 @@ namespace RideOnServer.Controllers
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
+            catch (ValidationException ex)
+            {
+                // Business-rule guard raised inside
+                // usp_updatemanagedpayerbasicdetails, already translated to
+                // Hebrew by PayerDAL.TranslateManagedPayerError.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in UpdateManagedPayer: {ex.Message}");
@@ -269,6 +276,13 @@ namespace RideOnServer.Controllers
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Business-rule guard raised inside usp_removemanagedpayer,
+                // already translated to Hebrew by
+                // PayerDAL.TranslateManagedPayerError.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
             }
             catch (Exception ex)
             {
@@ -398,6 +412,51 @@ namespace RideOnServer.Controllers
             {
                 Console.WriteLine($"Error in AddPayerManager: {ex.Message}");
                 return BadRequest("אירעה שגיאה בהוספת מנהל למשלם");
+            }
+        }
+
+        [HttpPut("{personId}/managers/{adminPersonId}/answer")]
+        public IActionResult AnswerPayerManagerRequest(
+            int personId,
+            int adminPersonId,
+            [FromBody] AnswerPayerManagerRequest request)
+        {
+            try
+            {
+                if (personId != request.PersonId || adminPersonId != request.AdminPersonId)
+                {
+                    return BadRequest("PersonId or AdminPersonId in URL does not match body");
+                }
+
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                // Only the payer who owns this relationship may answer it - an
+                // admin can never approve their own request on the payer's
+                // behalf, because currentPersonId comes from the JWT and must
+                // equal the payer's own personId, never the admin's.
+                if (currentPersonId != personId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לענות על בקשת ניהול עבור משלם אחר");
+                }
+
+                Payer.AnswerManagedPayerRequest(currentPersonId, request);
+                return Ok("Managed payer request answered successfully");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Business-rule guard raised inside
+                // usp_answermanagedpayerrequest, already translated to
+                // Hebrew by PayerDAL.TranslateManagedPayerError.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in AnswerPayerManagerRequest: {ex.Message}");
+                return BadRequest("אירעה שגיאה במענה לבקשת הניהול");
             }
         }
 

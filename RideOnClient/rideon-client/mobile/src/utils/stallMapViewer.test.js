@@ -4,9 +4,18 @@ import {
   getCompoundId,
   readAssignmentFields,
   resolveIsMine,
+  resolveIsMyRanch,
   buildAssignmentsByCompoundAndStall,
   buildMineCountByCompoundId,
   resolveInitialCompoundId,
+  MIN_ZOOM,
+  MAX_ZOOM,
+  clampZoom,
+  computeFitZoom,
+  DETAIL_LEVEL_FAR,
+  DETAIL_LEVEL_MEDIUM,
+  DETAIL_LEVEL_CLOSE,
+  resolveDetailLevel,
 } from "./stallMapViewer";
 
 // Mobile stall-map slice 1, corrected (2026-08-07). Real behavioral coverage
@@ -54,6 +63,7 @@ function payerAssignment(overrides) {
       isForTack: false,
       horseName: null,
       barnName: null,
+      isMyRanch: false,
     },
     overrides,
   );
@@ -175,6 +185,34 @@ describe("buildAssignmentsByCompoundAndStall - CompoundId + StallNumber keying",
 
     expect(map["1::1"].bookingRanchId).toBeNull();
   });
+
+  it("forwards isForTack:true through to the map entry (ranch mode)", () => {
+    var tackStall = ranchAssignment({
+      isForTack: true,
+      horseName: null,
+      barnName: null,
+    });
+    var viewer = { ranchId: 11 };
+    var map = buildAssignmentsByCompoundAndStall([tackStall], viewer);
+
+    expect(map["1::1"].isForTack).toBe(true);
+  });
+
+  it("forwards isForTack:true through to the map entry (payer mode)", () => {
+    var tackStall = payerAssignment({ isForTack: true, isMine: true });
+    var viewer = { trustServerIsMine: true };
+    var map = buildAssignmentsByCompoundAndStall([tackStall], viewer);
+
+    expect(map["1::1"].isForTack).toBe(true);
+  });
+
+  it("keeps isForTack:false for an ordinary horse stall", () => {
+    var horseStall = ranchAssignment({ isForTack: false });
+    var viewer = { ranchId: 11 };
+    var map = buildAssignmentsByCompoundAndStall([horseStall], viewer);
+
+    expect(map["1::1"].isForTack).toBe(false);
+  });
 });
 
 describe("buildMineCountByCompoundId - compound tab counts", () => {
@@ -283,13 +321,150 @@ describe("resolveInitialCompoundId - default selection priority", () => {
   });
 });
 
+describe("buildAssignmentsByCompoundAndStall - bookingRanchName (ranch-name display, UX task section K)", () => {
+  it("forwards bookingRanchName through in ranch mode", () => {
+    var hostAssignment = ranchAssignment({ bookingRanchId: 11, bookingRanchName: "Double K" });
+    var viewer = { ranchId: 11 };
+    var map = buildAssignmentsByCompoundAndStall([hostAssignment], viewer);
+
+    expect(map["1::1"].bookingRanchName).toBe("Double K");
+  });
+
+  it("stays null in payer mode (the redacted endpoint never sends one, same as bookingRanchId)", () => {
+    var myStall = payerAssignment({ isMine: true });
+    var viewer = { trustServerIsMine: true };
+    var map = buildAssignmentsByCompoundAndStall([myStall], viewer);
+
+    expect(map["1::1"].bookingRanchName).toBeNull();
+  });
+});
+
+describe("resolveIsMyRanch - 'My ranch' state (2026-08-07, boolean-only, no identity)", () => {
+  it("trusts a true IsMyRanch from the payer-map endpoint", () => {
+    var myRanchStall = payerAssignment({ isMyRanch: true });
+
+    expect(resolveIsMyRanch(myRanchStall)).toBe(true);
+  });
+
+  it("is false when the server says false", () => {
+    var otherRanchStall = payerAssignment({ isMyRanch: false });
+
+    expect(resolveIsMyRanch(otherRanchStall)).toBe(false);
+  });
+
+  it("reads IsMyRanch across camelCase/PascalCase wire shapes", () => {
+    expect(resolveIsMyRanch({ IsMyRanch: true })).toBe(true);
+    expect(resolveIsMyRanch({ IsMyRanch: false })).toBe(false);
+  });
+
+  it("defaults to false (never true) when the field is entirely absent, e.g. ranch/admin mode rows", () => {
+    var adminRow = ranchAssignment({});
+
+    expect(resolveIsMyRanch(adminRow)).toBe(false);
+  });
+
+  it("can be true independently of isMine - a stall can be my ranch's without being mine", () => {
+    var myRanchNotMine = payerAssignment({ isMine: false, isMyRanch: true });
+
+    expect(resolveIsMyRanch(myRanchNotMine)).toBe(true);
+  });
+});
+
+describe("buildAssignmentsByCompoundAndStall - isMyRanch propagation and priority over isMine", () => {
+  it("carries isMyRanch through into the map entry", () => {
+    var myRanchStall = payerAssignment({ isMyRanch: true });
+    var viewer = { trustServerIsMine: true };
+    var map = buildAssignmentsByCompoundAndStall([myRanchStall], viewer);
+
+    expect(map["1::1"].isMyRanch).toBe(true);
+  });
+
+  it("keeps isMine and isMyRanch as two independent booleans on the same entry (priority is a rendering concern, not a data one)", () => {
+    var myOwnStall = payerAssignment({ isMine: true, isMyRanch: true });
+    var viewer = { trustServerIsMine: true };
+    var map = buildAssignmentsByCompoundAndStall([myOwnStall], viewer);
+
+    expect(map["1::1"].isMine).toBe(true);
+    expect(map["1::1"].isMyRanch).toBe(true);
+  });
+
+  it("stays false in ranch/admin mode, where the field is never sent", () => {
+    var hostAssignment = ranchAssignment({ bookingRanchId: 11 });
+    var viewer = { ranchId: 11 };
+    var map = buildAssignmentsByCompoundAndStall([hostAssignment], viewer);
+
+    expect(map["1::1"].isMyRanch).toBe(false);
+  });
+});
+
+describe("clampZoom - keeps zoom within [MIN_ZOOM, MAX_ZOOM]", () => {
+  it("passes values already inside the range through unchanged", () => {
+    expect(clampZoom(1)).toBe(1);
+  });
+
+  it("clamps below MIN_ZOOM up to MIN_ZOOM", () => {
+    expect(clampZoom(0.1)).toBe(MIN_ZOOM);
+  });
+
+  it("clamps above MAX_ZOOM down to MAX_ZOOM", () => {
+    expect(clampZoom(10)).toBe(MAX_ZOOM);
+  });
+});
+
+describe("computeFitZoom - initial overview framing (UX task section A/B)", () => {
+  it("returns 1 when the viewport size isn't known yet, rather than guessing", () => {
+    expect(computeFitZoom(5, 5, 0, 0, 56, 4)).toBe(1);
+  });
+
+  it("returns 1 when there is no layout (rows/cols) yet", () => {
+    expect(computeFitZoom(0, 0, 400, 600, 56, 4)).toBe(1);
+  });
+
+  it("picks the tighter of width/height ratio so the whole grid fits both ways", () => {
+    // 10 cols needs 10*56 + 9*4 = 596px; a 400px-wide viewport forces zoom
+    // under 1, even though the viewport is tall enough for the rows.
+    var zoom = computeFitZoom(2, 10, 400, 1000, 56, 4);
+
+    expect(zoom).toBeLessThan(1);
+    expect(zoom).toBeCloseTo(400 / 596, 5);
+  });
+
+  it("clamps the computed fit ratio into [MIN_ZOOM, MAX_ZOOM]", () => {
+    // A tiny 2x2 grid in a huge viewport would compute a huge ratio uncapped.
+    var zoom = computeFitZoom(2, 2, 4000, 4000, 56, 4);
+
+    expect(zoom).toBe(MAX_ZOOM);
+  });
+});
+
+describe("resolveDetailLevel - progressive detail thresholds (UX task section C)", () => {
+  it("far zoom shows number/color only", () => {
+    expect(resolveDetailLevel(0.6)).toBe(DETAIL_LEVEL_FAR);
+  });
+
+  it("medium zoom adds the stall type label", () => {
+    expect(resolveDetailLevel(1)).toBe(DETAIL_LEVEL_MEDIUM);
+  });
+
+  it("close zoom adds horse/ranch names", () => {
+    expect(resolveDetailLevel(1.5)).toBe(DETAIL_LEVEL_CLOSE);
+  });
+
+  it("boundaries: exactly the threshold value counts as the higher level", () => {
+    expect(resolveDetailLevel(0.9)).toBe(DETAIL_LEVEL_MEDIUM);
+    expect(resolveDetailLevel(1.4)).toBe(DETAIL_LEVEL_CLOSE);
+  });
+});
+
 describe("readAssignmentFields - defensive wire-casing", () => {
   it("reads camelCase fields", () => {
     var fields = readAssignmentFields({
       stallNumber: "1",
       compoundId: 1,
       bookingRanchId: 11,
+      bookingRanchName: "Double K",
       isMine: true,
+      isForTack: true,
     });
 
     expect(fields).toEqual(
@@ -297,7 +472,9 @@ describe("readAssignmentFields - defensive wire-casing", () => {
         stallNumber: "1",
         compoundId: 1,
         bookingRanchId: 11,
+        bookingRanchName: "Double K",
         isMine: true,
+        isForTack: true,
       }),
     );
   });
@@ -307,7 +484,9 @@ describe("readAssignmentFields - defensive wire-casing", () => {
       StallNumber: "2",
       CompoundId: 2,
       BookingRanchId: 22,
+      BookingRanchName: "Green Acres",
       IsMine: false,
+      IsForTack: true,
     });
 
     expect(fields).toEqual(
@@ -315,7 +494,9 @@ describe("readAssignmentFields - defensive wire-casing", () => {
         stallNumber: "2",
         compoundId: 2,
         bookingRanchId: 22,
+        bookingRanchName: "Green Acres",
         isMine: false,
+        isForTack: true,
       }),
     );
   });
@@ -324,5 +505,11 @@ describe("readAssignmentFields - defensive wire-casing", () => {
     var fields = readAssignmentFields({ stallNumber: "3", compoundId: 3 });
 
     expect(fields.isMine).toBeNull();
+  });
+
+  it("defaults isForTack to false when the field is entirely absent", () => {
+    var fields = readAssignmentFields({ stallNumber: "3", compoundId: 3 });
+
+    expect(fields.isForTack).toBe(false);
   });
 });

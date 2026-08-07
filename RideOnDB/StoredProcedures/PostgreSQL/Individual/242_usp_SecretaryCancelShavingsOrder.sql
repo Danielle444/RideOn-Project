@@ -23,6 +23,12 @@
 --
 -- All expected validation/business-rule failures use ERRCODE = 'RN001',
 -- matching 241 and the DAL's existing RN001 catch convention.
+--
+-- Two guards added on fix/competition-ended-and-delivery-guards (2026-08-07):
+--   - Cannot cancel a DELIVERED order (shavingsorder.arrivaltime IS NOT
+--     NULL) -- checked before ranch match, mirroring 241.
+--   - Cannot cancel once the competition has ended -- this proc had no date
+--     check at all before.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_secretarycancelshavingsorder(
@@ -34,6 +40,8 @@ RETURNS integer
 LANGUAGE plpgsql AS $$
 DECLARE
     v_hostranchid       integer;
+    v_competitionenddate date;
+    v_arrivaltime        timestamp without time zone;
     v_paid_exists       boolean;
     v_new_request_id    integer;
     v_bill_ids          integer[];
@@ -51,10 +59,11 @@ BEGIN
         RAISE EXCEPTION 'Invalid ranch id' USING ERRCODE = 'RN001';
     END IF;
 
-    SELECT c.hostranchid
-    INTO v_hostranchid
+    SELECT c.hostranchid, c.competitionenddate, so.arrivaltime
+    INTO v_hostranchid, v_competitionenddate, v_arrivaltime
     FROM public.productrequest pr
     INNER JOIN public.competition c ON c.competitionid = pr.competitionid
+    INNER JOIN public.shavingsorder so ON so.shavingsorderid = pr.prequestid
     WHERE pr.prequestid = p_shavingsorderid;
 
     IF v_hostranchid IS NULL THEN
@@ -63,6 +72,14 @@ BEGIN
 
     IF v_hostranchid <> p_ranchid THEN
         RAISE EXCEPTION 'Shavings order does not belong to this ranch' USING ERRCODE = 'RN001';
+    END IF;
+
+    IF v_arrivaltime IS NOT NULL THEN
+        RAISE EXCEPTION 'Cannot cancel a delivered shavings order' USING ERRCODE = 'RN001';
+    END IF;
+
+    IF (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate THEN
+        RAISE EXCEPTION 'Competition has already ended' USING ERRCODE = 'RN001';
     END IF;
 
     -- Ownership: secretary of the competition's host ranch.

@@ -51,6 +51,8 @@ RETURNS integer
 LANGUAGE plpgsql AS $$
 DECLARE
     v_requestingranchid     integer;
+    v_competitionid         integer;
+    v_competitionenddate    date;
     v_iscreatedbyadmin      boolean;
     v_ismanagedpayerbooking boolean;
     v_paid_exists           boolean;
@@ -73,9 +75,10 @@ BEGIN
     END IF;
 
     -- Load the booking and confirm it belongs to the caller's requesting ranch.
-    SELECT sb.requestingranchid
-    INTO v_requestingranchid
+    SELECT sb.requestingranchid, pr.competitionid
+    INTO v_requestingranchid, v_competitionid
     FROM public.stallbooking sb
+    JOIN public.productrequest pr ON pr.prequestid = sb.stallbookingid
     WHERE sb.stallbookingid = p_stallbookingid;
 
     IF v_requestingranchid IS NULL THEN
@@ -84,6 +87,18 @@ BEGIN
 
     IF v_requestingranchid <> p_ranchid THEN
         RAISE EXCEPTION 'Stall booking does not belong to this ranch' USING ERRCODE = 'RN001';
+    END IF;
+
+    -- Competition-ended guard, added on
+    -- fix/competition-ended-and-delivery-guards (2026-08-07): the direct
+    -- cancel path had no date check at all.
+    SELECT c.competitionenddate
+    INTO v_competitionenddate
+    FROM public.competition c
+    WHERE c.competitionid = v_competitionid;
+
+    IF (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate THEN
+        RAISE EXCEPTION 'Competition has already ended' USING ERRCODE = 'RN001';
     END IF;
 
     -- Authorization, exact shape of usp_admineditstallbooking: Approved

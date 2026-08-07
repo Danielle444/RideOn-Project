@@ -27,6 +27,7 @@ import {
 } from "../../hooks/useAdminCompetitionStallBookings";
 
 import CompetitionDateField from "../competitionRegistrations/CompetitionDateField";
+import { getApiErrorMessage } from "../../../../shared/auth/utils/authApiErrors";
 
 import CompetitionRegistrationDropdown from "./CompetitionRegistrationDropdown";
 
@@ -296,7 +297,7 @@ export default function StallBookingEditModal(props) {
     } catch (error) {
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה בעדכון הזמנת התא"),
+        getApiErrorMessage(error, "אירעה שגיאה בעדכון הזמנת התא"),
       );
     } finally {
       setIsSaving(false);

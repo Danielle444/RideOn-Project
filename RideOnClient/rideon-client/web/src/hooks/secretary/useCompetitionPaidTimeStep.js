@@ -22,6 +22,13 @@ export default function useCompetitionPaidTimeStep(options) {
   var [paidTimeModalError, setPaidTimeModalError] = useState("");
   var [savingPaidTime, setSavingPaidTime] = useState(false);
 
+  var [paidTimeDeleteConfirm, setPaidTimeDeleteConfirm] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+  });
+
   useEffect(
     function () {
       if (
@@ -180,39 +187,52 @@ export default function useCompetitionPaidTimeStep(options) {
     }
   }
 
-  async function handleDeletePaidTime(item) {
+  function closePaidTimeDeleteConfirm() {
+    setPaidTimeDeleteConfirm({
+      isOpen: false,
+      title: "",
+      message: "",
+      onConfirm: null,
+    });
+  }
+
+  function handleDeletePaidTime(item) {
     if (!competitionId || !currentRanchId) {
       return;
     }
 
-    var confirmed = window.confirm("האם למחוק את סלוט הפייד־טיים?");
+    setPaidTimeDeleteConfirm({
+      isOpen: true,
+      title: "מחיקת סלוט פייד־טיים",
+      message: "האם למחוק את סלוט הפייד־טיים?",
+      onConfirm: async function () {
+        try {
+          await deletePaidTimeSlotInCompetition(
+            item.PaidTimeSlotInCompId,
+            competitionId,
+            currentRanchId,
+            false,
+          );
 
-    if (!confirmed) {
-      return;
-    }
+          closePaidTimeDeleteConfirm();
 
-    try {
-      await deletePaidTimeSlotInCompetition(
-        item.PaidTimeSlotInCompId,
-        competitionId,
-        currentRanchId,
-        false,
-      );
+          setPaidTimeSlotsInCompetition(function (prev) {
+            return prev.filter(function (currentItem) {
+              return currentItem.PaidTimeSlotInCompId !== item.PaidTimeSlotInCompId;
+            });
+          });
 
-      setPaidTimeSlotsInCompetition(function (prev) {
-        return prev.filter(function (currentItem) {
-          return currentItem.PaidTimeSlotInCompId !== item.PaidTimeSlotInCompId;
-        });
-      });
-
-      onShowToast("success", "סלוט הפייד־טיים נמחק בהצלחה");
-    } catch (error) {
-      console.error(error);
-      onShowToast(
-        "error",
-        getErrorMessage(error, "שגיאה במחיקת סלוט הפייד־טיים"),
-      );
-    }
+          onShowToast("success", "סלוט הפייד־טיים נמחק בהצלחה");
+        } catch (error) {
+          console.error(error);
+          closePaidTimeDeleteConfirm();
+          onShowToast(
+            "error",
+            getErrorMessage(error, "שגיאה במחיקת סלוט הפייד־טיים"),
+          );
+        }
+      },
+    });
   }
 
   return {
@@ -222,6 +242,8 @@ export default function useCompetitionPaidTimeStep(options) {
     editPaidTimeItem,
     paidTimeModalError,
     savingPaidTime,
+    paidTimeDeleteConfirm,
+    closePaidTimeDeleteConfirm,
     openCreatePaidTimeModal,
     openEditPaidTimeModal,
     closePaidTimeModal,

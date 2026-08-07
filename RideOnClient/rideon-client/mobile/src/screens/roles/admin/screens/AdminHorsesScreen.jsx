@@ -14,6 +14,7 @@ import EditHorseBarnNameModal from "../components/EditHorseBarnNameModal";
 import horsesStyles from "../../../../styles/horsesStyles";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import { useUser } from "../../../../context/UserContext";
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import { getAdminMenuItems } from "../../../../navigation/sideMenuConfigs";
@@ -63,11 +64,7 @@ export default function AdminHorsesScreen(props) {
     } catch (error) {
       console.log("AdminHorsesScreen load error:", error?.response?.data || error);
       setScreenError(
-        String(
-          error?.response?.data ||
-            error?.message ||
-            "אירעה שגיאה בטעינת רשימת הסוסים"
-        )
+        getApiErrorMessage(error, "אירעה שגיאה בטעינת רשימת הסוסים"),
       );
     } finally {
       setLoading(false);
@@ -112,11 +109,7 @@ export default function AdminHorsesScreen(props) {
     } catch (error) {
       Alert.alert(
         "שגיאה",
-        String(
-          error?.response?.data ||
-            error?.message ||
-            "אירעה שגיאה בעדכון הכינוי"
-        )
+        getApiErrorMessage(error, "אירעה שגיאה בעדכון הכינוי"),
       );
     } finally {
       setIsSavingBarnName(false);

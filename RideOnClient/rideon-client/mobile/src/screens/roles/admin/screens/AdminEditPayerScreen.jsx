@@ -17,6 +17,7 @@ import { getAdminMenuItems } from "../../../../navigation/sideMenuConfigs";
 
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 import { useCompetition } from "../../../../context/CompetitionContext";
 
 import { updateManagedPayer } from "../../../../services/payerService";
@@ -81,7 +82,7 @@ export default function AdminEditPayerScreen(props) {
     } catch (error) {
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה בעדכון המשלם"),
+        getApiErrorMessage(error, "אירעה שגיאה בעדכון המשלם"),
       );
     } finally {
       setIsSubmitting(false);

@@ -1,7 +1,7 @@
 import axios from "axios";
 import { getToken, clearAuthStorage } from "./storageService";
 import { API_BASE_URL } from "../config/apiBaseUrl";
-import { isLoginRequestUrl } from "../utils/loginErrors";
+import { isLoginRequestUrl } from "../../../shared/auth/utils/loginErrorMessages";
 
 let unauthorizedHandler = null;
 

@@ -32,6 +32,76 @@ export default function PayerManagersSection(props) {
 
   return (
     <>
+      {(props.pendingManagerRequests || []).length > 0 ? (
+        <ProfileSectionCard
+          title="בקשות ניהול ממתינות"
+          subtitle="אדמינים שביקשו לנהל אותך. יש לאשר או לדחות כל בקשה."
+        >
+          <View style={{ marginTop: 12 }}>
+            {(props.pendingManagerRequests || []).map(function (item) {
+              var isAnswering = props.answeringManagerId === item.adminPersonId;
+
+              return (
+                <View key={String(item.adminPersonId)} style={profileStyles.managerCard}>
+                  <Text style={profileStyles.managerName}>
+                    {(item.firstName || "") + " " + (item.lastName || "")}
+                  </Text>
+
+                  <Text style={profileStyles.managerMeta}>
+                    חוות: {item.ranchName || "—"}
+                  </Text>
+
+                  <Text style={profileStyles.managerMeta}>
+                    סטטוס: ממתין לאישור
+                  </Text>
+
+                  <View style={profileStyles.buttonsRow}>
+                    <Pressable
+                      style={profileStyles.primaryButton}
+                      disabled={isAnswering}
+                      onPress={function () {
+                        props.onApproveManagerRequest(item.adminPersonId);
+                      }}
+                    >
+                      <Text style={profileStyles.primaryButtonText}>
+                        {isAnswering ? "מעדכנת..." : "אישור"}
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      style={profileStyles.destructiveButton}
+                      disabled={isAnswering}
+                      onPress={function () {
+                        Alert.alert(
+                          "דחיית בקשה",
+                          "האם לדחות את בקשת הניהול מ" +
+                            ((item.firstName || "") + " " + (item.lastName || "")).trim() +
+                            "?",
+                          [
+                            { text: "ביטול", style: "cancel" },
+                            {
+                              text: "דחייה",
+                              style: "destructive",
+                              onPress: function () {
+                                props.onRejectManagerRequest(item.adminPersonId);
+                              },
+                            },
+                          ],
+                        );
+                      }}
+                    >
+                      <Text style={profileStyles.destructiveButtonText}>
+                        {isAnswering ? "מעדכנת..." : "דחייה"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </ProfileSectionCard>
+      ) : null}
+
       <ProfileSectionCard
         title="האדמינים שמנהלים אותי"
         subtitle="רשימת האדמינים המשויכים למשלם. חייב להישאר לפחות מנהל אחד."

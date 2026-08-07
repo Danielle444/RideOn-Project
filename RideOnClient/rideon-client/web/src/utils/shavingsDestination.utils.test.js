@@ -34,10 +34,13 @@ describe("formatStallNumbers", () => {
 });
 
 describe("formatCompoundDestination", () => {
+  // Live stallcompound.compoundname always includes "מתחם" already (e.g. "מתחם תאי תחרות",
+  // "מתחם B2W") — fixtures below use full live-shaped names, not bare ones, so this suite
+  // also guards the 2026-08-07 double-prefix bug (formatter used to prepend a second "מתחם ").
   it("uses singular תא for exactly one stall", () => {
     expect(
       formatCompoundDestination({
-        compoundName: "תאי תחרות",
+        compoundName: "מתחם תאי תחרות",
         stalls: [{ stallNumber: "901" }],
       }),
     ).toBe("מתחם תאי תחרות · תא 901");
@@ -46,7 +49,7 @@ describe("formatCompoundDestination", () => {
   it("uses plural תאים for a contiguous range", () => {
     expect(
       formatCompoundDestination({
-        compoundName: "B2W",
+        compoundName: "מתחם B2W",
         stalls: [{ stallNumber: "10" }, { stallNumber: "11" }],
       }),
     ).toBe("מתחם B2W · תאים 10–11");
@@ -55,7 +58,7 @@ describe("formatCompoundDestination", () => {
   it("uses plural תאים for non-contiguous stalls", () => {
     expect(
       formatCompoundDestination({
-        CompoundName: "B2W",
+        CompoundName: "מתחם B2W",
         Stalls: [
           { StallNumber: "10" },
           { StallNumber: "12" },
@@ -64,6 +67,25 @@ describe("formatCompoundDestination", () => {
       }),
     ).toBe("מתחם B2W · תאים 10, 12, 15");
   });
+
+  it("renders the compound name verbatim, never prepending its own מתחם prefix on top", () => {
+    // Regression pin for the exact reported bug string: "מתחם מתחם תאי תחרות".
+    expect(
+      formatCompoundDestination({
+        compoundName: "מתחם תאי תחרות",
+        stalls: [{ stallNumber: "901" }],
+      }),
+    ).not.toContain("מתחם מתחם");
+  });
+
+  it("renders a compound name with no מתחם prefix exactly as stored, without adding one", () => {
+    expect(
+      formatCompoundDestination({
+        compoundName: "חנייה צפונית",
+        stalls: [{ stallNumber: "3" }],
+      }),
+    ).toBe("חנייה צפונית · תא 3");
+  });
 });
 
 describe("getDeliveryDestinationDisplay", () => {
@@ -71,11 +93,11 @@ describe("getDeliveryDestinationDisplay", () => {
     const result = getDeliveryDestinationDisplay({
       deliveryDestinations: [
         {
-          compoundName: "תאי תחרות",
+          compoundName: "מתחם תאי תחרות",
           stalls: [{ stallNumber: "504" }],
         },
         {
-          compoundName: "B2W",
+          compoundName: "מתחם B2W",
           stalls: [{ stallNumber: "10" }, { stallNumber: "11" }],
         },
       ],
@@ -93,7 +115,7 @@ describe("getDeliveryDestinationDisplay", () => {
   it("also reads the PascalCase DeliveryDestinations/HasUnassignedStalls fallback", () => {
     const result = getDeliveryDestinationDisplay({
       DeliveryDestinations: [
-        { CompoundId: 1, CompoundName: "B2W", Stalls: [{ StallNumber: "10" }] },
+        { CompoundId: 1, CompoundName: "מתחם B2W", Stalls: [{ StallNumber: "10" }] },
       ],
       HasUnassignedStalls: false,
     });
@@ -104,7 +126,7 @@ describe("getDeliveryDestinationDisplay", () => {
   it("shows known destinations plus the partial warning when some stalls are unassigned", () => {
     const result = getDeliveryDestinationDisplay({
       deliveryDestinations: [
-        { compoundName: "B2W", stalls: [{ stallNumber: "10" }] },
+        { compoundName: "מתחם B2W", stalls: [{ stallNumber: "10" }] },
       ],
       hasUnassignedStalls: true,
     });
@@ -148,7 +170,7 @@ describe("getDeliveryDestinationDisplay", () => {
     const result = getDeliveryDestinationDisplay({
       deliveryDestinations: [
         {
-          compoundName: "B2W",
+          compoundName: "מתחם B2W",
           stalls: [{ stallNumber: "10" }, { stallNumber: "10" }],
         },
       ],

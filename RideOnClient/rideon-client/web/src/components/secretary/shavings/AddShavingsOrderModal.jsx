@@ -1,9 +1,12 @@
 // Add-order form with mandatory Ranch — Spec 2 (CAP-5, add-order-form.md).
 //
 // Mirrors the mobile admin add-order FLOW/field semantics (not the RN components). The web delta
-// is a REQUIRED Ranch dropdown that scopes three coupled reads: the stall picker
-// (getStallBookingsForShavings), the price (getServicePricesDashboard → נסורת section), and the
-// create auth/write. Changing ranch resets stalls + price. Backend already authorizes HostSecretary.
+// is a REQUIRED Ranch (requesting ranch) dropdown that scopes the stall picker
+// (getStallBookingsForShavings) and the create auth/write. The price read
+// (getServicePricesDashboard → נסורת section) is scoped by hostRanchId instead — shavings
+// pricing always belongs to the competition's host-ranch catalog regardless of which ranch is
+// requesting (ranch-model fix). Changing the requesting ranch resets stalls + selected price.
+// Backend already authorizes HostSecretary.
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 
@@ -102,6 +105,7 @@ function formatNow() {
 
 export default function AddShavingsOrderModal(props) {
   const competitionId = props.competitionId;
+  const hostRanchId = props.hostRanchId;
   const ranchOptions = Array.isArray(props.ranchOptions) ? props.ranchOptions : [];
 
   const [ranchId, setRanchId] = useState("");
@@ -188,8 +192,15 @@ export default function AddShavingsOrderModal(props) {
           }
         });
 
+      // Ranch-model fix: shavings prices belong to the competition's HOST
+      // ranch catalog (usp_CreateShavingsOrder requires the price catalog
+      // item to belong to the host ranch, regardless of which ranch is
+      // requesting the order) — fetched with hostRanchId, never the
+      // selected/requesting ranchId. Previously this used ranchId, which
+      // 403'd for any guest ranch the secretary has no direct role in and
+      // was silently swallowed into a misleading "no active price" message.
       setLoadingPrices(true);
-      getServicePricesDashboard(ranchId)
+      getServicePricesDashboard(hostRanchId)
         .then(function (res) {
           if (cancelled) {
             return;
@@ -218,7 +229,7 @@ export default function AddShavingsOrderModal(props) {
         cancelled = true;
       };
     },
-    [props.isOpen, ranchId, competitionId],
+    [props.isOpen, ranchId, competitionId, hostRanchId],
   );
 
   const selectedPrice = useMemo(

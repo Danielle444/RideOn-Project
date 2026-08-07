@@ -175,7 +175,7 @@ describe("PayerCompetitionAccountScreen - independent in-flight guards for accou
     var source = readSource();
     var block = getDoBlock(
       source,
-      "async function doStallChangeRequest(item) {",
+      "async function doStallChangeRequest(dates) {",
       "function confirmCancelEntry(item) {",
     );
 

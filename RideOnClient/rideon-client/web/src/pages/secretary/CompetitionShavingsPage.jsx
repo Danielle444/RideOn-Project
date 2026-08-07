@@ -9,6 +9,7 @@ import CompetitionWorkspaceLayout from "../../components/secretary/competition-w
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import useCompetitionShavingsPage from "../../hooks/secretary/useCompetitionShavingsPage";
 import ToastMessage from "../../components/common/ToastMessage";
+import ConfirmDialog from "../../components/superuser/ConfirmDialog";
 import ShavingsGroupingToggle from "../../components/secretary/shavings/ShavingsGroupingToggle";
 import ShavingsNeedsAttentionSection from "../../components/secretary/shavings/ShavingsNeedsAttentionSection";
 import ShavingsGroup from "../../components/secretary/shavings/ShavingsGroup";
@@ -31,19 +32,44 @@ function ShavingsContent(props) {
     });
   }
 
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+  });
+
+  function closeConfirmDialog() {
+    setConfirmDialog({
+      isOpen: false,
+      title: "",
+      message: "",
+      onConfirm: null,
+    });
+  }
+
   async function handleOrderCreated() {
     await shavings.handleOrderCreated();
     showToast("success", "הזמנת הנסורת נוספה בהצלחה");
   }
 
-  async function handleCancelOrder(order) {
-    const result = await shavings.handleCancelOrder(order);
+  function handleCancelOrder(order) {
+    setConfirmDialog({
+      isOpen: true,
+      title: "ביטול הזמנת נסורת",
+      message: "האם לבטל את הזמנת הנסורת? פעולה זו תעדכן גם את החיובים.",
+      onConfirm: async function () {
+        const result = await shavings.handleCancelOrder(order);
 
-    if (result === true) {
-      showToast("success", "הזמנת הנסורת בוטלה");
-    } else if (result === false) {
-      showToast("error", shavings.cancelErrorMessage);
-    }
+        closeConfirmDialog();
+
+        if (result === true) {
+          showToast("success", "הזמנת הנסורת בוטלה");
+        } else if (result === false) {
+          showToast("error", shavings.cancelErrorMessage);
+        }
+      },
+    });
   }
 
   const hasOrders = shavings.orders.length > 0;
@@ -55,6 +81,14 @@ function ShavingsContent(props) {
         type={toast.type}
         message={toast.message}
         onClose={closeToast}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onCancel={closeConfirmDialog}
+        onConfirm={confirmDialog.onConfirm}
       />
 
       {/* Header */}
@@ -132,6 +166,13 @@ function ShavingsContent(props) {
         onClose={shavings.closeAdd}
         competitionId={competitionId}
         ranchOptions={shavings.ranchOptions}
+        // ranchId here is the page's own ranch (activeRole.ranchId), which
+        // is always the competition's host ranch — proc 172 validates
+        // c.hostranchid = p_ranchid, so the page could not have loaded
+        // otherwise. Shavings pricing is host-ranch-scoped (ranch-model
+        // fix), independent of whichever requesting ranch is selected in
+        // the modal's own dropdown.
+        hostRanchId={ranchId}
         onCreated={handleOrderCreated}
       />
     </div>

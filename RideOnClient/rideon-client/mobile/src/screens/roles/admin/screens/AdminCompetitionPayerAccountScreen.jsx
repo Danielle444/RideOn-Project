@@ -271,6 +271,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
   });
 
   var paidTimesAvailability = registrationStepStatus.availability.paidTimes;
+  var classesAvailability = registrationStepStatus.availability.classes;
 
   var payer = account.payer || routePayer;
 
@@ -1147,14 +1148,26 @@ export default function AdminCompetitionPayerAccountScreen(props) {
     );
   }
 
+  // Gated on availability.classes.isEnabled to match
+  // AdminCompetitionClassesScreen's identical button
+  // (fix/competition-ended-and-delivery-guards, 2026-08-07) -- previously
+  // this button stayed enabled after registration closed, relying entirely
+  // on the server's RN001 rejection instead of telling the admin why.
   function renderAddEntryButton() {
+    var isDisabled = !classesAvailability.isEnabled;
+
     return (
       <Pressable
         onPress={function () {
+          if (isDisabled) {
+            return;
+          }
+
           setShowEntryCreateModal(true);
         }}
+        disabled={isDisabled}
         style={{
-          backgroundColor: "#7B5A4D",
+          backgroundColor: isDisabled ? "#C9B7AC" : "#7B5A4D",
           borderRadius: 12,
           paddingVertical: 12,
           alignItems: "center",
@@ -1325,6 +1338,12 @@ export default function AdminCompetitionPayerAccountScreen(props) {
               </Text>
             </View>
           </View>
+
+          {item.hasEntryCreationFine ? (
+            <Text style={styles.itemMutedText}>
+              כולל קנס הרשמה מאוחרת: {formatCurrency(item.entryCreationFineAmount)}
+            </Text>
+          ) : null}
 
           {renderActions(
             "entry:" + item.entryId,

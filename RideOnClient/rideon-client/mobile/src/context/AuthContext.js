@@ -16,7 +16,7 @@ import {
 } from "../services/storageService";
 import { registerUnauthorizedHandler } from "../services/axiosInstance";
 import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
-import { getLoginErrorMessage } from "../utils/loginErrors";
+import { getLoginErrorMessage } from "../../../shared/auth/utils/loginErrorMessages";
 import { useUser } from "./UserContext";
 import { useActiveRole } from "./ActiveRoleContext";
 

@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
 
@@ -47,6 +48,8 @@ import {
 
 import ShavingsGroupCard from "../../../../components/payerAccount/ShavingsGroupCard";
 
+import PayerStallChangeRequestModal from "../../../../components/payerAccount/PayerStallChangeRequestModal";
+
 import StallMapModal from "../../../../components/competitions/StallMapModal";
 
 import { getStallMapPublishStatus } from "../../../../services/stallMapService";
@@ -69,21 +72,13 @@ import { createShavingsOrderCancelRequest } from "../../../../services/shavingsO
 
 import { createInFlightGuard } from "../../../../utils/inFlightGuard";
 
+// Consolidated onto the shared, hardened extractor (RideOn notification
+// audit, 2026-08-07, Slice 2) - the local version used to JSON.stringify an
+// unrecognized object body as a last resort, which could leak raw backend
+// shape to the user. Name/signature kept so every Alert.alert call site
+// below is untouched.
 function extractErrorMessage(err) {
-  if (!err) return "אירעה שגיאה";
-  var data = err.response && err.response.data;
-  if (data) {
-    if (typeof data === "string") return data;
-    if (data.message) return String(data.message);
-    if (data.error) return String(data.error);
-    try {
-      return JSON.stringify(data);
-    } catch {
-      return "אירעה שגיאה";
-    }
-  }
-  if (err.message) return err.message;
-  return "אירעה שגיאה";
+  return getApiErrorMessage(err, "אירעה שגיאה");
 }
 
 function formatCurrency(value) {
@@ -372,6 +367,10 @@ export default function PayerCompetitionAccountScreen(props) {
     shavingsCancelGuardRef.current = createInFlightGuard();
   }
 
+  var [stallChangeRequestItem, setStallChangeRequestItem] = useState(null);
+
+  var [isSubmittingStallChange, setIsSubmittingStallChange] = useState(false);
+
   var [editingPaidTime, setEditingPaidTime] = useState(null);
 
   var [editPaidTimeNotes, setEditPaidTimeNotes] = useState("");
@@ -411,22 +410,24 @@ export default function PayerCompetitionAccountScreen(props) {
   }
 
   function confirmStallChangeRequest(item) {
-    Alert.alert(
-      "בקשת שינוי תא",
-      "האם לשלוח בקשת שינוי תא למזכירה? המזכירה תיצור איתך קשר לפרטים.",
-      [
-        { text: "לא", style: "cancel" },
-        {
-          text: "כן",
-          onPress: function () {
-            doStallChangeRequest(item);
-          },
-        },
-      ],
-    );
+    setStallChangeRequestItem(item);
   }
 
-  async function doStallChangeRequest(item) {
+  function closeStallChangeRequestModal() {
+    if (isSubmittingStallChange) {
+      return;
+    }
+
+    setStallChangeRequestItem(null);
+  }
+
+  async function doStallChangeRequest(dates) {
+    var item = stallChangeRequestItem;
+
+    if (!item) {
+      return;
+    }
+
     var guardKey = "stall-change:" + item.stallBookingId;
 
     if (!stallChangeGuardRef.current.tryAcquire(guardKey)) {
@@ -434,18 +435,24 @@ export default function PayerCompetitionAccountScreen(props) {
     }
 
     try {
+      setIsSubmittingStallChange(true);
       setCancellingId(guardKey);
 
       await createStallChangeRequestByPayer({
         stallBookingId: item.stallBookingId,
         ranchId: activeRole?.ranchId,
+        newStartDate: dates.newStartDate,
+        newEndDate: dates.newEndDate,
+        notes: dates.notes,
       });
 
       Alert.alert("נשלח", "בקשת שינוי התא נשלחה למזכירה");
+      setStallChangeRequestItem(null);
       await account.reload();
     } catch (err) {
       Alert.alert("שגיאה", extractErrorMessage(err));
     } finally {
+      setIsSubmittingStallChange(false);
       setCancellingId(null);
       stallChangeGuardRef.current.release(guardKey);
     }
@@ -941,6 +948,12 @@ export default function PayerCompetitionAccountScreen(props) {
               </Text>
             </View>
           </View>
+
+          {item.hasEntryCreationFine ? (
+            <Text style={styles.itemMutedText}>
+              כולל קנס הרשמה מאוחרת: {formatCurrency(item.entryCreationFineAmount)}
+            </Text>
+          ) : null}
 
           {renderCancelButton(
             "entry:" + item.entryId,
@@ -1507,6 +1520,14 @@ export default function PayerCompetitionAccountScreen(props) {
         onClose={function () {
           setIsStallMapOpen(false);
         }}
+      />
+
+      <PayerStallChangeRequestModal
+        visible={!!stallChangeRequestItem}
+        item={stallChangeRequestItem}
+        isSubmitting={isSubmittingStallChange}
+        onSubmit={doStallChangeRequest}
+        onClose={closeStallChangeRequestModal}
       />
     </MobileScreenLayout>
   );

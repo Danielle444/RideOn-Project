@@ -13,6 +13,9 @@
 -- Ownership: payer must be in at least one bill linked to this booking.
 -- Guards: not already cancelled, no existing pending request (unique constraint
 -- on originalprequestid will also prevent double-insert).
+--
+-- Competition-ended guard added on fix/competition-ended-and-delivery-guards
+-- (2026-08-07): this proc had no date check at all.
 -- ============================================================================
 
 DROP FUNCTION IF EXISTS public.usp_cancelstallbookingbypayer(integer, integer);
@@ -27,14 +30,27 @@ DECLARE
     v_owner_exists    boolean;
     v_existing_pend   integer;
     v_new_request_id  integer;
+    v_competitionid       integer;
+    v_competitionenddate  date;
 BEGIN
     -- Validate stall booking exists
-    IF NOT EXISTS (
-        SELECT 1
-        FROM public.stallbooking
-        WHERE stallbookingid = p_stallbookingid
-    ) THEN
+    SELECT pr.competitionid
+    INTO v_competitionid
+    FROM public.stallbooking sb
+    JOIN public.productrequest pr ON pr.prequestid = sb.stallbookingid
+    WHERE sb.stallbookingid = p_stallbookingid;
+
+    IF v_competitionid IS NULL THEN
         RAISE EXCEPTION 'Stall booking not found';
+    END IF;
+
+    SELECT c.competitionenddate
+    INTO v_competitionenddate
+    FROM public.competition c
+    WHERE c.competitionid = v_competitionid;
+
+    IF (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate THEN
+        RAISE EXCEPTION 'Competition has already ended' USING ERRCODE = 'RN001';
     END IF;
 
     -- Validate payer pays for this booking (via billproductrequest -> bill)

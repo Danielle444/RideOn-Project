@@ -106,6 +106,7 @@ export default function ProfileScreenTemplate(props) {
         {page.config.showManagersSection ? (
           <PayerManagersSection
             managers={page.managers}
+            pendingManagerRequests={page.pendingManagerRequests}
             availableManagers={page.availableManagers}
             loadingManagers={page.loadingManagers}
             loadingAvailableManagers={page.loadingAvailableManagers}
@@ -113,11 +114,14 @@ export default function ProfileScreenTemplate(props) {
             managersSearchText={page.managersSearchText}
             submittingManagerId={page.submittingManagerId}
             removingManagerId={page.removingManagerId}
+            answeringManagerId={page.answeringManagerId}
             onOpenManagersModal={page.openManagersModal}
             onCloseManagersModal={page.closeManagersModal}
             onManagersSearchChange={page.onManagersSearchChange}
             onAddManager={page.handleAddManager}
             onRemoveManager={page.handleRemoveManager}
+            onApproveManagerRequest={page.handleApproveManagerRequest}
+            onRejectManagerRequest={page.handleRejectManagerRequest}
           />
         ) : null}
 

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { getCompetitionSummaryShavingsDetails } from "../../services/competitionSummaryService";
+import { getParticipatingRanches } from "../../services/competitionService";
 import {
   getShavingsOrdersForCompetitionAndRanch,
   secretaryCancelShavingsOrder,
@@ -40,6 +41,7 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
   const [error, setError] = useState(null);
   const [orders, setOrders] = useState([]);
   const [ranchRollup, setRanchRollup] = useState([]);
+  const [participatingRanches, setParticipatingRanches] = useState([]);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [cancellingId, setCancellingId] = useState(null);
   const [cancelError, setCancelError] = useState(null);
@@ -118,16 +120,30 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
       setError(null);
 
       try {
-        const rollupResponse = await getCompetitionSummaryShavingsDetails(
-          competitionId,
-          ranchId,
-        );
+        const [rollupResponse, participatingRanchesResponse] =
+          await Promise.all([
+            getCompetitionSummaryShavingsDetails(competitionId, ranchId),
+            // Ranch-model fix: participating-ranch source for the add-order
+            // ranch dropdown. Guarded with its own catch (rather than the
+            // outer try/catch) so a failure here degrades the dropdown to
+            // its host-ranch fallback instead of blanking the whole page.
+            getParticipatingRanches(competitionId, ranchId).catch(
+              function () {
+                return { data: [] };
+              },
+            ),
+          ]);
 
         const rollup = Array.isArray(rollupResponse.data)
           ? rollupResponse.data
           : [];
 
         setRanchRollup(rollup);
+        setParticipatingRanches(
+          Array.isArray(participatingRanchesResponse.data)
+            ? participatingRanchesResponse.data
+            : [],
+        );
 
         // Enumerate participating ranches from the rollup; loop R2 per ranch in parallel.
         // allSettled (not all): a single ranch's request failing must not blank the whole
@@ -168,6 +184,7 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
         setError(err);
         setOrders([]);
         setRanchRollup([]);
+        setParticipatingRanches([]);
       } finally {
         setLoading(false);
       }
@@ -221,26 +238,33 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
     [orders],
   );
 
-  // Ranch options for the add-order dropdown: the participating ranches from the rollup, plus
-  // the host ranch (always priced) so an order can be created before any order exists yet.
+  // Ranch options for the add-order dropdown: the competition's participating
+  // ranches (usp_GetParticipatingRanchesForCompetition — entries/stall-
+  // bookings/paid-time-derived), not the shavings-order rollup, which only
+  // listed ranches with an EXISTING shavings order and made a guest ranch's
+  // first order unselectable. Host ranch kept as a fallback in case the
+  // participating-ranches read fails or returns empty.
   const ranchOptions = useMemo(
     function () {
       const seen = new Set();
       const options = [];
 
-      // Rollup ranches first — they carry names.
-      ranchRollup.forEach(function (row) {
-        const id = rollupRanchId(row);
+      participatingRanches.forEach(function (row) {
+        const id = getValue(row, "ranchId", "RanchId", null);
 
         if (id === null || id === undefined || seen.has(String(id))) {
           return;
         }
 
         seen.add(String(id));
-        options.push({ ranchId: Number(id), ranchName: rollupRanchName(row) });
+        options.push({
+          ranchId: Number(id),
+          ranchName: getValue(row, "ranchName", "RanchName", null),
+        });
       });
 
-      // Host ranch (always priced) — add if no order/rollup row exists for it yet.
+      // Host ranch (always priced) — safety-net fallback if the
+      // participating-ranches read fails or returns empty.
       if (
         ranchId !== null &&
         ranchId !== undefined &&
@@ -251,7 +275,7 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
 
       return options;
     },
-    [ranchRollup, ranchId],
+    [participatingRanches, ranchId],
   );
 
   const openAdd = useCallback(function () {
@@ -296,14 +320,8 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
         return null;
       }
 
-      const confirmed = window.confirm(
-        "האם לבטל את הזמנת הנסורת? פעולה זו תעדכן גם את החיובים.",
-      );
-
-      if (!confirmed) {
-        return null;
-      }
-
+      // Confirmation is owned by the page (CompetitionShavingsPage.jsx),
+      // which shows the shared ConfirmDialog before calling this.
       setCancelError(null);
       setCancellingId(shavingsOrderId);
 

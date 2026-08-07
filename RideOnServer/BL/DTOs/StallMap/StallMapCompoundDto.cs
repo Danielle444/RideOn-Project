@@ -70,6 +70,11 @@ namespace RideOnServer.BL.DTOs.StallMap
     // render occupied/mine/tack, and each identifies another participant or
     // ranch. HorseName/BarnName are null at the SQL layer (never transmitted)
     // whenever IsMine is false - see usp_GetStallAssignmentsForCompetitionPayer.
+    // IsMyRanch (2026-08-07, "My ranch" UX) is the ONE deliberate exception:
+    // a same-ranch boolean computed server-side (sb.requestingranchid = the
+    // caller's own active ranch), never the raw ranch id/name. It still never
+    // reveals which OTHER ranch a stall belongs to, only same/not-same versus
+    // the caller.
     public class PayerStallAssignmentDto
     {
         public int AssignmentId { get; set; }
@@ -83,6 +88,8 @@ namespace RideOnServer.BL.DTOs.StallMap
 
         public string? HorseName { get; set; }
         public string? BarnName { get; set; }
+
+        public bool IsMyRanch { get; set; }
     }
 
     public class StallMapPublishStatusDto

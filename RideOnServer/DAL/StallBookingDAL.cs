@@ -116,6 +116,39 @@ namespace RideOnServer.DAL
             return horses;
         }
 
+        // HostSecretary cross-ranch service flows (2026-08-07): additive
+        // sibling read for GetHorsesForStallBooking above, which hard-filters
+        // h.ranchid = p_ranchId and is shared with the mobile RanchAdmin
+        // self-service flow (left untouched). This one is competition-scoped
+        // only, so a HostSecretary can select a horse belonging to any
+        // participating ranch, not just her own.
+        public static List<HorseForStallBookingByCompetitionItem> GetHorsesForStallBookingByCompetition(int competitionId)
+        {
+            List<HorseForStallBookingByCompetitionItem> horses = new List<HorseForStallBookingByCompetitionItem>();
+
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand("SELECT * FROM usp_gethorsesforstallbookingbycompetition(@competitionId)", conn);
+            cmd.Parameters.AddWithValue("@competitionId", competitionId);
+
+            using NpgsqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                horses.Add(new HorseForStallBookingByCompetitionItem
+                {
+                    HorseId = Convert.ToInt32(reader["horseid"]),
+                    HorseName = reader["horsename"]?.ToString() ?? string.Empty,
+                    BarnName = reader["barnname"] == DBNull.Value ? null : reader["barnname"].ToString(),
+                    FederationNumber = reader["federationnumber"] == DBNull.Value ? null : reader["federationnumber"].ToString(),
+                    RanchId = Convert.ToInt32(reader["ranchid"]),
+                    RanchName = reader["ranchname"]?.ToString() ?? string.Empty
+                });
+            }
+
+            return horses;
+        }
+
         public static List<HorsePayerOptionItem> GetHorsePayersForCompetition(int competitionId, int ranchId)
         {
             List<HorsePayerOptionItem> payers = new List<HorsePayerOptionItem>();
@@ -511,54 +544,129 @@ namespace RideOnServer.DAL
             return Convert.ToInt32(result);
         }
 
-        public static int CreateStallChangeRequestByPayer(int stallBookingId, int payerPersonId)
+        public static int CreateStallChangeRequestByPayer(
+            int stallBookingId,
+            int payerPersonId,
+            DateTime newStartDate,
+            DateTime newEndDate,
+            string? notes
+        )
         {
-            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
-            conn.Open();
-
-            using NpgsqlCommand cmd = new NpgsqlCommand(
-                @"SELECT public.usp_createstallchangerequestbypayer(
-                    p_stallbookingid := @stallBookingId,
-                    p_payerpersonid  := @payerPersonId
-                );",
-                conn
-            );
-
-            cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
-            cmd.Parameters.AddWithValue("@payerPersonId", payerPersonId);
-
-            object? result = cmd.ExecuteScalar();
-
-            if (result == null || result == DBNull.Value)
+            try
             {
-                throw new Exception("Failed to create payer stall change request");
-            }
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
 
-            return Convert.ToInt32(result);
+                using NpgsqlCommand cmd = new NpgsqlCommand(
+                    @"SELECT public.usp_createstallchangerequestbypayer(
+                        p_stallbookingid := @stallBookingId,
+                        p_payerpersonid  := @payerPersonId,
+                        p_newstartdate   := @newStartDate::date,
+                        p_newenddate     := @newEndDate::date,
+                        p_notes          := @notes::text
+                    );",
+                    conn
+                );
+
+                cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
+                cmd.Parameters.AddWithValue("@payerPersonId", payerPersonId);
+
+                cmd.Parameters.Add(
+                    "@newStartDate",
+                    NpgsqlDbType.Date
+                ).Value = newStartDate.Date;
+
+                cmd.Parameters.Add(
+                    "@newEndDate",
+                    NpgsqlDbType.Date
+                ).Value = newEndDate.Date;
+
+                cmd.Parameters.AddWithValue(
+                    "@notes",
+                    (object?)notes ?? DBNull.Value
+                );
+
+                object? result = cmd.ExecuteScalar();
+
+                if (result == null || result == DBNull.Value)
+                {
+                    throw new Exception("Failed to create payer stall change request");
+                }
+
+                return Convert.ToInt32(result);
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                throw new BL.ValidationException(ex.MessageText);
+            }
         }
 
         public static int SecretaryDeleteStallBooking(int stallBookingId, int secretarySystemUserId)
         {
-            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
-            conn.Open();
-
-            using NpgsqlCommand cmd = new NpgsqlCommand(
-                @"SELECT public.usp_secretarydeletestallbooking(
-                    p_stallbookingid        := @stallBookingId,
-                    p_secretarysystemuserid := @secretaryId
-                );",
-                conn
-            );
-
-            cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
-            cmd.Parameters.AddWithValue("@secretaryId", secretarySystemUserId);
-
-            object? result = cmd.ExecuteScalar();
-            if (result == null || result == DBNull.Value)
+            try
             {
-                throw new Exception("Failed to delete stall booking");
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
+
+                using NpgsqlCommand cmd = new NpgsqlCommand(
+                    @"SELECT public.usp_secretarydeletestallbooking(
+                        p_stallbookingid        := @stallBookingId,
+                        p_secretarysystemuserid := @secretaryId
+                    );",
+                    conn
+                );
+
+                cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
+                cmd.Parameters.AddWithValue("@secretaryId", secretarySystemUserId);
+
+                object? result = cmd.ExecuteScalar();
+                if (result == null || result == DBNull.Value)
+                {
+                    throw new Exception("Failed to delete stall booking");
+                }
+                return Convert.ToInt32(result);
             }
-            return Convert.ToInt32(result);
+            catch (PostgresException ex) when (ex.SqlState == "P0001")
+            {
+                // Business-rule/authorization guard raised inside
+                // usp_secretarydeletestallbooking. No custom ERRCODE in the
+                // proc, so Postgres's default RAISE EXCEPTION SQLSTATE
+                // (P0001) is what's actually thrown -- same convention the
+                // RN001 guards elsewhere in this file use. Message text is
+                // in English at the DB layer; translate before surfacing.
+                throw new BL.ValidationException(TranslateSecretaryDeleteStallBookingError(ex.MessageText));
+            }
+            catch (NpgsqlException ex)
+            {
+                // This method previously had no catch at all, so any other
+                // Postgres/connection failure propagated with a raw native
+                // .NET exception message. Route it through the same
+                // "Database error: " DAL convention as the rest of this
+                // file so the controller's generic catch has a safe,
+                // fixed fallback to fall back to instead of echoing this.
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        // Fixed, exhaustive translation of
+        // usp_secretarydeletestallbooking's known English guard messages.
+        // Anything unrecognized falls to the generic line rather than
+        // leaking English to the secretary.
+        private static string TranslateSecretaryDeleteStallBookingError(string message)
+        {
+            switch (message)
+            {
+                case "Stall booking not found":
+                    return "הזמנת התא לא נמצאה";
+                case "Permission denied: not the host ranch secretary":
+                    return "אין לך הרשאה לבצע פעולה זו";
+                case "Cannot delete a paid stall booking":
+                    return "לא ניתן למחוק הזמנת תא ששולמה";
+                case "A pending change request exists — resolve it first":
+                    return "קיימת בקשת שינוי ממתינה — יש לטפל בה תחילה";
+                default:
+                    return "לא ניתן לבטל את הזמנת התא";
+            }
         }
 
         public static NpgsqlCommand BuildAdminCancelStallBookingCommand(

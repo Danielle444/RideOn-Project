@@ -17,6 +17,7 @@ import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import horsesStyles from "../../../../styles/horsesStyles";
 
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 import { getAdminCompetitionMenuItems } from "../../../../navigation/competitionMenuConfigs";
 
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
@@ -77,7 +78,7 @@ export default function AdminCompetitionTrainersScreen(props) {
       setItems(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       setScreenError(
-        String(error?.response?.data || "אירעה שגיאה בטעינת מאמני התחרות"),
+        getApiErrorMessage(error, "אירעה שגיאה בטעינת מאמני התחרות"),
       );
       setItems([]);
     } finally {

@@ -16,6 +16,7 @@ import styles from "../../../../styles/adminAddPayerStyles";
 
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import { getAdminMenuItems } from "../../../../navigation/sideMenuConfigs";
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
@@ -137,7 +138,7 @@ export default function AdminAddPayerScreen(props) {
 
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה בשליחת בקשת הוספת משלם"),
+        getApiErrorMessage(error, "אירעה שגיאה בשליחת בקשת הוספת משלם"),
       );
     } finally {
       setIsSubmitting(false);
@@ -191,7 +192,7 @@ export default function AdminAddPayerScreen(props) {
     } catch (error) {
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה ביצירת המשלם"),
+        getApiErrorMessage(error, "אירעה שגיאה ביצירת המשלם"),
       );
     } finally {
       setIsCreatingWithCredentials(false);

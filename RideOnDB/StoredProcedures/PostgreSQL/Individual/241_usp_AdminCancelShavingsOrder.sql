@@ -41,6 +41,12 @@
 -- convention this codebase's DAL layer already maps to BL.ValidationException
 -- -> HTTP 409 (see ShavingsOrderDAL.CreateShavingsOrder for the existing
 -- RN001 catch in this same DAL file).
+--
+-- Two guards added on fix/competition-ended-and-delivery-guards (2026-08-07):
+--   - Cannot cancel a DELIVERED order (shavingsorder.arrivaltime IS NOT
+--     NULL) -- checked immediately after existence, before ranch/ownership.
+--   - Cannot cancel once the competition has ended -- this proc had no date
+--     check at all before, unlike usp_createshavingsorder's own guard.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_admincancelshavingsorder(
@@ -51,7 +57,9 @@ CREATE OR REPLACE FUNCTION public.usp_admincancelshavingsorder(
 RETURNS integer
 LANGUAGE plpgsql AS $$
 DECLARE
-    v_order_exists          boolean;
+    v_competitionid         integer;
+    v_competitionenddate    date;
+    v_arrivaltime           timestamp without time zone;
     v_ranch_linked          boolean;
     v_iscreatedbyadmin      boolean;
     v_ismanagedpayerorder   boolean;
@@ -72,13 +80,27 @@ BEGIN
         RAISE EXCEPTION 'Invalid ranch id' USING ERRCODE = 'RN001';
     END IF;
 
-    SELECT EXISTS (
-        SELECT 1 FROM public.shavingsorder WHERE shavingsorderid = p_shavingsorderid
-    )
-    INTO v_order_exists;
+    SELECT pr.competitionid, so.arrivaltime
+    INTO v_competitionid, v_arrivaltime
+    FROM public.productrequest pr
+    JOIN public.shavingsorder so ON so.shavingsorderid = pr.prequestid
+    WHERE pr.prequestid = p_shavingsorderid;
 
-    IF NOT v_order_exists THEN
+    IF v_competitionid IS NULL THEN
         RAISE EXCEPTION 'Shavings order not found' USING ERRCODE = 'RN001';
+    END IF;
+
+    IF v_arrivaltime IS NOT NULL THEN
+        RAISE EXCEPTION 'Cannot cancel a delivered shavings order' USING ERRCODE = 'RN001';
+    END IF;
+
+    SELECT c.competitionenddate
+    INTO v_competitionenddate
+    FROM public.competition c
+    WHERE c.competitionid = v_competitionid;
+
+    IF (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate THEN
+        RAISE EXCEPTION 'Competition has already ended' USING ERRCODE = 'RN001';
     END IF;
 
     -- Ranch scoping via the order's linked stall(s) -- STRICT: every linked

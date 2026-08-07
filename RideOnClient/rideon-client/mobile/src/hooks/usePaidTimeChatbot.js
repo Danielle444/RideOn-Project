@@ -1,5 +1,6 @@
 import { useReducer, useCallback, useMemo } from "react";
 import { bulkCreatePaidTimeRequests } from "../services/paidTimeRequestsService";
+import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 
 const STEPS = [
   "intro",
@@ -160,21 +161,13 @@ function findSlotForHorse(answers, context, coachId) {
   );
 }
 
+// Consolidated onto the shared, hardened extractor (RideOn notification
+// audit, 2026-08-07, Slice 2) - the local version used to JSON.stringify an
+// unrecognized object body as a last resort, which could leak raw backend
+// shape to the user. Name/signature kept so the one call site below is
+// untouched.
 function extractErrorMessage(err) {
-  const data = err?.response?.data;
-  if (typeof data === "string" && data.trim()) return data;
-  if (data && typeof data === "object") {
-    if (typeof data.message === "string") return data.message;
-    if (typeof data.title === "string") return data.title;
-    if (typeof data.error === "string") return data.error;
-    try {
-      return JSON.stringify(data);
-    } catch (e) {
-      // fall through
-    }
-  }
-  if (typeof err?.message === "string") return err.message;
-  return "אירעה שגיאה בשליחה לשרת";
+  return getApiErrorMessage(err, "אירעה שגיאה בשליחה לשרת");
 }
 
 function buildMetadata(answers) {

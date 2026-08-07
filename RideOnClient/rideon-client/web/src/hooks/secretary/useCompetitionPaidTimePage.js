@@ -142,6 +142,16 @@ export default function useCompetitionPaidTimePage(options) {
   var [savingPaidTimeSlot, setSavingPaidTimeSlot] = useState(false);
   var [paidTimeSlotModalError, setPaidTimeSlotModalError] = useState("");
 
+  var [paidTimeSlotDeleteConfirm, setPaidTimeSlotDeleteConfirm] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+  });
+
+  /* ===== CREATE REQUEST MODAL STATE (Slice B, HostSecretary creation) ===== */
+  var [createRequestModalOpen, setCreateRequestModalOpen] = useState(false);
+
   /* =======================
      LOAD
   ======================= */
@@ -301,34 +311,76 @@ export default function useCompetitionPaidTimePage(options) {
     }
   }
 
-  async function handleDeletePaidTimeSlot(slot) {
-    if (!window.confirm("למחוק את הסלוט?")) {
-      return;
+  function closePaidTimeSlotDeleteConfirm() {
+    setPaidTimeSlotDeleteConfirm({
+      isOpen: false,
+      title: "",
+      message: "",
+      onConfirm: null,
+    });
+  }
+
+  function handleDeletePaidTimeSlot(slot) {
+    setPaidTimeSlotDeleteConfirm({
+      isOpen: true,
+      title: "מחיקת סלוט",
+      message: "למחוק את הסלוט?",
+      onConfirm: async function () {
+        try {
+          await deletePaidTimeSlotInCompetition(
+            getSlotId(slot),
+            competitionId,
+            ranchId,
+            false,
+          );
+
+          closePaidTimeSlotDeleteConfirm();
+          await loadSlots();
+
+          if (onShowToast) {
+            onShowToast("success", "הסלוט נמחק בהצלחה");
+          }
+        } catch (err) {
+          console.error("Delete paid time slot error:", err.response?.data || err);
+
+          closePaidTimeSlotDeleteConfirm();
+
+          if (onShowToast) {
+            onShowToast(
+              "error",
+              getErrorMessage(err, "שגיאה במחיקת סלוט פייד־טיים"),
+            );
+          }
+        }
+      },
+    });
+  }
+
+  /* =======================
+     CREATE REQUEST (Slice B, HostSecretary creation)
+  ======================= */
+
+  function openCreateRequestModal() {
+    setCreateRequestModalOpen(true);
+  }
+
+  function closeCreateRequestModal() {
+    setCreateRequestModalOpen(false);
+  }
+
+  async function handlePaidTimeRequestCreated() {
+    setCreateRequestModalOpen(false);
+
+    await loadSlots();
+
+    // The assignment view's pending-requests list is only fetched for the
+    // currently selected slot(s); refresh it too so a newly-created request
+    // for an already-selected slot appears without a manual toggle.
+    if (assignmentViewOpen && selectedSlotIds.length > 0) {
+      await loadRequests();
     }
 
-    try {
-      await deletePaidTimeSlotInCompetition(
-        getSlotId(slot),
-        competitionId,
-        ranchId,
-        false,
-      );
-
-      await loadSlots();
-
-      if (onShowToast) {
-        onShowToast("success", "הסלוט נמחק בהצלחה");
-      }
-    } catch (err) {
-      console.error("Delete paid time slot error:", err.response?.data || err);
-
-      if (onShowToast) {
-        onShowToast(
-          "error",
-          getErrorMessage(err, "שגיאה במחיקת סלוט פייד־טיים"),
-        );
-      }
-    }
+    onShowToast?.("success", "בקשת פייד-טיים נוספה בהצלחה");
   }
 
   /* =======================
@@ -702,6 +754,14 @@ export default function useCompetitionPaidTimePage(options) {
     handleSubmitPaidTimeSlot,
     handleSetPublishState,
     handleDeletePaidTimeSlot,
+    paidTimeSlotDeleteConfirm,
+    closePaidTimeSlotDeleteConfirm,
+
+    /* create request modal (Slice B) */
+    createRequestModalOpen,
+    openCreateRequestModal,
+    closeCreateRequestModal,
+    handlePaidTimeRequestCreated,
 
     /* assignment */
     setIncludeAllPending,

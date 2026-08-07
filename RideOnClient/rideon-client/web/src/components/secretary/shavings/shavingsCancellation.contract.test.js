@@ -38,10 +38,16 @@ describe("shavingsOrderService — secretaryCancelShavingsOrder contract", () =>
 });
 
 describe("useCompetitionShavingsPage — handleCancelOrder contract", () => {
-  it("confirms before cancelling, using the approved confirm copy", () => {
-    expect(hookSource).toContain(
+  // Confirmation moved from a native window.confirm inside the hook to the
+  // page's ConfirmDialog (RideOn notification audit, 2026-08-07, Slice 3) —
+  // the approved copy now lives in CompetitionShavingsPage.jsx, and the hook
+  // itself no longer confirms at all (it's the unconditional action).
+  it("confirms via ConfirmDialog before cancelling, using the approved confirm copy", () => {
+    expect(hookSource).not.toContain("window.confirm");
+    expect(pageSource).toContain(
       "האם לבטל את הזמנת הנסורת? פעולה זו תעדכן גם את החיובים.",
     );
+    expect(pageSource).toContain("ConfirmDialog");
   });
 
   it("cancels against the order's own participating ranch, not the page's ranchId", () => {

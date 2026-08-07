@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 
 import { getMyCompetitionPaidTimeRequests } from "../services/paidTimeRequestsService";
+import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 
 function formatTime(timeValue) {
   if (!timeValue) {
@@ -143,7 +144,7 @@ export default function useAdminCompetitionPaidTimesList(params) {
       setItems(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       setScreenError(
-        String(error?.response?.data || "אירעה שגיאה בטעינת הפייד טיימים"),
+        getApiErrorMessage(error, "אירעה שגיאה בטעינת הפייד טיימים"),
       );
       setItems([]);
     } finally {

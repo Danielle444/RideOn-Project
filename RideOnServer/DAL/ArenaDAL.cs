@@ -132,6 +132,17 @@ namespace RideOnServer.DAL
                     }
                 }
             }
+            catch (PostgresException ex) when (ex.SqlState == "P0001")
+            {
+                // Business-rule guard raised inside usp_DeleteArena (arena
+                // still in use, or not found). The proc has no custom
+                // ERRCODE, so Postgres's default RAISE EXCEPTION SQLSTATE
+                // (P0001) is what's actually thrown here -- same convention
+                // the RN001 guards elsewhere in this codebase use, just
+                // without a DB migration to add one. Message text is
+                // already correct Hebrew; surface it as-is.
+                throw new BL.ValidationException(ex.MessageText);
+            }
             catch (NpgsqlException ex)
             {
                 throw new Exception(ex.Message);

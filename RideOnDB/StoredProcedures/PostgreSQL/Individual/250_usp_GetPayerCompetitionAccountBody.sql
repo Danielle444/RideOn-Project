@@ -34,8 +34,121 @@
 -- authenticates directly as the owning DB role and is unaffected by that
 -- revoke -- it never goes through PostgREST/anon/authenticated at all.
 -- ============================================================================
+--
+-- ENTRY-CREATED FINE FOLD (fix/payer-proc250-fine-fold, 2026-08-07): mobile
+-- Payer QA showed an Organizer entry-creation late fine (categorykey='fine',
+-- sourcetype='Fine', sourceid=entryid -- see the "ENTRY-CREATION FINES" note
+-- in 212_usp_GetPayerCompetitionAccount.sql) still rendering as its own
+-- standalone "קנסות" card in PayerCompetitionAccountScreen.jsx /
+-- AdminCompetitionPayerAccountScreen.jsx, separate from its entry's class
+-- card -- even though usp_getcompetitionpayercategorysummary (203, the
+-- Secretary Payments sidebar) and 206/247/248/204 were already fixed to fold
+-- the same convention into 'classes' back on PR #327/#329. Proc 203's fix is
+-- a pure category-aggregate GROUP BY and is NOT reused here by assumption --
+-- this proc returns a per-entry classes[] list plus a separate fines[] list,
+-- so the fold has to happen at the row level, not just the category label.
+--
+-- New class_charge_source CTE (feeding class_charge_summary instead of
+-- payer_charges directly): UNIONs the base Entry/classes charge rows with
+-- Organizer entry-creation fine rows (categorykey rewritten 'fine' ->
+-- 'classes', chargeowner left as-is and filtered to 'Organizer' -- same
+-- guard as proc 203's folded_charges CTE). sourceid already IS the entryid
+-- for this fine convention (never joined through changeentryrequest), so no
+-- new join key was needed -- class_charge_summary's existing
+-- chargeowner/categorykey/chargestatus arithmetic treats the folded fine
+-- amount exactly like the base Organizer charge. fine_items' second UNION ALL
+-- branch (the entry-creation-fine branch) is removed entirely, since that
+-- money is now folded into class_items instead of listed separately; the
+-- first branch (ChangeEntryRequest change/cancellation fines, sourceid =
+-- changeentryrequestid) is untouched and still renders in fines[] as its own
+-- "קנסות" row -- unchanged by design, per the standing decision that
+-- ChangeEntryRequest fines are a structurally different, still-out-of-scope
+-- category.
+--
+-- Federation is untouched: this fine convention is Organizer-only by
+-- construction (usp_InsertEntry/usp_AdminCreateEntry), and the fold branch
+-- is filtered to chargeowner = 'Organizer' defensively regardless.
+-- classGrandTotal/organizerTotal/grandTotal arithmetic is unaffected -- the
+-- amount only moves from the finetotal bucket into the classorganizertotal/
+-- classgrandtotal bucket, both already summed into organizertotal/grandtotal.
+--
+-- Live-verified for competition 78 / payer 79 / entry 10675 (ranch 11): entry
+-- 10675 classes[] row went organizerCost 250->300, totalAmount 300->350,
+-- federationCost unchanged at 50; fines[] no longer contains entry 10675 (was
+-- 1 row, now 0); summary.classGrandTotal 300->350, summary.fineTotal 50->0,
+-- summary.organizerTotal unchanged at 1060, summary.grandTotal unchanged at
+-- 1110, summary.classFederationTotal unchanged at 50. Verified via a
+-- rollback-only smoke test (BEGIN -> capture before -> CREATE OR REPLACE ->
+-- capture after -> RAISE EXCEPTION carrying both JSON payloads -> forced
+-- rollback) before live deploy, then re-confirmed against the live function
+-- post-deploy. Proc 203/204/206/212/247/248/251 and Proc 200 are untouched by
+-- this change.
+-- ============================================================================
+--
+-- ENTRY-CREATED FINE METADATA (fix/payer-proc250-fine-metadata, 2026-08-07):
+-- follow-up UX gap found in real Payer QA -- the fold above correctly hides
+-- the fine as a separate line, but left the Payer with no way to see that a
+-- class card's organizerCost/totalAmount now INCLUDES a late-entry fine.
+-- Fully additive, informational-only extension, no existing sum/column
+-- changed:
+--
+-- class_charge_source now passes bc.sourcetype through both UNION branches
+-- (previously dropped once categorykey was rewritten to 'classes'), so
+-- class_charge_summary can still tell which rows came in via the fine-fold
+-- branch. A new aggregate, entrycreationfineamount, sums only sourcetype=
+-- 'Fine' rows (same Open/Paid filter as organizercost). class_items exposes
+-- it plus a derived hasentrycreationfine boolean. Both surface on each
+-- classes[] item as 'hasEntryCreationFine' / 'entryCreationFineAmount'.
+--
+-- organizerCost/federationCost/totalAmount and every summary total are
+-- computed by the exact same expressions as before -- this is a second,
+-- independent aggregate over the same class_charge_source rows, never a
+-- rederivation or a replacement. Federation is untouched (the fine
+-- convention is Organizer-only by construction, same guard as the fold).
+--
+-- Live-verified for competition 78 / payer 79 / entry 10675 (ranch 11) via
+-- rollback-only smoke test then live re-read: entry 10675 now carries
+-- hasEntryCreationFine=true, entryCreationFineAmount=50.00, while
+-- organizerCost (300), federationCost (50), totalAmount (350), and every
+-- summary field (classGrandTotal 350, organizerTotal 1060, federationTotal
+-- 50, grandTotal 1110, remainingAmount 1110, fineTotal 0) are byte-identical
+-- before and after. fines[] is unaffected (still empty for this entry).
+--
+-- Consumed by PayerCompetitionAccountScreen.jsx and
+-- AdminCompetitionPayerAccountScreen.jsx (both mobile, share this proc via
+-- proc 212/251), which render "כולל קנס הרשמה מאוחרת: ₪X" inside the class
+-- card only when hasEntryCreationFine is true -- never re-derived from
+-- arithmetic client-side. Proc 203/204/206/212/247/248/251 and Proc 200 are
+-- untouched by this change.
+-- ============================================================================
+--
+-- CHANGEENTRYREQUEST FINE ATTRIBUTION (fix/change-entry-fine-attribution,
+-- 2026-08-07): business decision -- when a ChangeEntryRequest both replaces
+-- an entry (originalEntryId) and creates a new one (newEntryId), the late/
+-- change fine belongs to the NEW entry, never the old one. fine_items below
+-- previously joined unconditionally on cer.originalentryid, so an approved
+-- replacement's fine kept showing under the OLD class forever. Fixed to
+-- coalesce(cer.newentryid, cer.originalentryid), matching the resolution
+-- rule already used by usp_getcompetitionpayercharges (204),
+-- usp_getcompetitionsummaryclassdetails (247), and
+-- usp_getcompetitionsummaryclassentries (248) -- those three were already
+-- correct and are untouched. A pure cancellation (no newentryid) still
+-- falls back to originalentryid exactly as before. Only the CLASSES[] JOIN
+-- TARGET (classIncompId/className shown for the fine row) changes --
+-- amounts, totals, and the exposed originalEntryId JSON field are
+-- unaffected. Live-verified against competition 7 / ranch 11: payer 2241's
+-- CER #5 (newentryid 296) moved from class 176 to class 142 "Open NRHA";
+-- CER #1 (newentryid 294) moved from class 176 to class 155 "נונ פרו 50+";
+-- summary.fineTotal stayed 150.00 and summary.grandTotal was unchanged
+-- before/after. Negative control confirmed: payer 300's CER #2 (pure
+-- cancellation, newentryid NULL) still resolves to originalentryid=46,
+-- class 176, unchanged. Proc 203/204/212/247/248/251 and Proc 200 are
+-- untouched by this change; proc 156 (usp_GetEntryFineDetails) has the same
+-- bug pattern but zero live callers (verified by full-repo grep) and was
+-- deliberately left out of this fix's scope.
+-- ============================================================================
 
-CREATE FUNCTION public.usp_getpayercompetitionaccount_body(p_competitionid integer, p_ranchid integer, p_payerpersonid integer)
+CREATE OR REPLACE FUNCTION public.usp_getpayercompetitionaccount_body(p_competitionid integer, p_ranchid integer, p_payerpersonid integer)
  RETURNS jsonb
  LANGUAGE plpgsql
 AS $function$
@@ -110,6 +223,49 @@ begin
           and bc.chargestatus in ('Open', 'Paid', 'Cancelled', 'Replaced')
         group by
             bc.sourceid
+    ),
+
+    -- Entry-created fine fold (2026-08-07): unions the base Entry/classes
+    -- charge with any Organizer entry-creation late fine sharing the same
+    -- entryid (categorykey rewritten 'fine' -> 'classes'), so
+    -- class_charge_summary's existing Organizer/Federation arithmetic below
+    -- treats the fine identically to the base charge. Federation is
+    -- untouched -- this fine convention is Organizer-only by construction,
+    -- and the second branch is filtered to chargeowner = 'Organizer'
+    -- defensively, matching the same guard already live on proc 203's
+    -- folded_charges CTE. sourcetype is passed through (2026-08-07, fine
+    -- metadata follow-up) so class_charge_summary can still tell which rows
+    -- were folded in, purely for read-side disclosure -- never used to
+    -- change any sum.
+    class_charge_source as (
+        select
+            bc.sourceid,
+            bc.billid,
+            bc.chargeowner,
+            bc.categorykey,
+            bc.chargestatus,
+            bc.amounttopay,
+            bc.federationcoveredamount,
+            bc.sourcetype
+        from payer_charges bc
+        where bc.sourcetype = 'Entry'
+          and bc.categorykey = 'classes'
+
+        union all
+
+        select
+            bc.sourceid,
+            bc.billid,
+            bc.chargeowner,
+            'classes' as categorykey,
+            bc.chargestatus,
+            bc.amounttopay,
+            bc.federationcoveredamount,
+            bc.sourcetype
+        from payer_charges bc
+        where bc.sourcetype = 'Fine'
+          and bc.categorykey = 'fine'
+          and bc.chargeowner = 'Organizer'
     ),
 
     class_charge_summary as (
@@ -190,6 +346,23 @@ begin
                 end
             ), 0)::numeric as unpaidamount,
 
+            -- Entry-creation fine metadata (2026-08-07, read-only disclosure):
+            -- sums only the rows that entered class_charge_source via the
+            -- fine-fold UNION branch above (sourcetype='Fine'), so the payer
+            -- UI can show "includes a late-entry fine of X" without ever
+            -- re-deriving the amount from arithmetic on the client. Purely
+            -- additive -- organizercost/federationcost/totalamount above are
+            -- unchanged, this is a separate aggregate over the same rows.
+            coalesce(sum(
+                case
+                    when bc.sourcetype = 'Fine'
+                     and bc.categorykey = 'classes'
+                     and bc.chargestatus in ('Open', 'Paid')
+                    then bc.amounttopay
+                    else 0
+                end
+            ), 0)::numeric as entrycreationfineamount,
+
             (
                 coalesce(sum(
                     case
@@ -224,9 +397,7 @@ begin
                 ), 0) = 0
             )::boolean as ispaid
 
-        from payer_charges bc
-        where bc.sourcetype = 'Entry'
-          and bc.categorykey = 'classes'
+        from class_charge_source bc
         group by
             bc.sourceid
     ),
@@ -247,6 +418,9 @@ begin
             coalesce(ccs.paidamount, 0)::numeric as paidamount,
             coalesce(ccs.unpaidamount, 0)::numeric as unpaidamount,
             coalesce(ccs.ispaid, false)::boolean as ispaid,
+
+            coalesce(ccs.entrycreationfineamount, 0)::numeric as entrycreationfineamount,
+            (coalesce(ccs.entrycreationfineamount, 0) > 0)::boolean as hasentrycreationfine,
 
             cch.historicalorganizeramount,
             cch.historicalfederationamount,
@@ -632,8 +806,24 @@ begin
     ),
 
     fine_items as (
-        -- A. Change/cancellation fines -- unchanged. sourceid is a
-        -- changeentryrequestid; resolve the original entry through it.
+        -- Change/cancellation fines only. sourceid is a changeentryrequestid;
+        -- resolve to the NEW entry when one exists (approved replacement),
+        -- falling back to the original entry only when there is no new
+        -- entry (cancellation, or rejected/pending). Fixed 2026-08-07
+        -- (fix/change-entry-fine-attribution): previously joined on
+        -- cer.originalentryid unconditionally, which kept an approved
+        -- change/cancellation fine attributed to the OLD class forever --
+        -- live-verified against competition 7 / payer 2241 (CER #5 -> class
+        -- 142, CER #1 -> class 155, both previously shown under class 176)
+        -- and the cancellation-only negative control (CER #2, no newentryid,
+        -- still correctly resolves to originalentryid=46). originalentryid
+        -- stays exposed under its existing JSON key, informational only --
+        -- no consumer reads it. Amounts/totals unaffected; only which
+        -- class/entry the fine displays against changes. The entry-creation-
+        -- fine branch that used to live here (sourceid = entryid directly,
+        -- categorykey='fine') was removed 2026-08-07 -- that money is now
+        -- folded into class_items via class_charge_source above instead of
+        -- being listed as a separate fine row (see the header note).
         select
             bc.billchargeid,
             bc.billid,
@@ -648,37 +838,12 @@ begin
         inner join public.changeentryrequest cer
             on cer.changeentryrequestid = bc.sourceid
         inner join public.entry e
-            on e.entryid = cer.originalentryid
+            on e.entryid = coalesce(cer.newentryid, cer.originalentryid)
         inner join public.classincompetition cic
             on cic.classincompid = e.classincompid
         inner join public.classtype ct
             on ct.classtypeid = cic.classtypeid
         where bc.categorykey = 'classes'
-          and bc.sourcetype = 'Fine'
-
-        union all
-
-        -- B. Entry-creation fines -- new. sourceid IS the entryid directly;
-        -- never joined through changeentryrequest (that id space is
-        -- unrelated and already proven to collide numerically with entryid).
-        select
-            bc.billchargeid,
-            bc.billid,
-            bc.sourceid,
-            bc.sourceid as originalentryid,
-            e.classincompid,
-            ct.classname::text as classname,
-            bc.amounttopay,
-            bc.chargestatus,
-            bc.notes
-        from payer_charges bc
-        inner join public.entry e
-            on e.entryid = bc.sourceid
-        inner join public.classincompetition cic
-            on cic.classincompid = e.classincompid
-        inner join public.classtype ct
-            on ct.classtypeid = cic.classtypeid
-        where bc.categorykey = 'fine'
           and bc.sourcetype = 'Fine'
     ),
 
@@ -827,7 +992,9 @@ begin
                         'organizerChargeStatus', ci.organizerchargestatus,
                         'federationChargeStatus', ci.federationchargestatus,
                         'entryStatus', ci.entrystatus,
-                        'isPaid', ci.ispaid
+                        'isPaid', ci.ispaid,
+                        'hasEntryCreationFine', ci.hasentrycreationfine,
+                        'entryCreationFineAmount', ci.entrycreationfineamount
                     )
                     order by
                         ci.classdatetime nulls last,

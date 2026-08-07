@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { getCompetitionInvitationDetails } from "../services/competitionService";
+import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 import { getManagedPayers } from "../services/payerService";
 import {
   getHorsesForStallBooking,
@@ -553,7 +554,7 @@ export default function useAdminCompetitionStallBookings(params) {
         );
       } catch (error) {
         setScreenError(
-          String(error?.response?.data || "אירעה שגיאה בטעינת נתוני התאים"),
+          getApiErrorMessage(error, "אירעה שגיאה בטעינת נתוני התאים"),
         );
       } finally {
         setLoading(false);

@@ -28,10 +28,12 @@ import DataTableEmptyState from "../../components/common/table/DataTableEmptySta
 import DataTableLoadingState from "../../components/common/table/DataTableLoadingState";
 import TableActionButton from "../../components/common/table/TableActionButton";
 import ToastMessage from "../../components/common/ToastMessage";
+import ConfirmDialog from "../../components/superuser/ConfirmDialog";
 import PaidTimeRequestCard from "../../components/secretary/paid-time/PaidTimeRequestCard";
 import PaidTimeScheduleCell from "../../components/secretary/paid-time/PaidTimeScheduleCell";
 import PaidTimeSlotInCompetitionModal from "../../components/secretary/PaidTimeSlotInCompetitionModal";
 import PaidTimeSlotRegistrationsModal from "../../components/secretary/paid-time/PaidTimeSlotRegistrationsModal";
+import SecretaryCreatePaidTimeRequestModal from "../../components/secretary/paid-time/SecretaryCreatePaidTimeRequestModal";
 import useCompetitionPaidTimePage from "../../hooks/secretary/useCompetitionPaidTimePage";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 import CustomDropdown from "../../components/common/CustomDropdown";
@@ -521,6 +523,14 @@ export default function CompetitionPaidTimePage() {
               />
             ) : null}
 
+            {!page.assignmentMode ? (
+              <TableActionButton
+                label="הוספת בקשה"
+                icon={<Plus size={15} />}
+                onClick={page.openCreateRequestModal}
+              />
+            ) : null}
+
             {page.assignmentMode ? (
               <TableActionButton
                 label="פתח שיבוץ לסלוטים שנבחרו"
@@ -785,11 +795,33 @@ export default function CompetitionPaidTimePage() {
         onShowToast={showToast}
       />
 
+      <SecretaryCreatePaidTimeRequestModal
+        isOpen={page.createRequestModalOpen}
+        onClose={page.closeCreateRequestModal}
+        competitionId={Number(competitionId)}
+        // ranchId here is the page's own ranch (activeRole.ranchId), which
+        // is always the competition's host ranch for a HostSecretary. Used
+        // both to authorize the competition-wide candidates read and to
+        // scope the price lookup (paid-time pricing is host-ranch-scoped,
+        // same convention as the Shavings ranch-model fix).
+        hostRanchId={ranchId}
+        slots={page.slots}
+        onCreated={page.handlePaidTimeRequestCreated}
+      />
+
       <ToastMessage
         isOpen={toast.isOpen}
         type={toast.type}
         message={toast.message}
         onClose={closeToast}
+      />
+
+      <ConfirmDialog
+        isOpen={page.paidTimeSlotDeleteConfirm.isOpen}
+        title={page.paidTimeSlotDeleteConfirm.title}
+        message={page.paidTimeSlotDeleteConfirm.message}
+        onCancel={page.closePaidTimeSlotDeleteConfirm}
+        onConfirm={page.paidTimeSlotDeleteConfirm.onConfirm}
       />
 
       <PaidTimeSlotRegistrationsModal

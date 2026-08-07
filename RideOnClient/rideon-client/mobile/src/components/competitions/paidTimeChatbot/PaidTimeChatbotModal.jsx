@@ -25,6 +25,7 @@ import StepNavBar from "./StepNavBar";
 import StepNavContext from "./StepNavContext";
 import styles, { COLORS } from "../../../styles/paidTimeChatbotStyles";
 import { loadPaidTimeChatbotContext } from "../../../services/paidTimeChatbotService";
+import { getApiErrorMessage } from "../../../../../shared/auth/utils/authApiErrors";
 import {
   buildSelectionSummary,
   getStepTitle,
@@ -83,7 +84,7 @@ export default function PaidTimeChatbotModal(props) {
         } catch (err) {
           if (cancelled) return;
           setLoadError(
-            String(err?.response?.data || err?.message || "טעינה נכשלה")
+            getApiErrorMessage(err, "טעינה נכשלה")
           );
           setLoadingContext(false);
         }

@@ -62,6 +62,17 @@ namespace RideOnServer.BL
             return competition;
         }
 
+        internal static List<ParticipatingRanchItem> GetParticipatingRanches(int competitionId)
+        {
+            if (competitionId <= 0)
+            {
+                throw new Exception("CompetitionId is invalid");
+            }
+
+            CompetitionDAL dal = new CompetitionDAL();
+            return dal.GetParticipatingRanches(competitionId);
+        }
+
         internal static int CreateCompetition(CreateCompetitionRequest request, int createdBySystemUserId)
         {
             ValidateCompetitionRequest(

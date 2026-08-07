@@ -4,6 +4,7 @@ import {
   getStallBookingsForCompetitionAndRanch,
   getAllStallBookingPayersForCompetitionAndRanch,
 } from "../services/stallBookingsService";
+import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 
 import {
   getShavingsOrdersForCompetitionAndRanch,
@@ -488,7 +489,7 @@ export default function useAdminCompetitionStallsOverview(params) {
         console.log("STALLS OVERVIEW ERROR", error);
 
         setScreenError(
-          String(error?.response?.data || "אירעה שגיאה בטעינת התאים"),
+          getApiErrorMessage(error, "אירעה שגיאה בטעינת התאים"),
         );
       } finally {
         setLoading(false);

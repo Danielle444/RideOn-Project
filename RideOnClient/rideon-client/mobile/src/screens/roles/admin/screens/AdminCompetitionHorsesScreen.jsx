@@ -17,6 +17,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
 import CompetitionHorseCard from "../../../../components/competitions/CompetitionHorseCard";
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import horsesStyles from "../../../../styles/horsesStyles";
@@ -90,7 +91,7 @@ export default function AdminCompetitionHorsesScreen(props) {
       setHorses(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       setScreenError(
-        String(error?.response?.data || "אירעה שגיאה בטעינת סוסי התחרות"),
+        getApiErrorMessage(error, "אירעה שגיאה בטעינת סוסי התחרות"),
       );
       setHorses([]);
     } finally {
@@ -166,7 +167,7 @@ export default function AdminCompetitionHorsesScreen(props) {
     } catch (error) {
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה בעדכון כינוי הסוס"),
+        getApiErrorMessage(error, "אירעה שגיאה בעדכון כינוי הסוס"),
       );
     } finally {
       setIsSavingBarnName(false);

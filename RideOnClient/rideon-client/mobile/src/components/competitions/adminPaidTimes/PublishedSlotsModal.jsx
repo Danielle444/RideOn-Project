@@ -10,6 +10,7 @@ import {
 
 import { getPublishedSlotsForCompetition } from "../../../services/paidTimeRequestsService";
 import SlotScheduleModal from "./SlotScheduleModal";
+import { getApiErrorMessage } from "../../../../../shared/auth/utils/authApiErrors";
 
 function fmtTime(value) {
   if (!value) return "";
@@ -55,7 +56,7 @@ export default function PublishedSlotsModal(props) {
         } catch (err) {
           if (!cancelled) {
             setError(
-              String(err?.response?.data || err?.message || "טעינה נכשלה")
+              getApiErrorMessage(err, "טעינה נכשלה")
             );
           }
         } finally {

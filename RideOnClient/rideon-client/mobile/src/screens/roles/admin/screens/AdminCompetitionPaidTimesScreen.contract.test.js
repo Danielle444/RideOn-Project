@@ -123,13 +123,24 @@ describe("AdminCompetitionPaidTimesScreen - PT-8 paid-time cancellation in-fligh
     ).toBe(1);
   });
 
-  it("on failure, the existing error alert and message extraction are unchanged", () => {
+  it("on failure, the error message goes through the shared hardened extractor, and the alert is unchanged", () => {
     var block = getHandleCancelBlock(readSource());
 
+    // Promoted off the raw err?.response?.data echo (RideOn notification
+    // audit, 2026-08-07, Slice 2) onto the shared, hardened extractor - it
+    // can no longer surface raw/English/SQLSTATE-prefixed backend text.
     expect(block).toContain(
-      'var msg = err?.response?.data || err?.message || "אירעה שגיאה";',
+      'var msg = getApiErrorMessage(err, "אירעה שגיאה");',
     );
     expect(block).toContain('Alert.alert("שגיאה", String(msg));');
+  });
+
+  it("imports the shared hardened error extractor", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'from "../../../../../../shared/auth/utils/authApiErrors"',
+    );
   });
 
   it("on success, the existing refresh call (paidTimes.handleRefresh) is unchanged", () => {

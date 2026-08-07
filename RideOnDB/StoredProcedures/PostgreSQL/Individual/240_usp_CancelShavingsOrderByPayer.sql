@@ -43,6 +43,16 @@
 -- BadRequest(ex.Message) with no PostgresException/SqlState inspection at
 -- all -- unlike the RN001 -> ValidationException -> 409 convention used by
 -- the admin/secretary direct-cancel paths below.
+--
+-- Two guards added on fix/competition-ended-and-delivery-guards (2026-08-07),
+-- both RN001-coded (unlike this proc's other, pre-existing plain guards --
+-- deliberately: these two are new business rules being enforced for the
+-- first time, matching the coding convention of the shavings admin/secretary
+-- cancel siblings, not this proc's own legacy plain-exception style):
+--   - Cannot cancel a DELIVERED order (shavingsorder.arrivaltime IS NOT
+--     NULL) -- checked first, before ownership, mirroring 241/242.
+--   - Cannot cancel once the competition has ended -- this proc had no date
+--     check at all before.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_cancelshavingsorderbypayer(
@@ -55,14 +65,32 @@ DECLARE
     v_owner_exists    boolean;
     v_paid_exists     boolean;
     v_new_request_id  integer;
+    v_competitionid       integer;
+    v_competitionenddate  date;
+    v_arrivaltime         timestamp without time zone;
 BEGIN
     -- Validate shavings order exists
-    IF NOT EXISTS (
-        SELECT 1
-        FROM public.shavingsorder
-        WHERE shavingsorderid = p_shavingsorderid
-    ) THEN
+    SELECT pr.competitionid, so.arrivaltime
+    INTO v_competitionid, v_arrivaltime
+    FROM public.productrequest pr
+    JOIN public.shavingsorder so ON so.shavingsorderid = pr.prequestid
+    WHERE pr.prequestid = p_shavingsorderid;
+
+    IF v_competitionid IS NULL THEN
         RAISE EXCEPTION 'Shavings order not found';
+    END IF;
+
+    IF v_arrivaltime IS NOT NULL THEN
+        RAISE EXCEPTION 'Cannot cancel a delivered shavings order' USING ERRCODE = 'RN001';
+    END IF;
+
+    SELECT c.competitionenddate
+    INTO v_competitionenddate
+    FROM public.competition c
+    WHERE c.competitionid = v_competitionid;
+
+    IF (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate THEN
+        RAISE EXCEPTION 'Competition has already ended' USING ERRCODE = 'RN001';
     END IF;
 
     -- Validate payer pays for this order (via billproductrequest -> bill)
