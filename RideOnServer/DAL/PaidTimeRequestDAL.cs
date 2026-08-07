@@ -647,6 +647,11 @@ namespace RideOnServer.DAL
 
                 command.ExecuteNonQuery();
             }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // 24h-cutoff guard raised inside usp_cancelpaidtimerequestbypayer.
+                throw new BL.ValidationException(ex.MessageText);
+            }
             catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");

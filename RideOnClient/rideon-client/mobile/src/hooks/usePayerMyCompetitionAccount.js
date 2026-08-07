@@ -77,6 +77,8 @@ function safeArray(value) {
  * @property {number} amountToPay
  * @property {string|null} status
  * @property {boolean} isPaid
+ * @property {number} hoursUntilStart
+ * @property {boolean} canCancel
  */
 
 /**

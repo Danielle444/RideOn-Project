@@ -147,6 +147,23 @@
 -- bug pattern but zero live callers (verified by full-repo grep) and was
 -- deliberately left out of this fix's scope.
 -- ============================================================================
+--
+-- PAIDTIME CANCEL SIGNAL (fix/payer-paidtime-24h-cancel-ux, 2026-08-07,
+-- forward-ported onto the fine-attribution fix above): paidtime_items gains
+-- two purely-additive computed columns, hoursuntilstart and cancancel,
+-- surfaced in the paidTimes[] JSON as hoursUntilStart/canCancel. Neither the
+-- Payer's cancel button (PayerCompetitionAccountScreen) nor the Admin's
+-- read-only account view had any signal that the 24h cutoff
+-- usp_cancelpaidtimerequestbypayer already hard-enforces server-side was
+-- approaching -- the payer's Cancel button rendered enabled right up until
+-- the server rejected the click with a raw error. cancancel reproduces that
+-- proc's exact guard (not paid, not Cancelled, >24h from the display slot --
+-- assigned if present else requested). Admin cancel (usp_cancelpaidtimerequest)
+-- has no 24h restriction by design -- this field is informational for the
+-- Admin read-only view and is NOT wired into any Admin cancel-button gating.
+-- No existing column, join, or JSON key (including the fine_items
+-- coalesce(cer.newentryid, cer.originalentryid) join above) was touched.
+-- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_getpayercompetitionaccount_body(p_competitionid integer, p_ranchid integer, p_payerpersonid integer)
  RETURNS jsonb
@@ -569,7 +586,26 @@ begin
             coalesce(assigned_slot.endtime, requested_slot.endtime) as displayendtime,
             coalesce(assigned_arena.arenaname, requested_arena.arenaname)::text as displayarenaname,
 
-            pcs.ispaid
+            pcs.ispaid,
+
+            round(
+                extract(epoch from (
+                    (coalesce(assigned_slot.slotdate, requested_slot.slotdate)
+                     + coalesce(assigned_slot.starttime, requested_slot.starttime)
+                    )::timestamp with time zone - now()
+                )) / 3600.0,
+                2
+            ) as hoursuntilstart,
+
+            (
+                not pcs.ispaid
+                and ptr.status <> 'Cancelled'
+                and extract(epoch from (
+                    (coalesce(assigned_slot.slotdate, requested_slot.slotdate)
+                     + coalesce(assigned_slot.starttime, requested_slot.starttime)
+                    )::timestamp with time zone - now()
+                )) / 3600.0 > 24
+            )::boolean as cancancel
 
         from paidtime_charge_summary pcs
         inner join public.paidtimerequest ptr
@@ -1035,7 +1071,9 @@ begin
                         'assignedStartTime', pti.assignedstarttime,
                         'assignedEndTime', pti.assignedendtime,
                         'assignedArenaName', pti.assignedarenaname,
-                        'isPaid', pti.ispaid
+                        'isPaid', pti.ispaid,
+                        'hoursUntilStart', pti.hoursuntilstart,
+                        'canCancel', pti.cancancel
                     )
                     order by
                         pti.displayslotdate nulls last,
