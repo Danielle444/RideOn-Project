@@ -86,8 +86,10 @@ namespace RideOnServer.Tests
         [Fact]
         public void The_sql_file_exists_and_declares_the_expected_signature()
         {
+            // Admin history cancel pre-gating: appends a trailing p_personid DEFAULT NULL,
+            // backward compatible with the pre-existing 2-arg call shape.
             SqlSource().Should().Contain(
-                "CREATE OR REPLACE FUNCTION public.usp_getshavingsordersforcompetitionandranch(\n    p_competitionid integer,\n    p_ranchid integer\n)");
+                "CREATE OR REPLACE FUNCTION public.usp_getshavingsordersforcompetitionandranch(\n    p_competitionid integer,\n    p_ranchid integer,\n    p_personid integer DEFAULT NULL\n)");
         }
 
         [Fact]
@@ -290,7 +292,7 @@ namespace RideOnServer.Tests
         }
 
         [Fact]
-        public void The_dal_method_declares_competitionId_then_ranchId()
+        public void The_dal_method_declares_competitionId_then_ranchId_then_adminPersonId()
         {
             MethodInfo method = typeof(ShavingsOrderDAL)
                 .GetMethod("GetShavingsOrdersForCompetitionAndRanch", BindingFlags.Public | BindingFlags.Static)
@@ -299,9 +301,16 @@ namespace RideOnServer.Tests
 
             ParameterInfo[] parameters = method.GetParameters();
 
-            parameters.Should().HaveCount(2);
-            parameters.Select(p => p.Name).Should().Equal("competitionId", "ranchId");
-            parameters.Select(p => p.ParameterType).Should().AllBeEquivalentTo(typeof(int));
+            parameters.Should().HaveCount(3);
+            parameters.Select(p => p.Name).Should().Equal("competitionId", "ranchId", "adminPersonId");
+            parameters[0].ParameterType.Should().Be(typeof(int));
+            parameters[1].ParameterType.Should().Be(typeof(int));
+
+            // Admin history cancel pre-gating: nullable, defaulted -- backward compatible with
+            // the pre-existing 2-arg call shape (see the SQL-signature test above).
+            parameters[2].ParameterType.Should().Be(typeof(int?));
+            parameters[2].HasDefaultValue.Should().BeTrue();
+            parameters[2].DefaultValue.Should().BeNull();
 
             method.ReturnType.Should().Be(typeof(List<CompetitionShavingsOrderListItem>));
         }

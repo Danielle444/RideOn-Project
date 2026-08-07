@@ -41,11 +41,56 @@
 -- requestingranchid) and the duplicate-impossibility argument, not repeated
 -- here. Requesting-ranch scoping (WHO may see the order) and every billing
 -- column/subquery are unchanged.
+--
+-- ADMIN HISTORY CANCEL PRE-GATING (2026-08-08): appends CanCancelShavings
+-- (boolean) and adds a new TRAILING p_personid integer DEFAULT NULL
+-- parameter -- backward compatible with the existing 2-arg caller shape
+-- (CreateCommandWithStoredProcedure builds `SELECT * FROM fn(@p1, @p2)`;
+-- Postgres fills the default for the omitted 3rd arg), so the web
+-- secretary page (which does not pass personId) keeps working unchanged.
+-- CanCancelShavings mirrors usp_admincancelshavingsorder (241)'s own guards
+-- exactly, to avoid the UI drifting from what the cancel SP actually
+-- enforces:
+--   - not delivered (so.arrivaltime IS NULL) -- already available via the
+--     existing "Delivered" column's source, re-tested directly here.
+--   - competition not yet ended -- requires a NEW join to competition,
+--     which this proc never joined before (it only had competitionid via
+--     productrequest, never resolved the row).
+--   - no productchangerequest row exists at all for this order, of ANY
+--     status -- broader than the existing IsCancelled/HasPendingCancellation
+--     columns (which only look at iscancelled=true rows in Approved/Pending
+--     status): a Rejected cancellation request (payer requested, secretary
+--     rejected via Change Tracking) would show both existing columns false
+--     while 241 still refuses to cancel, since
+--     productchangerequest.originalprequestid is unique per order once any
+--     row exists. IsCancelled/HasPendingCancellation are left unchanged for
+--     their existing consumers; this is a separate, wider check.
+--   - no Paid billcharge row for this order -- requires a NEW reference to
+--     billcharge, a table this proc never touched before (it only summed
+--     billproductrequest for TotalAmount, a different table).
+--   - ownership (orderedbysystemuserid = p_personid OR caller manages the
+--     paying payer via personmanagedbysystemuser) -- ONLY evaluated when
+--     p_personid IS NOT NULL, exact mirror of 241's own two-branch OR.
+--     When p_personid IS NULL (any caller that doesn't pass it, e.g. the
+--     web secretary page), this sub-check is skipped entirely -- correct
+--     for that caller since their own cancel proc (242,
+--     usp_secretarycancelshavingsorder) has no ownership dimension at all,
+--     only a host-ranch-secretary role check. This column is scoped to be
+--     accurate for the mobile admin history screen (241's rules); it is
+--     NOT verified against or wired into the web secretary page in this
+--     change.
+--   Ranch scoping (241's "every linked stall must match p_ranchid") and
+--   caller-role authorization (241's "approved RanchAdmin at p_ranchid")
+--   are both per-CALLER-ranch, not per-row, and are already enforced
+--   uniformly for the whole result set by
+--   EnsureCanAccessCompetitionRanchShavings before this proc is ever
+--   called -- not duplicated here.
 DROP FUNCTION IF EXISTS public.usp_getshavingsordersforcompetitionandranch(integer, integer);
 
 CREATE OR REPLACE FUNCTION public.usp_getshavingsordersforcompetitionandranch(
     p_competitionid integer,
-    p_ranchid integer
+    p_ranchid integer,
+    p_personid integer DEFAULT NULL
 )
  RETURNS TABLE(
     "ShavingsOrderId" integer,
@@ -65,7 +110,8 @@ CREATE OR REPLACE FUNCTION public.usp_getshavingsordersforcompetitionandranch(
     "IsCancelled" boolean,                          -- standalone shavings cancellation: appended LAST
     "HasPendingCancellation" boolean,               -- standalone shavings cancellation: appended LAST
     "DeliveryDestinations" jsonb,                   -- Slice 1: appended LAST
-    "HasUnassignedStalls" boolean                   -- Slice 1: appended LAST
+    "HasUnassignedStalls" boolean,                  -- Slice 1: appended LAST
+    "CanCancelShavings" boolean                     -- Admin history cancel pre-gating: appended LAST
  )
  LANGUAGE plpgsql
 AS $function$
@@ -159,12 +205,47 @@ BEGIN
               AND pcr.status = 'Pending'
         ) AS "HasPendingCancellation",
         COALESCE(dj.deliverydestinations, '[]'::jsonb) AS "DeliveryDestinations",
-        COALESCE(df.hasunassignedstalls, false) AS "HasUnassignedStalls"
+        COALESCE(df.hasunassignedstalls, false) AS "HasUnassignedStalls",
+        COALESCE(
+            so.arrivaltime IS NULL
+            AND (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date <= c.competitionenddate
+            AND NOT EXISTS (
+                SELECT 1 FROM productchangerequest pcr
+                WHERE pcr.originalprequestid = pr.prequestid
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM billcharge bc
+                WHERE bc.sourcetype = 'ProductRequest'
+                  AND bc.sourceid = pr.prequestid
+                  AND bc.chargestatus = 'Paid'
+            )
+            AND (
+                p_personid IS NULL
+                OR pr.orderedbysystemuserid = p_personid
+                OR EXISTS (
+                    SELECT 1
+                    FROM public.billcharge bc2
+                    JOIN public.personmanagedbysystemuser pmsu ON pmsu.personid = bc2.paidbypersonid
+                    JOIN public.personranchrole prr ON prr.personid = bc2.paidbypersonid
+                    JOIN public.role r ON r.roleid = prr.roleid
+                    WHERE bc2.sourcetype = 'ProductRequest'
+                      AND bc2.sourceid = pr.prequestid
+                      AND bc2.categorykey = 'shavings'
+                      AND pmsu.systemuserid = p_personid
+                      AND pmsu.approvalstatus = 'Approved'
+                      AND prr.ranchid = p_ranchid
+                      AND prr.rolestatus = 'Approved'
+                      AND r.rolename = 'משלם'
+                )
+            ),
+            false
+        ) AS "CanCancelShavings"
     FROM shavingsorder so
     INNER JOIN productrequest pr ON pr.prequestid = so.shavingsorderid
     INNER JOIN pricecatalog pc  ON pc.pricecatalogid = pr.pricecatalogid
     INNER JOIN systemuser su    ON su.systemuserid = pr.orderedbysystemuserid
     INNER JOIN person p         ON p.personid = su.systemuserid
+    LEFT JOIN public.competition c ON c.competitionid = pr.competitionid
     LEFT JOIN (
         SELECT bpr.prequestid, SUM(bpr.amounttopay) AS totalamount
         FROM billproductrequest bpr

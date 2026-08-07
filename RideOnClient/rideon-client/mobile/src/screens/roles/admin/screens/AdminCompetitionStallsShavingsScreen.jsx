@@ -41,6 +41,7 @@ import StallMapModal from "../../../../components/competitions/StallMapModal";
 import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
 
 import { adminCancelStallBooking } from "../../../../services/stallBookingsService";
+import { adminCancelShavingsOrder } from "../../../../services/shavingsOrderService";
 import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
 
 import {
@@ -142,6 +143,8 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
   var [showStallMap, setShowStallMap] = useState(false);
 
   var [stallMapFocus, setStallMapFocus] = useState(null);
+
+  var [cancellingShavingsId, setCancellingShavingsId] = useState(null);
 
   var registrationStepStatus = useRegistrationStepStatus({
     competitionId: activeCompetition?.competitionId,
@@ -407,6 +410,59 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
     ]);
   }
 
+  // Admin history cancel: the button is only ever shown when proc 176's
+  // server-computed CanCancelShavings was true (see ShavingsHistoryModal),
+  // so no order-state re-check happens here -- usp_admincancelshavingsorder
+  // (241) still re-validates every guard itself and is the final authority
+  // for a race/stale-state tap.
+  function handleCancelShavingsFromHistory(order) {
+    if (!order || !order.shavingsOrderId) {
+      Alert.alert("שגיאה", "לא נמצא מזהה הזמנת נסורת תקין");
+      return;
+    }
+
+    if (!activeRole || !activeRole.ranchId) {
+      Alert.alert("שגיאה", "לא נמצאה חווה פעילה");
+      return;
+    }
+
+    Alert.alert("ביטול הזמנת נסורת", "האם לבטל את הזמנת הנסורת?", [
+      {
+        text: "לא",
+        style: "cancel",
+      },
+      {
+        text: "כן, בטלי",
+        style: "destructive",
+        onPress: async function () {
+          var busyKey = "shavings:" + order.shavingsOrderId;
+
+          setCancellingShavingsId(busyKey);
+
+          try {
+            await adminCancelShavingsOrder(
+              order.shavingsOrderId,
+              activeRole.ranchId,
+            );
+
+            await overview.reload();
+
+            Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);
+          } catch (error) {
+            console.log("ADMIN CANCEL SHAVINGS ORDER ERROR", error);
+
+            Alert.alert(
+              "שגיאה",
+              getApiErrorMessage(error, "אירעה שגיאה בביטול הזמנת הנסורת"),
+            );
+          } finally {
+            setCancellingShavingsId(null);
+          }
+        },
+      },
+    ]);
+  }
+
   function renderContent() {
     if (overview.loading) {
       return (
@@ -447,6 +503,8 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           onDelete={handleCancelStallBooking}
           onEdit={handleEditStallBooking}
           onViewCompound={handleViewCompoundForStall}
+          onCancelShavings={handleCancelShavingsFromHistory}
+          cancellingShavingsId={cancellingShavingsId}
         />
       );
     });
