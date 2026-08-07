@@ -123,6 +123,14 @@ namespace RideOnServer.DAL
                     }
                 }
             }
+            catch (PostgresException ex) when (ex.SqlState == "P0001")
+            {
+                // Business-rule guard raised inside usp_DeleteCompound
+                // (compound still in use, or not found). Same P0001 note as
+                // ArenaDAL.DeleteArena -- no custom ERRCODE in the proc, so
+                // Postgres's default RAISE EXCEPTION code is what's caught.
+                throw new BL.ValidationException(ex.MessageText);
+            }
             catch (NpgsqlException ex)
             {
                 throw new Exception(ex.Message);

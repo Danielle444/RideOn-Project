@@ -167,6 +167,16 @@ namespace RideOnServer.DAL
                     }
                 }
             }
+            catch (PostgresException ex) when (ex.SqlState == "P0001")
+            {
+                // Business-rule guard raised inside
+                // usp_updatemanagedpayerbasicdetails ("Managed payer
+                // relation not found"). No custom ERRCODE in the proc, so
+                // Postgres's default RAISE EXCEPTION SQLSTATE (P0001) is
+                // what's actually thrown -- same convention the RN001
+                // guards elsewhere in this codebase use.
+                throw new BL.ValidationException(TranslateManagedPayerError(ex.MessageText));
+            }
             catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
@@ -195,6 +205,14 @@ namespace RideOnServer.DAL
                         command.ExecuteNonQuery();
                     }
                 }
+            }
+            catch (PostgresException ex) when (ex.SqlState == "P0001")
+            {
+                // Business-rule guard raised inside usp_removemanagedpayer
+                // ("Managed payer relation not found" or "A payer must have
+                // at least one managing admin"). See UpdateManagedPayerBasicDetails
+                // above for why P0001 (not RN001) is caught here.
+                throw new BL.ValidationException(TranslateManagedPayerError(ex.MessageText));
             }
             catch (NpgsqlException ex)
             {
@@ -458,9 +476,39 @@ namespace RideOnServer.DAL
                     }
                 }
             }
+            catch (PostgresException ex) when (ex.SqlState == "P0001")
+            {
+                // Business-rule guard raised inside
+                // usp_answermanagedpayerrequest ("Invalid answer status" or
+                // "Pending managed payer request not found"). See
+                // UpdateManagedPayerBasicDetails above for why P0001 (not
+                // RN001) is caught here.
+                throw new BL.ValidationException(TranslateManagedPayerError(ex.MessageText));
+            }
             catch (NpgsqlException ex)
             {
                 throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
+        // Fixed, exhaustive translation of the known English guard messages
+        // shared across the managed-payer procs above. Anything
+        // unrecognized falls to the generic line rather than leaking
+        // English to the payer/admin.
+        private static string TranslateManagedPayerError(string message)
+        {
+            switch (message)
+            {
+                case "Managed payer relation not found":
+                    return "קשר המשלם המנוהל לא נמצא";
+                case "A payer must have at least one managing admin":
+                    return "למשלם חייב להיות לפחות מנהל אחד";
+                case "Invalid answer status":
+                    return "סטטוס מענה לא תקין";
+                case "Pending managed payer request not found":
+                    return "לא נמצאה בקשת ניהול ממתינה";
+                default:
+                    return "לא ניתן היה לבצע את הפעולה";
             }
         }
 

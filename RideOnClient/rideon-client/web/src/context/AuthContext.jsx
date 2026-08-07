@@ -16,6 +16,7 @@ import {
   clearAuthStorage,
 } from "../services/storageService";
 import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
+import { getLoginErrorMessage } from "../../../shared/auth/utils/loginErrorMessages";
 import { isRoleSupportedOnWeb } from "../../../shared/auth/utils/platformRoles";
 import { useUser } from "./UserContext";
 import { useActiveRole } from "./ActiveRoleContext";
@@ -118,9 +119,11 @@ export function AuthProvider({ children }) {
         activeRole: nextActiveRole,
       };
     } catch (error) {
+      // המיפוי מחזיר מחרוזת קבועה בלבד — אף פעם לא טקסט מהשרת (לדוגמה
+      // ה-401 האנגלי הגולמי של SystemUsersController.Login).
       return {
         ok: false,
-        message: String(getApiErrorMessage(error, "אירעה שגיאה בהתחברות לשרת")),
+        message: getLoginErrorMessage(error),
       };
     }
   }
@@ -157,9 +160,10 @@ export function AuthProvider({ children }) {
         activeRole: null,
       };
     } catch (error) {
+      // המיפוי מחזיר מחרוזת קבועה בלבד — אף פעם לא טקסט מהשרת.
       return {
         ok: false,
-        message: String(getApiErrorMessage(error, "שגיאה בהתחברות מנהל מערכת")),
+        message: getLoginErrorMessage(error),
       };
     }
   }
@@ -192,16 +196,9 @@ export function AuthProvider({ children }) {
 
       return { ok: true, user: updatedUser };
     } catch (error) {
-      if (error.response && typeof error.response.data === "string") {
-        return {
-          ok: false,
-          message: error.response.data,
-        };
-      }
-
       return {
         ok: false,
-        message: "אירעה שגיאה בהחלפת הסיסמה",
+        message: getApiErrorMessage(error, "אירעה שגיאה בהחלפת הסיסמה"),
       };
     }
   }
@@ -233,16 +230,9 @@ export function AuthProvider({ children }) {
 
       return { ok: true, user: updatedUser };
     } catch (error) {
-      if (error.response && typeof error.response.data === "string") {
-        return {
-          ok: false,
-          message: error.response.data,
-        };
-      }
-
       return {
         ok: false,
-        message: "אירעה שגיאה בהחלפת סיסמת מנהל המערכת",
+        message: getApiErrorMessage(error, "אירעה שגיאה בהחלפת סיסמת מנהל המערכת"),
       };
     }
   }
