@@ -119,6 +119,8 @@ DECLARE
     v_horseid              integer;
     v_old_pricecatalogid   integer;
     v_old_productid        smallint;
+    v_competitionid        integer;
+    v_competitionenddate   date;
     v_paid_exists          boolean;
     v_is_assigned          boolean;
     v_iscreatedbyadmin     boolean;
@@ -152,8 +154,8 @@ BEGIN
         RAISE EXCEPTION 'End date must be on or after start date' USING ERRCODE = 'RN001';
     END IF;
 
-    SELECT sb.requestingranchid, sb.ranchid, sb.horseid, pr.pricecatalogid, pc.productid
-    INTO v_requestingranchid, v_hostranchid, v_horseid, v_old_pricecatalogid, v_old_productid
+    SELECT sb.requestingranchid, sb.ranchid, sb.horseid, pr.pricecatalogid, pc.productid, pr.competitionid
+    INTO v_requestingranchid, v_hostranchid, v_horseid, v_old_pricecatalogid, v_old_productid, v_competitionid
     FROM public.stallbooking sb
     INNER JOIN public.productrequest pr ON pr.prequestid = sb.stallbookingid
     INNER JOIN public.pricecatalog pc ON pc.pricecatalogid = pr.pricecatalogid
@@ -165,6 +167,19 @@ BEGIN
 
     IF v_requestingranchid <> p_ranchid THEN
         RAISE EXCEPTION 'Stall booking does not belong to this ranch' USING ERRCODE = 'RN001';
+    END IF;
+
+    -- Competition-ended guard, added on
+    -- fix/competition-ended-and-delivery-guards (2026-08-07): this proc had
+    -- no date check at all -- Create (usp_createstallbooking) already
+    -- blocked post-end, Edit/Cancel did not.
+    SELECT c.competitionenddate
+    INTO v_competitionenddate
+    FROM public.competition c
+    WHERE c.competitionid = v_competitionid;
+
+    IF (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate THEN
+        RAISE EXCEPTION 'Competition has already ended' USING ERRCODE = 'RN001';
     END IF;
 
     -- RanchAdmin authorization, scoped to the REQUEST ranch -- same shape as

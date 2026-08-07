@@ -12,7 +12,6 @@ import {
 } from "react-native";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
-import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
 
@@ -76,13 +75,21 @@ import StallBookingCreateModal from "../../../../components/competitions/StallBo
 
 import StallBookingEditModal from "../../../../components/competitions/StallBookingEditModal";
 
-// Consolidated onto the shared, hardened extractor (RideOn notification
-// audit, 2026-08-07, Slice 2) - the local version used to JSON.stringify an
-// unrecognized object body as a last resort, which could leak raw backend
-// shape to the user. Name/signature kept so every Alert.alert call site
-// below is untouched.
 function extractErrorMessage(err) {
-  return getApiErrorMessage(err, "אירעה שגיאה");
+  if (!err) return "אירעה שגיאה";
+  var data = err.response && err.response.data;
+  if (data) {
+    if (typeof data === "string") return data;
+    if (data.message) return String(data.message);
+    if (data.error) return String(data.error);
+    try {
+      return JSON.stringify(data);
+    } catch {
+      return "אירעה שגיאה";
+    }
+  }
+  if (err.message) return err.message;
+  return "אירעה שגיאה";
 }
 
 function pickDateKey(dateValue) {
@@ -264,6 +271,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
   });
 
   var paidTimesAvailability = registrationStepStatus.availability.paidTimes;
+  var classesAvailability = registrationStepStatus.availability.classes;
 
   var payer = account.payer || routePayer;
 
@@ -1140,14 +1148,26 @@ export default function AdminCompetitionPayerAccountScreen(props) {
     );
   }
 
+  // Gated on availability.classes.isEnabled to match
+  // AdminCompetitionClassesScreen's identical button
+  // (fix/competition-ended-and-delivery-guards, 2026-08-07) -- previously
+  // this button stayed enabled after registration closed, relying entirely
+  // on the server's RN001 rejection instead of telling the admin why.
   function renderAddEntryButton() {
+    var isDisabled = !classesAvailability.isEnabled;
+
     return (
       <Pressable
         onPress={function () {
+          if (isDisabled) {
+            return;
+          }
+
           setShowEntryCreateModal(true);
         }}
+        disabled={isDisabled}
         style={{
-          backgroundColor: "#7B5A4D",
+          backgroundColor: isDisabled ? "#C9B7AC" : "#7B5A4D",
           borderRadius: 12,
           paddingVertical: 12,
           alignItems: "center",

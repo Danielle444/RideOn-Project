@@ -74,6 +74,14 @@ function getGroupLabel(group) {
 // footer style as every other paid item on these screens instead of a
 // button, since Policy A and the server both already refuse to cancel a
 // paid order - this is purely a UX short-circuit, not the source of truth.
+//
+// A Delivered order (deliveryStatus === "Delivered", set only by
+// usp_markdelivered/usp_savedeliveryphoto once arrivaltime is stamped -
+// already part of the proc-212 shape, no new field needed) is locked the
+// same way: usp_admincancelshavingsorder / usp_cancelshavingsorderbypayer /
+// usp_secretarycancelshavingsorder all reject a delivered order server-side
+// now (fix/competition-ended-and-delivery-guards), so offering the button
+// here would only produce a guaranteed-fail tap.
 function renderShavingsOrderRow(order, actions) {
   var linkedStallCount = Array.isArray(order.stallBookingIds)
     ? order.stallBookingIds.length
@@ -81,6 +89,7 @@ function renderShavingsOrderRow(order, actions) {
 
   var canShowCancel = actions && typeof actions.onCancelOrder === "function";
   var isPaid = order.isPaid === true;
+  var isDelivered = order.deliveryStatus === "Delivered";
   var busyKey = "shavings:" + order.shavingsOrderId;
   var isBusy = !!actions && actions.cancellingId === busyKey;
 
@@ -142,7 +151,28 @@ function renderShavingsOrderRow(order, actions) {
         </View>
       ) : null}
 
-      {canShowCancel && !isPaid ? (
+      {canShowCancel && !isPaid && isDelivered ? (
+        <View
+          style={{
+            marginTop: 10,
+            padding: 8,
+            backgroundColor: "#F0E5DC",
+            borderRadius: 8,
+          }}
+        >
+          <Text
+            style={{
+              color: "#8A7268",
+              fontSize: 12,
+              textAlign: "right",
+            }}
+          >
+            ההזמנה נמסרה — לא ניתן לבטל
+          </Text>
+        </View>
+      ) : null}
+
+      {canShowCancel && !isPaid && !isDelivered ? (
         <Pressable
           onPress={function () {
             actions.onCancelOrder(order);
