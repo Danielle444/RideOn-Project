@@ -319,6 +319,8 @@ export default function CompetitionStallCard(props) {
             setShowHistory(false);
           }}
           orders={shavingsOrders}
+          onCancel={props.onCancelShavings}
+          cancellingId={props.cancellingShavingsId}
         />
       ) : null}
     </>

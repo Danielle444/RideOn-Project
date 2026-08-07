@@ -441,7 +441,20 @@ namespace RideOnServer.Controllers
 
                 EnsureCanAccessCompetitionRanchShavings(personId, competitionId, ranchId);
 
-                var result = ShavingsOrderDAL.GetShavingsOrdersForCompetitionAndRanch(competitionId, ranchId);
+                // CanCancelShavings's ownership dimension (see proc 176's header) mirrors
+                // usp_admincancelshavingsorder (241), which only a RanchAdmin at ranchId can
+                // ever call -- so the authenticated personId is threaded through ONLY for
+                // that caller, never taken from the request. A HostSecretary reached via
+                // EnsureCanAccessCompetitionRanchShavings's cross-ranch case cancels through
+                // a different proc (242) with no ownership dimension, so passing their
+                // personId here would wrongly gate CanCancelShavings by rules that proc never
+                // enforces for them -- leaving it null keeps the proc's existing behavior for
+                // every non-RanchAdmin caller unchanged.
+                int? adminPersonId = UserAccessValidator.HasUserRoleInRanch(personId, ranchId, RoleNames.RanchAdmin)
+                    ? personId
+                    : (int?)null;
+
+                var result = ShavingsOrderDAL.GetShavingsOrdersForCompetitionAndRanch(competitionId, ranchId, adminPersonId);
                 return Ok(result);
             }
             catch (UnauthorizedAccessException ex)

@@ -312,6 +312,14 @@ function normalizeShavingsOrder(item) {
         item.HasPendingCancellation ??
         item.haspendingcancellation,
     ),
+
+    // Admin history cancel pre-gating (proc 176's CanCancelShavings): server-computed,
+    // mirrors usp_admincancelshavingsorder's full guard set. Never re-derived client-side.
+    canCancelShavings: normalizeBoolean(
+      item.canCancelShavings ??
+        item.CanCancelShavings ??
+        item.cancancelshavings,
+    ),
   };
 }
 
