@@ -351,6 +351,22 @@ export default function useSecretaryCompetitionClassesPage(options) {
     });
   }
 
+  var [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+  });
+
+  function closeConfirmDialog() {
+    setConfirmDialog({
+      isOpen: false,
+      title: "",
+      message: "",
+      onConfirm: null,
+    });
+  }
+
   var [selectedDate, setSelectedDate] = useState("");
   var [viewMode, setViewMode] = useState("classes");
   var [selectedClass, setSelectedClass] = useState(null);
@@ -553,41 +569,49 @@ export default function useSecretaryCompetitionClassesPage(options) {
     }
   }
 
-  async function handleDeleteClass(item) {
+  function handleDeleteClass(item) {
     var classInCompId = item.classInCompId || item.ClassInCompId;
     if (!classInCompId) return;
 
-    var confirmed = window.confirm(
-      "האם למחוק את המקצה? פעולה זו אינה הפיכה.",
-    );
-    if (!confirmed) return;
-
-    try {
-      setDeletingClassId(classInCompId);
-      await deleteClassInCompetition(classInCompId, competitionId, ranchId);
-      await loadClasses();
-    } catch (err) {
-      showToast("error", getErrorMessage(err, "שגיאה במחיקת מקצה"));
-    } finally {
-      setDeletingClassId(null);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "מחיקת מקצה",
+      message: "האם למחוק את המקצה? פעולה זו אינה הפיכה.",
+      onConfirm: async function () {
+        try {
+          setDeletingClassId(classInCompId);
+          await deleteClassInCompetition(classInCompId, competitionId, ranchId);
+          closeConfirmDialog();
+          await loadClasses();
+        } catch (err) {
+          closeConfirmDialog();
+          showToast("error", getErrorMessage(err, "שגיאה במחיקת מקצה"));
+        } finally {
+          setDeletingClassId(null);
+        }
+      },
+    });
   }
 
-  async function handleDeleteEntry(item) {
+  function handleDeleteEntry(item) {
     var entryId = item.entryId || item.EntryId;
     if (!entryId) return;
 
-    var confirmed = window.confirm(
-      "האם לבטל את ההרשמה? הפעולה תסומן כביטול מאושר.",
-    );
-    if (!confirmed) return;
-
-    try {
-      await secretaryDeleteEntry(entryId, ranchId);
-      await loadEntries();
-    } catch (err) {
-      showToast("error", getErrorMessage(err, "שגיאה בביטול הרשמה"));
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "ביטול הרשמה",
+      message: "האם לבטל את ההרשמה? הפעולה תסומן כביטול מאושר.",
+      onConfirm: async function () {
+        try {
+          await secretaryDeleteEntry(entryId, ranchId);
+          closeConfirmDialog();
+          await loadEntries();
+        } catch (err) {
+          closeConfirmDialog();
+          showToast("error", getErrorMessage(err, "שגיאה בביטול הרשמה"));
+        }
+      },
+    });
   }
 
   var selectedFieldName = useMemo(
@@ -1312,7 +1336,7 @@ export default function useSecretaryCompetitionClassesPage(options) {
     await saveDrawOrderWithEntries(drawOrderDraftEntries);
   }
 
-  async function clearDrawOrder() {
+  function clearDrawOrder() {
     if (!selectedGroup) {
       setDrawOrderError("מחיקת הגרלה אפשרית רק במסך שנפתח דרך מספר המקצה");
       return;
@@ -1328,38 +1352,40 @@ export default function useSecretaryCompetitionClassesPage(options) {
       return;
     }
 
-    var confirmed = window.confirm(
-      "האם למחוק את ההגרלה לכל המקצים באותו יום ובאותו מספר? פעולה זו תאפס את סדר ההגרלה.",
-    );
+    setConfirmDialog({
+      isOpen: true,
+      title: "מחיקת הגרלה",
+      message:
+        "האם למחוק את ההגרלה לכל המקצים באותו יום ובאותו מספר? פעולה זו תאפס את סדר ההגרלה.",
+      onConfirm: async function () {
+        try {
+          setSavingDrawOrder(true);
+          setDrawOrderError("");
+          setDrawOrderWarnings([]);
+          setDrawOrderSummaryMessage("");
 
-    if (!confirmed) {
-      return;
-    }
+          var payload = {
+            competitionId: Number(competitionId),
+            classDate: selectedGroup.classDate,
+            orderInDay: Number(selectedGroup.orderInDay),
+            ranchId: Number(ranchId),
+          };
 
-    try {
-      setSavingDrawOrder(true);
-      setDrawOrderError("");
-      setDrawOrderWarnings([]);
-      setDrawOrderSummaryMessage("");
+          await clearGroupEntriesDrawOrder(payload);
+          closeConfirmDialog();
+          await loadEntries();
 
-      var payload = {
-        competitionId: Number(competitionId),
-        classDate: selectedGroup.classDate,
-        orderInDay: Number(selectedGroup.orderInDay),
-        ranchId: Number(ranchId),
-      };
-
-      await clearGroupEntriesDrawOrder(payload);
-      await loadEntries();
-
-      setDrawOrderEditMode(false);
-      setDrawOrderDraftEntries([]);
-    } catch (error) {
-      console.error(error);
-      setDrawOrderError(getErrorMessage(error, "שגיאה במחיקת ההגרלה"));
-    } finally {
-      setSavingDrawOrder(false);
-    }
+          setDrawOrderEditMode(false);
+          setDrawOrderDraftEntries([]);
+        } catch (error) {
+          console.error(error);
+          closeConfirmDialog();
+          setDrawOrderError(getErrorMessage(error, "שגיאה במחיקת ההגרלה"));
+        } finally {
+          setSavingDrawOrder(false);
+        }
+      },
+    });
   }
 
   // Schedule view (Phase 7). Deliberately its own explicit Active-only filter rather than
@@ -1645,6 +1671,9 @@ export default function useSecretaryCompetitionClassesPage(options) {
     toast,
     showToast,
     closeToast,
+
+    confirmDialog,
+    closeConfirmDialog,
 
     selectedDate,
     viewMode,

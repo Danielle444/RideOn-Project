@@ -17,6 +17,7 @@ import SecretaryClassEntriesTable from "../../components/secretary/classes/Secre
 import SecretaryClassEntriesSummaryCards from "../../components/secretary/classes/SecretaryClassEntriesSummaryCards";
 import ClassInCompetitionModal from "../../components/secretary/ClassInCompetitionModal";
 import ToastMessage from "../../components/common/ToastMessage";
+import ConfirmDialog from "../../components/superuser/ConfirmDialog";
 import useSecretaryCompetitionClassesPage from "../../hooks/secretary/useSecretaryCompetitionClassesPage";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 
@@ -517,6 +518,14 @@ export default function CompetitionClassesPage() {
         type={page.toast.type}
         message={page.toast.message}
         onClose={page.closeToast}
+      />
+
+      <ConfirmDialog
+        isOpen={page.confirmDialog.isOpen}
+        title={page.confirmDialog.title}
+        message={page.confirmDialog.message}
+        onCancel={page.closeConfirmDialog}
+        onConfirm={page.confirmDialog.onConfirm}
       />
     </CompetitionWorkspaceLayout>
   );

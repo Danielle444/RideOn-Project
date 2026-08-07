@@ -23,9 +23,15 @@ describe("CAP-2 sweep — paid-time delete no longer surfaces raw response data"
   );
 
   it("handleDeletePaidTimeSlot routes its error through getErrorMessage", () => {
-    const fnAt = source.indexOf("async function handleDeletePaidTimeSlot(");
+    // No longer "async function" at the top level (RideOn notification
+    // audit, 2026-08-07, Slice 3) - confirmation moved to a ConfirmDialog,
+    // and the async delete+error-handling now lives in its onConfirm.
+    const fnAt = source.indexOf("function handleDeletePaidTimeSlot(");
     const fnEndAt = source.indexOf("\n  }", fnAt);
     const body = source.slice(fnAt, fnEndAt);
+
+    expect(fnAt).toBeGreaterThan(-1);
+    expect(body).not.toContain("window.confirm");
 
     expect(body).toContain(
       'getErrorMessage(err, "שגיאה במחיקת סלוט פייד־טיים")',
@@ -83,10 +89,15 @@ describe("CAP-2 sweep — stall-booking cancel failure routes through the page's
       'import { getErrorMessage } from "../../utils/competitionForm.utils";',
     );
 
-    const fnAt = source.indexOf("async function handleDeleteBooking(");
+    // No longer "async function" at the top level (RideOn notification
+    // audit, 2026-08-07, Slice 3) - confirmation moved to a ConfirmDialog,
+    // and the async delete+toast logic now lives in its onConfirm.
+    const fnAt = source.indexOf("function handleDeleteBooking(");
     const fnEndAt = source.indexOf("\n  }", fnAt);
     const body = source.slice(fnAt, fnEndAt);
 
+    expect(fnAt).toBeGreaterThan(-1);
+    expect(body).not.toContain("window.confirm");
     expect(body).toContain("setToast({");
     expect(body).toContain('getErrorMessage(err, "שגיאה בביטול תא")');
   });

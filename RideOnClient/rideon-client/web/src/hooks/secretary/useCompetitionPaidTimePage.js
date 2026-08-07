@@ -142,6 +142,13 @@ export default function useCompetitionPaidTimePage(options) {
   var [savingPaidTimeSlot, setSavingPaidTimeSlot] = useState(false);
   var [paidTimeSlotModalError, setPaidTimeSlotModalError] = useState("");
 
+  var [paidTimeSlotDeleteConfirm, setPaidTimeSlotDeleteConfirm] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+  });
+
   /* ===== CREATE REQUEST MODAL STATE (Slice B, HostSecretary creation) ===== */
   var [createRequestModalOpen, setCreateRequestModalOpen] = useState(false);
 
@@ -304,34 +311,49 @@ export default function useCompetitionPaidTimePage(options) {
     }
   }
 
-  async function handleDeletePaidTimeSlot(slot) {
-    if (!window.confirm("למחוק את הסלוט?")) {
-      return;
-    }
+  function closePaidTimeSlotDeleteConfirm() {
+    setPaidTimeSlotDeleteConfirm({
+      isOpen: false,
+      title: "",
+      message: "",
+      onConfirm: null,
+    });
+  }
 
-    try {
-      await deletePaidTimeSlotInCompetition(
-        getSlotId(slot),
-        competitionId,
-        ranchId,
-        false,
-      );
+  function handleDeletePaidTimeSlot(slot) {
+    setPaidTimeSlotDeleteConfirm({
+      isOpen: true,
+      title: "מחיקת סלוט",
+      message: "למחוק את הסלוט?",
+      onConfirm: async function () {
+        try {
+          await deletePaidTimeSlotInCompetition(
+            getSlotId(slot),
+            competitionId,
+            ranchId,
+            false,
+          );
 
-      await loadSlots();
+          closePaidTimeSlotDeleteConfirm();
+          await loadSlots();
 
-      if (onShowToast) {
-        onShowToast("success", "הסלוט נמחק בהצלחה");
-      }
-    } catch (err) {
-      console.error("Delete paid time slot error:", err.response?.data || err);
+          if (onShowToast) {
+            onShowToast("success", "הסלוט נמחק בהצלחה");
+          }
+        } catch (err) {
+          console.error("Delete paid time slot error:", err.response?.data || err);
 
-      if (onShowToast) {
-        onShowToast(
-          "error",
-          getErrorMessage(err, "שגיאה במחיקת סלוט פייד־טיים"),
-        );
-      }
-    }
+          closePaidTimeSlotDeleteConfirm();
+
+          if (onShowToast) {
+            onShowToast(
+              "error",
+              getErrorMessage(err, "שגיאה במחיקת סלוט פייד־טיים"),
+            );
+          }
+        }
+      },
+    });
   }
 
   /* =======================
@@ -732,6 +754,8 @@ export default function useCompetitionPaidTimePage(options) {
     handleSubmitPaidTimeSlot,
     handleSetPublishState,
     handleDeletePaidTimeSlot,
+    paidTimeSlotDeleteConfirm,
+    closePaidTimeSlotDeleteConfirm,
 
     /* create request modal (Slice B) */
     createRequestModalOpen,

@@ -388,9 +388,10 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
     handleCreateStallBookingForPayer,
   };
 
+  // Confirmation is owned by the page (CompetitionStallsPage.jsx), which
+  // shows the shared ConfirmDialog before calling this - this function is
+  // the unconditional action, not the confirm+action combo it used to be.
   async function handleDeleteStallBooking(stallBookingId) {
-    var ok = window.confirm("האם לבטל את התא? פעולה זו תעדכן גם את החיובים.");
-    if (!ok) return;
     await secretaryDeleteStallBooking(stallBookingId, ranchId);
     await refreshAssignmentsAndOverview();
   }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { getHorsesForStallBookingByCompetition } from "../../../services/stallBookingsService";
 import DatePicker from "../../common/DatePicker";
+import { getErrorMessage } from "../../../utils/competitionForm.utils";
 
 function toInputDate(value) {
   if (!value) return "";
@@ -92,7 +93,7 @@ export default function SecretaryUpdateStallBookingModal(props) {
 
       props.onClose();
     } catch (err) {
-      setError(String(err?.response?.data || err?.message || "שגיאה בעדכון תא"));
+      setError(getErrorMessage(err, "שגיאה בעדכון תא"));
     } finally {
       setSaving(false);
     }

@@ -28,6 +28,7 @@ import DataTableEmptyState from "../../components/common/table/DataTableEmptySta
 import DataTableLoadingState from "../../components/common/table/DataTableLoadingState";
 import TableActionButton from "../../components/common/table/TableActionButton";
 import ToastMessage from "../../components/common/ToastMessage";
+import ConfirmDialog from "../../components/superuser/ConfirmDialog";
 import PaidTimeRequestCard from "../../components/secretary/paid-time/PaidTimeRequestCard";
 import PaidTimeScheduleCell from "../../components/secretary/paid-time/PaidTimeScheduleCell";
 import PaidTimeSlotInCompetitionModal from "../../components/secretary/PaidTimeSlotInCompetitionModal";
@@ -813,6 +814,14 @@ export default function CompetitionPaidTimePage() {
         type={toast.type}
         message={toast.message}
         onClose={closeToast}
+      />
+
+      <ConfirmDialog
+        isOpen={page.paidTimeSlotDeleteConfirm.isOpen}
+        title={page.paidTimeSlotDeleteConfirm.title}
+        message={page.paidTimeSlotDeleteConfirm.message}
+        onCancel={page.closePaidTimeSlotDeleteConfirm}
+        onConfirm={page.paidTimeSlotDeleteConfirm.onConfirm}
       />
 
       <PaidTimeSlotRegistrationsModal

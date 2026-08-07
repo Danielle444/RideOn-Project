@@ -26,6 +26,13 @@ export default function useCompetitionClassesStep(options) {
   var [savingClass, setSavingClass] = useState(false);
   var [createClassDefaultDate, setCreateClassDefaultDate] = useState("");
 
+  var [classDeleteConfirm, setClassDeleteConfirm] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+  });
+
   var canPublishCompetition = useMemo(
     function () {
       return !!competitionId && classesInCompetition.length > 0;
@@ -199,35 +206,48 @@ export default function useCompetitionClassesStep(options) {
     }
   }
 
-  async function handleDeleteClass(item) {
+  function closeClassDeleteConfirm() {
+    setClassDeleteConfirm({
+      isOpen: false,
+      title: "",
+      message: "",
+      onConfirm: null,
+    });
+  }
+
+  function handleDeleteClass(item) {
     if (!competitionId || !currentRanchId) {
       return;
     }
 
-    var confirmed = window.confirm("האם למחוק את המקצה?");
+    setClassDeleteConfirm({
+      isOpen: true,
+      title: "מחיקת מקצה",
+      message: "האם למחוק את המקצה?",
+      onConfirm: async function () {
+        try {
+          await deleteClassInCompetition(
+            item.classInCompId,
+            competitionId,
+            currentRanchId,
+          );
 
-    if (!confirmed) {
-      return;
-    }
+          closeClassDeleteConfirm();
 
-    try {
-      await deleteClassInCompetition(
-        item.classInCompId,
-        competitionId,
-        currentRanchId,
-      );
+          setClassesInCompetition(function (prev) {
+            return prev.filter(function (currentItem) {
+              return currentItem.classInCompId !== item.classInCompId;
+            });
+          });
 
-      setClassesInCompetition(function (prev) {
-        return prev.filter(function (currentItem) {
-          return currentItem.classInCompId !== item.classInCompId;
-        });
-      });
-
-      onShowToast("success", "המקצה נמחק בהצלחה");
-    } catch (error) {
-      console.error(error);
-      onShowToast("error", getErrorMessage(error, "שגיאה במחיקת המקצה"));
-    }
+          onShowToast("success", "המקצה נמחק בהצלחה");
+        } catch (error) {
+          console.error(error);
+          closeClassDeleteConfirm();
+          onShowToast("error", getErrorMessage(error, "שגיאה במחיקת המקצה"));
+        }
+      },
+    });
   }
 
   return {
@@ -240,6 +260,8 @@ export default function useCompetitionClassesStep(options) {
     savingClass,
     canPublishCompetition,
     createClassDefaultDate,
+    classDeleteConfirm,
+    closeClassDeleteConfirm,
     openCreateClassModal,
     openEditClassModal,
     closeClassModal,

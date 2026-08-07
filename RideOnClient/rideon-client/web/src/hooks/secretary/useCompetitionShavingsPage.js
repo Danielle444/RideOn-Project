@@ -320,14 +320,8 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
         return null;
       }
 
-      const confirmed = window.confirm(
-        "האם לבטל את הזמנת הנסורת? פעולה זו תעדכן גם את החיובים.",
-      );
-
-      if (!confirmed) {
-        return null;
-      }
-
+      // Confirmation is owned by the page (CompetitionShavingsPage.jsx),
+      // which shows the shared ConfirmDialog before calling this.
       setCancelError(null);
       setCancellingId(shavingsOrderId);
 
