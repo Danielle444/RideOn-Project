@@ -22,6 +22,11 @@ function readAssignmentFields(assignment) {
       assignment.BookingRanchId ||
       assignment.bookingranchid ||
       null,
+    bookingRanchName:
+      assignment.bookingRanchName ||
+      assignment.BookingRanchName ||
+      assignment.bookingranchname ||
+      null,
     horseName: assignment.horseName || assignment.HorseName || assignment.horsename || "",
     barnName: assignment.barnName || assignment.BarnName || assignment.barnname || "",
     isMine:
@@ -30,6 +35,11 @@ function readAssignmentFields(assignment) {
       assignment.isForTack ??
       assignment.IsForTack ??
       assignment.isfortack ??
+      false,
+    isMyRanch:
+      assignment.isMyRanch ??
+      assignment.IsMyRanch ??
+      assignment.ismyranch ??
       false,
   };
 }
@@ -58,6 +68,19 @@ function resolveIsMine(assignment, viewer) {
   return Number(fields.bookingRanchId) === Number(viewer.ranchId);
 }
 
+// "My ranch" state (2026-08-07, business decision: a boolean visual state
+// only, never an identity). The payer-map endpoint computes IsMyRanch
+// server-side (sb.requestingranchid = the caller's own already-authorized
+// active ranch, see usp_GetStallAssignmentsForCompetitionPayer) and never
+// sends this field in ranch/admin mode, so this always simply trusts what
+// the server said, defaulting to false when absent - no client-side
+// re-derivation, no viewer-mode branching needed (unlike resolveIsMine,
+// which still has two modes for the unrelated Admin ranch-ownership rule).
+function resolveIsMyRanch(assignment) {
+  var fields = readAssignmentFields(assignment);
+  return fields.isMyRanch === true;
+}
+
 // Keyed by CompoundId + StallNumber (never StallNumber alone) - identical
 // stall numbers in two different compounds must never collide.
 function buildAssignmentsByCompoundAndStall(assignments, viewer) {
@@ -73,8 +96,10 @@ function buildAssignmentsByCompoundAndStall(assignments, viewer) {
       horseName: fields.horseName,
       barnName: fields.barnName,
       bookingRanchId: fields.bookingRanchId,
+      bookingRanchName: fields.bookingRanchName,
       isForTack: fields.isForTack,
       isMine: resolveIsMine(a, viewer),
+      isMyRanch: resolveIsMyRanch(a),
     };
   });
 
@@ -131,11 +156,63 @@ function resolveInitialCompoundId(rawCompounds, rawAssignments, focusCompoundId,
   return sortedCompounds.length > 0 ? getCompoundId(sortedCompounds[0]) : null;
 }
 
+// Zoom range shared by StallMapModal's buttons and its fit-to-screen
+// calculation, so both stay in sync with a single source of truth.
+var MIN_ZOOM = 0.6;
+var MAX_ZOOM = 2.2;
+var ZOOM_STEP = 0.2;
+
+function clampZoom(zoom) {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
+}
+
+// Largest zoom (within [MIN_ZOOM, MAX_ZOOM]) that still fits the whole
+// compound grid inside the given viewport, so opening/switching a compound
+// starts at a readable overview instead of a fixed, often-too-tight crop
+// (UX task section A/B). Falls back to 1 when layout or viewport size isn't
+// known yet.
+function computeFitZoom(rows, cols, viewportWidth, viewportHeight, cellSize, cellGap) {
+  if (!rows || !cols || !viewportWidth || !viewportHeight || !cellSize) {
+    return 1;
+  }
+
+  var neededWidth = cols * cellSize + Math.max(0, cols - 1) * cellGap;
+  var neededHeight = rows * cellSize + Math.max(0, rows - 1) * cellGap;
+
+  var widthRatio = viewportWidth / neededWidth;
+  var heightRatio = viewportHeight / neededHeight;
+
+  return clampZoom(Math.min(widthRatio, heightRatio));
+}
+
+var DETAIL_LEVEL_FAR = "far";
+var DETAIL_LEVEL_MEDIUM = "medium";
+var DETAIL_LEVEL_CLOSE = "close";
+
+// Progressive detail thresholds (UX task section C): how much text a stall
+// cell shows is driven by the current zoom, not a fixed per-cell size, so
+// zooming in progressively reveals more without any per-cell layout logic.
+function resolveDetailLevel(zoomLevel) {
+  if (zoomLevel >= 1.4) return DETAIL_LEVEL_CLOSE;
+  if (zoomLevel >= 0.9) return DETAIL_LEVEL_MEDIUM;
+  return DETAIL_LEVEL_FAR;
+}
+
 export {
   getCompoundId,
   readAssignmentFields,
   resolveIsMine,
+  resolveIsMyRanch,
   buildAssignmentsByCompoundAndStall,
   buildMineCountByCompoundId,
   resolveInitialCompoundId,
+  MIN_ZOOM,
+  MAX_ZOOM,
+  ZOOM_STEP,
+  clampZoom,
+  computeFitZoom,
+  DETAIL_LEVEL_FAR,
+  DETAIL_LEVEL_MEDIUM,
+  DETAIL_LEVEL_CLOSE,
+  resolveDetailLevel,
 };

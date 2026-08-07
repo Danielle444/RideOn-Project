@@ -115,3 +115,31 @@ describe("StallMapModal delegates viewer logic to utils/stallMapViewer.js", () =
     expect(source).toContain("var hasMine = mineCount > 0;");
   });
 });
+
+describe("StallMapModal 'My ranch' visual priority (business decision, 2026-08-07)", () => {
+  it("checks assignment.isMine strictly before assignment.isMyRanch in the cell color branch, so Mine always wins", () => {
+    var source = readSource();
+    var mineIndex = source.indexOf("if (assignment.isMine) {");
+    var myRanchIndex = source.indexOf("} else if (assignment.isMyRanch) {");
+
+    expect(mineIndex).toBeGreaterThan(-1);
+    expect(myRanchIndex).toBeGreaterThan(-1);
+    expect(mineIndex).toBeLessThan(myRanchIndex);
+  });
+
+  it("gives 'My ranch' its own fill and border constants, distinct from Mine and plain Occupied", () => {
+    var source = readSource();
+
+    expect(source).toContain("var MY_RANCH_BG =");
+    expect(source).toContain("var MY_RANCH_BORDER =");
+    expect(source).not.toContain('MY_RANCH_BG = "#7B5A4D"');
+    expect(source).not.toContain('MY_RANCH_BG = "#D9CFC2"');
+  });
+
+  it("only shows the 'My ranch' legend entry in payer viewer mode", () => {
+    var source = readSource();
+
+    expect(source).toContain('var isPayer = props.viewerMode === "payer";');
+    expect(source).toContain("<CompoundLegend viewerMode={viewerMode} />");
+  });
+});

@@ -2,9 +2,10 @@
 -- usp_GetStallAssignmentsForCompetitionPayer - payer-safe stall-map assignment
 -- projection (mobile stall-map slice 1, 2026-08-07).
 -- ============================================================================
--- NOT YET APPLIED LIVE. Prepared for review; apply only after explicit
--- sign-off, via apply_migration, then re-read live as proof it landed (per
--- the standing DB-write protocol).
+-- LIVE (confirmed via pg_get_functiondef, 2026-08-07). The header below
+-- previously read "NOT YET APPLIED LIVE" -- that was stale; a live read
+-- proved this body was already deployed byte-for-byte before the IsMyRanch
+-- addition further down was applied.
 --
 -- Companion to usp_GetStallAssignmentsForCompetition (the existing
 -- Admin/HostSecretary-only full-detail read, unchanged). That proc returns
@@ -52,9 +53,24 @@
 -- StallBookingId, BookingRanchId, BookingRanchName, ProductName, HorseId -
 -- none of these are needed to render occupied/mine/tack, and every one of
 -- them identifies another participant or their ranch.
+--
+-- IsMyRanch (2026-08-07, "My ranch" UX, applied live via migration
+-- add_ismyranch_to_stall_assignments_for_competition_payer). Deliberately
+-- the ONE narrow exception to the redaction above: a same-ranch boolean, not
+-- an identity. p_ranchid is the caller's own already-authorized active ranch
+-- (StallAssignmentsController.GetAssignmentsForPayer already validates it via
+-- EnsureUserHasRoleInRanch before this proc is ever called). The predicate
+-- (sb.requestingranchid = p_ranchid) mirrors the authoritative "booking
+-- ranch" column usp_GetStallAssignmentsForCompetition (the admin proc) uses
+-- for the same concept (see the ranch-model correction note in
+-- 107_usp_GetStallAssignmentsForCompetition.sql) - not a new or guessed
+-- relationship. It reveals only same/not-same versus the caller, never the
+-- actual requestingranchid value, ranch name, or any other participant
+-- identity - StallBookingId/BookingRanchId/BookingRanchName/HorseId remain
+-- fully absent from the return shape, unchanged.
 -- ============================================================================
 
-CREATE OR REPLACE FUNCTION public.usp_getstallassignmentsforcompetitionpayer(p_competitionid integer, p_payerpersonid integer)
+CREATE OR REPLACE FUNCTION public.usp_getstallassignmentsforcompetitionpayer(p_competitionid integer, p_payerpersonid integer, p_ranchid integer)
  RETURNS TABLE(
      "AssignmentId" integer,
      "CompoundId" smallint,
@@ -64,7 +80,8 @@ CREATE OR REPLACE FUNCTION public.usp_getstallassignmentsforcompetitionpayer(p_c
      "IsMine" boolean,
      "IsForTack" boolean,
      "HorseName" text,
-     "BarnName" text
+     "BarnName" text,
+     "IsMyRanch" boolean
  )
  LANGUAGE plpgsql
 AS $function$
@@ -90,7 +107,9 @@ begin
         sb.isfortack::boolean as "IsForTack",
 
         case when pos.stallbookingid is not null then h.horsename::text else null end as "HorseName",
-        case when pos.stallbookingid is not null then h.barnname::text else null end as "BarnName"
+        case when pos.stallbookingid is not null then h.barnname::text else null end as "BarnName",
+
+        (sb.requestingranchid = p_ranchid)::boolean as "IsMyRanch"
 
     from public.stallassignment sa
     inner join public.stallbooking sb

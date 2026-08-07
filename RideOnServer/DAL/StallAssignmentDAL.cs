@@ -199,13 +199,19 @@ namespace RideOnServer.DAL
 
         // Payer-safe projection (mobile stall-map slice 1). payerPersonId is
         // the authenticated caller's own PersonId only - callers must never
-        // be able to pass another person's id here.
-        public List<PayerStallAssignmentDto> GetAssignmentsForPayer(int competitionId, int payerPersonId)
+        // be able to pass another person's id here. ranchId (added for
+        // "My ranch" UX, 2026-08-07) is the caller's own already-authorized
+        // active ranch (see StallAssignmentsController.GetAssignmentsForPayer) -
+        // it only drives the IsMyRanch same-ranch comparison inside the proc,
+        // never a different ranch's data. Dictionary order is positional
+        // (@p1/@p2/@p3) and must match the proc's parameter order exactly.
+        public List<PayerStallAssignmentDto> GetAssignmentsForPayer(int competitionId, int payerPersonId, int ranchId)
         {
             var paramDic = new Dictionary<string, object?>
             {
                 { "@CompetitionId", competitionId },
-                { "@PayerPersonId", payerPersonId }
+                { "@PayerPersonId", payerPersonId },
+                { "@RanchId", ranchId }
             };
 
             try
@@ -238,6 +244,8 @@ namespace RideOnServer.DAL
 
                         HorseName = reader["HorseName"] == DBNull.Value ? null : reader["HorseName"].ToString(),
                         BarnName = reader["BarnName"] == DBNull.Value ? null : reader["BarnName"].ToString(),
+
+                        IsMyRanch = Convert.ToBoolean(reader["IsMyRanch"]),
                     });
                 }
 
