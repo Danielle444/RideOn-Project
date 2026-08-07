@@ -309,3 +309,74 @@ describe("PayerCompetitionAccountScreen - independent in-flight guards for accou
     expect(block).toContain("shavingsCancelGuardRef.current.release(guardKey);");
   });
 });
+
+describe("PayerCompetitionAccountScreen - mobile stall-map slice 1 entry point (corrected, blocker 2)", () => {
+  it("imports the shared StallMapModal and the publish-status read (never the removed orphaned screen)", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import StallMapModal from "../../../../components/competitions/StallMapModal";',
+    );
+    expect(source).toContain(
+      'import { getStallMapPublishStatus } from "../../../../services/stallMapService";',
+    );
+    expect(source).not.toContain("StallMapScreen");
+  });
+
+  it("gates the entry point strictly on stallMapPublished === true (hidden while unknown/loading/false)", () => {
+    var source = readSource();
+    var block = getFunctionBlock(
+      source,
+      "function renderStallMapEntryPoint() {",
+      "function renderStallsTab() {",
+    );
+
+    expect(block).toContain("if (stallMapPublished !== true) {");
+    expect(block).toContain("return null;");
+  });
+
+  it("fetches publish status via getStallMapPublishStatus keyed on competitionId/ranchId, defaulting to not-published on any failure", () => {
+    var source = readSource();
+    var block = getFunctionBlock(
+      source,
+      "useEffect(\n    function () {\n      var cancelled = false;\n\n      if (!competitionId || !ranchId) {",
+      "var bandedClasses = useMemo(",
+    );
+
+    expect(block).toContain("getStallMapPublishStatus(competitionId, ranchId)");
+    expect(block).toContain(
+      "setStallMapPublished(!!(data && (data.isPublished ?? data.IsPublished)));",
+    );
+    expect(block).toContain(".catch(function () {");
+    expect(block).toContain("if (!cancelled) setStallMapPublished(null);");
+  });
+
+  it("never derives myStallBookingIds - blocker 2's redacted payer-map endpoint computes IsMine server-side now", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("myStallBookingIds");
+  });
+
+  it("renders the entry point both when stalls is empty and when it has rows", () => {
+    var source = readSource();
+    var block = getFunctionBlock(
+      source,
+      "function renderStallsTab() {",
+      "function renderShavingsTab() {",
+    );
+
+    expect(block).toContain("var mapEntryPoint = renderStallMapEntryPoint();");
+    expect(countOccurrences(block, "{mapEntryPoint}")).toBe(2);
+  });
+
+  it("mounts one StallMapModal wired to isStallMapOpen, competitionId, ranchId, and viewerMode=\"payer\"", () => {
+    var source = readSource();
+
+    expect(source).toContain("<StallMapModal");
+    expect(source).toContain("isOpen={isStallMapOpen}");
+    expect(source).toContain("competitionId={competitionId}");
+    expect(source).toContain("ranchId={ranchId}");
+    expect(source).toContain('viewerMode="payer"');
+    expect(source).toContain("setIsStallMapOpen(false);");
+  });
+});

@@ -64,6 +64,27 @@ namespace RideOnServer.BL.DTOs.StallMap
         public bool IsAssigned { get; set; }
     }
 
+    // Payer-safe projection (mobile stall-map slice 1, 2026-08-07). Deliberately
+    // narrower than StallAssignmentDto: no StallBookingId, BookingRanchId,
+    // BookingRanchName, ProductName, or HorseId - none of those are needed to
+    // render occupied/mine/tack, and each identifies another participant or
+    // ranch. HorseName/BarnName are null at the SQL layer (never transmitted)
+    // whenever IsMine is false - see usp_GetStallAssignmentsForCompetitionPayer.
+    public class PayerStallAssignmentDto
+    {
+        public int AssignmentId { get; set; }
+        public short CompoundId { get; set; }
+        public short StallId { get; set; }
+        public string? StallNumber { get; set; }
+
+        public bool IsOccupied { get; set; }
+        public bool IsMine { get; set; }
+        public bool IsForTack { get; set; }
+
+        public string? HorseName { get; set; }
+        public string? BarnName { get; set; }
+    }
+
     public class StallMapPublishStatusDto
     {
         public int CompetitionId { get; set; }

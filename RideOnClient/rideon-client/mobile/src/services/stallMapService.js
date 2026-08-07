@@ -23,6 +23,15 @@ function getAssignments(competitionId, ranchId) {
   });
 }
 
+// Payer-safe projection (blocker 2, 2026-08-07): server redacts other
+// participants' identity server-side (IsMine/HorseName/BarnName only for the
+// caller's own stall) - never call getAssignments() for a Payer viewer.
+function getPayerMapAssignments(competitionId, ranchId) {
+  return apiClient.get("/StallAssignments/payer-map", {
+    params: { competitionId: competitionId, ranchId: ranchId },
+  });
+}
+
 function getHorses(competitionId, ranchId) {
   return apiClient.get("/StallAssignments/horses", {
     params: { competitionId: competitionId, ranchId: ranchId },
@@ -66,6 +75,7 @@ function parseCompoundLayout(compound) {
 export {
   getCompounds,
   getAssignments,
+  getPayerMapAssignments,
   getHorses,
   getAssignedStallPrices,
   getStallMapPublishStatus,
