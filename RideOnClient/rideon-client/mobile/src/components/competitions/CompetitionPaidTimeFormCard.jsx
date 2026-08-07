@@ -20,6 +20,38 @@ var SLOT_EXPLANATION =
 
 var LOCK_EXPLANATION = "שמירת בחירה לבקשה הבאה - הנעילה שומרת את הערך גם אחרי שליחה.";
 
+// זהה לסולם שהיה ב-PaidTimeEditModal (שהוחלף בטופס הזה, CAP-1) - אותן
+// מחרוזות עברית מאושרות, לא ניסוח חדש.
+function getTypeLockReason(props) {
+  if (!props.isEditMode) {
+    return null;
+  }
+
+  if (props.editStatus === "Cancelled") {
+    return "הבקשה בוטלה";
+  }
+
+  if (!props.editCanCancel) {
+    return "הבקשה שולמה - לא ניתן לשנות סוג";
+  }
+
+  if (!props.editCanModify) {
+    return "נותרו <24h - שינוי סוג חסום";
+  }
+
+  return null;
+}
+
+function getSlotLockReason(props) {
+  if (!props.isEditMode || props.editCanCancel) {
+    return null;
+  }
+
+  return props.editStatus === "Cancelled"
+    ? "הבקשה בוטלה"
+    : "הבקשה שולמה - לא ניתן לשנות סלוט";
+}
+
 function LockButton(props) {
   return (
     <Pressable
@@ -86,6 +118,21 @@ export default function CompetitionPaidTimeFormCard(props) {
   var requestableSlots = Array.isArray(props.requestableSlots)
     ? props.requestableSlots
     : [];
+
+  // CAP-1: סוס/רוכב/מאמן/משלם נעולים תמיד במצב עריכה - הם מוצגים מלאים
+  // מראש (hydration ב-useAdminCompetitionPaidTimes) אבל לעולם לא נכתבים
+  // מחדש דרך usp_updatepaidtimerequest. props.payerFieldDisabled (נעילת
+  // ה-payer-account, מצב יצירה) ממשיך לחול גם כשלא במצב עריכה.
+  var identityFieldsDisabled = !!props.isEditMode;
+  var payerFieldDisabled = !!props.payerFieldDisabled || identityFieldsDisabled;
+
+  var typeLockReason = getTypeLockReason(props);
+  var typeFieldDisabled = !!typeLockReason;
+
+  var slotLockReason = getSlotLockReason(props);
+  var slotFieldDisabled = !!slotLockReason;
+
+  var notesFieldDisabled = !!props.isEditMode && !props.editCanCancel;
 
   var [cascadeDate, setCascadeDate] = useState(null);
   var [cascadeTimeOfDay, setCascadeTimeOfDay] = useState(null);
@@ -326,6 +373,7 @@ export default function CompetitionPaidTimeFormCard(props) {
           onToggleLock={function () {
             props.onToggleLock("requestedSlot");
           }}
+          disabled={slotFieldDisabled}
         />
 
         {cascadeDate !== null && needsTimeOfDayStep ? (
@@ -398,10 +446,15 @@ export default function CompetitionPaidTimeFormCard(props) {
             onToggleLock={function () {
               props.onToggleLock("requestedSlot");
             }}
+            disabled={slotFieldDisabled}
           />
         ) : null}
 
         <FieldError message={fieldErrors.requestedSlot} />
+
+        {slotLockReason ? (
+          <Text style={styles.formSectionHint}>{slotLockReason}</Text>
+        ) : null}
 
         {slotSummary ? (
           <View style={styles.selectionSummaryCard}>
@@ -450,12 +503,17 @@ export default function CompetitionPaidTimeFormCard(props) {
                   style={[
                     styles.typeCard,
                     isSelected ? styles.typeCardActive : null,
+                    typeFieldDisabled ? styles.typeCardDisabled : null,
                   ]}
+                  disabled={typeFieldDisabled}
                   onPress={function () {
                     handleSelectPriceCatalog(item);
                   }}
                   accessibilityRole="radio"
-                  accessibilityState={{ selected: isSelected }}
+                  accessibilityState={{
+                    selected: isSelected,
+                    disabled: typeFieldDisabled,
+                  }}
                   accessibilityLabel={summary.productName}
                 >
                   <Ionicons
@@ -488,6 +546,10 @@ export default function CompetitionPaidTimeFormCard(props) {
         )}
 
         <FieldError message={fieldErrors.priceCatalog} />
+
+        {typeLockReason ? (
+          <Text style={styles.formSectionHint}>{typeLockReason}</Text>
+        ) : null}
 
         {typeSummary && typeSummary.priceLabel ? (
           <View style={styles.infoNote}>
@@ -523,6 +585,7 @@ export default function CompetitionPaidTimeFormCard(props) {
             onToggleLock={function () {
               props.onToggleLock("coach");
             }}
+            disabled={identityFieldsDisabled}
           />
 
           <FieldError message={fieldErrors.coach} />
@@ -544,6 +607,7 @@ export default function CompetitionPaidTimeFormCard(props) {
             onToggleLock={function () {
               props.onToggleLock("horse");
             }}
+            disabled={identityFieldsDisabled}
           />
 
           <FieldError message={fieldErrors.horse} />
@@ -565,6 +629,7 @@ export default function CompetitionPaidTimeFormCard(props) {
             onToggleLock={function () {
               props.onToggleLock("rider");
             }}
+            disabled={identityFieldsDisabled}
           />
 
           <FieldError message={fieldErrors.rider} />
@@ -586,7 +651,7 @@ export default function CompetitionPaidTimeFormCard(props) {
             onToggleLock={function () {
               props.onToggleLock("payer");
             }}
-            disabled={props.payerFieldDisabled}
+            disabled={payerFieldDisabled}
           />
 
           <FieldError message={fieldErrors.payer} />
@@ -620,6 +685,7 @@ export default function CompetitionPaidTimeFormCard(props) {
             style={[styles.textInput, styles.notesInput]}
             textAlign="right"
             multiline={true}
+            editable={!notesFieldDisabled}
           />
 
           <Text style={styles.formSectionHint}>שדה רשות.</Text>

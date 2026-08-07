@@ -442,6 +442,59 @@ namespace RideOnServer.DAL
             };
         }
 
+        public PaidTimeRequestEditDetail? GetPaidTimeRequestEditDetail(int paidTimeRequestId, int ranchId)
+        {
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@p_paidtimerequestid", paidTimeRequestId },
+                { "@p_ranchid", ranchId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_getpaidtimerequestforedit",
+                        connection,
+                        paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (!reader.Read())
+                        {
+                            return null;
+                        }
+
+                        return new PaidTimeRequestEditDetail
+                        {
+                            PaidTimeRequestId = Convert.ToInt32(reader["paidtimerequestid"]),
+                            RequestedCompSlotId = Convert.ToInt32(reader["requestedcompslotid"]),
+                            PriceCatalogId = Convert.ToInt32(reader["pricecatalogid"]),
+                            HorseId = Convert.ToInt32(reader["horseid"]),
+                            RiderFederationMemberId = Convert.ToInt32(reader["riderfederationmemberid"]),
+                            CoachFederationMemberId = reader["coachfederationmemberid"] == DBNull.Value
+                                ? (int?)null
+                                : Convert.ToInt32(reader["coachfederationmemberid"]),
+                            PaidByPersonId = Convert.ToInt32(reader["paidbypersonid"]),
+                            Notes = reader["notes"] == DBNull.Value ? null : reader["notes"].ToString(),
+                            Status = reader["status"]?.ToString() ?? string.Empty,
+                            HoursUntilStart = reader["hoursuntilstart"] == DBNull.Value
+                                ? 0m
+                                : Convert.ToDecimal(reader["hoursuntilstart"]),
+                            CanModify = reader["canmodify"] != DBNull.Value && Convert.ToBoolean(reader["canmodify"]),
+                            CanCancel = reader["cancancel"] != DBNull.Value && Convert.ToBoolean(reader["cancancel"])
+                        };
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
         public List<SlotScheduleItem> GetSlotScheduleForViewing(int slotId, int competitionId, int ranchId)
         {
             List<SlotScheduleItem> result = new List<SlotScheduleItem>();

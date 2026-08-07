@@ -70,6 +70,10 @@ export default function CompetitionPaidTimeTab(props) {
         fieldErrors={fieldErrors}
         scrollRequest={props.scrollRequest}
         onScrollToOffset={props.onScrollToOffset}
+        isEditMode={props.isEditMode}
+        editCanModify={props.editCanModify}
+        editCanCancel={props.editCanCancel}
+        editStatus={props.editStatus}
       />
 
       {hasFieldErrors ? (
@@ -86,33 +90,48 @@ export default function CompetitionPaidTimeTab(props) {
         </View>
       ) : null}
 
+      {/* CAP-1: מצב עריכה שומר ישירות - אין מסך סקירה/הצלחה שמניח "בקשה
+          חדשה" (ראו PaidTimeCreateModal). שגיאת שמירה מוצגת כאן, כמו שגיאות
+          השדות למעלה. */}
+      {props.isEditMode && props.submitError ? (
+        <View style={styles.errorCard}>
+          <Text style={styles.errorText}>{props.submitError}</Text>
+        </View>
+      ) : null}
+
       <Pressable
         style={[
           styles.primaryButton,
           !props.canSubmit ? styles.primaryButtonDisabled : null,
         ]}
         disabled={!props.canSubmit}
-        onPress={props.onContinueToReview}
+        onPress={props.isEditMode ? props.onSaveEdit : props.onContinueToReview}
         accessibilityRole="button"
       >
-        <Text style={styles.primaryButtonText}>המשך לאישור</Text>
+        <Text style={styles.primaryButtonText}>
+          {props.isEditMode ? "שמירת שינויים" : "המשך לאישור"}
+        </Text>
       </Pressable>
 
-      <PaidTimeRequestReviewModal
-        visible={!!props.isReviewOpen}
-        model={props.reviewModel}
-        isSaving={props.isSaving}
-        errorMessage={props.submitError}
-        onBackToEdit={props.onBackToEdit}
-        onConfirm={props.onConfirmSubmit}
-      />
+      {!props.isEditMode ? (
+        <PaidTimeRequestReviewModal
+          visible={!!props.isReviewOpen}
+          model={props.reviewModel}
+          isSaving={props.isSaving}
+          errorMessage={props.submitError}
+          onBackToEdit={props.onBackToEdit}
+          onConfirm={props.onConfirmSubmit}
+        />
+      ) : null}
 
-      <PaidTimeRequestSuccessModal
-        visible={!!props.isSuccessOpen}
-        snapshot={props.successSnapshot}
-        onAddAnother={props.onAddAnother}
-        onFinish={props.onFinish}
-      />
+      {!props.isEditMode ? (
+        <PaidTimeRequestSuccessModal
+          visible={!!props.isSuccessOpen}
+          snapshot={props.successSnapshot}
+          onAddAnother={props.onAddAnother}
+          onFinish={props.onFinish}
+        />
+      ) : null}
     </>
   );
 }

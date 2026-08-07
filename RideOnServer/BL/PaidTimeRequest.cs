@@ -882,6 +882,17 @@ namespace RideOnServer.BL
             return dal.GetMyPaidTimeRequestsForCompetition(competitionId, orderedBySystemUserId);
         }
 
+        internal static PaidTimeRequestEditDetail? GetPaidTimeRequestEditDetail(int paidTimeRequestId, int ranchId)
+        {
+            if (paidTimeRequestId <= 0 || ranchId <= 0)
+            {
+                throw new Exception("Invalid request");
+            }
+
+            PaidTimeRequestDAL dal = new PaidTimeRequestDAL();
+            return dal.GetPaidTimeRequestEditDetail(paidTimeRequestId, ranchId);
+        }
+
         internal static List<SlotScheduleItem> GetSlotScheduleForViewing(int slotId, int competitionId, int ranchId)
         {
             if (slotId <= 0 || competitionId <= 0 || ranchId <= 0)
