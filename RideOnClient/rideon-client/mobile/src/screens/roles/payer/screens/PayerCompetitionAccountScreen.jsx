@@ -47,6 +47,10 @@ import {
 
 import ShavingsGroupCard from "../../../../components/payerAccount/ShavingsGroupCard";
 
+import StallMapModal from "../../../../components/competitions/StallMapModal";
+
+import { getStallMapPublishStatus } from "../../../../services/stallMapService";
+
 import styles from "../../../../styles/adminCompetitionPayerAccountStyles";
 
 import { cancelEntryByPayer } from "../../../../services/entriesService";
@@ -258,6 +262,41 @@ export default function PayerCompetitionAccountScreen(props) {
 
   var payer = account.payer;
   var summary = account.summary || {};
+
+  var competitionId = activeCompetition?.competitionId || null;
+  var ranchId = activeRole?.ranchId || null;
+
+  // Stall map entry point (business rule 2/8): the graphical map is reachable
+  // from this stalls tab, but only openable once the host has published it -
+  // reuses the same publish-status read RanchAdmin already relies on.
+  var [stallMapPublished, setStallMapPublished] = useState(null);
+  var [isStallMapOpen, setIsStallMapOpen] = useState(false);
+
+  useEffect(
+    function () {
+      var cancelled = false;
+
+      if (!competitionId || !ranchId) {
+        setStallMapPublished(null);
+        return undefined;
+      }
+
+      getStallMapPublishStatus(competitionId, ranchId)
+        .then(function (response) {
+          if (cancelled) return;
+          var data = response?.data;
+          setStallMapPublished(!!(data && (data.isPublished ?? data.IsPublished)));
+        })
+        .catch(function () {
+          if (!cancelled) setStallMapPublished(null);
+        });
+
+      return function () {
+        cancelled = true;
+      };
+    },
+    [competitionId, ranchId],
+  );
 
   // Phase 3E Slice D: CAP-8/proc 212 now returns a verified entryStatus on
   // every class row, so classes are banded the same way paid time and
@@ -1036,9 +1075,47 @@ export default function PayerCompetitionAccountScreen(props) {
     return renderBandedSections(bandedPaidTimes, renderPaidTimeCard);
   }
 
+  // Business rules 2/8: hidden while publish status is unknown/unpublished,
+  // enabled once the host secretary publishes the map. RanchAdmin's own
+  // entry point is intentionally NOT gated this way - that is a deliberate
+  // difference, not an oversight (see report).
+  function renderStallMapEntryPoint() {
+    if (stallMapPublished !== true) {
+      return null;
+    }
+
+    return (
+      <Pressable
+        onPress={function () {
+          setIsStallMapOpen(true);
+        }}
+        style={{
+          marginBottom: 12,
+          backgroundColor: "#F0E5DC",
+          borderWidth: 1,
+          borderColor: "#7B5A4D",
+          borderRadius: 10,
+          paddingVertical: 10,
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ color: "#7B5A4D", fontWeight: "800" }}>
+          צפה במפת תאים
+        </Text>
+      </Pressable>
+    );
+  }
+
   function renderStallsTab() {
+    var mapEntryPoint = renderStallMapEntryPoint();
+
     if (!account.stalls || account.stalls.length === 0) {
-      return renderEmpty("אין לך הזמנות תאים בתחרות זו");
+      return (
+        <>
+          {mapEntryPoint}
+          {renderEmpty("אין לך הזמנות תאים בתחרות זו")}
+        </>
+      );
     }
 
     function renderStallCard(item) {
@@ -1173,7 +1250,12 @@ export default function PayerCompetitionAccountScreen(props) {
       );
     }
 
-    return renderBandedSections(bandedStalls, renderStallCard);
+    return (
+      <>
+        {mapEntryPoint}
+        {renderBandedSections(bandedStalls, renderStallCard)}
+      </>
+    );
   }
 
   // CAP-4: renders the top-level account.shavings[] tab - each band's
@@ -1416,6 +1498,16 @@ export default function PayerCompetitionAccountScreen(props) {
           </View>
         </View>
       </Modal>
+
+      <StallMapModal
+        isOpen={isStallMapOpen}
+        competitionId={competitionId}
+        ranchId={ranchId}
+        viewerMode="payer"
+        onClose={function () {
+          setIsStallMapOpen(false);
+        }}
+      />
     </MobileScreenLayout>
   );
 }
