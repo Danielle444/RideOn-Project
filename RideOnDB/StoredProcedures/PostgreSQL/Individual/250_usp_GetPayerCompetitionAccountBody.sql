@@ -34,8 +34,58 @@
 -- authenticates directly as the owning DB role and is unaffected by that
 -- revoke -- it never goes through PostgREST/anon/authenticated at all.
 -- ============================================================================
+--
+-- ENTRY-CREATED FINE FOLD (fix/payer-proc250-fine-fold, 2026-08-07): mobile
+-- Payer QA showed an Organizer entry-creation late fine (categorykey='fine',
+-- sourcetype='Fine', sourceid=entryid -- see the "ENTRY-CREATION FINES" note
+-- in 212_usp_GetPayerCompetitionAccount.sql) still rendering as its own
+-- standalone "קנסות" card in PayerCompetitionAccountScreen.jsx /
+-- AdminCompetitionPayerAccountScreen.jsx, separate from its entry's class
+-- card -- even though usp_getcompetitionpayercategorysummary (203, the
+-- Secretary Payments sidebar) and 206/247/248/204 were already fixed to fold
+-- the same convention into 'classes' back on PR #327/#329. Proc 203's fix is
+-- a pure category-aggregate GROUP BY and is NOT reused here by assumption --
+-- this proc returns a per-entry classes[] list plus a separate fines[] list,
+-- so the fold has to happen at the row level, not just the category label.
+--
+-- New class_charge_source CTE (feeding class_charge_summary instead of
+-- payer_charges directly): UNIONs the base Entry/classes charge rows with
+-- Organizer entry-creation fine rows (categorykey rewritten 'fine' ->
+-- 'classes', chargeowner left as-is and filtered to 'Organizer' -- same
+-- guard as proc 203's folded_charges CTE). sourceid already IS the entryid
+-- for this fine convention (never joined through changeentryrequest), so no
+-- new join key was needed -- class_charge_summary's existing
+-- chargeowner/categorykey/chargestatus arithmetic treats the folded fine
+-- amount exactly like the base Organizer charge. fine_items' second UNION ALL
+-- branch (the entry-creation-fine branch) is removed entirely, since that
+-- money is now folded into class_items instead of listed separately; the
+-- first branch (ChangeEntryRequest change/cancellation fines, sourceid =
+-- changeentryrequestid) is untouched and still renders in fines[] as its own
+-- "קנסות" row -- unchanged by design, per the standing decision that
+-- ChangeEntryRequest fines are a structurally different, still-out-of-scope
+-- category.
+--
+-- Federation is untouched: this fine convention is Organizer-only by
+-- construction (usp_InsertEntry/usp_AdminCreateEntry), and the fold branch
+-- is filtered to chargeowner = 'Organizer' defensively regardless.
+-- classGrandTotal/organizerTotal/grandTotal arithmetic is unaffected -- the
+-- amount only moves from the finetotal bucket into the classorganizertotal/
+-- classgrandtotal bucket, both already summed into organizertotal/grandtotal.
+--
+-- Live-verified for competition 78 / payer 79 / entry 10675 (ranch 11): entry
+-- 10675 classes[] row went organizerCost 250->300, totalAmount 300->350,
+-- federationCost unchanged at 50; fines[] no longer contains entry 10675 (was
+-- 1 row, now 0); summary.classGrandTotal 300->350, summary.fineTotal 50->0,
+-- summary.organizerTotal unchanged at 1060, summary.grandTotal unchanged at
+-- 1110, summary.classFederationTotal unchanged at 50. Verified via a
+-- rollback-only smoke test (BEGIN -> capture before -> CREATE OR REPLACE ->
+-- capture after -> RAISE EXCEPTION carrying both JSON payloads -> forced
+-- rollback) before live deploy, then re-confirmed against the live function
+-- post-deploy. Proc 203/204/206/212/247/248/251 and Proc 200 are untouched by
+-- this change.
+-- ============================================================================
 
-CREATE FUNCTION public.usp_getpayercompetitionaccount_body(p_competitionid integer, p_ranchid integer, p_payerpersonid integer)
+CREATE OR REPLACE FUNCTION public.usp_getpayercompetitionaccount_body(p_competitionid integer, p_ranchid integer, p_payerpersonid integer)
  RETURNS jsonb
  LANGUAGE plpgsql
 AS $function$
@@ -110,6 +160,44 @@ begin
           and bc.chargestatus in ('Open', 'Paid', 'Cancelled', 'Replaced')
         group by
             bc.sourceid
+    ),
+
+    -- Entry-created fine fold (2026-08-07): unions the base Entry/classes
+    -- charge with any Organizer entry-creation late fine sharing the same
+    -- entryid (categorykey rewritten 'fine' -> 'classes'), so
+    -- class_charge_summary's existing Organizer/Federation arithmetic below
+    -- treats the fine identically to the base charge. Federation is
+    -- untouched -- this fine convention is Organizer-only by construction,
+    -- and the second branch is filtered to chargeowner = 'Organizer'
+    -- defensively, matching the same guard already live on proc 203's
+    -- folded_charges CTE.
+    class_charge_source as (
+        select
+            bc.sourceid,
+            bc.billid,
+            bc.chargeowner,
+            bc.categorykey,
+            bc.chargestatus,
+            bc.amounttopay,
+            bc.federationcoveredamount
+        from payer_charges bc
+        where bc.sourcetype = 'Entry'
+          and bc.categorykey = 'classes'
+
+        union all
+
+        select
+            bc.sourceid,
+            bc.billid,
+            bc.chargeowner,
+            'classes' as categorykey,
+            bc.chargestatus,
+            bc.amounttopay,
+            bc.federationcoveredamount
+        from payer_charges bc
+        where bc.sourcetype = 'Fine'
+          and bc.categorykey = 'fine'
+          and bc.chargeowner = 'Organizer'
     ),
 
     class_charge_summary as (
@@ -224,9 +312,7 @@ begin
                 ), 0) = 0
             )::boolean as ispaid
 
-        from payer_charges bc
-        where bc.sourcetype = 'Entry'
-          and bc.categorykey = 'classes'
+        from class_charge_source bc
         group by
             bc.sourceid
     ),
@@ -632,8 +718,12 @@ begin
     ),
 
     fine_items as (
-        -- A. Change/cancellation fines -- unchanged. sourceid is a
-        -- changeentryrequestid; resolve the original entry through it.
+        -- Change/cancellation fines only. sourceid is a changeentryrequestid;
+        -- resolve the original entry through it. The entry-creation-fine
+        -- branch that used to live here (sourceid = entryid directly,
+        -- categorykey='fine') was removed 2026-08-07 -- that money is now
+        -- folded into class_items via class_charge_source above instead of
+        -- being listed as a separate fine row (see the header note).
         select
             bc.billchargeid,
             bc.billid,
@@ -654,31 +744,6 @@ begin
         inner join public.classtype ct
             on ct.classtypeid = cic.classtypeid
         where bc.categorykey = 'classes'
-          and bc.sourcetype = 'Fine'
-
-        union all
-
-        -- B. Entry-creation fines -- new. sourceid IS the entryid directly;
-        -- never joined through changeentryrequest (that id space is
-        -- unrelated and already proven to collide numerically with entryid).
-        select
-            bc.billchargeid,
-            bc.billid,
-            bc.sourceid,
-            bc.sourceid as originalentryid,
-            e.classincompid,
-            ct.classname::text as classname,
-            bc.amounttopay,
-            bc.chargestatus,
-            bc.notes
-        from payer_charges bc
-        inner join public.entry e
-            on e.entryid = bc.sourceid
-        inner join public.classincompetition cic
-            on cic.classincompid = e.classincompid
-        inner join public.classtype ct
-            on ct.classtypeid = cic.classtypeid
-        where bc.categorykey = 'fine'
           and bc.sourcetype = 'Fine'
     ),
 
