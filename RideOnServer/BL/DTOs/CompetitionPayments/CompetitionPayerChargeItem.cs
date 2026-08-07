@@ -65,5 +65,7 @@
         public string? InvoiceNumber { get; set; }
 
         public bool CanSelectForPayment { get; set; }
+
+        public int? ResolvedEntryId { get; set; }
     }
 }

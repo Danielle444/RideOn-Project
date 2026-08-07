@@ -14,6 +14,25 @@
 -- LEAST(amounttopay, coveredamount from federationcreditallocation) when the
 -- charge isn't already 'Paid', or the full amount when it is - inheriting the
 -- same blind spot to organizer-paid Federation charges as 193/199/200.
+--
+-- MODIFIED 2026-08-07 (HostSecretary fine-presentation slice, live-verified
+-- against pg_get_functiondef immediately before this change): an Entry-created
+-- late-entry fine (chargeowner='Organizer', categorykey='fine',
+-- sourcetype='Fine', sourceid=EntryId) is folded into the same group as its
+-- base Entry charge (categorykey='classes') so it no longer produces its own
+-- standalone "קנסות" category - the locked rule is base + fine = one Entry
+-- cost. The fold happens in calculated_charges, keyed ONLY on
+-- categorykey='fine' - ChangeEntryRequest fines already carry
+-- categorykey='classes' (verified live 2026-08-07: billcharge sourcetype=
+-- 'Fine' splits cleanly into categorykey='classes' (3 rows/₪200, CER) and
+-- categorykey='fine' (5 rows/₪400, Entry-created), no third shape exists), so
+-- they were already inside the 'classes'/'מקצים' bucket before this change
+-- and are untouched by it. count(distinct sourceid) naturally dedupes an
+-- entry that now matches on two billcharge rows (classes+fine), so Quantity
+-- keeps meaning "entry count", never inflated by the fold. Federation is
+-- untouched: the fold condition is chargeowner='Organizer'-only, matching
+-- that fine billcharge rows are hardcoded Organizer-only at every known write
+-- site (usp_insertentry, usp_admincreateentry).
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_getcompetitionsummarybycategory(p_competitionid integer, p_ranchid integer)
@@ -69,7 +88,17 @@ begin
         select
             ac.billchargeid,
             ac.chargeowner,
-            ac.categorykey,
+
+            -- Entry-created late-entry fines fold into the 'classes' bucket for
+            -- the same ChargeOwner (Organizer-only by construction). Scoped
+            -- strictly to categorykey='fine' so ChangeEntryRequest fines
+            -- (categorykey='classes' already) are never touched by this CASE.
+            case
+                when ac.chargeowner = 'Organizer' and ac.categorykey = 'fine'
+                    then 'classes'
+                else ac.categorykey
+            end::text as categorykey,
+
             ac.sourcetype,
             ac.sourceid,
             ac.amounttopay,
@@ -124,7 +153,6 @@ begin
                 when chargeowner = 'Organizer' and categorykey = 'paid-time' then 'פייד־טיים'
                 when chargeowner = 'Organizer' and categorykey = 'stalls' then 'תאים'
                 when chargeowner = 'Organizer' and categorykey = 'shavings' then 'נסורת'
-                when chargeowner = 'Organizer' and categorykey = 'fine' then 'קנסות'
                 when chargeowner = 'Federation' and categorykey = 'classes' then 'התאחדות - מקצים'
                 else categorykey
             end::text as categoryname,
@@ -161,7 +189,6 @@ begin
             when 'paid-time' then 2
             when 'stalls' then 3
             when 'shavings' then 4
-            when 'fine' then 5
             when 'federation-classes' then 6
             else 99
         end;

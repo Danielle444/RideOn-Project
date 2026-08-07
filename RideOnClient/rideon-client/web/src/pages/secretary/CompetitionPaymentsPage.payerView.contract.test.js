@@ -194,7 +194,10 @@ describe("Charges table summary treatment contract", () => {
     expect(chargesTableSource).toContain('type="checkbox"');
     expect(chargesTableSource).toContain("checked={isSelected}");
     expect(chargesTableSource).toContain("disabled={!canSelect}");
-    expect(chargesTableSource).toContain("props.onToggleCharge(charge);");
+    // The table now iterates payable units (buildPayableEntryUnits), not raw
+    // billcharge rows -- onToggleCharge receives a unit so an Entry-created
+    // fine's billChargeId travels with its base charge's as one selection.
+    expect(chargesTableSource).toContain("props.onToggleCharge(unit);");
   });
 
   it("keeps the empty state and status/invoice rendering", () => {
@@ -202,7 +205,7 @@ describe("Charges table summary treatment contract", () => {
     expect(chargesTableSource).toContain("getStatusLabel(status)");
     expect(chargesTableSource).toContain("getStatusClass(status)");
     expect(chargesTableSource).toContain(
-      'getValue(charge, "invoiceNumber", "InvoiceNumber", "-")',
+      'getValue(unit, "invoiceNumber", "InvoiceNumber", "-")',
     );
   });
 });

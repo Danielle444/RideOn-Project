@@ -673,13 +673,15 @@ export default function CreatePaymentModal(props) {
             </h3>
 
             <div className="space-y-2">
-              {(props.selectedCharges || []).map(function (charge) {
-                var rowKey = getValue(
-                  charge,
-                  "displayRowKey",
-                  "DisplayRowKey",
-                  getValue(charge, "billChargeId", "BillChargeId", 0),
-                );
+              {(props.selectedCharges || []).map(function (unit) {
+                var rowKey =
+                  unit.displayUnitKey ||
+                  getValue(
+                    unit,
+                    "displayRowKey",
+                    "DisplayRowKey",
+                    getValue(unit, "billChargeId", "BillChargeId", 0),
+                  );
 
                 return (
                   <div
@@ -687,14 +689,28 @@ export default function CreatePaymentModal(props) {
                     className="flex flex-col gap-2 rounded-xl bg-[#FCFAF8] px-4 py-3 text-sm md:flex-row md:items-center md:justify-between"
                   >
                     <span className="font-bold text-[#3F312B]">
-                      {getSelectedChargeTitle(charge)}
+                      {getSelectedChargeTitle(unit)}
                     </span>
 
-                    <span className="shrink-0 font-black text-[#7B5A4D]">
-                      {formatMoney(
-                        getValue(charge, "amountToPay", "AmountToPay", 0),
-                      )}
-                    </span>
+                    {unit.hasFine ? (
+                      <span className="shrink-0 text-left text-xs font-semibold text-[#8A7268]">
+                        <span className="block">
+                          מחיר כניסה: {formatMoney(unit.baseAmount)}
+                        </span>
+                        <span className="block">
+                          קנס הרשמה מאוחרת: {formatMoney(unit.fineAmount)}
+                        </span>
+                        <span className="block font-black text-[#7B5A4D]">
+                          סה״כ: {formatMoney(unit.amountToPay)}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="shrink-0 font-black text-[#7B5A4D]">
+                        {formatMoney(
+                          getValue(unit, "amountToPay", "AmountToPay", 0),
+                        )}
+                      </span>
+                    )}
                   </div>
                 );
               })}
