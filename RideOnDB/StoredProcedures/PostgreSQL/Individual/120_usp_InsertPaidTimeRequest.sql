@@ -45,6 +45,63 @@
 -- public.usp_bulkinsertpaidtimerequests for free, since it calls this
 -- function once per item inside a single transaction. No other statement in
 -- this file was changed.
+--
+-- REPOSITORY RECOVERY #2 -- CROSS-RANCH HOST-CATALOG VALIDATION (2026-08-07):
+-- this file was stale again. Live had already been updated on 2026-08-05 via
+-- migration fix_paidtime_insert_pricecatalog_host_ranch_validation (PR2 of
+-- Oren's "Mobile board parity + cross-ranch registration" spec) to mirror
+-- the usp_createstallbooking cross-ranch split -- a RanchAdmin of the
+-- horse's own (requesting) ranch can create a single Paid-Time request in a
+-- competition hosted by a DIFFERENT ranch. The body below is again captured
+-- verbatim from live via pg_get_functiondef; re-read immediately before this
+-- sync and confirmed byte-identical to the copy audited earlier in the same
+-- session -- no drift during the investigation.
+--
+-- What changed versus the previous (2026-08-04) repository copy:
+--   - new declaration v_hostranchid
+--   - the competition/slot lookup (previously done later) now runs FIRST,
+--     immediately resolving v_hostranchid alongside v_competitionenddate,
+--     because the price-catalog check below now needs it
+--   - the price-catalog check changed from
+--       v_catalog_ranchid <> p_ranchid
+--     to
+--       v_catalog_ranchid <> v_hostranchid
+--     i.e. pricing is validated against the competition's HOST ranch,
+--     derived server-side from competition.hostranchid -- never trusted
+--     from the client -- instead of against p_ranchid
+--   - the horse-ranch check is UNCHANGED: v_horse_ranchid <> p_ranchid
+--     still means "the horse must belong to the ranch the caller is acting
+--     as" -- p_ranchid's meaning as the requesting/home ranch was already
+--     correct and needed no change; only the pricing side was same-ranch-
+--     only before this fix
+--   - no new parameter was added (unlike usp_createstallbooking's
+--     p_requestingranchid): paidtimerequest/servicerequest have no ranch
+--     column to persist, so the requesting ranch is always re-derivable via
+--     horse.ranchid and never needs to be stored
+--
+-- Confirmed via a rollback-only DO $$ smoke test against live (2026-08-07,
+-- zero residual rows, verified by count and by max(id) unchanged
+-- afterward): same-ranch create succeeds; cross-ranch create (guest
+-- RanchAdmin, guest-ranch horse, HOST ranch's price catalog item) succeeds;
+-- a guest-ranch caller submitting a HOST-ranch horse is rejected with
+-- 'Horse does not belong to your ranch'; a guest-ranch caller submitting
+-- their OWN ranch's (non-host) price catalog item is rejected with
+-- 'Price catalog item does not belong to the competition host ranch'.
+--
+-- No C# change was needed: PaidTimeRequestsController.CreatePaidTimeRequest
+-- already authorizes EnsureUserHasRoleInRanch(personId, request.RanchId,
+-- RanchAdmin) without any host-ranch restriction, PaidTimeRequestDAL binds
+-- all 9 parameters by NAME (not positionally), and the mobile single-create
+-- screen (useAdminCompetitionPaidTimes.js) already sources its price
+-- catalog from the competition's host ranch via
+-- CompetitionInvitationManager.GetInvitationDetails ->
+-- ServicePriceManager.GetActiveServicePricesForRanch(competition.HostRanchId)
+-- and its horse/rider/coach candidates from the caller's own active ranch
+-- via usp_getpaidtimecandidatesbyranch. This is a repository-text-only sync;
+-- no production behavior changed.
+--
+-- STATUS: repository-text-only sync (no behavior change; live already ran
+-- this exact body since 2026-08-05).
 
 CREATE OR REPLACE FUNCTION public.usp_insertpaidtimerequest(p_pricecatalogid integer, p_requestedcompslotid integer, p_orderedbysystemuserid integer, p_ranchid integer, p_horseid integer, p_riderfederationmemberid integer, p_coachfederationmemberid integer, p_paidbypersonid integer, p_notes character varying)
  RETURNS integer
@@ -59,7 +116,30 @@ declare
     v_horse_ranchid integer;
     v_competitionid integer;
     v_competitionenddate date;
+    v_hostranchid integer;
 begin
+    -- p_ranchid = the requesting/home ranch (the horse's own ranch). Moved
+    -- up: resolving v_competitionid (and, with it, v_hostranchid) must
+    -- happen before the pricecatalog check below, since pricing is now
+    -- validated against the competition's host ranch, not p_ranchid.
+    select pts.competitionid
+    into v_competitionid
+    from public.paidtimeslotincompetition pts
+    where pts.paidtimeslotincompid = p_requestedcompslotid;
+
+    if v_competitionid is null then
+        raise exception 'Requested paid time slot not found';
+    end if;
+
+    select c.competitionenddate, c.hostranchid
+    into v_competitionenddate, v_hostranchid
+    from public.competition c
+    where c.competitionid = v_competitionid;
+
+    if (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate then
+        raise exception 'Competition has already ended' using errcode = 'RN001';
+    end if;
+
     select
         pc.itemprice,
         pc.ranchid
@@ -74,26 +154,10 @@ begin
         raise exception 'Price catalog item not found or inactive';
     end if;
 
-    if v_catalog_ranchid <> p_ranchid then
-        raise exception 'Price catalog item does not belong to this ranch';
-    end if;
-
-    select pts.competitionid
-    into v_competitionid
-    from public.paidtimeslotincompetition pts
-    where pts.paidtimeslotincompid = p_requestedcompslotid;
-
-    if v_competitionid is null then
-        raise exception 'Requested paid time slot not found';
-    end if;
-
-    select c.competitionenddate
-    into v_competitionenddate
-    from public.competition c
-    where c.competitionid = v_competitionid;
-
-    if (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate then
-        raise exception 'Competition has already ended' using errcode = 'RN001';
+    -- Pricing is host-ranch-uniform: the price catalog row must belong to
+    -- the competition's host ranch, not to the requesting horse's ranch.
+    if v_catalog_ranchid <> v_hostranchid then
+        raise exception 'Price catalog item does not belong to the competition host ranch';
     end if;
 
     select h.ranchid
@@ -105,6 +169,8 @@ begin
         raise exception 'Horse not found';
     end if;
 
+    -- Unchanged: p_ranchid authorizes against the horse's own (requesting)
+    -- ranch.
     if v_horse_ranchid <> p_ranchid then
         raise exception 'Horse does not belong to your ranch';
     end if;
