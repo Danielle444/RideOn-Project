@@ -23,6 +23,7 @@ import { getAdminCompetitionMenuItems } from "../../../../navigation/competition
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
 
 import { useCompetition } from "../../../../context/CompetitionContext";
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 
 import useAdminCompetitionStallsOverview from "../../../../hooks/useAdminCompetitionStallsOverview";
 import useRegistrationStepStatus from "../../../../hooks/useRegistrationStepStatus";
@@ -389,9 +390,7 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
 
             Alert.alert(
               "שגיאה",
-              String(
-                error?.response?.data || "אירעה שגיאה בשליחת בקשת ביטול התא",
-              ),
+              getApiErrorMessage(error, "אירעה שגיאה בשליחת בקשת ביטול התא"),
             );
           }
         },

@@ -20,6 +20,7 @@ import {
   DUPLICATE_WARNING_MAIN,
   formatDuplicateWarningDetails,
 } from "../../utils/entriesPhysicalRunCopy";
+import { getApiErrorMessage } from "../../../../shared/auth/utils/authApiErrors";
 
 function fmtDate(value) {
   if (!value) return "";
@@ -106,7 +107,7 @@ export default function EntriesViewModal(props) {
           if (!cancelled) {
             console.log("ENTRIES VIEW LOAD ERROR", err);
             setError(
-              String(err?.response?.data || err?.message || "טעינה נכשלה"),
+              getApiErrorMessage(err, "טעינה נכשלה"),
             );
           }
         } finally {

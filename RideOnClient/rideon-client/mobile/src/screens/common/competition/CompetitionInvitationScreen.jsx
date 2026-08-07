@@ -5,6 +5,7 @@ import SideMenuTemplate from "../../../components/mobile-nav/SideMenuTemplate";
 import CompetitionMenuTemplate from "../../../components/mobile-nav/CompetitionMenuTemplate";
 
 import CompetitionInfoSection from "../../../components/competitions/CompetitionInfoSection";
+import { getApiErrorMessage } from "../../../../../shared/auth/utils/authApiErrors";
 import CompetitionDatesSection from "../../../components/competitions/CompetitionDatesSection";
 import CompetitionJudgesSection from "../../../components/competitions/CompetitionJudgesSection";
 import CompetitionClassesSection from "../../../components/competitions/CompetitionClassesSection";
@@ -226,11 +227,7 @@ export default function CompetitionInvitationScreen(props) {
         );
 
         setScreenError(
-          String(
-            error?.response?.data ||
-              error?.message ||
-              "אירעה שגיאה בטעינת פרטי התחרות",
-          ),
+          getApiErrorMessage(error, "אירעה שגיאה בטעינת פרטי התחרות"),
         );
       })
       .finally(function () {

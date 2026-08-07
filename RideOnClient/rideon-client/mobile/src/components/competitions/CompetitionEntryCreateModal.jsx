@@ -26,6 +26,7 @@ import {
   createChangeEntryRequest,
   adminEditEntry,
 } from "../../services/entriesService";
+import { getApiErrorMessage } from "../../../../shared/auth/utils/authApiErrors";
 
 import { resolveEntryEditInitialization } from "../../utils/entryEditInitialization";
 
@@ -222,7 +223,7 @@ export default function CompetitionEntryCreateModal(props) {
     } catch (error) {
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה בעדכון ההרשמה"),
+        getApiErrorMessage(error, "אירעה שגיאה בעדכון ההרשמה"),
       );
 
       return;

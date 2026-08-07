@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 
 import { getCompetitionInvitationDetails } from "../services/competitionService";
 import {
@@ -298,7 +299,7 @@ export default function useAdminCompetitionShavings(params) {
         );
       } catch (error) {
         setScreenError(
-          String(error?.response?.data || "אירעה שגיאה בטעינת נתוני הנסורת"),
+          getApiErrorMessage(error, "אירעה שגיאה בטעינת נתוני הנסורת"),
         );
       } finally {
         setLoading(false);
@@ -640,7 +641,7 @@ export default function useAdminCompetitionShavings(params) {
     } catch (error) {
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה ביצירת הזמנת הנסורת"),
+        getApiErrorMessage(error, "אירעה שגיאה ביצירת הזמנת הנסורת"),
       );
 
       return false;

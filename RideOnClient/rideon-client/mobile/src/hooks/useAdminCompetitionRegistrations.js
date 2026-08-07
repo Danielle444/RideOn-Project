@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 import {
   getRidersByRanch,
   getTrainersByRanch,
@@ -350,7 +351,7 @@ export default function useAdminCompetitionRegistrations(params) {
       );
     } catch (error) {
       setScreenError(
-        String(error?.response?.data || "אירעה שגיאה בטעינת נתוני ההרשמה"),
+        getApiErrorMessage(error, "אירעה שגיאה בטעינת נתוני ההרשמה"),
       );
     } finally {
       setLoading(false);
@@ -599,7 +600,7 @@ export default function useAdminCompetitionRegistrations(params) {
     } catch (error) {
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה בשמירת ההרשמה"),
+        getApiErrorMessage(error, "אירעה שגיאה בשמירת ההרשמה"),
       );
 
       return null;
