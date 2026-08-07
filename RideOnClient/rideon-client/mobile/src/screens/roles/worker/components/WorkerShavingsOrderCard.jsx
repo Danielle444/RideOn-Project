@@ -3,8 +3,7 @@ import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import workerStyles from "../../../../styles/workerStyles";
-
-const STALL_NUMBER_FALLBACK = "נסורת";
+import { getDeliveryDestinationDisplay } from "../../../../../../shared/shavings/shavingsDestination.utils";
 
 // House date format, mirroring PayerCompetitionAccountScreen's formatDate/
 // formatTime (toLocaleDateString + manual HH:mm) - timestamp only, no
@@ -86,7 +85,11 @@ export default function WorkerShavingsOrderCard(props) {
   const [expanded, setExpanded] = useState(false);
   const showFullDetails = !isResolved || expanded;
 
-  const title = props.stallNumber || STALL_NUMBER_FALLBACK;
+  // Delivery destination replaces the legacy stallNumber title entirely — stallNumber is a
+  // typed NULL from the proc since the DB-side destination-contract slice, never a real join
+  // any more. Prominent by design (business rule: a worker must be able to physically deliver
+  // without opening another screen), so it renders as the card's headline, not a detail row.
+  const destination = getDeliveryDestinationDisplay(props);
   const requestedTimeText = formatRequestedDeliveryTime(
     props.requestedDeliveryTime,
   );
@@ -99,7 +102,28 @@ export default function WorkerShavingsOrderCard(props) {
         </View>
 
         <View style={roleSharedStyles.cardTextWrap}>
-          <Text style={roleSharedStyles.cardTitle}>{title}</Text>
+          {destination.emptyText ? (
+            <Text
+              style={[roleSharedStyles.cardTitle, workerStyles.destinationUnassignedText]}
+            >
+              {destination.emptyText}
+            </Text>
+          ) : (
+            <>
+              {destination.lines.map(function (line, index) {
+                return (
+                  <Text key={index} style={roleSharedStyles.cardTitle}>
+                    {line}
+                  </Text>
+                );
+              })}
+              {destination.warningText && (
+                <Text style={workerStyles.destinationWarningText}>
+                  {destination.warningText}
+                </Text>
+              )}
+            </>
+          )}
 
           <View style={workerStyles.orderStatusBadge}>
             <Text style={workerStyles.orderStatusText}>{statusLabel}</Text>

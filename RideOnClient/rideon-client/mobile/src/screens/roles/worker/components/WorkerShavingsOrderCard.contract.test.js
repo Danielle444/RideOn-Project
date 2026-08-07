@@ -159,3 +159,52 @@ describe("WorkerShavingsOrderCard - locked actions for cancellation states", fun
     expect(source).toContain('{state === "Cancelled" && showFullDetails && (');
   });
 });
+
+describe("WorkerShavingsOrderCard - delivery destination display", function () {
+  // Delivery destination replaces the legacy stallNumber/STALL_NUMBER_FALLBACK title
+  // entirely — stallNumber is a typed NULL from the proc since the DB-side
+  // destination-contract slice, never a real join any more.
+
+  it("imports the shared destination formatter instead of duplicating the logic locally", function () {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { getDeliveryDestinationDisplay } from "../../../../../../shared/shavings/shavingsDestination.utils";',
+    );
+  });
+
+  it("no longer hardcodes a stallNumber-based title fallback", function () {
+    var source = readSource();
+
+    expect(source).not.toContain("STALL_NUMBER_FALLBACK");
+    expect(source).not.toContain("props.stallNumber ||");
+  });
+
+  it("derives the destination model from the full props object once", function () {
+    var source = readSource();
+
+    expect(source).toContain(
+      "const destination = getDeliveryDestinationDisplay(props);",
+    );
+  });
+
+  it("renders the fully-unassigned text in place of the title, not a separate detail row", function () {
+    var source = readSource();
+
+    expect(source).toContain("{destination.emptyText ? (");
+    expect(source).toContain("{destination.emptyText}");
+  });
+
+  it("renders one line per resolved compound when destinations are known", function () {
+    var source = readSource();
+
+    expect(source).toContain("{destination.lines.map(function (line, index) {");
+  });
+
+  it("renders the partial-assignment warning only when present, alongside the resolved lines", function () {
+    var source = readSource();
+
+    expect(source).toContain("{destination.warningText && (");
+    expect(source).toContain("{destination.warningText}");
+  });
+});

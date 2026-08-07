@@ -181,3 +181,20 @@ describe("WorkerHomeScreen - shavings cancellation lifecycle wiring", () => {
     );
   });
 });
+
+describe("WorkerHomeScreen - delivery destination wiring", () => {
+  it("forwards deliveryDestinations and hasUnassignedStalls to the shared order card", () => {
+    var source = readSource();
+
+    var cardBlockStart = source.indexOf("<WorkerShavingsOrderCard");
+    expect(cardBlockStart).toBeGreaterThan(-1);
+
+    var cardBlockEnd = source.indexOf("/>", cardBlockStart);
+    expect(cardBlockEnd).toBeGreaterThan(-1);
+
+    var cardBlock = source.substring(cardBlockStart, cardBlockEnd);
+
+    expect(cardBlock).toContain("deliveryDestinations={order.deliveryDestinations}");
+    expect(cardBlock).toContain("hasUnassignedStalls={order.hasUnassignedStalls}");
+  });
+});

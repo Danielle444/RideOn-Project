@@ -215,3 +215,78 @@ export function bucketWorkerCompetitionOrders(orders, now) {
     future: unwrap(future),
   };
 }
+
+// --- Worker competition shavings-orders screen STATUS tabs (דורש טיפול / בטיפול /
+// הושלם) — a coarser axis layered on top of the date bucketing above, not a replacement for
+// it. Each tab's order list is still meant to be run back through
+// bucketWorkerCompetitionOrders for its own today/older/future sections.
+
+// Membership derivation mirrors WorkerShavingsOrderCard's own deriveState() precedence
+// exactly (Cancelled/Delivered are both terminal -> "completed"; a pending cancellation
+// preserves claimed-worker context regardless of who claimed it -> "inMyCare"; unclaimed ->
+// "requiresAttention"; everything else is a claim, mine or another worker's, both "inMyCare"
+// since the card already has a purpose-built read-only rendering for a foreign claim).
+export function classifyWorkerShavingsBoardOrder(order) {
+  if (isOrderDelivered(order) || order.isCancelled === true) {
+    return "completed";
+  }
+
+  if (order.hasPendingCancellation === true) {
+    return "inMyCare";
+  }
+
+  if (isUnclaimedShavingsOrder(order)) {
+    return "requiresAttention";
+  }
+
+  return "inMyCare";
+}
+
+/**
+ * Splits a competition's shavings orders into the three status-tab buckets, further
+ * splitting "inMyCare" into the current worker's own claims vs. another worker's (rendered as
+ * two sub-groups within the same tab, mine first — see classifyWorkerShavingsBoardOrder's
+ * comment for why a foreign claim lands in this tab rather than a fourth one).
+ *
+ * Pure: returns fresh arrays, never mutates `orders`. Each returned array is in its original
+ * relative order — callers that also want date-based sections should run each array back
+ * through bucketWorkerCompetitionOrders.
+ * @param {Array<Object>} orders
+ * @param {number|string} currentUserId
+ * @returns {{requiresAttention: Array<Object>, myCare: Array<Object>, otherCare: Array<Object>, completed: Array<Object>}}
+ */
+export function groupWorkerShavingsBoardOrders(orders, currentUserId) {
+  var safeOrders = Array.isArray(orders) ? orders : [];
+
+  var requiresAttention = [];
+  var myCare = [];
+  var otherCare = [];
+  var completed = [];
+
+  safeOrders.forEach(function (order) {
+    var tab = classifyWorkerShavingsBoardOrder(order);
+
+    if (tab === "completed") {
+      completed.push(order);
+      return;
+    }
+
+    if (tab === "requiresAttention") {
+      requiresAttention.push(order);
+      return;
+    }
+
+    if (isMyShavingsOrder(order, currentUserId)) {
+      myCare.push(order);
+    } else {
+      otherCare.push(order);
+    }
+  });
+
+  return {
+    requiresAttention: requiresAttention,
+    myCare: myCare,
+    otherCare: otherCare,
+    completed: completed,
+  };
+}
