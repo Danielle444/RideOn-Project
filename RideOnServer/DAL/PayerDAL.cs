@@ -434,6 +434,36 @@ namespace RideOnServer.DAL
             }
         }
 
+        public void AnswerManagedPayerRequest(int personId, int adminPersonId, string answerStatus)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@p_personid", personId },
+                { "@p_systemuserid", adminPersonId },
+                { "@p_answerstatus", answerStatus }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_answermanagedpayerrequest",
+                        connection,
+                        paramDic))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
         public void RemovePayerManager(int personId, int adminPersonId)
         {
             Dictionary<string, object> paramDic = new Dictionary<string, object>

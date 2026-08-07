@@ -217,6 +217,37 @@ namespace RideOnServer.BL
             dal.AddPayerManager(request.PersonId, request.AdminPersonId);
         }
 
+        internal static void AnswerManagedPayerRequest(int currentPersonId, AnswerPayerManagerRequest request)
+        {
+            if (currentPersonId <= 0)
+            {
+                throw new Exception("Invalid current PersonId");
+            }
+
+            if (request == null)
+            {
+                throw new Exception("Request is required");
+            }
+
+            if (request.AdminPersonId <= 0)
+            {
+                throw new Exception("Invalid AdminPersonId");
+            }
+
+            if (currentPersonId != request.PersonId)
+            {
+                throw new UnauthorizedAccessException("You can only answer management requests for your own account");
+            }
+
+            if (request.AnswerStatus != "Approved" && request.AnswerStatus != "Rejected")
+            {
+                throw new Exception("Invalid AnswerStatus");
+            }
+
+            PayerDAL dal = new PayerDAL();
+            dal.AnswerManagedPayerRequest(request.PersonId, request.AdminPersonId, request.AnswerStatus);
+        }
+
         internal static void RemovePayerManager(int currentPersonId, RemovePayerManagerRequest request)
         {
             if (currentPersonId <= 0)
