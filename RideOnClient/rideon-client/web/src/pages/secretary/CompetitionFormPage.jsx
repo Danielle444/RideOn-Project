@@ -52,14 +52,6 @@ export default function CompetitionFormPage(props) {
       subtitle={subtitle}
       menuItems={secretaryGeneralMenu}
       activeItemKey="competitions-board"
-      onNavigate={function (itemKey) {
-        if (itemKey === "competitions-board") {
-          page.navigate("/competitions");
-          return;
-        }
-
-        page.handleSkipPaidTimeStep();
-      }}
     >
       <div className="mx-auto max-w-[1500px] space-y-8">
         <CompetitionFormHeader
