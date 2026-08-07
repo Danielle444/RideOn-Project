@@ -34,7 +34,13 @@ namespace RideOnServer.BL
             return StallBookingDAL.CancelStallBookingByPayer(stallBookingId, payerPersonId);
         }
 
-        public static int CreateChangeRequestByPayer(int stallBookingId, int payerPersonId)
+        public static int CreateChangeRequestByPayer(
+            int stallBookingId,
+            int payerPersonId,
+            DateTime newStartDate,
+            DateTime newEndDate,
+            string? notes
+        )
         {
             if (stallBookingId <= 0)
             {
@@ -46,7 +52,18 @@ namespace RideOnServer.BL
                 throw new Exception("Invalid PayerPersonId");
             }
 
-            return StallBookingDAL.CreateStallChangeRequestByPayer(stallBookingId, payerPersonId);
+            if (newStartDate.Date > newEndDate.Date)
+            {
+                throw new Exception("Start date cannot be after end date");
+            }
+
+            return StallBookingDAL.CreateStallChangeRequestByPayer(
+                stallBookingId,
+                payerPersonId,
+                newStartDate,
+                newEndDate,
+                notes
+            );
         }
 
         public static int SecretaryDeleteStallBooking(int stallBookingId, int secretarySystemUserId)

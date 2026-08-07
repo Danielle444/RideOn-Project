@@ -516,13 +516,23 @@ namespace RideOnServer.Controllers
 
         [HttpPost("change-request-by-payer")]
         public IActionResult CreateStallChangeRequestByPayer(
-            [FromBody] CreateStallBookingCancelRequest request)
+            [FromBody] CreateStallChangeRequestByPayerRequest request)
         {
             try
             {
                 if (request == null || request.StallBookingId <= 0 || request.RanchId <= 0)
                 {
                     return BadRequest("Invalid request");
+                }
+
+                if (request.NewStartDate == default || request.NewEndDate == default)
+                {
+                    return BadRequest("Start date and end date are required.");
+                }
+
+                if (request.NewStartDate.Date > request.NewEndDate.Date)
+                {
+                    return BadRequest("Start date cannot be after end date.");
                 }
 
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
@@ -535,7 +545,10 @@ namespace RideOnServer.Controllers
 
                 int requestId = StallBooking.CreateChangeRequestByPayer(
                     request.StallBookingId,
-                    personId
+                    personId,
+                    request.NewStartDate,
+                    request.NewEndDate,
+                    request.Notes
                 );
 
                 return Ok(requestId);
@@ -543,6 +556,10 @@ namespace RideOnServer.Controllers
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
             }
             catch (Exception ex)
             {
