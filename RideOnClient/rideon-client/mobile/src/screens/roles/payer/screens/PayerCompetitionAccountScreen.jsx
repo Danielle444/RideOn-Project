@@ -942,6 +942,12 @@ export default function PayerCompetitionAccountScreen(props) {
             </View>
           </View>
 
+          {item.hasEntryCreationFine ? (
+            <Text style={styles.itemMutedText}>
+              כולל קנס הרשמה מאוחרת: {formatCurrency(item.entryCreationFineAmount)}
+            </Text>
+          ) : null}
+
           {renderCancelButton(
             "entry:" + item.entryId,
             isLocked,
