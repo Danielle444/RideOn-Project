@@ -348,7 +348,19 @@ namespace RideOnServer.DAL
 
                 HcApproverSystemUserId = reader["HcApproverSystemUserId"] == DBNull.Value
                     ? null
-                    : Convert.ToInt32(reader["HcApproverSystemUserId"])
+                    : Convert.ToInt32(reader["HcApproverSystemUserId"]),
+
+                HcRejectionReason = reader["HcRejectionReason"] == DBNull.Value
+                    ? null
+                    : reader["HcRejectionReason"].ToString(),
+
+                HcRejectionDate = reader["HcRejectionDate"] == DBNull.Value
+                    ? null
+                    : DateOnly.FromDateTime(Convert.ToDateTime(reader["HcRejectionDate"])),
+
+                HcRejectedBySystemUserId = reader["HcRejectedBySystemUserId"] == DBNull.Value
+                    ? null
+                    : Convert.ToInt32(reader["HcRejectedBySystemUserId"])
             };
         }
 
@@ -430,6 +442,70 @@ namespace RideOnServer.DAL
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in ApproveHealthCertificate: {ex.Message}");
+                throw;
+            }
+        }
+
+        // Returns true only when usp_RejectHealthCertificate actually updated one
+        // eligible row (exact horse/competition match, status Pending, hcpath set
+        // and non-blank) - see repo file 245. The five-entry dictionary order below
+        // is the positional contract with the stored procedure's parameter order
+        // (HorseId, CompetitionId, HcRejectedBySystemUserId, HcRejectionDate,
+        // HcRejectionReason) and must not change without changing the procedure to
+        // match. Mirrors ApproveHealthCertificate's ExecuteScalar/fail-safe shape
+        // exactly.
+        public bool RejectHealthCertificate(int horseId, int competitionId, int rejectedBySystemUserId, string reason)
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@HorseId", horseId },
+                { "@CompetitionId", competitionId },
+                { "@HcRejectedBySystemUserId", rejectedBySystemUserId },
+                { "@HcRejectionDate", DateOnly.FromDateTime(DateTime.UtcNow) },
+                { "@HcRejectionReason", reason }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_RejectHealthCertificate",
+                        connection,
+                        paramDic))
+                    {
+                        object? result = command.ExecuteScalar();
+
+                        if (result == null || result == DBNull.Value)
+                        {
+                            return false;
+                        }
+
+                        if (result is bool rejected)
+                        {
+                            return rejected;
+                        }
+
+                        return false;
+                    }
+                }
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_RejectHealthCertificate itself (invalid ids, competition
+                // not found, caller not an approved HostSecretary for the
+                // competition's host ranch) - the proc's own defense against a
+                // direct RPC call bypassing HorsesController entirely. Matches
+                // the established RN001 -> ValidationException convention (see
+                // ShavingsOrderDAL.AdminCancelShavingsOrder).
+                throw new BL.ValidationException(ex.MessageText);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in RejectHealthCertificate: {ex.Message}");
                 throw;
             }
         }

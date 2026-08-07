@@ -501,7 +501,18 @@ namespace RideOnServer.Tests
             source.Should().Contain("return StatusCode(500, \"שגיאה באישור תעודת הבריאות\");");
 
             source.Should().NotContain("StatusCode(500, ex.Message)");
-            source.Should().NotContain("BadRequest(ex.Message)");
+
+            // BadRequest(ex.Message) is now allowed exactly once: the reject
+            // endpoint's ArgumentException catch (Health Certificate rejection
+            // foundation, 2026-08-07 - see HealthCertificateRejectionContractTests).
+            // ArgumentException in this codebase is always a fixed, self-authored
+            // Hebrew string (HorseParticipationInCompetition throws it that way
+            // throughout, e.g. GetHealthCertificatesForHostedCompetition above),
+            // never raw framework or database text - unlike a generic
+            // Exception.Message, which StatusCode(500, ex.Message) above still
+            // forbids everywhere. This assertion still fails if a second,
+            // unreviewed BadRequest(ex.Message) is ever added anywhere else.
+            CountOccurrences(source, "BadRequest(ex.Message)").Should().Be(1);
         }
 
         [Fact]

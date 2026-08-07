@@ -274,9 +274,14 @@ namespace RideOnServer.Tests
         public void No_raw_database_or_exception_text_reaches_the_409_response()
         {
             // The same property HealthCertificateAuthorizationTests pins for the
-            // existing 500 path - the new 409 path must not regress it by
-            // echoing ex.Message or any other non-fixed text.
-            ControllerSource().Should().NotContain("StatusCode(409, ex.Message)");
+            // existing 500 path - the approve endpoint's own 409 path must not
+            // regress by echoing ex.Message or any other non-fixed text. Scoped
+            // to ApproveHealthCertificate's own body (not the whole controller
+            // source) because the sibling reject endpoint deliberately does use
+            // StatusCode(409, ex.Message) on its own, separate ValidationException
+            // path - see HealthCertificateRejectionContractTests - which is out
+            // of scope for this approve-specific assertion.
+            ControllerApproveMethodBody().Should().NotContain("StatusCode(409, ex.Message)");
         }
     }
 }
