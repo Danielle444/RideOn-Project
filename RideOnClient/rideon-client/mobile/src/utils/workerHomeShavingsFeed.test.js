@@ -5,6 +5,8 @@ import {
   bucketWorkerCompetitionOrders,
   classifyWorkerShavingsBoardOrder,
   groupWorkerShavingsBoardOrders,
+  isFutureDatedOrder,
+  splitFutureDatedShavingsBoardOrders,
 } from "./workerHomeShavingsFeed.js";
 
 var ME = 501;
@@ -722,5 +724,155 @@ describe("groupWorkerShavingsBoardOrders", function () {
 
     expect(idsOf(input)).toEqual([1]);
     expect(input[0]).toBe(first);
+  });
+});
+
+describe("isFutureDatedOrder", function () {
+  var NOW = "2026-08-05T12:00:00Z";
+
+  it("returns false for an order requested today", function () {
+    var order = makeOrder({ requestedDeliveryTime: "2026-08-05T09:00:00Z" });
+
+    expect(isFutureDatedOrder(order, NOW)).toBe(false);
+  });
+
+  it("returns false for a past-dated order", function () {
+    var order = makeOrder({ requestedDeliveryTime: "2026-08-03T09:00:00Z" });
+
+    expect(isFutureDatedOrder(order, NOW)).toBe(false);
+  });
+
+  it("returns true for a future-dated order", function () {
+    var order = makeOrder({ requestedDeliveryTime: "2026-08-07T09:00:00Z" });
+
+    expect(isFutureDatedOrder(order, NOW)).toBe(true);
+  });
+
+  it("returns false for a null or missing RequestedDeliveryTime, same as the older-bucket treatment", function () {
+    expect(isFutureDatedOrder(makeOrder({ requestedDeliveryTime: null }), NOW)).toBe(
+      false,
+    );
+    expect(
+      isFutureDatedOrder(makeOrder({ requestedDeliveryTime: undefined }), NOW),
+    ).toBe(false);
+  });
+
+  it("returns false for an unparsable RequestedDeliveryTime string", function () {
+    var order = makeOrder({ requestedDeliveryTime: "not-a-real-date" });
+
+    expect(isFutureDatedOrder(order, NOW)).toBe(false);
+  });
+});
+
+describe("splitFutureDatedShavingsBoardOrders", function () {
+  var NOW = "2026-08-05T12:00:00Z";
+
+  it("moves a future-dated unclaimed order out of requiresAttention into future.requiresAttention", function () {
+    var todayUnclaimed = makeOrder({
+      shavingsOrderId: 1,
+      workerSystemUserId: null,
+      requestedDeliveryTime: "2026-08-05T09:00:00Z",
+    });
+    var futureUnclaimed = makeOrder({
+      shavingsOrderId: 2,
+      workerSystemUserId: null,
+      requestedDeliveryTime: "2026-08-07T09:00:00Z",
+    });
+
+    var groups = groupWorkerShavingsBoardOrders(
+      [todayUnclaimed, futureUnclaimed],
+      ME,
+    );
+    var split = splitFutureDatedShavingsBoardOrders(groups, NOW);
+
+    expect(idsOf(split.requiresAttention)).toEqual([1]);
+    expect(idsOf(split.future.requiresAttention)).toEqual([2]);
+  });
+
+  it("moves a future-dated claimed order out of myCare/otherCare into future.myCare/future.otherCare", function () {
+    var todayMine = makeOrder({
+      shavingsOrderId: 1,
+      workerSystemUserId: ME,
+      requestedDeliveryTime: "2026-08-05T09:00:00Z",
+    });
+    var futureMine = makeOrder({
+      shavingsOrderId: 2,
+      workerSystemUserId: ME,
+      requestedDeliveryTime: "2026-08-07T09:00:00Z",
+    });
+    var futureOther = makeOrder({
+      shavingsOrderId: 3,
+      workerSystemUserId: OTHER_WORKER,
+      requestedDeliveryTime: "2026-08-09T09:00:00Z",
+    });
+
+    var groups = groupWorkerShavingsBoardOrders(
+      [todayMine, futureMine, futureOther],
+      ME,
+    );
+    var split = splitFutureDatedShavingsBoardOrders(groups, NOW);
+
+    expect(idsOf(split.myCare)).toEqual([1]);
+    expect(idsOf(split.future.myCare)).toEqual([2]);
+    expect(idsOf(split.otherCare)).toEqual([]);
+    expect(idsOf(split.future.otherCare)).toEqual([3]);
+  });
+
+  it("keeps an overdue (past-dated) unclaimed order in requiresAttention, not future", function () {
+    var overdue = makeOrder({
+      shavingsOrderId: 1,
+      workerSystemUserId: null,
+      requestedDeliveryTime: "2026-08-01T09:00:00Z",
+    });
+
+    var groups = groupWorkerShavingsBoardOrders([overdue], ME);
+    var split = splitFutureDatedShavingsBoardOrders(groups, NOW);
+
+    expect(idsOf(split.requiresAttention)).toEqual([1]);
+    expect(idsOf(split.future.requiresAttention)).toEqual([]);
+  });
+
+  it("passes completed through unchanged regardless of date - a future-dated delivered order stays in completed, not future", function () {
+    var futureDelivered = makeOrder({
+      shavingsOrderId: 1,
+      deliveryStatus: "Delivered",
+      requestedDeliveryTime: "2026-08-09T09:00:00Z",
+    });
+
+    var groups = groupWorkerShavingsBoardOrders([futureDelivered], ME);
+    var split = splitFutureDatedShavingsBoardOrders(groups, NOW);
+
+    expect(idsOf(split.completed)).toEqual([1]);
+    expect(split.future.requiresAttention).toEqual([]);
+    expect(split.future.myCare).toEqual([]);
+    expect(split.future.otherCare).toEqual([]);
+  });
+
+  it("does not mutate the input groups or its arrays", function () {
+    var order = makeOrder({
+      shavingsOrderId: 1,
+      workerSystemUserId: null,
+      requestedDeliveryTime: "2026-08-07T09:00:00Z",
+    });
+    var groups = groupWorkerShavingsBoardOrders([order], ME);
+    var originalRequiresAttention = groups.requiresAttention;
+
+    splitFutureDatedShavingsBoardOrders(groups, NOW);
+
+    expect(groups.requiresAttention).toBe(originalRequiresAttention);
+    expect(idsOf(groups.requiresAttention)).toEqual([1]);
+  });
+
+  it("returns empty arrays throughout for an empty groups object", function () {
+    var groups = groupWorkerShavingsBoardOrders([], ME);
+    var split = splitFutureDatedShavingsBoardOrders(groups, NOW);
+
+    expect(split).toEqual({
+      requiresAttention: [],
+      myCare: [],
+      otherCare: [],
+      completed: [],
+      future: { requiresAttention: [], myCare: [], otherCare: [] },
+    });
   });
 });

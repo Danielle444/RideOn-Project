@@ -27,10 +27,13 @@ describe("shared shavingsDestination.utils — resolved from mobile", function (
     expect(formatStallNumbers(["10", "12", "15"])).toBe("10, 12, 15");
   });
 
+  // Live stallcompound.compoundname always includes "מתחם" already (e.g. "מתחם תאי תחרות",
+  // "מתחם B2W") — fixtures below use full live-shaped names, not bare ones, so this suite
+  // also guards the 2026-08-07 double-prefix bug (formatter used to prepend a second "מתחם ").
   it("uses the singular תא label for exactly one stall", function () {
     expect(
       formatCompoundDestination({
-        compoundName: "תאי תחרות",
+        compoundName: "מתחם תאי תחרות",
         stalls: [{ stallNumber: "901" }],
       }),
     ).toBe("מתחם תאי תחרות · תא 901");
@@ -39,7 +42,7 @@ describe("shared shavingsDestination.utils — resolved from mobile", function (
   it("uses the plural תאים label for a contiguous range", function () {
     expect(
       formatCompoundDestination({
-        compoundName: "B2W",
+        compoundName: "מתחם B2W",
         stalls: [{ stallNumber: "10" }, { stallNumber: "11" }],
       }),
     ).toBe("מתחם B2W · תאים 10–11");
@@ -48,7 +51,7 @@ describe("shared shavingsDestination.utils — resolved from mobile", function (
   it("uses the plural תאים label for non-contiguous stalls", function () {
     expect(
       formatCompoundDestination({
-        compoundName: "B2W",
+        compoundName: "מתחם B2W",
         stalls: [
           { stallNumber: "10" },
           { stallNumber: "12" },
@@ -58,11 +61,30 @@ describe("shared shavingsDestination.utils — resolved from mobile", function (
     ).toBe("מתחם B2W · תאים 10, 12, 15");
   });
 
+  it("renders the compound name verbatim, never prepending its own מתחם prefix on top", function () {
+    // Regression pin for the exact reported bug string: "מתחם מתחם תאי תחרות".
+    expect(
+      formatCompoundDestination({
+        compoundName: "מתחם תאי תחרות",
+        stalls: [{ stallNumber: "901" }],
+      }),
+    ).not.toContain("מתחם מתחם");
+  });
+
+  it("renders a compound name with no מתחם prefix exactly as stored, without adding one", function () {
+    expect(
+      formatCompoundDestination({
+        compoundName: "חנייה צפונית",
+        stalls: [{ stallNumber: "3" }],
+      }),
+    ).toBe("חנייה צפונית · תא 3");
+  });
+
   it("renders one line per compound for a multi-compound destination, no warning", function () {
     var display = getDeliveryDestinationDisplay({
       deliveryDestinations: [
-        { compoundName: "תאי תחרות", stalls: [{ stallNumber: "901" }] },
-        { compoundName: "B2W", stalls: [{ stallNumber: "10" }, { stallNumber: "11" }] },
+        { compoundName: "מתחם תאי תחרות", stalls: [{ stallNumber: "901" }] },
+        { compoundName: "מתחם B2W", stalls: [{ stallNumber: "10" }, { stallNumber: "11" }] },
       ],
       hasUnassignedStalls: false,
     });
@@ -78,7 +100,7 @@ describe("shared shavingsDestination.utils — resolved from mobile", function (
   it("appends the partial-assignment warning when known destinations exist and hasUnassignedStalls is true", function () {
     var display = getDeliveryDestinationDisplay({
       deliveryDestinations: [
-        { compoundName: "תאי תחרות", stalls: [{ stallNumber: "901" }] },
+        { compoundName: "מתחם תאי תחרות", stalls: [{ stallNumber: "901" }] },
       ],
       hasUnassignedStalls: true,
     });
@@ -108,7 +130,7 @@ describe("shared shavingsDestination.utils — resolved from mobile", function (
   it("also reads PascalCase DeliveryDestinations/HasUnassignedStalls", function () {
     var display = getDeliveryDestinationDisplay({
       DeliveryDestinations: [
-        { CompoundName: "B2W", Stalls: [{ StallNumber: "10" }, { StallNumber: "12" }] },
+        { CompoundName: "מתחם B2W", Stalls: [{ StallNumber: "10" }, { StallNumber: "12" }] },
       ],
       HasUnassignedStalls: false,
     });
@@ -120,7 +142,7 @@ describe("shared shavingsDestination.utils — resolved from mobile", function (
     var display = getDeliveryDestinationDisplay({
       deliveryDestinations: [
         {
-          compoundName: "B2W",
+          compoundName: "מתחם B2W",
           stalls: [{ stallNumber: "10" }, { stallNumber: "10" }],
         },
       ],

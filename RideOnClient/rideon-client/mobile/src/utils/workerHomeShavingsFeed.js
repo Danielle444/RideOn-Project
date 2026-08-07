@@ -290,3 +290,71 @@ export function groupWorkerShavingsBoardOrders(orders, currentUserId) {
     completed: completed,
   };
 }
+
+// --- Future-dated split for the "הוזמנו להמשך" tab — layered on top of
+// groupWorkerShavingsBoardOrders' output, never a replacement for its classification. Reuses
+// the exact "future" criterion already used by bucketWorkerCompetitionOrders (local date >
+// today's local date; a missing/invalid time is never future — same as its "older" grouping)
+// so a single order is never classified as future by one code path and non-future by another.
+
+// True only for a strictly-future local calendar date. Missing/invalid RequestedDeliveryTime
+// is never future - it belongs with "now", same as bucketWorkerCompetitionOrders' `older`
+// null-time tier.
+export function isFutureDatedOrder(order, now) {
+  var time = getDeliveryTimeOrNull(order);
+  if (time === null) {
+    return false;
+  }
+
+  return toLocalDateKey(time) > toLocalDateKey(now);
+}
+
+/**
+ * Pulls every future-dated, non-completed order out of groupWorkerShavingsBoardOrders'
+ * requiresAttention/myCare/otherCare buckets into their own `future` sub-object, for the
+ * "הוזמנו להמשך" tab. `completed` is passed through UNCHANGED regardless of date — a
+ * future-dated delivered/cancelled order still belongs in "הושלם", not here (locked business
+ * rule: this request only rescopes the two actionable tabs, never the completed one).
+ *
+ * A future order keeps its original classification (requiresAttention vs. myCare/otherCare)
+ * inside the `future` sub-object, so the "הוזמנו להמשך" tab can still tell a not-yet-claimed
+ * future order (needs קח לטיפול) apart from an already-claimed one (needs סופק) — same
+ * distinction the two existing tabs already render, just scoped to future dates here.
+ *
+ * Pure: returns fresh arrays/objects, never mutates `groups` or its arrays.
+ * @param {{requiresAttention: Array<Object>, myCare: Array<Object>, otherCare: Array<Object>, completed: Array<Object>}} groups
+ * @param {Date|number|string} now
+ * @returns {{requiresAttention: Array<Object>, myCare: Array<Object>, otherCare: Array<Object>, completed: Array<Object>, future: {requiresAttention: Array<Object>, myCare: Array<Object>, otherCare: Array<Object>}}}
+ */
+export function splitFutureDatedShavingsBoardOrders(groups, now) {
+  function partition(list) {
+    var nonFuture = [];
+    var future = [];
+
+    list.forEach(function (order) {
+      if (isFutureDatedOrder(order, now)) {
+        future.push(order);
+      } else {
+        nonFuture.push(order);
+      }
+    });
+
+    return { nonFuture: nonFuture, future: future };
+  }
+
+  var attention = partition(groups.requiresAttention);
+  var mine = partition(groups.myCare);
+  var other = partition(groups.otherCare);
+
+  return {
+    requiresAttention: attention.nonFuture,
+    myCare: mine.nonFuture,
+    otherCare: other.nonFuture,
+    completed: groups.completed,
+    future: {
+      requiresAttention: attention.future,
+      myCare: mine.future,
+      otherCare: other.future,
+    },
+  };
+}

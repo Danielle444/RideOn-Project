@@ -21,6 +21,8 @@ import { supabase } from "../../../../lib/supabaseClient";
 import {
   bucketWorkerCompetitionOrders,
   groupWorkerShavingsBoardOrders,
+  splitFutureDatedShavingsBoardOrders,
+  isFutureDatedOrder,
 } from "../../../../utils/workerHomeShavingsFeed";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 
@@ -28,17 +30,31 @@ import roleSharedStyles from "../../../../styles/roleSharedStyles";
 // orders claimed by another worker (read-only, secondary), and a "my care" label would
 // misdescribe that section. The two sub-sections rendered inside it carry the ownership
 // distinction instead - see renderActiveTabContent below.
+//
+// "future" (הוזמנו להמשך) holds every future-dated, non-completed order pulled out of the
+// two tabs above by splitFutureDatedShavingsBoardOrders — דורש טיפול/בטיפול therefore only
+// ever show today/overdue orders. "הושלם" is untouched by that split and keeps showing
+// completed orders at any date, same as before this change.
 var STATUS_TABS = [
   { key: "requiresAttention", label: "דורש טיפול" },
   { key: "inMyCare", label: "בטיפול" },
+  { key: "future", label: "הוזמנו להמשך" },
   { key: "completed", label: "הושלם" },
 ];
 
 var STATUS_TAB_EMPTY_TEXT = {
   requiresAttention: "אין הזמנות שממתינות לטיפול",
   inMyCare: "אין הזמנות בטיפול כרגע",
+  future: "אין הזמנות עתידיות",
   completed: "אין הזמנות שהושלמו עדיין",
 };
+
+// Confirmation copy for acting on a future-dated order (קח לטיפול / סופק) — a soft warning,
+// never a block: cancel leaves the order untouched, confirm runs the exact same mutation a
+// same-day action would.
+var FUTURE_ORDER_CONFIRM_TITLE = "הזמנה עתידית";
+var FUTURE_ORDER_CONFIRM_MESSAGE =
+  "ההזמנה מתוזמנת לתאריך עתידי. להמשיך בפעולה?";
 
 const DELIVERY_BUCKET = "delivery-photos";
 
@@ -240,17 +256,53 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
     [orders, currentUserId],
   );
 
+  // Pulls future-dated, non-completed orders out of orderGroups into their own `future`
+  // sub-object - דורש טיפול/בטיפול below read ONLY this split's non-future arrays, so a
+  // future-dated order never appears in either tab; it renders exclusively under "הוזמנו
+  // להמשך" instead. `completed` passes through unchanged (any date), same as before.
+  const dateSplitGroups = useMemo(
+    function () {
+      return splitFutureDatedShavingsBoardOrders(orderGroups, new Date());
+    },
+    [orderGroups],
+  );
+
   const statusTabs = STATUS_TABS.map(function (tab) {
     if (tab.key === "requiresAttention") {
-      return Object.assign({}, tab, { count: orderGroups.requiresAttention.length });
+      return Object.assign({}, tab, { count: dateSplitGroups.requiresAttention.length });
     }
     if (tab.key === "inMyCare") {
       return Object.assign({}, tab, {
-        count: orderGroups.myCare.length + orderGroups.otherCare.length,
+        count: dateSplitGroups.myCare.length + dateSplitGroups.otherCare.length,
+      });
+    }
+    if (tab.key === "future") {
+      return Object.assign({}, tab, {
+        count:
+          dateSplitGroups.future.requiresAttention.length +
+          dateSplitGroups.future.myCare.length +
+          dateSplitGroups.future.otherCare.length,
       });
     }
     return Object.assign({}, tab, { count: orderGroups.completed.length });
   });
+
+  // Wraps a mutation (קח לטיפול / סופק) with a soft confirmation when the order is
+  // future-dated - cancel is a no-op (order stays untouched), confirm calls `action` exactly
+  // as a same-day tap would. Non-future orders run `action` immediately, no dialog.
+  function confirmIfFutureDated(order, action) {
+    return function () {
+      if (!isFutureDatedOrder(order, new Date())) {
+        action();
+        return;
+      }
+
+      Alert.alert(FUTURE_ORDER_CONFIRM_TITLE, FUTURE_ORDER_CONFIRM_MESSAGE, [
+        { text: "ביטול", style: "cancel" },
+        { text: "המשך", onPress: action },
+      ]);
+    };
+  }
 
   function renderOrderCard(order) {
     const isMyOrder = order.workerSystemUserId === currentUserId;
@@ -286,15 +338,15 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
         claiming={claimingOrderId === order.shavingsOrderId}
         marking={markingOrderId === order.shavingsOrderId}
         showNoPhotoFallback={photoFailedOrderId === order.shavingsOrderId}
-        onCapturePhoto={function () {
+        onCapturePhoto={confirmIfFutureDated(order, function () {
           handleCapturePhoto(order);
-        }}
-        onClaim={function () {
+        })}
+        onClaim={confirmIfFutureDated(order, function () {
           handleClaimOrder(order);
-        }}
-        onMarkDelivered={function () {
+        })}
+        onMarkDelivered={confirmIfFutureDated(order, function () {
           handleMarkDelivered(order);
-        }}
+        })}
       />
     );
   }
@@ -325,20 +377,31 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
     );
   }
 
+  // Renders one future-dated subset as a single section, sorted date-ascending. Every order
+  // here already passed isFutureDatedOrder, so re-running bucketWorkerCompetitionOrders on
+  // just this subset always yields an empty today/older and a fully-populated, already-sorted
+  // future bucket - reusing its tested sort instead of duplicating it.
+  function renderFutureSection(title, futureOrders) {
+    if (futureOrders.length === 0) return null;
+
+    const buckets = bucketWorkerCompetitionOrders(futureOrders, new Date());
+    return renderOrderSection(title, buckets.future);
+  }
+
   function renderActiveTabContent() {
     if (activeTab === "requiresAttention") {
-      if (orderGroups.requiresAttention.length === 0) {
+      if (dateSplitGroups.requiresAttention.length === 0) {
         return (
           <Text style={roleSharedStyles.cardSubText}>
             {STATUS_TAB_EMPTY_TEXT.requiresAttention}
           </Text>
         );
       }
-      return renderDateSections(orderGroups.requiresAttention);
+      return renderDateSections(dateSplitGroups.requiresAttention);
     }
 
     if (activeTab === "inMyCare") {
-      if (orderGroups.myCare.length === 0 && orderGroups.otherCare.length === 0) {
+      if (dateSplitGroups.myCare.length === 0 && dateSplitGroups.otherCare.length === 0) {
         return (
           <Text style={roleSharedStyles.cardSubText}>
             {STATUS_TAB_EMPTY_TEXT.inMyCare}
@@ -348,20 +411,44 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
 
       return (
         <>
-          {orderGroups.myCare.length > 0 && (
+          {dateSplitGroups.myCare.length > 0 && (
             <View style={{ gap: 12 }}>
               <Text style={roleSharedStyles.sectionTitle}>בטיפול שלי</Text>
-              {renderDateSections(orderGroups.myCare)}
+              {renderDateSections(dateSplitGroups.myCare)}
             </View>
           )}
-          {orderGroups.otherCare.length > 0 && (
+          {dateSplitGroups.otherCare.length > 0 && (
             <View style={{ gap: 12 }}>
               <Text style={roleSharedStyles.sectionTitle}>
                 בטיפול של עובד אחר
               </Text>
-              {renderDateSections(orderGroups.otherCare)}
+              {renderDateSections(dateSplitGroups.otherCare)}
             </View>
           )}
+        </>
+      );
+    }
+
+    if (activeTab === "future") {
+      const future = dateSplitGroups.future;
+      const isEmpty =
+        future.requiresAttention.length === 0 &&
+        future.myCare.length === 0 &&
+        future.otherCare.length === 0;
+
+      if (isEmpty) {
+        return (
+          <Text style={roleSharedStyles.cardSubText}>
+            {STATUS_TAB_EMPTY_TEXT.future}
+          </Text>
+        );
+      }
+
+      return (
+        <>
+          {renderFutureSection("דורש טיפול", future.requiresAttention)}
+          {renderFutureSection("בטיפול שלי", future.myCare)}
+          {renderFutureSection("בטיפול של עובד אחר", future.otherCare)}
         </>
       );
     }
