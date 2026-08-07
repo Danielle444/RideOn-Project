@@ -207,8 +207,14 @@ namespace RideOnServer.Controllers
                 // payerPersonId is the authenticated caller's own PersonId only
                 // -- never taken from a request field, exactly like
                 // GetMyCompetitionAccount's "force payerPersonId = self".
+                // ranchId is the SAME already-authorized value checked above
+                // (EnsureUserHasRoleInRanch) -- now also threaded through to
+                // drive the proc's IsMyRanch same-ranch comparison ("My ranch"
+                // UX, 2026-08-07). It still never selects which competition's
+                // data is returned (competitionId/publication gate above are
+                // unchanged) and never widens the redacted column set.
                 var dal = new StallAssignmentDAL();
-                return Ok(dal.GetAssignmentsForPayer(competitionId, personId));
+                return Ok(dal.GetAssignmentsForPayer(competitionId, personId, ranchId));
             }
             catch (UnauthorizedAccessException ex)
             {
