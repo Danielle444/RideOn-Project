@@ -25,6 +25,10 @@ import { buildRegistrationStepNoticeMessage } from "../../utils/registrationStep
 
 import styles from "../../styles/adminCompetitionClassesStyles";
 
+// זמן ההשהיה לפני סגירת מודל היצירה אחרי סגירת מודל ההצלחה, כדי לפרק את שני
+// ה-Modal-ים המקוננים בפריימים נפרדים (תואם למשך אנימציית ה-fade של RN).
+var MODAL_TEARDOWN_DELAY_MS = 300;
+
 // CAP-5: focused, frontend-only single-form paid-time create surface for the
 // payer-account screen. Deliberately reuses CompetitionPaidTimeTab +
 // useAdminCompetitionPaidTimes exactly as the real Registrations screen does
@@ -44,6 +48,11 @@ export default function PaidTimeCreateModal(props) {
   var activeCompetition = competitionContext.activeCompetition;
 
   var lockedPayerPersonId = props.lockedPayerPersonId || null;
+  // CAP-1: כשמסופק, המודל הזה עובד במצב עריכה של בקשה קיימת (מחליף את
+  // PaidTimeEditModal, שהוסר) במקום יצירה. שני המצבים חולקים את אותו טופס
+  // עשיר, אבל לא את אותה זרימת סיום - ראו האפקט למטה.
+  var editPaidTimeRequestId = props.editPaidTimeRequestId || null;
+  var isEditMode = !!editPaidTimeRequestId;
 
   var paidTimesStepAvailability = props.paidTimesStepAvailability || {
     isEnabled: false,
@@ -59,6 +68,8 @@ export default function PaidTimeCreateModal(props) {
     competitionName: activeCompetition
       ? activeCompetition.competitionName
       : "",
+    editPaidTimeRequestId: editPaidTimeRequestId,
+    payerSource: props.payerSource,
   });
 
   // Same data-level gate CompetitionPaidTimeTab already uses on the real
@@ -131,6 +142,26 @@ export default function PaidTimeCreateModal(props) {
     [paidTime.isSuccessOpen],
   );
 
+  // CAP-1: מצב עריכה נסגר מיד אחרי שמירה מוצלחת - אין מסך הצלחה/"בקשה
+  // נוספת" שמתאים לעריכה. editSaveVersion עולה פעם אחת בכל שמירה מוצלחת
+  // (ראו useAdminCompetitionPaidTimes), כך שהאפקט הזה לא יורה שוב סתם.
+  useEffect(
+    function () {
+      if (!isEditMode || paidTime.editSaveVersion === 0) {
+        return;
+      }
+
+      if (typeof props.onSaved === "function") {
+        props.onSaved();
+      }
+
+      if (typeof props.onClose === "function") {
+        props.onClose();
+      }
+    },
+    [paidTime.editSaveVersion],
+  );
+
   var contentScrollRef = useRef(null);
 
   function handleScrollToOffset(offsetY) {
@@ -151,11 +182,18 @@ export default function PaidTimeCreateModal(props) {
   }
 
   // "סיום" - סוגר את המודל (אין מסך פייד טיימים נפרד לנווט אליו מתוך מודל).
+  //
+  // חובה לפרק את שני ה-Modal-ים בפריימים נפרדים: מודל ההצלחה (transparent/fade)
+  // מקונן בתוך מודל היצירה (fullScreen/slide). סגירת שניהם באותו tick סינכרוני
+  // מקפיאה את RN למסך שחור שדורש הפעלה מחדש של האפליקציה. לכן קודם סוגרים את
+  // מודל ההצלחה, ורק בפריים הבא סוגרים את מודל היצירה.
   function handleFinish() {
     paidTime.handleCloseSuccess();
 
     if (typeof props.onClose === "function") {
-      props.onClose();
+      setTimeout(function () {
+        props.onClose();
+      }, MODAL_TEARDOWN_DELAY_MS);
     }
   }
 
@@ -172,7 +210,9 @@ export default function PaidTimeCreateModal(props) {
             <Ionicons name="close-outline" size={28} color="#4F3B31" />
           </Pressable>
 
-          <Text style={styles.modalTitle}>הוספת פייד טיים</Text>
+          <Text style={styles.modalTitle}>
+            {isEditMode ? "עריכת פייד טיים" : "הוספת פייד טיים"}
+          </Text>
 
           <View style={styles.modalHeaderSpacer} />
         </View>
@@ -220,6 +260,11 @@ export default function PaidTimeCreateModal(props) {
             locks={paidTime.locks}
             onToggleLock={paidTime.handleToggleLock}
             payerFieldDisabled={!!lockedPayerPersonId}
+            isEditMode={isEditMode}
+            editCanModify={paidTime.editCanModify}
+            editCanCancel={paidTime.editCanCancel}
+            editStatus={paidTime.editStatus}
+            onSaveEdit={paidTime.handleSaveEdit}
             formatRequestedSlotLabel={paidTime.formatRequestedSlotLabel}
             formatMemberLabel={paidTime.formatMemberLabel}
             formatHorseLabel={paidTime.formatHorseLabel}

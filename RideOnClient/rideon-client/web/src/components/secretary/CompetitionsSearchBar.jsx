@@ -1,4 +1,5 @@
 import { Search } from "lucide-react";
+import DatePicker from "../common/DatePicker";
 
 export default function CompetitionsSearchBar(props) {
   return (
@@ -37,8 +38,7 @@ export default function CompetitionsSearchBar(props) {
             <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
               מתאריך
             </label>
-            <input
-              type="date"
+            <DatePicker
               value={props.dateFrom}
               onChange={function (e) {
                 props.onDateFromChange(e.target.value);
@@ -51,8 +51,7 @@ export default function CompetitionsSearchBar(props) {
             <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
               עד תאריך
             </label>
-            <input
-              type="date"
+            <DatePicker
               value={props.dateTo}
               onChange={function (e) {
                 props.onDateToChange(e.target.value);

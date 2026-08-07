@@ -3,26 +3,28 @@ import { describe, it, expect } from "vitest";
 
 // Source-level contract test for the secretary's health-certificate page.
 //
-// This repo has no DOM test environment and no React Testing Library (see the web
-// package.json devDependencies), and this file deliberately does not add one. A
-// component that returns JSX cannot be rendered here, and the load/approve
-// handlers are local closures inside the page rather than a hook's return value,
-// so they cannot be reached by stubbing react either - the same situation as
-// PaidTimeSlotRegistrationsModal.contract.test.js, which this mirrors.
+// This repo has no DOM test environment and no React Testing Library (see the
+// web package.json devDependencies), so a component that returns JSX cannot
+// be rendered here.
 //
-// What CAN be asserted without a renderer is the contract the Stage B1 fix
-// establishes, and these are exactly the properties that would silently regress:
+// As of the status-tab/search redesign, the page's own state and the
+// load/approve request logic were extracted into
+// useCompetitionHealthCertificatesPage (see
+// hooks/secretary/useCompetitionHealthCertificatesPage.contract.test.js for
+// those guarantees - state ownership, request shape, error-leakage
+// prevention). This file now covers only what still lives directly in the
+// page's own source:
 //
-//   1. useActiveRole is actually CALLED, not merely imported - the page threw a
-//      ReferenceError on every load because activeRole was never defined;
-//   2. the load failure has its own error state, separate from "no horses";
-//   3. the empty state can only be reached after a successful response;
-//   4. approve failures surface through the shared toast, not alert();
-//   5. nothing from the response body is rendered.
-//
-// Behavioural coverage of the authorization itself lives in the backend tests
-// (RideOnServer.Tests/HealthCertificateAuthorizationTests) plus the manual
-// checklist.
+//   1. useActiveRole is actually CALLED, not merely imported;
+//   2. competitionId/ranchId are still passed down correctly;
+//   3. the render guards (loading / load-error / empty / per-tab-empty /
+//      table) are wired to the right conditions, including over a load
+//      failure;
+//   4. no alert()/confirm()/prompt() dialogs are used;
+//   5. the table columns, status labels, PDF/view link and approve button
+//      are preserved;
+//   6. the tabs and search input are wired to the hook's state;
+//   7. the workspace layout and menu key are preserved.
 
 const PAGE_PATH = new URL(
   "./CompetitionHealthCertificatesPage.jsx",
@@ -66,78 +68,153 @@ describe("CompetitionHealthCertificatesPage active-role contract", () => {
       "function HealthCertificatesContent({ competitionId, ranchId })",
     );
   });
+});
 
-  it("gives the loader both identifiers", () => {
+describe("CompetitionHealthCertificatesPage hook wiring", () => {
+  it("delegates state to useCompetitionHealthCertificatesPage instead of owning it", () => {
     expect(pageSource).toContain(
-      "await getHealthCertificates(competitionId, ranchId)",
+      'import useCompetitionHealthCertificatesPage from "../../hooks/secretary/useCompetitionHealthCertificatesPage";',
     );
+    expect(pageSource).toContain("useCompetitionHealthCertificatesPage({");
+    expect(pageSource).toContain("competitionId: competitionId,");
+    expect(pageSource).toContain("ranchId: ranchId,");
   });
 
-  it("waits for the ranch id before loading", () => {
-    expect(pageSource).toContain("if (!competitionId) return;");
-    expect(pageSource).toContain("if (!ranchId) return;");
-    expect(pageSource).toMatch(/\[competitionId, ranchId\]/);
+  it("no longer declares its own certificate/loading/error state", () => {
+    expect(pageSource).not.toContain("useState(false)");
+    expect(pageSource).not.toContain("useState([])");
+    expect(pageSource).not.toContain("useState(null)");
   });
 });
 
-describe("CompetitionHealthCertificatesPage error-state contract", () => {
-  it("keeps a load error state separate from the certificate list", () => {
-    expect(pageSource).toContain("const [loadError, setLoadError] = useState(false);");
-    expect(pageSource).toContain("setLoadError(true);");
-
-    // and clears it when a fresh load starts, so a recovered load stops showing
-    // the banner
-    expect(pageSource).toContain("setLoadError(false);");
-  });
-
-  it("keeps the loading state intact", () => {
-    expect(pageSource).toContain("setLoading(true);");
-    expect(pageSource).toContain("setLoading(false);");
-    expect(pageSource).toContain("{loading && (");
-  });
-
-  it("renders a dedicated Hebrew error block", () => {
-    expect(pageSource).toContain(
-      'const LOAD_ERROR_MESSAGE = "אירעה שגיאה בטעינת תעודות הבריאות. יש לנסות שוב.";',
-    );
+describe("CompetitionHealthCertificatesPage render-guard contract", () => {
+  it("keeps loading, load-error and true-empty guards over the full certificate list", () => {
+    expect(pageSource).toMatch(/\{loading && \(/);
     expect(pageSource).toMatch(/\{!loading && loadError && \(/);
-    expect(pageSource).toContain("{LOAD_ERROR_MESSAGE}");
-  });
-
-  it("never shows the empty state for a failed request", () => {
-    // This is the whole point: "אין סוסים רשומים לתחרות זו" must be gated on a
-    // load that actually succeeded.
     expect(pageSource).toMatch(
       /\{!loading && !loadError && certificates\.length === 0 && \(/,
     );
+  });
 
+  it("never shows the true-empty state for a failed request", () => {
     const guardAt = pageSource.indexOf(
       "{!loading && !loadError && certificates.length === 0 && (",
     );
 
     expect(guardAt).toBeGreaterThan(-1);
 
-    // The rendered occurrence sits inside that guard. The string also appears
-    // once earlier, in the comment on the catch block explaining why this gate
-    // exists, so the search deliberately starts at the guard.
     const renderedEmptyAt = pageSource.indexOf(
       "אין סוסים רשומים לתחרות זו",
       guardAt,
     );
 
     expect(renderedEmptyAt).toBeGreaterThan(-1);
-
-    // and nothing else renders it: every occurrence is either that comment or
-    // this one.
-    const occurrences = pageSource.split("אין סוסים רשומים לתחרות זו").length - 1;
-
-    expect(occurrences).toBe(2);
   });
 
-  it("does not render the table over a failed load", () => {
-    expect(pageSource).toMatch(
-      /\{!loading && !loadError && certificates\.length > 0 && \(/,
+  it("adds a separate empty state for a tab/search combination with zero matches", () => {
+    expect(pageSource).toContain("const noResultsInTab =");
+    expect(pageSource).toContain("{noResultsInTab && (");
+    expect(pageSource).toContain("getTabEmptyMessage(page.activeTab)");
+    expect(pageSource).toContain(
+      "לא נמצאו תעודות בריאות התואמות את החיפוש.",
     );
+  });
+
+  it("renders the table from visibleCertificates, not the raw list", () => {
+    expect(pageSource).toContain(
+      "{!loading && !loadError && page.visibleCertificates.length > 0 && (",
+    );
+    expect(pageSource).toContain("{page.visibleCertificates.map(function (cert, index) {");
+  });
+
+  it("declares one empty message per tab, matching the approved tab keys", () => {
+    expect(pageSource).toContain("pendingReview:");
+    expect(pageSource).toContain("notUploaded:");
+    expect(pageSource).toContain("rejected:");
+    expect(pageSource).toContain("approved:");
+  });
+});
+
+describe("CompetitionHealthCertificatesPage reject contract", () => {
+  it("imports and renders the reject modal", () => {
+    expect(pageSource).toContain(
+      'import HealthCertificateRejectModal from "../../components/secretary/health-certificates/HealthCertificateRejectModal";',
+    );
+    expect(pageSource).toContain("<HealthCertificateRejectModal");
+  });
+
+  it("wires the modal to the hook's reject state and handlers", () => {
+    expect(pageSource).toContain("isOpen={page.rejectModal.isOpen}");
+    expect(pageSource).toContain("reason={page.rejectModal.reason}");
+    expect(pageSource).toContain("error={page.rejectModal.error}");
+    expect(pageSource).toContain("isSaving={page.isRejectSubmitting}");
+    expect(pageSource).toContain("onReasonChange={page.setRejectReason}");
+    expect(pageSource).toContain("onClose={page.closeRejectModal}");
+    expect(pageSource).toContain("onSubmit={page.submitReject}");
+  });
+
+  it("adds a reject button alongside approve, on the same Pending+hasFile row", () => {
+    var pendingGuardIndex = pageSource.indexOf(
+      'cert.hcApprovalStatus === "Pending" &&',
+    );
+    var approveButtonIndex = pageSource.indexOf("page.handleApproveClick(cert);");
+    var rejectButtonIndex = pageSource.indexOf("page.openRejectModal(cert);");
+
+    expect(pendingGuardIndex).toBeGreaterThan(-1);
+    expect(approveButtonIndex).toBeGreaterThan(pendingGuardIndex);
+    expect(rejectButtonIndex).toBeGreaterThan(approveButtonIndex);
+
+    var rejectButtonCloseIndex = pageSource.indexOf(
+      "</button>",
+      rejectButtonIndex,
+    );
+    var rejectButtonBlock = pageSource.slice(
+      rejectButtonIndex,
+      rejectButtonCloseIndex,
+    );
+    expect(rejectButtonCloseIndex).toBeGreaterThan(rejectButtonIndex);
+    expect(rejectButtonBlock).toContain("דחה");
+  });
+
+  it("shows a distinct actions-column message for an already-rejected row", () => {
+    expect(pageSource).toContain('cert.hcApprovalStatus === "Rejected" && (');
+    expect(pageSource).toContain("ממתין להעלאה מחדש");
+  });
+
+  it("shows the rejection reason and, when present, the rejection date on a rejected row", () => {
+    expect(pageSource).toContain("cert.hcRejectionReason");
+    expect(pageSource).toContain("cert.hcRejectionDate &&");
+  });
+
+  it("never renders the raw rejected-by system-user id", () => {
+    expect(pageSource).not.toContain("hcRejectedBySystemUserId");
+  });
+});
+
+describe("CompetitionHealthCertificatesPage tabs and search contract", () => {
+  it("renders the status tabs wired to the hook's tab state", () => {
+    expect(pageSource).toContain(
+      'import HealthCertificateStatusTabs from "../../components/secretary/health-certificates/HealthCertificateStatusTabs";',
+    );
+    expect(pageSource).toContain("<HealthCertificateStatusTabs");
+    expect(pageSource).toContain("tabs={page.tabs}");
+    expect(pageSource).toContain("activeTab={page.activeTab}");
+    expect(pageSource).toContain("onChange={page.setActiveTab}");
+  });
+
+  it("renders a search input wired to the hook's search state", () => {
+    expect(pageSource).toContain("value={page.searchText}");
+    expect(pageSource).toContain("page.setSearchText(event.target.value);");
+  });
+
+  it("hides tabs and search until the true-empty and loading/error checks have passed", () => {
+    const tabsGuardIndex = pageSource.indexOf(
+      "{!loading && !loadError && certificates.length > 0 && (",
+    );
+    const tabsRenderIndex = pageSource.indexOf("<HealthCertificateStatusTabs");
+
+    expect(tabsGuardIndex).toBeGreaterThan(-1);
+    expect(tabsRenderIndex).toBeGreaterThan(tabsGuardIndex);
   });
 });
 
@@ -155,55 +232,19 @@ describe("CompetitionHealthCertificatesPage approve-feedback contract", () => {
     expect(pageSource).not.toMatch(/(?<![A-Za-z0-9_$.])prompt\s*\(/);
   });
 
-  it("routes the approve failure through the shared toast component", () => {
+  it("routes toast state and the approve click through the hook", () => {
     expect(pageSource).toContain(
       'import ToastMessage from "../../components/common/ToastMessage";',
     );
     expect(pageSource).toContain("<ToastMessage");
-    expect(pageSource).toContain('showToast("error", APPROVE_ERROR_MESSAGE);');
+    expect(pageSource).toContain("isOpen={page.toast.isOpen}");
+    expect(pageSource).toContain("page.handleApproveClick(cert);");
   });
 
-  it("uses the approved Hebrew approve-failure message", () => {
-    expect(pageSource).toContain(
-      'const APPROVE_ERROR_MESSAGE = "אירעה שגיאה באישור תעודת הבריאות";',
-    );
-  });
-
-  it("keeps the approve request shape and the busy-row guard", () => {
-    expect(pageSource).toContain(
-      "await approveHealthCertificate(cert.horseId, competitionId, ranchId);",
-    );
-    expect(pageSource).toContain("setActionLoadingKey(key);");
-    expect(pageSource).toContain("setActionLoadingKey(null);");
-  });
-
-  it("keeps the confirm dialog", () => {
+  it("keeps the confirm dialog, driven by the hook", () => {
     expect(pageSource).toContain("<ConfirmDialog");
-    expect(pageSource).toContain("function closeConfirmDialog()");
-    expect(pageSource).toContain("closeConfirmDialog();");
-  });
-});
-
-describe("CompetitionHealthCertificatesPage leakage contract", () => {
-  it("never renders the response body or an exception message", () => {
-    expect(pageSource).not.toMatch(/response\?\.\.?data\?\.\.?message/);
-    expect(pageSource).not.toContain("error.message");
-    expect(pageSource).not.toContain("error?.message");
-    expect(pageSource).not.toContain("err.message");
-    expect(pageSource).not.toContain("err?.message");
-    expect(pageSource).not.toContain("error.response");
-    expect(pageSource).not.toContain("error?.response");
-  });
-
-  it("does not bind the caught error at all", () => {
-    // Both handlers use a bare `catch {`, so there is no error object in scope
-    // that could be rendered by accident.
-    expect(pageSource).toMatch(/\}\s*catch\s*\{/);
-    expect(pageSource).not.toMatch(/catch\s*\(\s*[A-Za-z_$]/);
-  });
-
-  it("only reads the data envelope from a successful response", () => {
-    expect(pageSource).toContain("setCertificates(response.data?.data || []);");
+    expect(pageSource).toContain("isOpen={page.confirmDialog.isOpen}");
+    expect(pageSource).toContain("onCancel={page.closeConfirmDialog}");
   });
 });
 
@@ -221,15 +262,33 @@ describe("CompetitionHealthCertificatesPage preserved structure", () => {
     }
   });
 
-  it("keeps the existing status labels", () => {
+  it("keeps the existing status labels and adds the Rejected one", () => {
     expect(pageSource).toContain('label: "מאושר"');
     expect(pageSource).toContain('label: "ממתין לאישור"');
     expect(pageSource).toContain('label: "לא הועלה"');
+    expect(pageSource).toContain('label: "נדחה"');
+  });
+
+  it("keeps the PDF/view link behavior", () => {
+    expect(pageSource).toContain("href={cert.hcPath}");
+    expect(pageSource).toContain('target="_blank"');
+    expect(pageSource).toContain("פתח PDF");
+  });
+
+  it("keeps the approve button gated on Pending status and an uploaded file", () => {
+    expect(pageSource).toContain('cert.hcApprovalStatus === "Pending" &&');
+    expect(pageSource).toContain("cert.hcPath && (");
   });
 
   it("keeps the workspace layout and menu key", () => {
     expect(pageSource).toContain(
       '<CompetitionWorkspaceLayout activeItemKey="health-certificates">',
+    );
+  });
+
+  it("no longer imports the service functions directly (moved to the hook)", () => {
+    expect(pageSource).not.toContain(
+      'from "../../services/healthCertificateService"',
     );
   });
 });

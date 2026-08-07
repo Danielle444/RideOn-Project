@@ -197,6 +197,58 @@ namespace RideOnServer.DAL
             }
         }
 
+        // Payer-safe projection (mobile stall-map slice 1). payerPersonId is
+        // the authenticated caller's own PersonId only - callers must never
+        // be able to pass another person's id here.
+        public List<PayerStallAssignmentDto> GetAssignmentsForPayer(int competitionId, int payerPersonId)
+        {
+            var paramDic = new Dictionary<string, object?>
+            {
+                { "@CompetitionId", competitionId },
+                { "@PayerPersonId", payerPersonId }
+            };
+
+            try
+            {
+                using var connection = Connect("DefaultConnection");
+                connection.Open();
+
+                using var command = CreateCommandWithStoredProcedure(
+                    "usp_GetStallAssignmentsForCompetitionPayer",
+                    connection,
+                    paramDic
+                );
+
+                using var reader = command.ExecuteReader();
+
+                var list = new List<PayerStallAssignmentDto>();
+
+                while (reader.Read())
+                {
+                    list.Add(new PayerStallAssignmentDto
+                    {
+                        AssignmentId = Convert.ToInt32(reader["AssignmentId"]),
+                        CompoundId = Convert.ToInt16(reader["CompoundId"]),
+                        StallId = Convert.ToInt16(reader["StallId"]),
+                        StallNumber = reader["StallNumber"] == DBNull.Value ? null : reader["StallNumber"].ToString(),
+
+                        IsOccupied = Convert.ToBoolean(reader["IsOccupied"]),
+                        IsMine = Convert.ToBoolean(reader["IsMine"]),
+                        IsForTack = Convert.ToBoolean(reader["IsForTack"]),
+
+                        HorseName = reader["HorseName"] == DBNull.Value ? null : reader["HorseName"].ToString(),
+                        BarnName = reader["BarnName"] == DBNull.Value ? null : reader["BarnName"].ToString(),
+                    });
+                }
+
+                return list;
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
         public void AssignStallBooking(
             int competitionId,
             int hostRanchId,

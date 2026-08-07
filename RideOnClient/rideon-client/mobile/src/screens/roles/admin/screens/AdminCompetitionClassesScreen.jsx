@@ -9,7 +9,7 @@ import {
   Alert,
 } from "react-native";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
@@ -38,8 +38,136 @@ import DuplicateEntriesModal from "../../../../components/competitions/Duplicate
 
 import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
 
-import { createChangeEntryRequest } from "../../../../services/entriesService";
+import { adminCancelEntry } from "../../../../services/entriesService";
 import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
+import {
+  getCancellationConfirmationText,
+  PAYER_ACCOUNT_ITEM_LABEL,
+  DIRECT_CANCELLATION_COPY,
+} from "../../../../utils/payerAccountCopy";
+import { createInFlightGuard } from "../../../../utils/inFlightGuard";
+
+import {
+  LIFECYCLE_STATE,
+  resolveClassLifecycleState,
+} from "../../../../utils/payerAccountLifecycle";
+import { sortClassesByVerifiedDate } from "../../../../utils/payerAccountBands";
+import { getLifecycleBandHeader } from "../../../../utils/payerAccountCopy";
+
+// Duplicate-from-previous-competition is hidden (off-design modal, escape-trap).
+// Flip to true to restore. Modal + utils remain in the repo.
+const DUPLICATE_ENTRIES_ENABLED = false;
+
+// CAP-10: this admin surface's items (usp_getmycompetitionentries +
+// usp_getmycompetitionentrystatusflags, verified live 2026-08-06) carry
+// hasPendingCancellation/hasPendingChange in addition to entryStatus - a
+// richer shape than the payer account's classes[] items, which
+// resolveClassLifecycleState alone was built against (no pending signal
+// there, per that file's own header comment). Layering the pending check on
+// top of the shared resolver - rather than editing payerAccountLifecycle.js
+// itself - keeps the payer-account contract and its tests untouched while
+// still using the real, verified data this surface has.
+function resolveEntryLifecycleState(item) {
+  var baseState = resolveClassLifecycleState(item);
+
+  if (baseState !== LIFECYCLE_STATE.ACTIVE) {
+    return baseState;
+  }
+
+  if (item && item.hasPendingCancellation === true) {
+    return LIFECYCLE_STATE.PENDING_CANCELLATION;
+  }
+
+  if (item && item.hasPendingChange === true) {
+    return LIFECYCLE_STATE.PENDING_CHANGE;
+  }
+
+  return baseState;
+}
+
+// Mirrors bandItems/bandAndSortClasses in payerAccountBands.js exactly,
+// swapping only the per-item resolver for the one above. Sorting is the
+// shared, verified-date sorter - reused directly, not reimplemented.
+function bandAndSortEntries(items) {
+  var active = [];
+  var pending = [];
+  var cancelled = [];
+
+  (Array.isArray(items) ? items : []).forEach(function (item) {
+    var state = resolveEntryLifecycleState(item);
+
+    if (state === LIFECYCLE_STATE.CANCELLED) {
+      cancelled.push(item);
+      return;
+    }
+
+    if (
+      state === LIFECYCLE_STATE.PENDING_CHANGE ||
+      state === LIFECYCLE_STATE.PENDING_CANCELLATION
+    ) {
+      pending.push(item);
+      return;
+    }
+
+    if (state === LIFECYCLE_STATE.ACTIVE) {
+      active.push(item);
+    }
+  });
+
+  return {
+    active: sortClassesByVerifiedDate(active),
+    pending: sortClassesByVerifiedDate(pending),
+    cancelled: sortClassesByVerifiedDate(cancelled),
+  };
+}
+
+function renderBandDivider(headerText, keyValue) {
+  if (!headerText) {
+    return null;
+  }
+
+  return (
+    <Text key={keyValue} style={styles.filterTitle}>
+      {headerText}
+    </Text>
+  );
+}
+
+// Renders one non-empty divider per lifecycle band, in Active / pending /
+// cancelled order, using the caller's existing per-item card renderer
+// unchanged.
+function renderBandedSections(banded, renderCard) {
+  var sections = [
+    {
+      key: "active",
+      items: banded.active,
+      header: getLifecycleBandHeader(LIFECYCLE_STATE.ACTIVE),
+    },
+    {
+      key: "pending",
+      items: banded.pending,
+      header: getLifecycleBandHeader(LIFECYCLE_STATE.PENDING_CHANGE),
+    },
+    {
+      key: "cancelled",
+      items: banded.cancelled,
+      header: getLifecycleBandHeader(LIFECYCLE_STATE.CANCELLED),
+    },
+  ];
+
+  return sections.map(function (section) {
+    if (section.items.length === 0) {
+      return null;
+    }
+
+    return (
+      <View key={"band-" + section.key}>
+        {renderBandDivider(section.header, "band-header-" + section.key)}
+        {section.items.map(renderCard)}
+      </View>
+    );
+  });
+}
 
 export default function AdminCompetitionClassesScreen(props) {
   var activeRoleContext = useActiveRole();
@@ -99,6 +227,15 @@ export default function AdminCompetitionClassesScreen(props) {
 
   var [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
 
+  // Synchronous in-flight guard for direct entry cancellation - same
+  // reusable helper and per-key-held-through-refresh pattern as
+  // AdminCompetitionPayerAccountScreen's stall cancellation. Initialized
+  // lazily so createInFlightGuard() runs once, not on every render.
+  var cancelGuardRef = useRef(null);
+  if (cancelGuardRef.current === null) {
+    cancelGuardRef.current = createInFlightGuard();
+  }
+
   // Force-closes an already-open create/edit/duplicate modal the moment
   // Classes becomes disabled or read-only (e.g. the competition ends) - a
   // still-open modal must not remain a live mutation path just because it
@@ -119,6 +256,13 @@ export default function AdminCompetitionClassesScreen(props) {
       }
     },
     [availability.classes.isEnabled, showCreateModal, duplicateModalOpen],
+  );
+
+  var bandedEntries = useMemo(
+    function () {
+      return bandAndSortEntries(entries.filteredItems);
+    },
+    [entries.filteredItems],
   );
 
   function handleMutationSuccess() {
@@ -162,49 +306,66 @@ export default function AdminCompetitionClassesScreen(props) {
     setShowCreateModal(true);
   }
 
+  // Phase 3C/CAP-6: direct admin cancellation via usp_admincancelentry
+  // (same endpoint/copy AdminCompetitionPayerAccountScreen already uses) -
+  // no ChangeEntryRequest is created from this screen anymore.
   function handleCancelEntry(item) {
     if (!availability.classes.isEnabled) {
       return;
     }
 
-    Alert.alert("ביטול הרשמה", "האם לשלוח בקשת ביטול למזכירה?", [
-      {
-        text: "לא",
-        style: "cancel",
-      },
-
-      {
-        text: "כן",
-        style: "destructive",
-
-        onPress: async function () {
-          if (!availability.classes.isEnabled) {
-            return;
-          }
-
-          try {
-            await createChangeEntryRequest({
-              competitionId: activeCompetition?.competitionId,
-
-              originalEntryId: item.entryId,
-
-              newEntryId: null,
-
-              isCancelled: true,
-            });
-
-            await entries.handleRefresh();
-            reloadRegistrationStepStatus();
-
-            Alert.alert("נשלח", "בקשת הביטול נשלחה למזכירה");
-          } catch (error) {
-            Alert.alert("שגיאה", "אירעה שגיאה בשליחת בקשת הביטול");
-
-            console.log(error);
-          }
+    Alert.alert(
+      "ביטול הרשמה",
+      getCancellationConfirmationText(PAYER_ACCOUNT_ITEM_LABEL.entry),
+      [
+        {
+          text: "לא",
+          style: "cancel",
         },
-      },
-    ]);
+
+        {
+          text: "כן",
+          style: "destructive",
+
+          onPress: async function () {
+            if (!availability.classes.isEnabled) {
+              return;
+            }
+
+            var guardKey = "entry:" + item.entryId;
+
+            if (!cancelGuardRef.current.tryAcquire(guardKey)) {
+              return;
+            }
+
+            try {
+              await adminCancelEntry(
+                item.entryId,
+                activeCompetition?.competitionId,
+                activeRole?.ranchId,
+              );
+
+              // The cancel succeeded - refresh is best-effort and must not
+              // be able to turn this into a reported failure.
+              Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);
+
+              try {
+                await entries.handleRefresh();
+                reloadRegistrationStepStatus();
+              } catch (refreshError) {
+                console.log("CANCEL ENTRY REFRESH ERROR", refreshError);
+              }
+            } catch (error) {
+              Alert.alert("שגיאה", "אירעה שגיאה בביטול ההרשמה");
+
+              console.log(error);
+            } finally {
+              cancelGuardRef.current.release(guardKey);
+            }
+          },
+        },
+      ],
+    );
   }
 
   function renderFilterChip(label, isActive, onPress, keyValue) {
@@ -352,7 +513,7 @@ export default function AdminCompetitionClassesScreen(props) {
       );
     }
 
-    return entries.filteredItems.map(function (item) {
+    return renderBandedSections(bandedEntries, function (item) {
       return (
         <CompetitionEntryCard
           key={String(item.entryId)}
@@ -492,19 +653,21 @@ export default function AdminCompetitionClassesScreen(props) {
           }}
         />
 
-        <Button
-          variant="outline"
-          label="שכפל הרשמות מתחרות קודמת"
-          disabled={!availability.classes.isEnabled}
-          onPress={function () {
-            if (!availability.classes.isEnabled) {
-              return;
-            }
+        {DUPLICATE_ENTRIES_ENABLED ? (
+          <Button
+            variant="outline"
+            label="שכפל הרשמות מתחרות קודמת"
+            disabled={!availability.classes.isEnabled}
+            onPress={function () {
+              if (!availability.classes.isEnabled) {
+                return;
+              }
 
-            setDuplicateModalOpen(true);
-          }}
-          style={{ marginTop: 10, marginBottom: 12 }}
-        />
+              setDuplicateModalOpen(true);
+            }}
+            style={{ marginTop: 10, marginBottom: 12 }}
+          />
+        ) : null}
 
         <Button
           variant="outline"
@@ -516,6 +679,7 @@ export default function AdminCompetitionClassesScreen(props) {
         <CompetitionEntryCreateModal
           visible={showCreateModal && availability.classes.isEnabled}
           editItem={editingItem}
+          useDirectAdminEdit={true}
           onClose={function () {
             setShowCreateModal(false);
 
@@ -528,19 +692,22 @@ export default function AdminCompetitionClassesScreen(props) {
           isOpen={entriesViewOpen}
           competitionId={activeCompetition?.competitionId}
           ranchId={activeRole?.ranchId}
+          ranchName={activeRole?.ranchName}
           focusClassInCompId={entriesViewFocusClass}
           onClose={handleCloseEntriesView}
         />
 
-        <DuplicateEntriesModal
-          isOpen={duplicateModalOpen && availability.classes.isEnabled}
-          activeCompetitionId={activeCompetition?.competitionId}
-          ranchId={activeRole?.ranchId}
-          onClose={function () {
-            setDuplicateModalOpen(false);
-          }}
-          onDuplicated={handleMutationSuccess}
-        />
+        {DUPLICATE_ENTRIES_ENABLED ? (
+          <DuplicateEntriesModal
+            isOpen={duplicateModalOpen && availability.classes.isEnabled}
+            activeCompetitionId={activeCompetition?.competitionId}
+            ranchId={activeRole?.ranchId}
+            onClose={function () {
+              setDuplicateModalOpen(false);
+            }}
+            onDuplicated={handleMutationSuccess}
+          />
+        ) : null}
 
         <Text style={styles.resultsText}>
           מוצגות {entries.filteredItems.length} מתוך {entries.items.length}{" "}

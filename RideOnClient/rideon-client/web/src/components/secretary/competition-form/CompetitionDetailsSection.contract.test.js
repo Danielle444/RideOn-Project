@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
-// Source-level contract test for CompetitionDetailsSection's ordinary-date
-// bypass fix (review-gate fix #1). This repo has no DOM test environment and
-// no React Testing Library (see CompetitionHealthCertificatesPage.contract.test.js,
-// which this mirrors), so the component cannot be rendered or interacted
-// with. What CAN be proven without a renderer is that the read-only gate is
-// wired to the right signal, applied to both date inputs, and never applies
-// in creation mode.
+// Source-level contract test for CAP-6: competitionStartDate becomes
+// directly editable on an existing competition (folding in what used to be
+// a separate "postpone" modal + button), while competitionEndDate stays
+// read-only and is derived by preserving the original (persisted) duration.
+// This repo has no DOM test environment and no React Testing Library (see
+// CompetitionHealthCertificatesPage.contract.test.js, which this mirrors),
+// so the component cannot be rendered or interacted with.
 
 const SECTION_PATH = new URL(
   "./CompetitionDetailsSection.jsx",
@@ -18,95 +18,140 @@ const SECTION_PATH = new URL(
 // this checkout's CRLF line endings (confirmed present in this file).
 const sectionSource = readFileSync(SECTION_PATH, "utf8").replace(/\r\n/g, "\n");
 
-describe("CompetitionDetailsSection date read-only gate", () => {
+describe("CompetitionDetailsSection — CAP-10 date fields use the shared DatePicker", () => {
+  it("imports the shared DatePicker rather than a native date input", () => {
+    expect(sectionSource).toContain(
+      'import DatePicker from "../../common/DatePicker";',
+    );
+    expect(sectionSource).not.toContain('type="date"');
+  });
+
+  it("uses DatePicker for all six date fields in this section", () => {
+    const occurrences = (sectionSource.match(/<DatePicker/g) || []).length;
+    expect(occurrences).toBe(6);
+  });
+});
+
+describe("CompetitionDetailsSection — start date is directly editable", () => {
   it("derives isExistingCompetition from competitionId alone, not status or any other signal", () => {
     expect(sectionSource).toContain(
       "var isExistingCompetition = !!props.competitionId;",
     );
   });
 
-  it("create mode (no competitionId) keeps isExistingCompetition falsy, so both dates stay editable", () => {
-    // props.competitionId is undefined/null before the first save — the
-    // coercion !!undefined / !!null is false, so isExistingCompetition is
-    // false and neither `disabled` prop below evaluates truthy.
-    const gateAt = sectionSource.indexOf(
-      "var isExistingCompetition = !!props.competitionId;",
-    );
-
-    expect(gateAt).toBeGreaterThan(-1);
-  });
-
-  it("both the start-date and end-date inputs are disabled by isExistingCompetition, and nothing else", () => {
+  it("the start-date field is never disabled — no disabled attribute on it at all", () => {
     const startDateBlockAt = sectionSource.indexOf("תאריך התחלה");
     const endDateBlockAt = sectionSource.indexOf("תאריך סיום");
 
     expect(startDateBlockAt).toBeGreaterThan(-1);
-    expect(endDateBlockAt).toBeGreaterThan(-1);
     expect(endDateBlockAt).toBeGreaterThan(startDateBlockAt);
 
     const startDateBlock = sectionSource.slice(startDateBlockAt, endDateBlockAt);
-    // Searched starting at endDateBlockAt, not from 0 — "פתיחת הרשמה" also
-    // appears earlier, inside the registrationEndError validation message
-    // ("...לפני תאריך פתיחת הרשמה"), which would otherwise be found first
-    // and produce an empty (end-before-start) slice.
-    const endDateBlock = sectionSource.slice(
-      endDateBlockAt,
-      sectionSource.indexOf("פתיחת הרשמה", endDateBlockAt),
+
+    // CAP-10: native type="date" was replaced by the shared DatePicker
+    // (component contract covered in DatePicker.contract.test.js). The
+    // CAP-6 behavior this test protects -- start date always editable --
+    // still holds: no disabled prop reaches this DatePicker instance.
+    expect(startDateBlock).toContain("<DatePicker");
+    expect(startDateBlock).toContain(
+      'value={props.detailsForm.competitionStartDate}',
     );
-
-    expect(startDateBlock).toContain('type="date"');
-    expect(startDateBlock).toContain("disabled={isExistingCompetition}");
-
-    expect(endDateBlock).toContain('type="date"');
-    expect(endDateBlock).toContain("disabled={isExistingCompetition}");
+    expect(startDateBlock).not.toContain("disabled");
   });
 
-  it("no other field on this form (name, field, notes, registration/paid-time dates) is gated by isExistingCompetition", () => {
+  it("the old reschedule button, its gate and its trigger prop are gone", () => {
+    expect(sectionSource).not.toContain("canOfferReschedule");
+    expect(sectionSource).not.toContain("onOpenReschedule");
+    expect(sectionSource).not.toContain("דחיית התחרות");
+  });
+
+  it("shows the forward-only guard inline under the start date when the picked date isn't a forward move", () => {
+    expect(sectionSource).toContain("startDateGuardError");
+    expect(sectionSource).toContain(
+      'var DATE_CHANGE_FORWARD_ONLY_GUARD =\n  "אפשר להזיז את התחרות רק קדימה. יש לבחור תאריך פתיחה מאוחר מהנוכחי.";',
+    );
+
+    const startDateBlockAt = sectionSource.indexOf("תאריך התחלה");
+    const endDateBlockAt = sectionSource.indexOf("תאריך סיום");
+    const startDateBlock = sectionSource.slice(startDateBlockAt, endDateBlockAt);
+
+    expect(startDateBlock).toContain("{startDateGuardError ? (");
+  });
+
+  it("detects a start-date change against the PERSISTED prop, never the old detailsForm-only comparison", () => {
+    expect(sectionSource).toContain("props.persistedCompetitionStartDate");
+    expect(sectionSource).toContain(
+      "competitionStartDate !== persistedCompetitionStartDate;",
+    );
+  });
+
+  it("computes the offset via the shared pure helper, imported not re-implemented", () => {
+    expect(sectionSource).toContain(
+      'import { getWholeDayOffsetDays } from "../../../utils/competitionForm.utils";',
+    );
+    expect(sectionSource).toContain(
+      "getWholeDayOffsetDays(competitionStartDate, persistedCompetitionStartDate)",
+    );
+  });
+});
+
+describe("CompetitionDetailsSection — end date stays read-only and derived", () => {
+  it("the end-date input is still gated by isExistingCompetition, and only that", () => {
     const occurrences = (
       sectionSource.match(/disabled=\{isExistingCompetition\}/g) || []
     ).length;
 
-    // Exactly two: the start-date input and the end-date input.
-    expect(occurrences).toBe(2);
+    // Exactly one now: only the end-date input (the start-date input's
+    // disabled attribute was removed entirely, not just its condition).
+    expect(occurrences).toBe(1);
   });
 
-  it("shows an explanatory hint pointing at the reschedule action only when read-only", () => {
+  it("reuses the existing paid-time date-add helper to derive the new end date, not ad-hoc math", () => {
+    expect(sectionSource).toContain(
+      'import { addDaysToDateOnly } from "../../../utils/paidTimeSlotForm.utils";',
+    );
+    expect(sectionSource).toContain(
+      "addDaysToDateOnly(\n      persistedCompetitionEndDate,\n      startDateOffsetDays,\n    )",
+    );
+  });
+
+  it("shows the approved auto-update helper text under the end date, replacing the old reschedule hint", () => {
+    expect(sectionSource).toContain(
+      'var END_DATE_AUTO_UPDATE_HINT =\n  "תאריך הסיום מתעדכן אוטומטית לפי תאריך הפתיחה";',
+    );
+
+    // Appears once, in the constant declaration — the render site references
+    // {END_DATE_AUTO_UPDATE_HINT}, not a second copy of the literal string.
     const hintOccurrences = (
-      sectionSource.match(/לשינוי תאריך יש להשתמש בפעולת "דחיית התחרות"/g) || []
+      sectionSource.match(/תאריך הסיום מתעדכן אוטומטית לפי תאריך הפתיחה/g) || []
     ).length;
 
-    expect(hintOccurrences).toBe(2);
+    expect(hintOccurrences).toBe(1);
+    expect(sectionSource).toContain("{END_DATE_AUTO_UPDATE_HINT}");
 
-    // Each hint is gated by the same isExistingCompetition condition — not a
-    // permanent fixture, so it never shows in creation mode either.
-    const hintGuardOccurrences = (
-      sectionSource.match(/\{isExistingCompetition \? \(/g) || []
-    ).length;
-
-    expect(hintGuardOccurrences).toBe(2);
-  });
-
-  it("keeps the disabled input visually distinct without changing the base layout classes", () => {
-    // The smallest-change requirement: same base classes, only `disabled:*`
-    // variants appended — no restructuring of the grid/container.
-    expect(sectionSource).toContain(
-      'className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right disabled:cursor-not-allowed disabled:bg-[#F3EEEA] disabled:text-[#8A7268]"',
+    expect(sectionSource).not.toContain(
+      'לשינוי תאריך יש להשתמש בפעולת "דחיית התחרות"',
     );
   });
 
-  it("the reschedule button visibility gate is a SEPARATE, stricter condition than the read-only gate", () => {
-    // canOfferReschedule additionally requires the competition to not have
-    // started yet — a read-only (but already-started) competition must still
-    // show the date fields as disabled even when the reschedule button itself
-    // is hidden, since editing is never re-enabled either way.
-    expect(sectionSource).toContain(
-      "var canOfferReschedule = !!(\n    props.competitionId && competitionStartDate\n  );",
+  it("only derives (overrides) the displayed end date when an existing competition's start actually moved forward", () => {
+    const derivedAt = sectionSource.indexOf("var displayedEndDate =");
+    expect(derivedAt).toBeGreaterThan(-1);
+
+    const guardAt = sectionSource.indexOf(
+      "if (isExistingCompetition && startDateChanged && startDateOffsetDays > 0) {",
+      derivedAt,
     );
 
-    const isExistingAt = sectionSource.indexOf("var isExistingCompetition");
-    const canOfferAt = sectionSource.indexOf("var canOfferReschedule");
+    expect(guardAt).toBeGreaterThan(derivedAt);
+  });
 
-    expect(isExistingAt).toBeGreaterThan(-1);
-    expect(canOfferAt).toBeGreaterThan(isExistingAt);
+  it("creation mode (no competitionId) keeps both dates editable and independent", () => {
+    // In create mode isExistingCompetition is false, so the end-date input's
+    // only disabled condition is falsy and displayedEndDate falls back to
+    // the ordinary form field.
+    expect(sectionSource).toContain(
+      "value={isExistingCompetition ? displayedEndDate : props.detailsForm.competitionEndDate}",
+    );
   });
 });

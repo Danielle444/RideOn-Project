@@ -369,6 +369,82 @@ function deriveFinancialProjection(classes, getPredictionForClass, financialConf
   };
 }
 
+function findCategoryExpectedAmount(categories, categoryKey) {
+  var list = Array.isArray(categories) ? categories : [];
+
+  var match = list.find(function (item) {
+    var key = item.categoryKey || item.CategoryKey;
+    return key === categoryKey;
+  });
+
+  if (!match) {
+    return 0;
+  }
+
+  return Number(readNumber(match, "expectedAmount", "ExpectedAmount")) || 0;
+}
+
+/**
+ * The actual side of the projection-vs-actual comparison, for the same four income sources the
+ * projection tab shows: organizer entries, federation entries, stalls, shavings. Paid-time is
+ * intentionally excluded (it is not one of the four sources this view compares -- see
+ * financialProjectionCopy.js).
+ *
+ * "Actual" means the real billed amount from confirmed bookings: ExpectedAmount as returned by
+ * usp_getcompetitionsummarybycategory (Open + Paid charges; Cancelled/Replaced excluded), the
+ * SAME accounting basis the backend already applies uniformly to every category -- never a mix of
+ * paid-only for one source and billed-for-another. The predicted side reuses the exact
+ * organizer/federation/stall/shavings bands `deriveFinancialProjection` already computed, so a
+ * comparison is never drawn against a number the projection tab itself does not also show.
+ *
+ * @param {object} financialProjection the return value of deriveFinancialProjection
+ * @param {Array<object>} organizerCategories rows from getCompetitionSummary (per-category real amounts)
+ * @param {object|null} federationTotals the federation totals object from getCompetitionSummary
+ * @param {boolean} hasActualData whether registration is closed (gates the whole comparison view)
+ */
+function deriveFinancialActual(
+  financialProjection,
+  organizerCategories,
+  federationTotals,
+  hasActualData,
+) {
+  var projection = financialProjection || {};
+  var entry = projection.entry || {};
+  var stall = projection.stall || {};
+  var shavings = projection.shavings || {};
+
+  var federationActual =
+    Number(readNumber(federationTotals, "expectedAmount", "ExpectedAmount")) || 0;
+
+  return {
+    hasActualData: !!hasActualData,
+    organizer: {
+      available: true,
+      actual: findCategoryExpectedAmount(organizerCategories, "classes"),
+      predictedLo: entry.organizerLo || 0,
+      predictedHi: entry.organizerHi || 0,
+    },
+    federation: {
+      available: true,
+      actual: federationActual,
+      predictedLo: entry.federationLo || 0,
+      predictedHi: entry.federationHi || 0,
+    },
+    stall: {
+      available: !!stall.available,
+      actual: findCategoryExpectedAmount(organizerCategories, "stalls"),
+      predictedLo: stall.available ? stall.lo : null,
+      predictedHi: stall.available ? stall.hi : null,
+    },
+    shavings: {
+      available: !!shavings.incomeAvailable,
+      actual: findCategoryExpectedAmount(organizerCategories, "shavings"),
+      predictedLo: shavings.incomeAvailable ? shavings.lo : null,
+      predictedHi: shavings.incomeAvailable ? shavings.hi : null,
+    },
+  };
+}
+
 export {
   getEntryBandForClass,
   getClassCost,
@@ -378,4 +454,5 @@ export {
   deriveTackStalls,
   deriveHorseDays,
   deriveFinancialProjection,
+  deriveFinancialActual,
 };

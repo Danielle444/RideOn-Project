@@ -11,7 +11,7 @@ import { getCompetitionsByHostRanch } from "../../services/competitionService";
 import { saveActiveCompetition } from "../../services/competitionSessionService";
 import { getErrorMessage } from "../../utils/competitionForm.utils";
 import { sortCompetitionsByStatusAndDate } from "../../../../shared/auth/utils/competitions/competitionSorting";
-import { WEB_SECRETARY_COMPETITION_STATUS_ORDER } from "../../config/competitionStatusOrder";
+import { WEB_SECRETARY_COMPETITION_STATUS_ORDER } from "../../../../shared/auth/utils/competitions/competitionStatusOrder";
 
 export default function CompetitionsBoardPage() {
   const navigate = useNavigate();
@@ -23,7 +23,10 @@ export default function CompetitionsBoardPage() {
   const activeRole = activeRoleContext.activeRole;
 
   const [competitions, setCompetitions] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // Start loading=true so the board shows a spinner on first paint instead of the
+  // "לא נמצאו תחרויות להצגה" empty row before the mount fetch runs. The effect below
+  // settles it to false when there is no active ranch to fetch for.
+  const [loading, setLoading] = useState(true);
 
   const [searchText, setSearchText] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -63,6 +66,9 @@ export default function CompetitionsBoardPage() {
   useEffect(
     function () {
       if (!currentRanchId) {
+        // No active ranch to fetch for: settle the initial loading=true so the
+        // board shows its empty state rather than a stuck spinner.
+        setLoading(false);
         return;
       }
 

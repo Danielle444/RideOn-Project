@@ -1,3 +1,48 @@
+-- RANCH-MODEL CORRECTION (2026-08-05, owner-approved architecture fix):
+-- p_ranchid now means the competition's host/service ranch and must equal
+-- competition.hostranchid (new check, same pattern as 188). Each supplied
+-- StallBookingId's requesting ranch is now read from the new
+-- stallbooking.requestingranchid column (see
+-- migrations/add_stallbooking_requestingranchid.sql) instead of being left
+-- undetermined; if the supplied stalls resolve to more than one distinct
+-- requesting ranch, the whole call fails loudly (this is a NEW check --
+-- previously, requiring every stall to match the single p_ranchid value
+-- accidentally guaranteed single-ranch calls only because stallbooking.ranchid
+-- used to mean home ranch; now that it means host ranch, every guest
+-- ranch's stalls at this competition would share the same value, so that
+-- accidental protection is gone and must be replaced explicitly). No
+-- client-supplied requesting-ranch parameter was added -- it is always
+-- derived from the referenced stalls, never trusted from the caller. Bag
+-- quantity/product/price validation, payer inheritance from each stall's
+-- own 'stalls' billcharge, bill/billcharge behavior, and return type are
+-- all unchanged.
+--
+-- WHOLE-SHEKEL SPLIT CORRECTION (2026-08-06, approved business rule): the
+-- per-stall-line split previously computed
+-- ceil(v_stallprice / v_payercount) -- a WHOLE-SHEKEL value already (no
+-- agorot), but rounded UP unconditionally, so it systematically OVERcharges
+-- whenever the division isn't exact (e.g. price 50 / 3 payers -> ceil ->
+-- 17 each -> 51 charged for a ₪50 line, a ₪1 overcharge every time, not
+-- just sometimes). Replaced with the shared
+-- public.usp_splitwholeshekels(lineTotal, payercount) helper: whole
+-- shekels, any two shares on the SAME line differ by at most ₪1, remainder
+-- shekels go to the lowest paidbypersonid first, and the line's shares sum
+-- EXACTLY to v_stallprice (never over). The existing multi-stall
+-- aggregation into temp_shavings_payer_amounts is unchanged in structure --
+-- it still SUMS each payer's per-line share across every stall in the
+-- order -- and stays exact and whole by construction: a sum of exact
+-- whole-shekel partitions of several line totals is itself an exact
+-- whole-shekel partition of the sum of those line totals, so the final
+-- aggregated per-payer amount, and the shavings order's grand total, remain
+-- whole-shekel and sum-exact with no further change needed. The nested
+-- DISTINCT-then-ROW_NUMBER shape below preserves the ORIGINAL query's own
+-- `select distinct b.paidbypersonid` dedup semantics exactly (ranking is
+-- applied AFTER dedup, not alongside it, so a payer who happens to have more
+-- than one billcharge row for this stall booking is still counted and
+-- ranked exactly once, matching v_payercount computed just above it).
+-- Requesting-ranch consistency check, bag/price validation, and the
+-- temp-table-driven bill/billcharge insert loop are unchanged.
+
 CREATE OR REPLACE FUNCTION public.usp_createshavingsorder(p_competitionid integer, p_orderedbysystemuserid integer, p_pricecatalogid integer, p_ranchid integer, p_notes text, p_requesteddeliverytime timestamp without time zone, p_stalls jsonb)
  RETURNS integer
  LANGUAGE plpgsql
@@ -9,13 +54,18 @@ declare
     v_catalog_ranchid integer;
     v_totalbags integer := 0;
     v_competitionenddate date;
+    v_hostranchid integer;
 
     v_stall jsonb;
     v_stallbookingid integer;
     v_bagqty integer;
     v_stallprice numeric(10,2);
     v_payercount integer;
+    v_baseshare integer;
+    v_remainder integer;
     v_amountperpayer numeric(10,2);
+    v_requestingranchid integer;
+    v_stall_requestingranchid integer;
 
     v_billid integer;
     v_payerpersonid integer;
@@ -39,13 +89,17 @@ begin
         raise exception 'At least one stall is required';
     end if;
 
-    select c.competitionenddate
-    into v_competitionenddate
+    select c.competitionenddate, c.hostranchid
+    into v_competitionenddate, v_hostranchid
     from public.competition c
     where c.competitionid = p_competitionid;
 
     if (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Jerusalem')::date > v_competitionenddate then
         raise exception 'Competition has already ended' using errcode = 'RN001';
+    end if;
+
+    if p_ranchid <> v_hostranchid then
+        raise exception 'RanchId must equal the competition host ranch';
     end if;
 
     select
@@ -94,17 +148,24 @@ begin
             raise exception 'Bag quantity must be positive';
         end if;
 
-        if not exists (
-            select 1
-            from public.stallbooking sb
-            inner join public.productrequest pr
-                on pr.prequestid = sb.stallbookingid
-            where sb.stallbookingid = v_stallbookingid
-              and pr.competitionid = p_competitionid
-              and sb.ranchid = p_ranchid
-              and sb.isfortack = false
-        ) then
+        select sb.requestingranchid
+        into v_stall_requestingranchid
+        from public.stallbooking sb
+        inner join public.productrequest pr
+            on pr.prequestid = sb.stallbookingid
+        where sb.stallbookingid = v_stallbookingid
+          and pr.competitionid = p_competitionid
+          and sb.ranchid = p_ranchid
+          and sb.isfortack = false;
+
+        if not found then
             raise exception 'Invalid stall booking id %', v_stallbookingid;
+        end if;
+
+        if v_requestingranchid is null then
+            v_requestingranchid := v_stall_requestingranchid;
+        elsif v_requestingranchid <> v_stall_requestingranchid then
+            raise exception 'All supplied stall bookings must belong to the same requesting ranch (found % and %)', v_requestingranchid, v_stall_requestingranchid;
         end if;
 
         select count(distinct b.paidbypersonid)
@@ -123,17 +184,33 @@ begin
 
         v_totalbags := v_totalbags + v_bagqty;
         v_stallprice := v_bagqty * v_itemprice;
-        v_amountperpayer := ceil(v_stallprice / v_payercount);
 
-        for v_payerpersonid in
-            select distinct b.paidbypersonid
-            from public.billcharge bc
-            inner join public.bill b
-                on b.billid = bc.billid
-            where bc.sourcetype = 'ProductRequest'
-              and bc.sourceid = v_stallbookingid
-              and bc.categorykey = 'stalls'
-              and bc.chargestatus in ('Open', 'Paid')
+        select o_baseshare, o_remainder
+        into v_baseshare, v_remainder
+        from public.usp_splitwholeshekels(v_stallprice, v_payercount);
+
+        -- WHOLE-SHEKEL SPLIT CORRECTION: deterministic remainder allocation
+        -- for THIS stall line, ordered by paidbypersonid ascending. DISTINCT
+        -- is applied in the innermost subquery, BEFORE row_number() ranks
+        -- the result -- preserves the original dedup semantics exactly (see
+        -- header comment).
+        for v_payerpersonid, v_amountperpayer in
+            select paidbypersonid,
+                   v_baseshare + case when rn <= v_remainder then 1 else 0 end
+            from (
+                select paidbypersonid,
+                       row_number() over (order by paidbypersonid asc) as rn
+                from (
+                    select distinct b.paidbypersonid
+                    from public.billcharge bc
+                    inner join public.bill b
+                        on b.billid = bc.billid
+                    where bc.sourcetype = 'ProductRequest'
+                      and bc.sourceid = v_stallbookingid
+                      and bc.categorykey = 'stalls'
+                      and bc.chargestatus in ('Open', 'Paid')
+                ) dp
+            ) ordered_payers
         loop
             insert into temp_shavings_payer_amounts
             (
@@ -151,6 +228,10 @@ begin
                 temp_shavings_payer_amounts.amounttopay + excluded.amounttopay;
         end loop;
     end loop;
+
+    if v_requestingranchid is null then
+        raise exception 'Could not resolve a requesting ranch from the supplied stall bookings';
+    end if;
 
     insert into public.productrequest
     (

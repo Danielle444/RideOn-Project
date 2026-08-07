@@ -7,6 +7,28 @@ namespace RideOnServer.DAL
 {
     public class ShavingsOrderDAL : DBServices
     {
+        // Delivery destination (Slice 1). DBNull/null/empty is a normal, expected shape (an
+        // order with zero linked bookings, or every linked booking unassigned) and maps to an
+        // empty list -- never an exception. A non-empty but malformed JSON payload is NOT
+        // caught here: it propagates as a JsonException, mirroring the one existing precedent
+        // for DB-sourced JSON in this codebase (AutoSchedulerDAL.GetAutoSchedulerData, which
+        // likewise does not special-case deserialization failures) and relying on the same
+        // generic controller-level catch every other unexpected DAL failure already goes
+        // through. Swallowing a malformed payload into an empty list would silently hide a
+        // real data/query bug behind a UI state ("no destination assigned yet") that looks
+        // identical to a legitimate one -- worse than a loud 500.
+        private static List<ShavingsDestinationCompound> ParseDeliveryDestinations(object rawValue)
+        {
+            string json = rawValue == DBNull.Value ? "[]" : rawValue?.ToString() ?? "[]";
+
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return new List<ShavingsDestinationCompound>();
+            }
+
+            return JsonSerializer.Deserialize<List<ShavingsDestinationCompound>>(json)
+                ?? new List<ShavingsDestinationCompound>();
+        }
         public List<WorkerShavingsOrderItem> GetWorkerShavingsOrders(int workerSystemUserId)
         {
             Dictionary<string, object?> paramDic = new Dictionary<string, object?>
@@ -57,13 +79,18 @@ namespace RideOnServer.DAL
             }
         }
 
-        public void SaveDeliveryPhoto(int shavingsOrderId, string photoUrl, DateTime photoDate)
+        // Returns rows-affected as bool, matching ClaimShavingsOrder/MarkDelivered's convention:
+        // >0 means "recorded", 0 means the authorization guard blocked it (not the caller's claim,
+        // or a photo was already recorded) -- see usp_savedeliveryphoto's own RN001 guards for the
+        // ownership/cancellation/competition-ended cases, which surface as ValidationException instead.
+        public bool SaveDeliveryPhoto(int shavingsOrderId, string photoUrl, DateTime photoDate, int workerSystemUserId)
         {
             Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
                 { "@ShavingsOrderId", shavingsOrderId },
                 { "@DeliveryPhotoUrl", photoUrl },
-                { "@DeliveryPhotoDate", photoDate }
+                { "@DeliveryPhotoDate", photoDate },
+                { "@WorkerSystemUserId", workerSystemUserId }
             };
 
             try
@@ -76,7 +103,9 @@ namespace RideOnServer.DAL
                     connection,
                     paramDic))
                 {
-                    command.ExecuteNonQuery();
+                    object? result = command.ExecuteScalar();
+                    int rowsAffected = result == null || result == DBNull.Value ? 0 : Convert.ToInt32(result);
+                    return rowsAffected > 0;
                 }
             }
             catch (Exception ex)
@@ -88,13 +117,14 @@ namespace RideOnServer.DAL
 
         // No-photo delivery fallback (CAP-4). Mirrors ClaimShavingsOrder: the SP returns
         // rows-affected, so >0 means "recorded", 0 means "no open order matched".
-        public static bool MarkDelivered(int shavingsOrderId)
+        public static bool MarkDelivered(int shavingsOrderId, int workerSystemUserId)
         {
             ShavingsOrderDAL dal = new ShavingsOrderDAL();
 
             Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
-                { "@shavingsOrderId", shavingsOrderId }
+                { "@shavingsOrderId", shavingsOrderId },
+                { "@workerSystemUserId", workerSystemUserId }
             };
 
             using NpgsqlConnection conn = DBServices.GetDefaultConnection();
@@ -108,6 +138,42 @@ namespace RideOnServer.DAL
             object? result = cmd.ExecuteScalar();
             int rowsAffected = result == null || result == DBNull.Value ? 0 : Convert.ToInt32(result);
             return rowsAffected > 0;
+        }
+
+        // Worker shavings-mutation authorization fix: resolves the order's REAL competition/
+        // host ranch server-side (never trust a client-supplied ranchId -- these three mutation
+        // endpoints receive none anyway). Returns null when the order does not exist; the caller
+        // deliberately does not turn that into a distinct 404 -- the mutating proc's own RN001
+        // "not found" guard stays the single source of truth for that message.
+        public static ShavingsOrderCompetitionContext? GetShavingsOrderCompetitionContext(int shavingsOrderId)
+        {
+            ShavingsOrderDAL dal = new ShavingsOrderDAL();
+
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@shavingsOrderId", shavingsOrderId }
+            };
+
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = dal.CreateCommandWithStoredProcedure(
+                "usp_getshavingsordercompetitioncontext",
+                conn,
+                paramDic);
+
+            using NpgsqlDataReader reader = cmd.ExecuteReader();
+
+            if (!reader.Read())
+            {
+                return null;
+            }
+
+            return new ShavingsOrderCompetitionContext
+            {
+                CompetitionId = Convert.ToInt32(reader["CompetitionId"]),
+                HostRanchId = Convert.ToInt32(reader["HostRanchId"])
+            };
         }
 
         public static List<WorkerShavingsOrderItem> GetShavingsOrdersByCompetitionForWorker(int competitionId, int ranchId)
@@ -151,6 +217,10 @@ namespace RideOnServer.DAL
                     WorkerSystemUserId = reader["WorkerSystemUserId"] == DBNull.Value ? null : Convert.ToInt32(reader["WorkerSystemUserId"]),
                     WorkerFirstName = reader["WorkerFirstName"] as string,
                     WorkerLastName = reader["WorkerLastName"] as string,
+                    IsCancelled = Convert.ToBoolean(reader["IsCancelled"]),
+                    HasPendingCancellation = Convert.ToBoolean(reader["HasPendingCancellation"]),
+                    DeliveryDestinations = ParseDeliveryDestinations(reader["DeliveryDestinations"]),
+                    HasUnassignedStalls = Convert.ToBoolean(reader["HasUnassignedStalls"]),
                 });
             }
 
@@ -200,6 +270,10 @@ namespace RideOnServer.DAL
                     WorkerSystemUserId = reader["WorkerSystemUserId"] == DBNull.Value ? null : Convert.ToInt32(reader["WorkerSystemUserId"]),
                     WorkerFirstName = reader["WorkerFirstName"] as string,
                     WorkerLastName = reader["WorkerLastName"] as string,
+                    IsCancelled = Convert.ToBoolean(reader["IsCancelled"]),
+                    HasPendingCancellation = Convert.ToBoolean(reader["HasPendingCancellation"]),
+                    DeliveryDestinations = ParseDeliveryDestinations(reader["DeliveryDestinations"]),
+                    HasUnassignedStalls = Convert.ToBoolean(reader["HasUnassignedStalls"]),
                 });
             }
 
@@ -417,11 +491,126 @@ namespace RideOnServer.DAL
                     DeliveryPhotoUrl =
                         reader["deliveryphotourl"] == DBNull.Value
                             ? null
-                            : reader["deliveryphotourl"].ToString()
+                            : reader["deliveryphotourl"].ToString(),
+
+                    // Standalone shavings cancellation: own-order state, appended LAST to #176.
+                    IsCancelled = Convert.ToBoolean(reader["iscancelled"]),
+
+                    HasPendingCancellation = Convert.ToBoolean(reader["haspendingcancellation"]),
+
+                    DeliveryDestinations = ParseDeliveryDestinations(reader["deliverydestinations"]),
+
+                    HasUnassignedStalls = Convert.ToBoolean(reader["hasunassignedstalls"])
                 });
             }
 
             return orders;
+        }
+
+        // Payer initiates a cancel request for a standalone shavings order -- the shavings
+        // sibling of StallBookingDAL.CancelStallBookingByPayer. Plain exception on failure
+        // (no RN001 catch), matching 141/usp_cancelstallbookingbypayer's own convention: the
+        // payer path never used the RN001 -> ValidationException -> 409 convention.
+        public static int CancelShavingsOrderByPayer(int shavingsOrderId, int payerPersonId)
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = new NpgsqlCommand(
+                @"SELECT public.usp_cancelshavingsorderbypayer(
+                    p_shavingsorderid := @shavingsOrderId,
+                    p_payerpersonid   := @payerPersonId
+                );",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("@shavingsOrderId", shavingsOrderId);
+            cmd.Parameters.AddWithValue("@payerPersonId", payerPersonId);
+
+            object? result = cmd.ExecuteScalar();
+
+            if (result == null || result == DBNull.Value)
+            {
+                throw new Exception("Failed to create payer shavings cancel request");
+            }
+
+            return Convert.ToInt32(result);
+        }
+
+        // Direct RanchAdmin cancellation -- the shavings sibling of
+        // StallBookingDAL.AdminCancelStallBooking. RN001 catch matches that sibling exactly.
+        public static int AdminCancelShavingsOrder(int shavingsOrderId, int ranchId, int personId)
+        {
+            try
+            {
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
+
+                using NpgsqlCommand cmd = new NpgsqlCommand(
+                    @"SELECT public.usp_admincancelshavingsorder(
+                        p_personid        := @personId,
+                        p_shavingsorderid := @shavingsOrderId,
+                        p_ranchid         := @ranchId
+                    );",
+                    conn
+                );
+
+                cmd.Parameters.AddWithValue("@personId", personId);
+                cmd.Parameters.AddWithValue("@shavingsOrderId", shavingsOrderId);
+                cmd.Parameters.AddWithValue("@ranchId", ranchId);
+
+                object? result = cmd.ExecuteScalar();
+                if (result == null || result == DBNull.Value)
+                {
+                    throw new Exception("Failed to cancel shavings order");
+                }
+                return Convert.ToInt32(result);
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_admincancelshavingsorder (ranch mismatch, unauthorized
+                // caller, already-resolved request, paid order, etc.).
+                throw new BL.ValidationException(ex.MessageText);
+            }
+        }
+
+        // Direct HostSecretary cancellation -- the shavings sibling of
+        // StallBookingDAL.SecretaryDeleteStallBooking, but built to
+        // usp_admincancelshavingsorder's RN001 standard (see 242's own header):
+        // unlike 146, this new secretary proc DOES raise RN001, so this DAL method
+        // catches it exactly like AdminCancelShavingsOrder above.
+        public static int SecretaryCancelShavingsOrder(int shavingsOrderId, int secretarySystemUserId, int ranchId)
+        {
+            try
+            {
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
+
+                using NpgsqlCommand cmd = new NpgsqlCommand(
+                    @"SELECT public.usp_secretarycancelshavingsorder(
+                        p_shavingsorderid       := @shavingsOrderId,
+                        p_secretarysystemuserid := @secretaryId,
+                        p_ranchid               := @ranchId
+                    );",
+                    conn
+                );
+
+                cmd.Parameters.AddWithValue("@shavingsOrderId", shavingsOrderId);
+                cmd.Parameters.AddWithValue("@secretaryId", secretarySystemUserId);
+                cmd.Parameters.AddWithValue("@ranchId", ranchId);
+
+                object? result = cmd.ExecuteScalar();
+                if (result == null || result == DBNull.Value)
+                {
+                    throw new Exception("Failed to cancel shavings order");
+                }
+                return Convert.ToInt32(result);
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                throw new BL.ValidationException(ex.MessageText);
+            }
         }
 
         public static List<ShavingsOrderDetailsItem> GetShavingsOrderDetails(int shavingsOrderId)

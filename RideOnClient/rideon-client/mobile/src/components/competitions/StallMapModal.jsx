@@ -12,14 +12,24 @@ import {
 import {
   getCompounds,
   getAssignments,
+  getPayerMapAssignments,
+  parseCompoundLayout,
 } from "../../services/stallMapService";
+
+import {
+  getCompoundId,
+  buildAssignmentsByCompoundAndStall,
+  buildMineCountByCompoundId,
+  resolveInitialCompoundId,
+} from "../../utils/stallMapViewer";
 
 var CELL_SIZE = 56;
 var CELL_GAP = 4;
 
-// Modal לצפייה במפת תאים - גישת אדמין read-only.
+// Modal לצפייה במפת תאים - גישת RanchAdmin (host/guest) ו-Payer, שתיהן read-only.
 // טבים לפי מתחם, גריד דו-ממדי לכל מתחם.
-// תא משובץ לחווה הנוכחית מודגש ("שלי").
+// תא משובץ לצופה הנוכחי מודגש ("שלי") - לפי חווה (RanchAdmin) או לפי isMine
+// שחוזר מהשרת (Payer, viewerMode="payer" - ראה usp_GetStallAssignmentsForCompetitionPayer).
 // תומך focusStallNumber - בעת פתיחה מתמקד באותו תא ובמתחם שלו.
 export default function StallMapModal(props) {
   var isOpen = !!props.isOpen;
@@ -27,6 +37,12 @@ export default function StallMapModal(props) {
   var ranchId = props.ranchId;
   var focusCompoundId = props.focusCompoundId || null;
   var focusStallNumber = props.focusStallNumber || null;
+  // Blocker 2 (2026-08-07): payer mode calls a DIFFERENT, server-redacted
+  // endpoint (never getAssignments, which returns every participant's
+  // identity) and trusts its own IsMine field rather than re-deriving
+  // ownership client-side. Default ("ranch" mode, no prop needed) is
+  // RanchAdmin/HostSecretary and is completely unchanged.
+  var viewerMode = props.viewerMode === "payer" ? "payer" : "ranch";
 
   var [loading, setLoading] = useState(false);
   var [error, setError] = useState(null);
@@ -45,8 +61,10 @@ export default function StallMapModal(props) {
       async function load() {
         try {
           var results = await Promise.all([
-            getCompounds(ranchId),
-            getAssignments(competitionId, ranchId),
+            getCompounds(ranchId, competitionId),
+            viewerMode === "payer"
+              ? getPayerMapAssignments(competitionId, ranchId)
+              : getAssignments(competitionId, ranchId),
           ]);
 
           if (cancelled) return;
@@ -62,12 +80,12 @@ export default function StallMapModal(props) {
           setCompounds(rawCompounds);
           setAssignments(rawAssignments);
 
-          var initialCompound =
-            focusCompoundId != null
-              ? focusCompoundId
-              : rawCompounds.length > 0
-                ? rawCompounds[0].compoundId || rawCompounds[0].CompoundId
-                : null;
+          var initialCompound = resolveInitialCompoundId(
+            rawCompounds,
+            rawAssignments,
+            focusCompoundId,
+            { ranchId: ranchId, trustServerIsMine: viewerMode === "payer" },
+          );
 
           setActiveCompoundId(initialCompound);
         } catch (err) {
@@ -87,34 +105,32 @@ export default function StallMapModal(props) {
         cancelled = true;
       };
     },
-    [isOpen, competitionId, ranchId, focusCompoundId],
+    [isOpen, competitionId, ranchId, focusCompoundId, viewerMode],
   );
 
-  var assignmentsByStallNumber = useMemo(
+  // Keyed by CompoundId + StallNumber (never StallNumber alone) - identical
+  // stall numbers in two different compounds must never collide.
+  var assignmentsByCompoundAndStall = useMemo(
     function () {
-      var map = {};
-      (assignments || []).forEach(function (a) {
-        var stallNumber = a.stallNumber || a.StallNumber || a.stallnumber;
-        if (!stallNumber) return;
-        var brId =
-          a.bookingRanchId || a.BookingRanchId || a.bookingranchid || null;
-        map[stallNumber] = {
-          horseName: a.horseName || a.HorseName || a.horsename || "",
-          barnName: a.barnName || a.BarnName || a.barnname || "",
-          bookingRanchId: brId,
-          isMine: Number(brId) === Number(ranchId),
-        };
-      });
-      return map;
+      var viewer = { ranchId: ranchId, trustServerIsMine: viewerMode === "payer" };
+      return buildAssignmentsByCompoundAndStall(assignments, viewer);
     },
-    [assignments, ranchId],
+    [assignments, ranchId, viewerMode],
+  );
+
+  // Per-compound count of the viewer's own highlighted stalls, for the
+  // compound tabs (badge + "contains my stalls" marker).
+  var mineCountByCompoundId = useMemo(
+    function () {
+      return buildMineCountByCompoundId(assignmentsByCompoundAndStall);
+    },
+    [assignmentsByCompoundAndStall],
   );
 
   var activeCompound = useMemo(
     function () {
       return (compounds || []).find(function (c) {
-        var cid = c.compoundId || c.CompoundId;
-        return Number(cid) === Number(activeCompoundId);
+        return Number(getCompoundId(c)) === Number(activeCompoundId);
       });
     },
     [compounds, activeCompoundId],
@@ -201,6 +217,7 @@ export default function StallMapModal(props) {
                 compounds={compounds}
                 activeCompoundId={activeCompoundId}
                 onSelect={setActiveCompoundId}
+                mineCountByCompoundId={mineCountByCompoundId}
               />
 
               <CompoundLegend />
@@ -209,7 +226,7 @@ export default function StallMapModal(props) {
                 {activeCompound ? (
                   <CompoundGrid
                     compound={activeCompound}
-                    assignmentsByStallNumber={assignmentsByStallNumber}
+                    assignmentsByCompoundAndStall={assignmentsByCompoundAndStall}
                     focusStallNumber={focusStallNumber}
                   />
                 ) : (
@@ -240,6 +257,8 @@ export default function StallMapModal(props) {
 }
 
 function CompoundTabs(props) {
+  var mineCountByCompoundId = props.mineCountByCompoundId || {};
+
   return (
     <ScrollView
       horizontal
@@ -251,9 +270,12 @@ function CompoundTabs(props) {
       }}
     >
       {props.compounds.map(function (c) {
-        var cid = c.compoundId || c.CompoundId;
+        var cid = getCompoundId(c);
         var name = c.compoundName || c.CompoundName || "מתחם " + cid;
         var active = Number(cid) === Number(props.activeCompoundId);
+        var mineCount = mineCountByCompoundId[cid] || 0;
+        var hasMine = mineCount > 0;
+
         return (
           <Pressable
             key={"comp-" + cid}
@@ -261,12 +283,15 @@ function CompoundTabs(props) {
               props.onSelect(cid);
             }}
             style={{
+              flexDirection: "row-reverse",
+              alignItems: "center",
+              gap: 6,
               paddingVertical: 8,
               paddingHorizontal: 14,
               borderRadius: 18,
               backgroundColor: active ? "#7B5A4D" : "#FFFFFF",
-              borderWidth: 1,
-              borderColor: "#7B5A4D",
+              borderWidth: hasMine ? 2 : 1,
+              borderColor: hasMine ? "#D97706" : "#7B5A4D",
             }}
           >
             <Text
@@ -278,6 +303,30 @@ function CompoundTabs(props) {
             >
               {name}
             </Text>
+
+            {hasMine ? (
+              <View
+                style={{
+                  minWidth: 18,
+                  height: 18,
+                  borderRadius: 9,
+                  paddingHorizontal: 4,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: active ? "#FFFFFF" : "#D97706",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: "800",
+                    color: active ? "#7B5A4D" : "#FFFFFF",
+                  }}
+                >
+                  {mineCount}
+                </Text>
+              </View>
+            ) : null}
           </Pressable>
         );
       })}
@@ -323,9 +372,10 @@ function LegendItem(props) {
 
 function CompoundGrid(props) {
   var compound = props.compound;
-  var layout = compound.layout || compound.Layout || null;
-  var assignmentsByStallNumber = props.assignmentsByStallNumber;
+  var layout = parseCompoundLayout(compound);
+  var assignmentsByCompoundAndStall = props.assignmentsByCompoundAndStall;
   var focusStallNumber = props.focusStallNumber;
+  var compoundId = getCompoundId(compound);
 
   if (!layout) {
     return (
@@ -387,7 +437,7 @@ function CompoundGrid(props) {
                   isEntrance: false,
                 };
                 var assignment = cell.stallNumber
-                  ? assignmentsByStallNumber[cell.stallNumber]
+                  ? assignmentsByCompoundAndStall[compoundId + "::" + cell.stallNumber]
                   : null;
                 var isFocused =
                   focusStallNumber &&

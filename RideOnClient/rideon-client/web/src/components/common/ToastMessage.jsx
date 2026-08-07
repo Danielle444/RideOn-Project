@@ -1,6 +1,26 @@
+import { useEffect } from "react";
 import { CheckCircle2, AlertCircle, X } from "lucide-react";
 
+const AUTO_DISMISS_MS = 4000;
+
 export default function ToastMessage(props) {
+  useEffect(
+    function () {
+      if (!props.isOpen) {
+        return undefined;
+      }
+
+      const timerId = setTimeout(function () {
+        props.onClose();
+      }, AUTO_DISMISS_MS);
+
+      return function () {
+        clearTimeout(timerId);
+      };
+    },
+    [props.isOpen, props.message, props.type],
+  );
+
   if (!props.isOpen) {
     return null;
   }

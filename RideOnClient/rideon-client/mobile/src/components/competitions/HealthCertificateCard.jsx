@@ -27,6 +27,13 @@ function getStatusLabel(status) {
     };
   }
 
+  if (status === "Rejected") {
+    return {
+      label: "נדחה",
+      color: "#E53935",
+    };
+  }
+
   return {
     label: "לא הועלה",
     color: "#8A7268",
@@ -122,6 +129,20 @@ export default function HealthCertificateCard(props) {
           עדיין לא הועלתה תעודת בריאות
         </Text>
       )}
+
+      {cert.hcApprovalStatus === "Rejected" && cert.hcRejectionReason ? (
+        <Text
+          style={{
+            color: "#B3261E",
+            fontSize: 13,
+            marginBottom: 10,
+            textAlign: "right",
+            lineHeight: 18,
+          }}
+        >
+          סיבת דחייה: {cert.hcRejectionReason}
+        </Text>
+      ) : null}
 
       <View style={roleSharedStyles.buttonsRow}>
         <Pressable

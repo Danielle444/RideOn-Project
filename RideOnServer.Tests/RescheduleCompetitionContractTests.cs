@@ -507,9 +507,20 @@ namespace RideOnServer.Tests
                 "RideOnDB", "StoredProcedures", "PostgreSQL", "Individual", fileName);
 
             sql.Should().Contain(expectedLockCall);
-            sql.Should().Contain(
-                "STATUS AS WRITTEN: NOT DEPLOYED",
-                "the live proc must not be claimed as deployed until explicit owner approval");
+
+            // Ranch-model-fix reconciliation (2026-08-05): the "STATUS AS
+            // WRITTEN: NOT DEPLOYED" assertion removed here pinned a
+            // deployment-status CLAIM that was only ever true at one point in
+            // time. Both files were subsequently live-verified as actually
+            // deployed (pg_get_functiondef, 2026-08-05) and their headers
+            // were correctly corrected to say so -- so this assertion was, by
+            // definition, checking for a statement that is now FALSE, not a
+            // durable contract. Per the explicit rule to never pin
+            // "NOT DEPLOYED" wording (deployment status legitimately changes
+            // over a file's lifecycle), this is removed rather than replaced
+            // with an equally time-bound opposite claim. The lock-before-
+            // overlap-check ordering below remains the real, durable contract
+            // this test protects, and is unchanged.
 
             int lockAt = sql.IndexOf(expectedLockCall, StringComparison.Ordinal);
             int overlapCheckAt = sql.IndexOf("overlapping stall booking already exists", StringComparison.Ordinal);
@@ -743,19 +754,26 @@ namespace RideOnServer.Tests
 
             checkBlock.Should().Contain("IF NOT COALESCE(p_isfortack, FALSE) THEN");
 
-            // Gated exactly twice in the file (once for the pre-existing lock,
-            // once for the new check) — both skip tack via the same condition,
-            // never a different/looser one.
-            int gateOccurrences = 0;
-            int index = 0;
+            // Ranch-model-fix reconciliation (2026-08-05): this used to count
+            // total file-wide occurrences of the gate condition and require
+            // exactly 2 (once for the pre-existing lock, once for this
+            // overlap check). The ranch-model fix legitimately added a THIRD,
+            // unrelated use of the identical condition elsewhere in this file
+            // (deciding whether RequestingRanchId is derived from the horse
+            // or supplied explicitly for tack) -- a correct, approved change,
+            // not a regression, so a global count is no longer a meaningful
+            // contract. What actually matters -- that the LOCK is gated by
+            // this exact same condition, not a different/looser one -- is
+            // checked directly below by finding the gate immediately
+            // preceding the lock call, independent of how many other
+            // legitimate uses exist elsewhere in the file.
+            int lockGateAt = sql.IndexOf("IF NOT COALESCE(p_isfortack, FALSE) THEN", StringComparison.Ordinal);
+            int lockCallAt = sql.IndexOf("PERFORM pg_advisory_xact_lock(1735, p_horseid);", StringComparison.Ordinal);
 
-            while ((index = sql.IndexOf("IF NOT COALESCE(p_isfortack, FALSE) THEN", index, StringComparison.Ordinal)) != -1)
-            {
-                gateOccurrences++;
-                index += 1;
-            }
-
-            gateOccurrences.Should().Be(2);
+            lockGateAt.Should().BeGreaterThan(-1);
+            lockCallAt.Should().BeGreaterThan(lockGateAt);
+            (lockCallAt - lockGateAt).Should().BeLessThan(
+                200, "the gate immediately preceding the lock call must be the tack-skip condition, not some unrelated occurrence");
         }
 
         [Fact]
@@ -820,8 +838,18 @@ namespace RideOnServer.Tests
                 "RideOnDB", "StoredProcedures", "PostgreSQL", "Individual", "187_usp_RescheduleCompetition.sql");
 
             sql.Should().Contain("gap is now CLOSED");
-            sql.Should().Contain(
-                "The reschedule\n--    guarantee is therefore no longer weakened by a sequential (non-\n--    concurrent) double-booking through 147/149");
+
+            // Ranch-model-fix reconciliation (2026-08-05): this used to be one
+            // exact multi-line Contain() with embedded "\n" line breaks. This
+            // file has CRLF line terminators on disk (confirmed: `file`
+            // reports "CRLF line terminators"), so a literal C# "\n" (not
+            // "\r\n") string could never match it -- an incidental
+            // line-ending pin, not a check on 187's actual header content;
+            // 187 itself was never touched by the ranch-model fix. Replaced
+            // with format-independent checks on the same two meaningful
+            // phrases the original assertion was protecting.
+            sql.Should().Contain("no longer weakened by a sequential");
+            sql.Should().Contain("double-booking through 147/149");
         }
 
         [Fact]

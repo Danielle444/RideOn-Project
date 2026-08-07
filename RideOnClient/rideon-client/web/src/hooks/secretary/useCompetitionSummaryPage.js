@@ -4,15 +4,16 @@ import {
   getClassesByCompetitionId,
   getPredictionsByCompetitionId,
 } from "../../services/classInCompetitionService";
-import { getSecretaryCompetitionEntries } from "../../services/entryService";
 import { getCompetitionById } from "../../services/competitionService";
 import { getFinancialConfigForCompetition } from "../../services/financialConfigService";
 import {
   deriveFinancialProjection,
-  getClassCost,
-  getEntryBandForClass,
+  deriveFinancialActual,
 } from "../../utils/financialProjection.utils";
-import { isRegistrationClosed } from "../../utils/classesView.utils";
+import {
+  isRegistrationClosed,
+  isCompetitionEnded,
+} from "../../utils/classesView.utils";
 import {
   groupDetailsByDay,
   filterItemsByDay,
@@ -121,9 +122,13 @@ export default function useCompetitionSummaryPage(options) {
   // failed fetch just degrades a band, never blocks the summary.
   var [finClasses, setFinClasses] = useState([]);
   var [finPredictions, setFinPredictions] = useState([]);
-  var [finEntries, setFinEntries] = useState([]);
   var [finCompetition, setFinCompetition] = useState(null);
   var [finConfig, setFinConfig] = useState(null);
+  // Loading flag for the financial-projection fetch. Init true because it fetches on mount
+  // alongside the summary; without it the projection panel and tab strip cannot tell "still
+  // loading" from "genuinely no prediction / registration not closed" and show the empty /
+  // "unavailable" copy during the fetch window.
+  var [financialLoading, setFinancialLoading] = useState(true);
 
   var [federationInvoiceImporting, setFederationInvoiceImporting] =
     useState(false);
@@ -134,19 +139,39 @@ export default function useCompetitionSummaryPage(options) {
   var [federationInvoiceImportResult, setFederationInvoiceImportResult] =
     useState(null);
 
+  function dismissFederationInvoiceImportMessages() {
+    setFederationInvoiceImportError("");
+    setFederationInvoiceImportSuccess("");
+  }
+
   var [federationMatchingOpen, setFederationMatchingOpen] = useState(false);
   var [federationMatchingItems, setFederationMatchingItems] = useState([]);
   var [federationMatchingLoading, setFederationMatchingLoading] =
     useState(false);
+  // Manual-allocation submit lock only (ManualTab) - suggestion row/bulk
+  // approval has its own row-scoped state below so approving one suggestion
+  // never disables unrelated rows.
   var [federationMatchingApproving, setFederationMatchingApproving] =
     useState(false);
   var [federationMatchingError, setFederationMatchingError] = useState("");
   var [federationMatchingSuccess, setFederationMatchingSuccess] = useState("");
+  // Set<rowKey> of suggestion rows with an approval currently in flight
+  // (single-click or as part of an "approve all" batch). Keyed by the same
+  // creditId-payerId signature used for rowKey in the modal.
+  var [federationMatchingProcessingKeys, setFederationMatchingProcessingKeys] =
+    useState(function () {
+      return new Set();
+    });
+  var [federationMatchingBulkRunning, setFederationMatchingBulkRunning] =
+    useState(false);
   // { operationId, signature } | null, refs not state - see
-  // utils/operationId.utils.js. Two distinct pending slots since the
-  // suggestion-approve and manual-approve actions are separate submissions
-  // that must never share (or accidentally collide on) an operation id.
-  var federationMatchingApproveOperationIdRef = useRef(null);
+  // utils/operationId.utils.js. manualFederationAllocationOperationIdRef is a
+  // single slot (only one manual allocation can be in flight at a time).
+  // federationMatchingRowOperationsRef is a plain object keyed by rowKey,
+  // since distinct suggestion rows can be approved concurrently (single-row
+  // clicks) or sequentially (approve-all) and must never share an operation
+  // id with each other.
+  var federationMatchingRowOperationsRef = useRef({});
   var manualFederationAllocationOperationIdRef = useRef(null);
 
   var [federationMatchingActiveTab, setFederationMatchingActiveTab] =
@@ -280,26 +305,32 @@ export default function useCompetitionSummaryPage(options) {
 
   async function loadFinancialData() {
     if (!competitionId || !ranchId) {
+      // Nothing to fetch: settle the initial loading=true so the panel/tabs show
+      // their terminal state instead of a permanent loading placeholder.
+      setFinancialLoading(false);
       return;
     }
 
-    await Promise.all([
-      loadFinancialResource(function () {
-        return getClassesByCompetitionId(competitionId, ranchId);
-      }, setFinClasses, []),
-      loadFinancialResource(function () {
-        return getPredictionsByCompetitionId(competitionId, ranchId);
-      }, setFinPredictions, []),
-      loadFinancialResource(function () {
-        return getSecretaryCompetitionEntries(competitionId, ranchId);
-      }, setFinEntries, []),
-      loadFinancialResource(function () {
-        return getCompetitionById(competitionId, ranchId);
-      }, setFinCompetition, null),
-      loadFinancialResource(function () {
-        return getFinancialConfigForCompetition(competitionId, ranchId);
-      }, setFinConfig, null),
-    ]);
+    setFinancialLoading(true);
+
+    try {
+      await Promise.all([
+        loadFinancialResource(function () {
+          return getClassesByCompetitionId(competitionId, ranchId);
+        }, setFinClasses, []),
+        loadFinancialResource(function () {
+          return getPredictionsByCompetitionId(competitionId, ranchId);
+        }, setFinPredictions, []),
+        loadFinancialResource(function () {
+          return getCompetitionById(competitionId, ranchId);
+        }, setFinCompetition, null),
+        loadFinancialResource(function () {
+          return getFinancialConfigForCompetition(competitionId, ranchId);
+        }, setFinConfig, null),
+      ]);
+    } finally {
+      setFinancialLoading(false);
+    }
   }
 
   async function loadFinancialResource(request, setter, fallback) {
@@ -327,19 +358,6 @@ export default function useCompetitionSummaryPage(options) {
     );
   }
 
-  function getActiveEntriesCountForClass(item) {
-    var classId = getFinClassInCompId(item);
-
-    return finEntries.filter(function (entry) {
-      if (Number(getFinClassInCompId(entry)) !== Number(classId)) {
-        return false;
-      }
-
-      var status = entry.entryStatus || entry.EntryStatus || "Active";
-      return status === "Active";
-    }).length;
-  }
-
   // The whole-competition income projection (entry / stall / shavings bands + bag order). Never
   // per-day: horse-days and unique horses span the entire event. All derivation is read-time.
   var financialProjection = useMemo(
@@ -350,46 +368,26 @@ export default function useCompetitionSummaryPage(options) {
     [finClasses, finPredictions, finConfig],
   );
 
-  // The actual side of the tabs. Entry income is real (Active entries x class cost); the
-  // projected entry-income range it is compared against reuses the same read-time entry band, so
-  // the comparison is like-for-like. hasActualData gates the actual + comparison tabs.
+  // The actual side of the tabs, for the same four sources the projection tab shows (organizer
+  // entries, federation entries, stalls, shavings). "Actual" is the real billed amount from
+  // confirmed bookings (getCompetitionSummary's ExpectedAmount per category) -- the same
+  // accounting basis for all four, never a proxy like entry count x cost. The predicted side
+  // reuses financialProjection's own bands, so Comparison never shows a number Projection itself
+  // does not also show. hasActualData gates the actual + comparison tabs.
   var financialActual = useMemo(
     function () {
-      var items = Array.isArray(finClasses) ? finClasses : [];
-      var entryIncomeActual = 0;
-      var entryIncomePredictedLo = 0;
-      var entryIncomePredictedHi = 0;
-
-      items.forEach(function (item) {
-        var cost = getClassCost(item);
-
-        if (cost === null) {
-          return;
-        }
-
-        entryIncomeActual += getActiveEntriesCountForClass(item) * cost;
-
-        var band = getEntryBandForClass(getPredictionForClass(item));
-
-        if (!band) {
-          return;
-        }
-
-        entryIncomePredictedLo += band.lo * cost;
-        entryIncomePredictedHi += band.hi * cost;
-      });
-
-      return {
-        hasActualData: isRegistrationClosed(finCompetition),
-        entryIncomeActual: entryIncomeActual,
-        entryIncomePredictedLo: entryIncomePredictedLo,
-        entryIncomePredictedHi: entryIncomePredictedHi,
-      };
+      return deriveFinancialActual(
+        financialProjection,
+        summary.organizerCategories,
+        summary.federation,
+        isRegistrationClosed(finCompetition),
+      );
     },
-    [finClasses, finEntries, finPredictions, finCompetition],
+    [financialProjection, summary, finCompetition],
   );
 
   var financialRegistrationClosed = isRegistrationClosed(finCompetition);
+  var financialCompetitionEnded = isCompetitionEnded(finCompetition);
 
   async function importFederationInvoices(file) {
     if (!competitionId || !ranchId) {
@@ -434,15 +432,28 @@ export default function useCompetitionSummaryPage(options) {
     }
   }
 
-  async function loadFederationMatchingSuggestions() {
+  // options.background: a reconciliation refresh after an approval - never
+  // shows the full loading UI and never blanks/replaces error state, so the
+  // rest of the modal (other rows, any success message just set) stays
+  // exactly as it is while this resolves. The full loading UI is reserved
+  // for the genuine initial load (no suggestions on screen yet).
+  async function loadFederationMatchingSuggestions(options) {
     if (!competitionId || !ranchId) {
       return;
     }
 
+    var isBackground = !!(options && options.background);
+    var isInitialLoad = !isBackground && federationMatchingItems.length === 0;
+
     try {
-      setFederationMatchingLoading(true);
-      setFederationMatchingError("");
-      setFederationMatchingSuccess("");
+      if (isInitialLoad) {
+        setFederationMatchingLoading(true);
+      }
+
+      if (!isBackground) {
+        setFederationMatchingError("");
+        setFederationMatchingSuccess("");
+      }
 
       var response = await getFederationMatchingSuggestions(
         competitionId,
@@ -454,12 +465,17 @@ export default function useCompetitionSummaryPage(options) {
       );
     } catch (error) {
       console.error(error);
-      setFederationMatchingError(
-        getErrorMessage(error, "שגיאה בטעינת הצעות התאמה"),
-      );
-      setFederationMatchingItems([]);
+
+      if (!isBackground) {
+        setFederationMatchingError(
+          getErrorMessage(error, "שגיאה בטעינת הצעות התאמה"),
+        );
+        setFederationMatchingItems([]);
+      }
     } finally {
-      setFederationMatchingLoading(false);
+      if (isInitialLoad) {
+        setFederationMatchingLoading(false);
+      }
     }
   }
 
@@ -474,8 +490,11 @@ export default function useCompetitionSummaryPage(options) {
     }
 
     // Explicit dismiss - a later approval, even of the exact same
-    // suggestion or manual entry, is a new intentional action.
-    federationMatchingApproveOperationIdRef.current = null;
+    // suggestion or manual entry, is a new intentional action. Any
+    // suggestion-row request already in flight is NOT aborted (see
+    // approveFederationMatchingSuggestion) - it keeps running against these
+    // refs/setters in the background and settles safely on its own.
+    federationMatchingRowOperationsRef.current = {};
     manualFederationAllocationOperationIdRef.current = null;
 
     setFederationMatchingOpen(false);
@@ -493,10 +512,45 @@ export default function useCompetitionSummaryPage(options) {
     setManualAllocationAmount("");
   }
 
-  async function approveFederationMatchingSuggestion(item) {
-    if (!competitionId || !ranchId || !item) {
-      return;
-    }
+  // Stable row identity for a suggestion - the same creditId-payerId
+  // signature the modal already uses for its table row `key`. Not derived
+  // from array index, and not the full operation signature (which also
+  // includes amount/notes and is used only for the operationId retry check).
+  function getSuggestionRowKey(item) {
+    var federationExternalCreditId = getValue(
+      item,
+      "federationExternalCreditId",
+      "FederationExternalCreditId",
+      0,
+    );
+    var paidByPersonId = getValue(item, "paidByPersonId", "PaidByPersonId", 0);
+
+    return String(federationExternalCreditId) + "-" + String(paidByPersonId);
+  }
+
+  function addFederationMatchingProcessingKey(rowKey) {
+    setFederationMatchingProcessingKeys(function (previous) {
+      var next = new Set(previous);
+      next.add(rowKey);
+      return next;
+    });
+  }
+
+  function removeFederationMatchingProcessingKey(rowKey) {
+    setFederationMatchingProcessingKeys(function (previous) {
+      var next = new Set(previous);
+      next.delete(rowKey);
+      return next;
+    });
+  }
+
+  // Core submission for a single suggestion row - the one place that talks
+  // to the idempotent approve endpoint. Used both by the single-row handler
+  // and, sequentially, by "approve all". Never touches the shared reload/
+  // summary refresh itself - callers decide when to reconcile (once per
+  // single approval, once per whole batch for approve-all).
+  async function submitFederationMatchingRowApproval(item) {
+    var rowKey = getSuggestionRowKey(item);
 
     var federationExternalCreditId = getValue(
       item,
@@ -517,7 +571,7 @@ export default function useCompetitionSummaryPage(options) {
       suggestedAllocatedAmount <= 0
     ) {
       setFederationMatchingError("הצעת ההתאמה אינה תקינה");
-      return;
+      return false;
     }
 
     var approveNotes = "אישור הצעת התאמה ממסך סיכום תחרות";
@@ -530,18 +584,20 @@ export default function useCompetitionSummaryPage(options) {
       notes: approveNotes,
     });
 
+    var pendingOperation =
+      federationMatchingRowOperationsRef.current[rowKey] || null;
+
     var resolvedOperation = resolveOperationId(
-      federationMatchingApproveOperationIdRef.current,
+      pendingOperation,
       approveSignature,
     );
 
-    federationMatchingApproveOperationIdRef.current = resolvedOperation.pending;
+    federationMatchingRowOperationsRef.current[rowKey] =
+      resolvedOperation.pending;
+
+    addFederationMatchingProcessingKey(rowKey);
 
     try {
-      setFederationMatchingApproving(true);
-      setFederationMatchingError("");
-      setFederationMatchingSuccess("");
-
       var response = await approveFederationMatchingSuggestionRequest({
         operationId: resolvedOperation.operationId,
         competitionId: Number(competitionId),
@@ -558,21 +614,96 @@ export default function useCompetitionSummaryPage(options) {
           ? result.message || result.Message
           : "הצעת ההתאמה אושרה בהצלחה";
 
-      // Success clears the pending operation - approving another suggestion
-      // later, even an identical-looking one, is a new intentional action.
-      federationMatchingApproveOperationIdRef.current = null;
+      // Success clears the pending operation - approving this suggestion
+      // again later, even an identical-looking one, is a new intentional
+      // action.
+      delete federationMatchingRowOperationsRef.current[rowKey];
 
       setFederationMatchingSuccess(message);
 
-      await loadFederationMatchingSuggestions();
-      await loadSummary();
+      // Remove only the approved row - the rest of the list is untouched,
+      // so no other row re-renders, remounts, or loses its own state.
+      setFederationMatchingItems(function (previous) {
+        return previous.filter(function (existingItem) {
+          return getSuggestionRowKey(existingItem) !== rowKey;
+        });
+      });
+
+      return true;
     } catch (error) {
       console.error(error);
       setFederationMatchingError(
         getErrorMessage(error, "שגיאה באישור הצעת התאמה"),
       );
+
+      // Failure keeps the pending operation id in the ref (not cleared) so
+      // an identical retry of this exact row reuses it instead of minting a
+      // new one.
+      return false;
     } finally {
-      setFederationMatchingApproving(false);
+      removeFederationMatchingProcessingKey(rowKey);
+    }
+  }
+
+  async function approveFederationMatchingSuggestion(item) {
+    if (!competitionId || !ranchId || !item) {
+      return;
+    }
+
+    var rowKey = getSuggestionRowKey(item);
+
+    if (federationMatchingProcessingKeys.has(rowKey)) {
+      return;
+    }
+
+    setFederationMatchingError("");
+    setFederationMatchingSuccess("");
+
+    var succeeded = await submitFederationMatchingRowApproval(item);
+
+    if (succeeded) {
+      // One best-effort background reconciliation, never blocking or
+      // blanking the list, and never turning a real success into a
+      // reported failure.
+      try {
+        await loadFederationMatchingSuggestions({ background: true });
+        await loadSummary();
+      } catch (refreshError) {
+        console.error(refreshError);
+      }
+    }
+  }
+
+  async function approveAllFederationMatchingSuggestions() {
+    if (!competitionId || !ranchId || federationMatchingBulkRunning) {
+      return;
+    }
+
+    var approvableItems = federationMatchingItems.filter(function (item) {
+      return !federationMatchingProcessingKeys.has(getSuggestionRowKey(item));
+    });
+
+    if (approvableItems.length === 0) {
+      return;
+    }
+
+    setFederationMatchingBulkRunning(true);
+    setFederationMatchingError("");
+    setFederationMatchingSuccess("");
+
+    for (var i = 0; i < approvableItems.length; i++) {
+      // Sequential by design (no Promise.all) - each row gets its own
+      // operation id and a failure here does not stop the remaining rows.
+      await submitFederationMatchingRowApproval(approvableItems[i]);
+    }
+
+    setFederationMatchingBulkRunning(false);
+
+    try {
+      await loadFederationMatchingSuggestions({ background: true });
+      await loadSummary();
+    } catch (refreshError) {
+      console.error(refreshError);
     }
   }
 
@@ -1353,6 +1484,8 @@ export default function useCompetitionSummaryPage(options) {
     financialProjection: financialProjection,
     financialActual: financialActual,
     financialRegistrationClosed: financialRegistrationClosed,
+    financialCompetitionEnded: financialCompetitionEnded,
+    financialLoading: financialLoading,
 
     detailsModal: detailsModal,
     detailsItems: detailsItems,
@@ -1409,6 +1542,8 @@ export default function useCompetitionSummaryPage(options) {
     federationInvoiceImportSuccess: federationInvoiceImportSuccess,
     federationInvoiceImportResult: federationInvoiceImportResult,
     importFederationInvoices: importFederationInvoices,
+    dismissFederationInvoiceImportMessages:
+      dismissFederationInvoiceImportMessages,
 
     federationMatchingOpen: federationMatchingOpen,
     federationMatchingItems: federationMatchingItems,
@@ -1416,10 +1551,16 @@ export default function useCompetitionSummaryPage(options) {
     federationMatchingApproving: federationMatchingApproving,
     federationMatchingError: federationMatchingError,
     federationMatchingSuccess: federationMatchingSuccess,
+    federationMatchingProcessingRowKeys: Array.from(
+      federationMatchingProcessingKeys,
+    ),
+    federationMatchingBulkRunning: federationMatchingBulkRunning,
     openFederationMatchingModal: openFederationMatchingModal,
     closeFederationMatchingModal: closeFederationMatchingModal,
     loadFederationMatchingSuggestions: loadFederationMatchingSuggestions,
     approveFederationMatchingSuggestion: approveFederationMatchingSuggestion,
+    approveAllFederationMatchingSuggestions:
+      approveAllFederationMatchingSuggestions,
 
     federationMatchingActiveTab: federationMatchingActiveTab,
     changeFederationMatchingTab: changeFederationMatchingTab,

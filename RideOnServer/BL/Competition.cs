@@ -170,10 +170,7 @@ namespace RideOnServer.BL
             }
 
             return list
-                .Where(item =>
-                    item.CompetitionStatus == CompetitionStatuses.Active ||
-                    item.CompetitionStatus == CompetitionStatuses.Current ||
-                    item.CompetitionStatus == CompetitionStatuses.Future)
+                .Where(item => item.CompetitionStatus != CompetitionStatuses.Draft)
                 .OrderBy(item => item.CompetitionStartDate)
                 .ToList();
         }
@@ -193,66 +190,48 @@ namespace RideOnServer.BL
             CompetitionDAL dal = new CompetitionDAL();
             List<Competition> list = dal.GetCompetitionsForMobilePayer(ranchId, personId);
 
-            DateTime today = DateTime.Today;
-
             foreach (Competition item in list)
             {
                 item.CompetitionStatus = CalculateEffectiveStatus(item);
             }
 
+            // Payer board shows the whole catalog (every competition except a
+            // draft), mirroring the admin board (see GetAllCompetitionsForMobileAdmin).
+            // The proc usp_getcompetitionsformobilepayer returns all competitions
+            // and still flags HasParticipated, which the client uses to sort the
+            // payer's enrolled competitions first. No ranch/registration gating
+            // here: a payer must be able to discover and enter any competition,
+            // not only ones their own ranch hosts or that they already joined.
             return list
-                .Where(item => IsVisibleOnPayerBoard(item, today))
+                .Where(item => item.CompetitionStatus != CompetitionStatuses.Draft)
                 .OrderBy(item => item.CompetitionStartDate)
                 .ToList();
         }
 
-        // Payer-board visibility:
-        // - Drafts: never shown (incl. a competition reverted from active to draft).
-        // - Enrolled: shown regardless of ranch; a cancelled one lingers 30 days past its end date.
-        // - Not enrolled: only future competitions at the selected ranch.
-        private const int CancelledVisibilityDays = 30;
-
-        private static bool IsVisibleOnPayerBoard(Competition item, DateTime today)
+        internal static List<Competition> GetCompetitionsForMobileAdminHome(int ranchId)
         {
-            string status = item.CompetitionStatus ?? string.Empty;
-
-            if (status == CompetitionStatuses.Draft)
+            if (ranchId <= 0)
             {
-                return false;
-            }
-
-            if (item.HasParticipated)
-            {
-                if (status == CompetitionStatuses.Cancelled)
-                {
-                    return today <= item.CompetitionEndDate.Date.AddDays(CancelledVisibilityDays);
-                }
-
-                return true;
-            }
-
-            return status == CompetitionStatuses.Future;
-        }
-
-        internal static List<Competition> GetCompetitionsForMobileAdminHome(int systemUserId)
-        {
-            if (systemUserId <= 0)
-            {
-                throw new Exception("SystemUserId is invalid");
+                throw new Exception("RanchId is invalid");
             }
 
             CompetitionDAL dal = new CompetitionDAL();
-            List<Competition> list = dal.GetCompetitionsForMobileAdminHome(systemUserId);
+            List<Competition> list = dal.GetCompetitionsForMobileAdminHome(ranchId);
 
             foreach (Competition item in list)
             {
                 item.CompetitionStatus = CalculateEffectiveStatus(item);
             }
 
+            // Admin home only ever shows a live or upcoming competition, even
+            // if the raw stored status (filtered in the proc) recomputes to
+            // Finished/Cancelled here via CalculateEffectiveStatus.
             return list
-                .Where(item => item.CompetitionStatus != CompetitionStatuses.Draft)
-                .OrderBy(item => item.CompetitionStartDate)
-                .Take(2)
+                .Where(item =>
+                    item.CompetitionStatus == CompetitionStatuses.Current ||
+                    item.CompetitionStatus == CompetitionStatuses.Active ||
+                    item.CompetitionStatus == CompetitionStatuses.Future)
+                .Take(3)
                 .ToList();
         }
 

@@ -560,6 +560,47 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("{id}/edit-detail")]
+        public IActionResult GetPaidTimeRequestEditDetail(
+            int id,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (id <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                PaidTimeRequestEditDetail? detail =
+                    PaidTimeRequest.GetPaidTimeRequestEditDetail(id, ranchId);
+
+                if (detail == null)
+                {
+                    return NotFound("בקשת הפייד-טיים לא נמצאה");
+                }
+
+                return Ok(detail);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetPaidTimeRequestEditDetail: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpGet("slot-schedule")]
         public IActionResult GetSlotScheduleForViewing(
             [FromQuery] int slotId,

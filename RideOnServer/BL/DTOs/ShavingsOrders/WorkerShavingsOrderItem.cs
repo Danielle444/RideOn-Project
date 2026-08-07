@@ -19,5 +19,16 @@ namespace RideOnServer.BL.DTOs.ShavingsOrders
         public int? WorkerSystemUserId { get; set; }
         public string? WorkerFirstName { get; set; }
         public string? WorkerLastName { get; set; }
+
+        // RanchWorker cancellation lifecycle: own-order state, computed from the shavings
+        // order's own productchangerequest (same technique as CompetitionShavingsOrderListItem).
+        public bool IsCancelled { get; set; }
+        public bool HasPendingCancellation { get; set; }
+
+        // Delivery destination (Slice 1): supersedes StallNumber above, which is now a typed
+        // NULL from the proc (legacy compatibility only, no longer backed by a real join).
+        // Empty list means no assigned destination yet, not "no data returned".
+        public List<ShavingsDestinationCompound> DeliveryDestinations { get; set; } = new();
+        public bool HasUnassignedStalls { get; set; }
     }
 }

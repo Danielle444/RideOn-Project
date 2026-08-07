@@ -1,3 +1,10 @@
+-- RANCH-MODEL CORRECTION (2026-08-05, owner-approved architecture fix):
+-- p_ranchid means the guest/requesting ranch (no host-ranch validation
+-- exists in this proc). Filter changed from sb.ranchid = p_ranchId to
+-- sb.requestingranchid = p_ranchId (see
+-- migrations/add_stallbooking_requestingranchid.sql). No other behavior
+-- changed.
+
 CREATE OR REPLACE FUNCTION public.usp_getallshavingsorderpayersforcompetitionandranch(p_competitionid integer, p_ranchid integer)
  RETURNS TABLE(shavingsorderid integer, billid integer, paidbypersonid integer, payerfullname text, amounttopay numeric, dateopened timestamp with time zone, dateclosed timestamp with time zone)
  LANGUAGE plpgsql
@@ -26,7 +33,7 @@ BEGIN
     INNER JOIN stallbooking sb
         ON sb.stallbookingid = sosb.stallbookingid
     WHERE pr.competitionid = p_competitionId
-      AND sb.ranchid = p_ranchId
+      AND sb.requestingranchid = p_ranchId
     ORDER BY so.shavingsorderid, payerfullname;
 END;
 $function$;

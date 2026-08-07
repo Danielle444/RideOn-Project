@@ -68,6 +68,20 @@ const workerStyles = StyleSheet.create({
   doneButton: {
     backgroundColor: "#D4C9C5",
   },
+
+  // Delivery-destination presentation — same warm-orange informational color the web
+  // Secretary table already uses for these two states (ShavingsDestinationCell.jsx), kept
+  // consistent across apps rather than inventing a second color for the same meaning.
+  destinationUnassignedText: {
+    color: "#B26A00",
+  },
+
+  destinationWarningText: {
+    textAlign: "right",
+    color: "#B26A00",
+    fontSize: 13,
+    marginTop: 2,
+  },
 });
 
 export default workerStyles;

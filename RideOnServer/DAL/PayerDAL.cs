@@ -619,6 +619,54 @@ namespace RideOnServer.DAL
             }
         }
 
+        // Self-service path (fix/payer-proc212-self-service-hardening): a
+        // distinct proc, usp_getmypayercompetitionaccount, not a mode flag on
+        // usp_getpayercompetitionaccount above. payerPersonId here is always
+        // the JWT-authenticated caller's own id - Payer.GetMyPayerCompetitionAccount
+        // and PayersController.GetMyCompetitionAccount both enforce that; this
+        // method has no adminsystemuserid parameter to bind because the proc
+        // itself takes none.
+        public string GetMyPayerCompetitionAccount(
+            int payerPersonId,
+            int competitionId,
+            int ranchId
+        )
+        {
+            Dictionary<string, object> paramDic = new Dictionary<string, object>
+            {
+                { "@p_competitionid", competitionId },
+                { "@p_ranchid", ranchId },
+                { "@p_payerpersonid", payerPersonId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure(
+                        "usp_getmypayercompetitionaccount",
+                        connection,
+                        paramDic))
+                    {
+                        object? result = command.ExecuteScalar();
+
+                        if (result == null || result == DBNull.Value)
+                        {
+                            return "{}";
+                        }
+
+                        return result.ToString() ?? "{}";
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
         public List<CompetitionPayerForSecretaryItem> GetCompetitionPayersForSecretary(
             int competitionId,
             int secretarySystemUserId)

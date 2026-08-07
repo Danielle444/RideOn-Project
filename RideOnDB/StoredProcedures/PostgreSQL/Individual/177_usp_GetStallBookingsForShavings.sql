@@ -1,3 +1,11 @@
+-- RANCH-MODEL CORRECTION (2026-08-05, owner-approved architecture fix):
+-- p_ranchid means the guest/requesting ranch (no host-ranch validation
+-- exists in this proc). Filter changed from sb.ranchid = p_ranchId to
+-- sb.requestingranchid = p_ranchId (see
+-- migrations/add_stallbooking_requestingranchid.sql) so this shavings-order
+-- stall picker keeps showing only the caller's own ranch's non-tack stalls
+-- once stallbooking.ranchid means host ranch. No other behavior changed.
+
 CREATE OR REPLACE FUNCTION public.usp_getstallbookingsforshavings(p_competitionid integer, p_ranchid integer)
  RETURNS TABLE(stallbookingid integer, horseid integer, horsename character varying, startdate date, enddate date, compoundid smallint, stallid smallint, payernames text)
  LANGUAGE plpgsql
@@ -31,7 +39,7 @@ BEGIN
         ON pcr.originalprequestid = pr.prequestid
        AND pcr.status = 'Approved'
     WHERE pr.competitionid = p_competitionId
-      AND sb.ranchid = p_ranchId
+      AND sb.requestingranchid = p_ranchId
       AND sb.isfortack = false
       AND (
             pcr.productchangerequestid IS NULL

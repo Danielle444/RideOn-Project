@@ -20,6 +20,38 @@ var SLOT_EXPLANATION =
 
 var LOCK_EXPLANATION = "שמירת בחירה לבקשה הבאה - הנעילה שומרת את הערך גם אחרי שליחה.";
 
+// זהה לסולם שהיה ב-PaidTimeEditModal (שהוחלף בטופס הזה, CAP-1) - אותן
+// מחרוזות עברית מאושרות, לא ניסוח חדש.
+function getTypeLockReason(props) {
+  if (!props.isEditMode) {
+    return null;
+  }
+
+  if (props.editStatus === "Cancelled") {
+    return "הבקשה בוטלה";
+  }
+
+  if (!props.editCanCancel) {
+    return "הבקשה שולמה - לא ניתן לשנות סוג";
+  }
+
+  if (!props.editCanModify) {
+    return "נותרו <24h - שינוי סוג חסום";
+  }
+
+  return null;
+}
+
+function getSlotLockReason(props) {
+  if (!props.isEditMode || props.editCanCancel) {
+    return null;
+  }
+
+  return props.editStatus === "Cancelled"
+    ? "הבקשה בוטלה"
+    : "הבקשה שולמה - לא ניתן לשנות סלוט";
+}
+
 function LockButton(props) {
   return (
     <Pressable
@@ -68,6 +100,11 @@ export default function CompetitionPaidTimeFormCard(props) {
   var cardOffsetRef = useRef(0);
   var sectionOffsetsRef = useRef({});
 
+  // זוכר את מזהה הסלוט שהרזולוציה האוטומטית (האפקט שלמטה) בחרה לאחרונה, כדי
+  // להבחין בין "המשתמשת מנקה את המדרג" לבין "הסלוט אופס מבחוץ" - ראו ההסבר
+  // המלא ליד אותו אפקט (הגנת ה-החייאה שמונעת את לולאת ה-Maximum update depth).
+  var lastAutoResolvedSlotIdRef = useRef(null);
+
   var fieldErrors = props.fieldErrors || {};
   var scrollRequest = props.scrollRequest || null;
   var onScrollToOffset = props.onScrollToOffset;
@@ -81,6 +118,21 @@ export default function CompetitionPaidTimeFormCard(props) {
   var requestableSlots = Array.isArray(props.requestableSlots)
     ? props.requestableSlots
     : [];
+
+  // CAP-1: סוס/רוכב/מאמן/משלם נעולים תמיד במצב עריכה - הם מוצגים מלאים
+  // מראש (hydration ב-useAdminCompetitionPaidTimes) אבל לעולם לא נכתבים
+  // מחדש דרך usp_updatepaidtimerequest. props.payerFieldDisabled (נעילת
+  // ה-payer-account, מצב יצירה) ממשיך לחול גם כשלא במצב עריכה.
+  var identityFieldsDisabled = !!props.isEditMode;
+  var payerFieldDisabled = !!props.payerFieldDisabled || identityFieldsDisabled;
+
+  var typeLockReason = getTypeLockReason(props);
+  var typeFieldDisabled = !!typeLockReason;
+
+  var slotLockReason = getSlotLockReason(props);
+  var slotFieldDisabled = !!slotLockReason;
+
+  var notesFieldDisabled = !!props.isEditMode && !props.editCanCancel;
 
   var [cascadeDate, setCascadeDate] = useState(null);
   var [cascadeTimeOfDay, setCascadeTimeOfDay] = useState(null);
@@ -193,6 +245,16 @@ export default function CompetitionPaidTimeFormCard(props) {
   // רזולוציה אוטומטית: ברגע שהמדרג מוביל לסלוט יחיד, זה הסלוט שנבחר בפועל.
   // אם המדרג עדיין לא חד-משמעי (0 או יותר מ-1 אחרי הבחירה המלאה), לא נשלח
   // סלוט לא ודאי - השדה נשאר ריק עד לבחירה נוספת בשלב הניקוי הסופי.
+  //
+  // הגנת "החייאה" (lastAutoResolvedSlotIdRef): האפקט הזה (מדרג ← סלוט) והאפקט
+  // שלמעלה (סלוט ← מדרג) יוצרים טבעת דו-כיוונית עם פיגור של commit אחד. כשהסלוט
+  // מתאפס מבחוץ - האיפוס של השדות הלא-נעולים אחרי שליחה מוצלחת - בזמן שהמדרג
+  // עדיין מצביע על אותו סלוט (למשל המגרש עדיין "B2W"), שני האפקטים קופצים אחד
+  // מעל השני בכל רינדור: האפקט הזה "מחייה" את הסלוט מ-null חזרה ל-S כי הוא קורא
+  // מדרג ישן, והאפקט שלמעלה מנקה את המדרג ל-null כי הסלוט התאפס - וחוזר חלילה,
+  // עד ש-React זורק "Maximum update depth exceeded". לכן: אם המדרג עדיין מוביל
+  // בדיוק לסלוט שהאפקט הזה בחר לאחרונה אבל הסלוט כרגע ריק, זו הייתה נקייה
+  // מכוונת מבחוץ - לא מחזירים אותו, ונותנים לאפקט המדרג לסיים את הניקוי.
   useEffect(
     function () {
       if (needsFinalDisambiguation) {
@@ -210,9 +272,24 @@ export default function CompetitionPaidTimeFormCard(props) {
         ? resolvedSlot.paidTimeSlotInCompId
         : null;
 
-      if (currentSlotId !== resolvedSlotId) {
-        props.setSelectedRequestedSlot(resolvedSlot);
+      if (currentSlotId === resolvedSlotId) {
+        // כבר מסונכרן (כולל שניהם ריקים) - מעדכנים את הזיכרון ולא כותבים שוב.
+        lastAutoResolvedSlotIdRef.current = resolvedSlotId;
+        return;
       }
+
+      if (
+        currentSlotId === null &&
+        resolvedSlotId !== null &&
+        resolvedSlotId === lastAutoResolvedSlotIdRef.current
+      ) {
+        // הסלוט נוקה מבחוץ (איפוס אחרי שליחה) והמדרג עדיין תקוע על הערך הישן -
+        // לא מחייים אותו, אחרת נכנסים ללולאה אינסופית מול אפקט המדרג שלמעלה.
+        return;
+      }
+
+      props.setSelectedRequestedSlot(resolvedSlot);
+      lastAutoResolvedSlotIdRef.current = resolvedSlotId;
     },
     [slotsForFullSelection, needsFinalDisambiguation, props.selectedRequestedSlot],
   );
@@ -296,6 +373,7 @@ export default function CompetitionPaidTimeFormCard(props) {
           onToggleLock={function () {
             props.onToggleLock("requestedSlot");
           }}
+          disabled={slotFieldDisabled}
         />
 
         {cascadeDate !== null && needsTimeOfDayStep ? (
@@ -368,10 +446,15 @@ export default function CompetitionPaidTimeFormCard(props) {
             onToggleLock={function () {
               props.onToggleLock("requestedSlot");
             }}
+            disabled={slotFieldDisabled}
           />
         ) : null}
 
         <FieldError message={fieldErrors.requestedSlot} />
+
+        {slotLockReason ? (
+          <Text style={styles.formSectionHint}>{slotLockReason}</Text>
+        ) : null}
 
         {slotSummary ? (
           <View style={styles.selectionSummaryCard}>
@@ -420,12 +503,17 @@ export default function CompetitionPaidTimeFormCard(props) {
                   style={[
                     styles.typeCard,
                     isSelected ? styles.typeCardActive : null,
+                    typeFieldDisabled ? styles.typeCardDisabled : null,
                   ]}
+                  disabled={typeFieldDisabled}
                   onPress={function () {
                     handleSelectPriceCatalog(item);
                   }}
                   accessibilityRole="radio"
-                  accessibilityState={{ selected: isSelected }}
+                  accessibilityState={{
+                    selected: isSelected,
+                    disabled: typeFieldDisabled,
+                  }}
                   accessibilityLabel={summary.productName}
                 >
                   <Ionicons
@@ -458,6 +546,10 @@ export default function CompetitionPaidTimeFormCard(props) {
         )}
 
         <FieldError message={fieldErrors.priceCatalog} />
+
+        {typeLockReason ? (
+          <Text style={styles.formSectionHint}>{typeLockReason}</Text>
+        ) : null}
 
         {typeSummary && typeSummary.priceLabel ? (
           <View style={styles.infoNote}>
@@ -493,6 +585,7 @@ export default function CompetitionPaidTimeFormCard(props) {
             onToggleLock={function () {
               props.onToggleLock("coach");
             }}
+            disabled={identityFieldsDisabled}
           />
 
           <FieldError message={fieldErrors.coach} />
@@ -514,6 +607,7 @@ export default function CompetitionPaidTimeFormCard(props) {
             onToggleLock={function () {
               props.onToggleLock("horse");
             }}
+            disabled={identityFieldsDisabled}
           />
 
           <FieldError message={fieldErrors.horse} />
@@ -535,6 +629,7 @@ export default function CompetitionPaidTimeFormCard(props) {
             onToggleLock={function () {
               props.onToggleLock("rider");
             }}
+            disabled={identityFieldsDisabled}
           />
 
           <FieldError message={fieldErrors.rider} />
@@ -556,7 +651,7 @@ export default function CompetitionPaidTimeFormCard(props) {
             onToggleLock={function () {
               props.onToggleLock("payer");
             }}
-            disabled={props.payerFieldDisabled}
+            disabled={payerFieldDisabled}
           />
 
           <FieldError message={fieldErrors.payer} />
@@ -590,6 +685,7 @@ export default function CompetitionPaidTimeFormCard(props) {
             style={[styles.textInput, styles.notesInput]}
             textAlign="right"
             multiline={true}
+            editable={!notesFieldDisabled}
           />
 
           <Text style={styles.formSectionHint}>שדה רשות.</Text>

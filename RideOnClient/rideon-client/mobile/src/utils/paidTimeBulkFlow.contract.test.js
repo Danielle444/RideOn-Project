@@ -200,11 +200,20 @@ describe("the smart entry still opens the existing bulk flow", () => {
     expect(screen).toContain("setIsChatbotOpen(true)");
   });
 
-  it("the single-request entry still routes the bulk option to the smart flow", () => {
+  // CAP-4 (Admin Paid-Time Unify, 2026-08-07): AddPaidTimeButton no longer
+  // navigates away or offers a single/bulk chooser - it mounts
+  // PaidTimeCreateModal in place with a wider (payerSource="managed") payer
+  // selector. This is a deliberate contract change to THIS button only; the
+  // bulk/chatbot flow itself is untouched and still reachable from the
+  // AdminCompetitionRegistrations screen's own SmartBookingFab, asserted
+  // above and in the modal check below.
+  it("the single-request entry mounts the in-place form, not the old navigate-away flow", () => {
     var button = read("components/competitions/adminPaidTimes/AddPaidTimeButton.jsx");
 
-    expect(button).toContain("openSmartBooking");
-    expect(button).toContain("AdminCompetitionRegistrations");
+    expect(button).toContain("PaidTimeCreateModal");
+    expect(button).toContain('payerSource="managed"');
+    expect(button).not.toContain("openSmartBooking");
+    expect(button).not.toContain("AdminCompetitionRegistrations");
   });
 
   it("the modal still drives the flow through usePaidTimeChatbot", () => {

@@ -1,18 +1,20 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import {
-  getRidersByRanch,
-  getTrainersByRanch,
-} from "../services/federationMembersService";
+import { getTrainersByRanch } from "../services/federationMembersService";
 import { getCompetitionInvitationDetails } from "../services/competitionService";
-import { getHorsesByRanch } from "../services/horsesService";
+import { getPaidTimeCandidatesByRanch } from "../services/entriesService";
 import { getManagedPayers } from "../services/payerService";
-import { createPaidTimeRequest } from "../services/paidTimeRequestsService";
+import {
+  createPaidTimeRequest,
+  getPaidTimeRequestEditDetail,
+  updatePaidTimeRequestNotes,
+} from "../services/paidTimeRequestsService";
 import {
   validatePaidTimeForm,
   clearFieldError,
   buildPaidTimeReviewModel,
   buildPaidTimeRequestPayload,
+  buildPaidTimeUpdatePayload,
   buildSuccessSnapshot,
   getHebrewDateLabel,
   formatDisplayTime,
@@ -22,6 +24,9 @@ import {
 
 var CREATE_ERROR_MESSAGE =
   "אירעה שגיאה בשמירת בקשת הפייד טיים. אנא נסי שוב.";
+var EDIT_ERROR_MESSAGE =
+  "אירעה שגיאה בעדכון בקשת הפייד טיים. אנא נסי שוב.";
+var EDIT_NOT_FOUND_MESSAGE = "בקשת הפייד-טיים לא נמצאה";
 
 function normalizeHorseItem(item) {
   if (!item) {
@@ -54,6 +59,8 @@ function normalizeFederationMemberItem(item) {
     fullName:
       item.fullName ||
       item.FullName ||
+      item.riderName ||
+      item.RiderName ||
       (
         (item.firstName || item.FirstName || "") +
         " " +
@@ -68,18 +75,45 @@ function normalizePayerItem(item) {
   }
 
   return {
-    personId: item.personId || item.PersonId || null,
+    personId:
+      item.personId ||
+      item.PersonId ||
+      item.paidByPersonId ||
+      item.PaidByPersonId ||
+      null,
     firstName: item.firstName || item.FirstName || "",
     lastName: item.lastName || item.LastName || "",
     fullName:
       item.fullName ||
       item.FullName ||
+      item.payerName ||
+      item.PayerName ||
       (
         (item.firstName || item.FirstName || "") +
         " " +
         (item.lastName || item.LastName || "")
       ).trim(),
   };
+}
+
+// דה-דופ של שורות מועמדים לפי מפתח, בסדר ההופעה הראשון - ל-CAP-1
+// (הורדת הכפילויות מ-usp_getpaidtimecandidatesbyranch, שמחזירה שורה לכל entry).
+function dedupeByKey(items, keyGetter) {
+  var seen = {};
+  var result = [];
+
+  items.forEach(function (item) {
+    var key = keyGetter(item);
+
+    if (key === null || key === undefined || key === "" || seen[key]) {
+      return;
+    }
+
+    seen[key] = true;
+    result.push(item);
+  });
+
+  return result;
 }
 
 function normalizePaidTimeSlotItem(item) {
@@ -182,6 +216,18 @@ export default function useAdminCompetitionPaidTimes(params) {
   var competitionId = params.competitionId;
   // רק לתצוגה במסך האישור. אם המסך לא מספק שם תחרות, פשוט לא מוצגת שורה.
   var competitionName = params.competitionName || "";
+  // CAP-1: כשמסופק, ה-hook הזה עובד במצב עריכה של בקשה קיימת במקום יצירה.
+  // מצב ה-hook (יצירה מול עריכה) נקבע פעם אחת ב-mount - כל מסך שמייצר
+  // פתיחה חדשה עבור בקשה אחרת ממקם מופע חדש של CompetitionPaidTimeFormCard/
+  // useAdminCompetitionPaidTimes (mount מותנה), לא מחליף פרמטר על מופע קיים.
+  var editPaidTimeRequestId = params.editPaidTimeRequestId || null;
+  var isEditMode = !!editPaidTimeRequestId;
+  // CAP-4: "managed" = usp_getmanagedpayersbysystemuser (המשלמים המנוהלים
+  // המאושרים של החווה - רשימה רחבה יותר), במקום ברירת המחדל (מועמדים לפי
+  // usp_getpaidtimecandidatesbyranch, רק משלמים שכבר משויכים למקצה שנרשם
+  // בפועל בתחרות זו). נבחר ע"י הקורא של ה-Add הבלתי-נעול בלבד - זרימת
+  // ה-Add הנעולה (payer-account) וזרימת העריכה ממשיכות במקור הקיים.
+  var payerSource = params.payerSource === "managed" ? "managed" : "candidates";
 
   var [horses, setHorses] = useState([]);
   var [riders, setRiders] = useState([]);
@@ -227,6 +273,23 @@ export default function useAdminCompetitionPaidTimes(params) {
   var [successSnapshot, setSuccessSnapshot] = useState(null);
   var [isSuccessOpen, setIsSuccessOpen] = useState(false);
 
+  // CAP-1: gating מהפרוצדורה החדשה usp_getpaidtimerequestforedit, ברירת
+  // מחדל חופשית (true/true) כדי שמצב יצירה לעולם לא ייחסם בטעות לפני
+  // שהעריכה בכלל נטענה.
+  var [editGating, setEditGating] = useState({
+    canModify: true,
+    canCancel: true,
+    status: null,
+  });
+  var [editLoadError, setEditLoadError] = useState("");
+  // עולה ב-1 בכל שמירת עריכה מוצלחת - הצרכן (PaidTimeCreateModal) מאזין
+  // לשינוי כדי לסגור את המודל, בלי לעבור דרך מסך סקירה/הצלחה שלא מתאים
+  // לזרימת עריכה.
+  var [editSaveVersion, setEditSaveVersion] = useState(0);
+  // מבטיח שפרטי העריכה נטענים ומיישרים את הטופס פעם אחת בלבד - לא בכל
+  // focus חוזר, כדי לא לדרוס בחירות שהמשתמשת כבר שינתה באמצע עריכה.
+  var hasHydratedEditRef = useRef(false);
+
   useFocusEffect(
     useCallback(
       function () {
@@ -249,23 +312,49 @@ export default function useAdminCompetitionPaidTimes(params) {
       setLoading(true);
       setScreenError("");
 
+      // CAP-1: פרטי העריכה נטענים באותו Promise.all, פעם אחת בלבד
+      // (hasHydratedEditRef), כדי לא לשלוח בקשה מיותרת בכל focus חוזר.
+      var shouldLoadEditDetail = isEditMode && !hasHydratedEditRef.current;
+      // CAP-4: מקור משלם רחב (usp_getmanagedpayersbysystemuser) רק כשמבקשים
+      // אותו במפורש - ראו payerSource למעלה. שני המצבים האחרים (יצירה עם
+      // משלם נעול, עריכה) ממשיכים במקור המועמדים הקיים בלי שינוי.
+      var shouldLoadManagedPayers = payerSource === "managed";
+
+      // חמישה "משבצות" קבועות (חלקן Promise.resolve(null) כשלא רלוונטיות)
+      // כדי ש-results[i] יישאר יציב בלי תלות באילו מהן בפועל נטענו.
       var results = await Promise.all([
         getCompetitionInvitationDetails(
           competitionId,
           activeRole.roleId,
           activeRole.ranchId,
         ),
-        getHorsesByRanch(activeRole.ranchId, null),
-        getManagedPayers(activeRole.ranchId, null, null),
-        getRidersByRanch(activeRole.ranchId, null),
+        getPaidTimeCandidatesByRanch(competitionId, activeRole.ranchId),
         getTrainersByRanch(activeRole.ranchId, null),
+        shouldLoadEditDetail
+          ? getPaidTimeRequestEditDetail(
+              editPaidTimeRequestId,
+              activeRole.ranchId,
+            )
+          : Promise.resolve(null),
+        shouldLoadManagedPayers
+          ? getManagedPayers(activeRole.ranchId, null, "Approved")
+          : Promise.resolve(null),
       ]);
 
       var invitationResponse = results[0];
-      var horsesResponse = results[1];
-      var payersResponse = results[2];
-      var ridersResponse = results[3];
-      var trainersResponse = results[4];
+      var candidatesResponse = results[1];
+      var trainersResponse = results[2];
+      var editDetailResponse = shouldLoadEditDetail ? results[3] : null;
+      var managedPayersResponse = shouldLoadManagedPayers ? results[4] : null;
+
+      // CAP-1: מקור אחד לסוס/רוכב/משלם - רק בעלי חיים/גורמים הרשומים
+      // בפועל למקצה בתחרות הזו (usp_getpaidtimecandidatesbyranch), במקום
+      // כל בעלי החיים/גורמי החווה כולל "רוחות רפאים". המאמן נשאר מכל
+      // מאמני החווה (getTrainersByRanch) - הפרוצדורה מסננת מאמן חובה,
+      // כך שרשימת מאמנים ממנה תהיה חסרה.
+      var candidateRows = Array.isArray(candidatesResponse?.data)
+        ? candidatesResponse.data
+        : [];
 
       var incomingSlots = Array.isArray(invitationResponse?.data?.paidTimeSlots)
         ? invitationResponse.data.paidTimeSlots
@@ -289,53 +378,138 @@ export default function useAdminCompetitionPaidTimes(params) {
         ? paidTimeSection.items
         : [];
 
-      setRequestableSlots(
-        incomingSlots
-          .map(function (item) {
-            return normalizePaidTimeSlotItem(item);
-          })
-          .filter(Boolean),
-      );
+      var nextRequestableSlots = incomingSlots
+        .map(function (item) {
+          return normalizePaidTimeSlotItem(item);
+        })
+        .filter(Boolean);
 
-      setPriceCatalogItems(
-        incomingPriceItems
-          .map(function (item) {
-            return normalizePriceCatalogItem(item);
-          })
-          .filter(Boolean),
-      );
+      var nextPriceCatalogItems = incomingPriceItems
+        .map(function (item) {
+          return normalizePriceCatalogItem(item);
+        })
+        .filter(Boolean);
 
-      setHorses(
-        (Array.isArray(horsesResponse?.data) ? horsesResponse.data : [])
-          .map(function (item) {
-            return normalizeHorseItem(item);
-          })
-          .filter(Boolean),
-      );
+      var nextHorses = dedupeByKey(candidateRows, function (item) {
+        return item.horseId || item.HorseId || null;
+      })
+        .map(function (item) {
+          return normalizeHorseItem(item);
+        })
+        .filter(Boolean);
 
-      setPayers(
-        (Array.isArray(payersResponse?.data) ? payersResponse.data : [])
-          .map(function (item) {
-            return normalizePayerItem(item);
+      // CAP-4: מקור המשלם ל-Add הבלתי-נעול הוא usp_getmanagedpayersbysystemuser
+      // (רשימה רחבה - המשלמים המנוהלים המאושרים של החווה), לא מוגבל למי
+      // שכבר משויך למקצה שנרשם. normalizePayerItem כבר דו-casing-מגונן
+      // (personId/PersonId, fullName/FullName) - נעשה בו שימוש חוזר ישירות,
+      // בלי מתאם חדש; usp_insertpaidtimerequest מוודא רק שהמשלם קיים
+      // כאדם, כך שרשימה רחבה יותר לא מפרה את כלל היצירה.
+      var nextPayers = shouldLoadManagedPayers
+        ? (Array.isArray(managedPayersResponse?.data)
+            ? managedPayersResponse.data
+            : []
+          )
+            .map(function (item) {
+              return normalizePayerItem(item);
+            })
+            .filter(Boolean)
+        : dedupeByKey(candidateRows, function (item) {
+            return item.paidByPersonId || item.PaidByPersonId || null;
           })
-          .filter(Boolean),
-      );
+            .map(function (item) {
+              return normalizePayerItem(item);
+            })
+            .filter(Boolean);
 
-      setRiders(
-        (Array.isArray(ridersResponse?.data) ? ridersResponse.data : [])
-          .map(function (item) {
-            return normalizeFederationMemberItem(item);
-          })
-          .filter(Boolean),
-      );
+      var nextRiders = dedupeByKey(candidateRows, function (item) {
+        return (
+          item.riderFederationMemberId || item.RiderFederationMemberId || null
+        );
+      })
+        .map(function (item) {
+          return normalizeFederationMemberItem(item);
+        })
+        .filter(Boolean);
 
-      setTrainers(
-        (Array.isArray(trainersResponse?.data) ? trainersResponse.data : [])
-          .map(function (item) {
-            return normalizeFederationMemberItem(item);
-          })
-          .filter(Boolean),
-      );
+      var nextTrainers = (
+        Array.isArray(trainersResponse?.data) ? trainersResponse.data : []
+      )
+        .map(function (item) {
+          return normalizeFederationMemberItem(item);
+        })
+        .filter(Boolean);
+
+      setRequestableSlots(nextRequestableSlots);
+      setPriceCatalogItems(nextPriceCatalogItems);
+      setHorses(nextHorses);
+      setPayers(nextPayers);
+      setRiders(nextRiders);
+      setTrainers(nextTrainers);
+
+      // CAP-1: יישור הטופס עם בקשה קיימת, פעם אחת. הסלוט חייב להיפתר בתוך
+      // requestableSlots (לא מסונתז) כדי שהמדרג תאריך/חלק-יום/מגרש/שעה-מדויקת
+      // ב-CompetitionPaidTimeFormCard יתמלא נכון - אם הבקשה מצביעה על סלוט
+      // שאינו ברשימה (למשל תאריך שכבר עבר וסונן החוצה מ-getCompetitionInvitationDetails),
+      // השדה נשאר ריק והמשתמשת בוחרת מחדש; לא ידוע מקרה כזה בפועל, מסומן
+      // כמגבלה ולא תוקן באופן שקט.
+      if (shouldLoadEditDetail) {
+        hasHydratedEditRef.current = true;
+
+        var detail = editDetailResponse ? editDetailResponse.data : null;
+
+        if (!detail) {
+          setEditLoadError(EDIT_NOT_FOUND_MESSAGE);
+        } else {
+          var resolvedSlot =
+            nextRequestableSlots.find(function (item) {
+              return (
+                item.paidTimeSlotInCompId === detail.requestedCompSlotId
+              );
+            }) || null;
+
+          var resolvedPriceCatalog =
+            nextPriceCatalogItems.find(function (item) {
+              return item.priceCatalogId === detail.priceCatalogId;
+            }) || null;
+
+          var resolvedHorse =
+            nextHorses.find(function (item) {
+              return item.horseId === detail.horseId;
+            }) || null;
+
+          var resolvedRider =
+            nextRiders.find(function (item) {
+              return item.federationMemberId === detail.riderFederationMemberId;
+            }) || null;
+
+          var resolvedCoach = detail.coachFederationMemberId
+            ? nextTrainers.find(function (item) {
+                return (
+                  item.federationMemberId === detail.coachFederationMemberId
+                );
+              }) || null
+            : null;
+
+          var resolvedPayer =
+            nextPayers.find(function (item) {
+              return item.personId === detail.paidByPersonId;
+            }) || null;
+
+          setSelectedRequestedSlot(resolvedSlot);
+          setSelectedPriceCatalog(resolvedPriceCatalog);
+          setSelectedHorse(resolvedHorse);
+          setSelectedRider(resolvedRider);
+          setSelectedTrainer(resolvedCoach);
+          setSelectedPayer(resolvedPayer);
+          setNotes(detail.notes || "");
+
+          setEditGating({
+            canModify: !!detail.canModify,
+            canCancel: !!detail.canCancel,
+            status: detail.status || null,
+          });
+        }
+      }
     } catch (error) {
       setScreenError(
         String(error?.response?.data || "אירעה שגיאה בטעינת נתוני פייד טיים"),
@@ -515,6 +689,48 @@ export default function useAdminCompetitionPaidTimes(params) {
     setSuccessSnapshot(null);
   }
 
+  // CAP-1: שמירת עריכה - ללא מסך סקירה/הצלחה (לא מתאים לזרימת עריכה, ראו
+  // הערת PaidTimeCreateModal). ולידציה זהה ליצירה נשארת רלוונטית: כל
+  // השדות מולאו מ-usp_getpaidtimerequestforedit, אז כישלון ולידציה כאן
+  // אומר שהפתרון (resolve) מול requestableSlots/horses/... נכשל.
+  async function handleSaveEdit() {
+    if (isSaving) {
+      return;
+    }
+
+    var values = getFormValues();
+    var result = validatePaidTimeForm(values);
+
+    if (!result.isValid) {
+      setFieldErrors(result.fieldErrors);
+      setFormError(result.contextError);
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setSubmitError("");
+
+      await updatePaidTimeRequestNotes(
+        buildPaidTimeUpdatePayload(
+          editPaidTimeRequestId,
+          activeRole ? activeRole.ranchId : null,
+          values,
+        ),
+      );
+
+      setFieldErrors({});
+      setFormError("");
+      setEditSaveVersion(function (prevVersion) {
+        return prevVersion + 1;
+      });
+    } catch (error) {
+      setSubmitError(EDIT_ERROR_MESSAGE);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   // "המשך לאישור" חייב להיות לחיץ גם כשחסרים שדות - זו הפעולה שמפעילה את
   // הוולידציה ומציגה את כל השגיאות יחד. לכן החסימה היחידה היא שמירה פעילה.
   var canSubmit = useMemo(
@@ -576,5 +792,13 @@ export default function useAdminCompetitionPaidTimes(params) {
     formatPayerLabel,
     formatRequestedSlotLabel,
     formatPriceCatalogLabel,
+
+    isEditMode,
+    editCanModify: editGating.canModify,
+    editCanCancel: editGating.canCancel,
+    editStatus: editGating.status,
+    editLoadError,
+    editSaveVersion,
+    handleSaveEdit,
   };
 }

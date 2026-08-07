@@ -9,6 +9,7 @@ import {
   getSeen,
   getCreated,
 } from "./shavingsStatus.utils";
+import { getDeliveryUrgency, getHoursSinceDue } from "./shavingsDueDate.utils";
 
 // The threshold appears EXACTLY ONCE (CAP-4). Badge strings template the number from it.
 export const SHAVINGS_SLA_THRESHOLD_HOURS = 3;
@@ -29,12 +30,31 @@ function hoursSince(value, now) {
   return (now - then) / MS_PER_HOUR;
 }
 
-// Rule A — unclaimed too long: created but no worker took it within the window.
+// Rule A — unclaimed too long: due (today or overdue) but no worker took it within the window.
+// The clock is anchored to requestedDeliveryTime, NOT to creation time -- an order created long
+// ago for a future delivery is not "unclaimed too long" merely because it has sat un-assigned;
+// it isn't operationally due yet. getDeliveryUrgency excludes "future" and "noDate" here for the
+// same reason isActionRequired does (shavingsDueDate.utils.js): neither is a due order. Once
+// overdue, it is flagged unconditionally (no hour math -- it is already at least a full calendar
+// day past due); "dueToday" still needs the hour threshold, measured from the due moment itself.
 export function isUnclaimedTooLong(order, now = Date.now()) {
-  return (
-    !getWorkerSystemUserId(order) &&
-    hoursSince(getCreated(order), now) > SHAVINGS_SLA_THRESHOLD_HOURS
-  );
+  if (getWorkerSystemUserId(order)) {
+    return false;
+  }
+
+  const urgency = getDeliveryUrgency(order, now);
+
+  if (urgency === "overdue") {
+    return true;
+  }
+
+  if (urgency !== "dueToday") {
+    return false;
+  }
+
+  const hoursSinceDue = getHoursSinceDue(order, now);
+
+  return hoursSinceDue !== null && hoursSinceDue > SHAVINGS_SLA_THRESHOLD_HOURS;
 }
 
 // Rule B — undelivered too long: a worker took it but has not delivered within the window.

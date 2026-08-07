@@ -145,6 +145,32 @@ function addDaysToDateString(dateString, days) {
   return formatDateForInput(date);
 }
 
+// CAP-5: כל התאריכים (כולל) בין startDate ל-endDate של הזמנת תא קיימת, לצורך
+// צביעת ימים שכבר הוזמנו ביומן. גבול בטיחות למניעת לולאה אינסופית על נתונים
+// פגומים - לעולם לא יידרשו יותר מ-366 ימים לתחרות בודדת.
+var ORDERED_DATE_RANGE_SAFETY_LIMIT = 366;
+
+function enumerateDateRange(startDateString, endDateString) {
+  var start = parseDateOnlyString(startDateString);
+  var end = parseDateOnlyString(endDateString);
+
+  if (!start || !end || start.getTime() > end.getTime()) {
+    return [];
+  }
+
+  var dates = [];
+  var cursor = new Date(start.getTime());
+  var guard = 0;
+
+  while (cursor.getTime() <= end.getTime() && guard < ORDERED_DATE_RANGE_SAFETY_LIMIT) {
+    dates.push(formatDateForInput(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+    guard += 1;
+  }
+
+  return dates;
+}
+
 function normalizeCompetitionSummary(item) {
   if (!item) {
     return {
@@ -408,7 +434,11 @@ export default function useAdminCompetitionStallBookings(params) {
   var [endDate, setendDate] = useState("");
   var [notes, setNotes] = useState("");
   var [mode, setMode] = useState("horse");
-  var [loading, setLoading] = useState(false);
+  // Start loading=true so the first frame after this tab activates shows a
+  // spinner, not the empty "לא נמצאו סוגי תאים לבחירה" branch, which would
+  // otherwise flash before loadData's setLoading(true) runs. The guard in
+  // loadData settles this back to false when there is no valid context to fetch.
+  var [loading, setLoading] = useState(true);
   var [screenError, setScreenError] = useState("");
   var isActiveTab = params.isActiveTab;
 
@@ -440,6 +470,9 @@ export default function useAdminCompetitionStallBookings(params) {
   var loadData = useCallback(
     async function () {
       if (!activeRole || !activeRole.ranchId || !competitionId) {
+        // Nothing to fetch: settle the initial loading=true so the tab shows its
+        // empty state rather than a stuck spinner.
+        setLoading(false);
         return;
       }
 
@@ -681,6 +714,29 @@ export default function useAdminCompetitionStallBookings(params) {
     [existingStallBookings],
   );
 
+  // CAP-5: ימים שכבר יש להם הזמנת תא בתחרות הזו (לכל סוס/ציוד) - צביעה
+  // בלבד, לא חסימת בחירה. "מוזמן" הוא לפי סוס בודד, לא הגבלה גלובלית.
+  var orderedDates = useMemo(
+    function () {
+      var uniqueDates = {};
+
+      existingStallBookings.forEach(function (booking) {
+        if (!booking || !booking.startDate || !booking.endDate) {
+          return;
+        }
+
+        enumerateDateRange(booking.startDate, booking.endDate).forEach(
+          function (dateString) {
+            uniqueDates[dateString] = true;
+          },
+        );
+      });
+
+      return Object.keys(uniqueDates);
+    },
+    [existingStallBookings],
+  );
+
   // CAP-1: כניסה מוגבלת מסיום ההרשמה (לא רשאים להזמין תא לפני שההרשמה
   // נסגרת), יציאה עם מרווח נוסף של יומיים אחרי סוף התחרות לפירוק.
   var minCompetitionDate = competitionSummary.registrationEndDate;
@@ -730,11 +786,13 @@ export default function useAdminCompetitionStallBookings(params) {
     minCompetitionDate: minCompetitionDate,
     maxCompetitionDate: maxCompetitionDate,
     highlightedCompetitionRange: highlightedCompetitionRange,
+    orderedDates: orderedDates,
 
     selectedHorseToAdd: horseHook.selectedHorseToAdd,
     setSelectedHorseToAdd: horseHook.setSelectedHorseToAdd,
     selectedHorseBookings: horseHook.selectedHorseBookings,
     availableHorseOptions: horseHook.availableHorseOptions,
+    bookedHorseIds: horseHook.bookedHorseIds,
     allEligibleHorsesAlreadyBooked: horseHook.allEligibleHorsesAlreadyBooked,
     hasAnyHorseStallBookingsForCompetition:
       horseHook.hasAnyHorseStallBookingsForCompetition,
@@ -780,3 +838,14 @@ export default function useAdminCompetitionStallBookings(params) {
     existingTackBookingsCount: existingTackBookingsCount,
   };
 }
+
+// Admin-payer direct-changes feature: exported so StallBookingEditModal can
+// reuse the exact same stall-type-option sourcing/filtering/labeling as
+// stall creation, instead of duplicating this logic. Purely additive --
+// the default hook export and every existing caller are unchanged.
+export {
+  getServicePriceSectionsFromInvitation,
+  extractHorseStallPriceItems,
+  extractTackStallPriceItems,
+  formatStallTypeLabel,
+};

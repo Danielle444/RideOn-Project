@@ -89,13 +89,6 @@ begin
         raise exception 'Cannot assign paid time request to a slot from another competition';
     end if;
 
-    -- סלוט שפורסם שייך למזכירה בלבד ואינו בתחום השיבוץ הידני דרך מסלול זה.
-    -- נבדק *אחרי* נעילת-הייעוץ, כדי שמצב-הפרסום שנקרא יהיה קבוע להמשך
-    -- הטרנזקציה. פרוצדורה 151 (העברה בין סלוטים) אוכפת את אותו כלל.
-    if v_assigned_ispublished then
-        raise exception 'לא ניתן לשבץ בקשה בסלוט שפורסם';
-    end if;
-
     select coalesce(h.barnname, h.horsename)
     into v_existing_name
     from paidtimerequest ptr

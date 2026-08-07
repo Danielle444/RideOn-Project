@@ -54,6 +54,145 @@ namespace RideOnServer.Controllers
             }
         }
 
+        // Stage B: admin-direct entry creation, routed server-side (Direct vs
+        // Pending) by usp_admincreateentry from live registration state.
+        // Deliberately a NEW, separate endpoint -- POST /Entries above is
+        // left completely unchanged, so any client still calling it keeps
+        // its exact current behavior regardless of this addition.
+        [HttpPost("admin-create")]
+        public IActionResult AdminCreateEntry([FromBody] AdminCreateEntryRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.RanchAdmin
+                );
+
+                // personId is never a field on AdminCreateEntryRequest -- it
+                // is passed as its own parameter, so there is nothing on the
+                // request body to overwrite. See the DTO's header comment.
+                AdminCreateEntryResult result = Entry.AdminCreateEntry(request, personId);
+
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Idempotency mismatch, payer authorization failure, or any
+                // reused usp_insertentry business-rule guard raised as RN001.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in AdminCreateEntry: {ex.Message}");
+                return BadRequest("אירעה שגיאה ביצירת הרשמה למקצה");
+            }
+        }
+
+        // Stage C: admin-direct entry edit, routed server-side (DirectUpdated
+        // vs DirectReplaced vs PendingReplaceApproval) by usp_admineditentry.
+        // Deliberately a NEW, separate endpoint -- the existing generic
+        // POST /api/ChangeEntryRequests flow is left completely unchanged.
+        [HttpPost("admin-edit")]
+        public IActionResult AdminEditEntry([FromBody] AdminEditEntryRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.RanchAdmin
+                );
+
+                AdminEditEntryResult result = Entry.AdminEditEntry(request, personId);
+
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_admineditentry, or inside the change-request procs it
+                // composes with.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in AdminEditEntry: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון ההרשמה");
+            }
+        }
+
+        // Stage C: admin-direct entry cancellation, regardless of
+        // registration-ended state. Same route/query-param shape as
+        // SecretaryDeleteEntry below -- deliberately a NEW, separate
+        // endpoint from both that one and the generic
+        // POST /api/ChangeEntryRequests/cancel-by-payer flow.
+        [HttpDelete("admin-cancel/{entryId}")]
+        public IActionResult AdminCancelEntry(
+            int entryId,
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (entryId <= 0 || competitionId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                AdminCancelEntryResult result = Entry.AdminCancelEntry(entryId, personId, competitionId, ranchId);
+
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_admincancelentry, or inside the change-request procs
+                // it composes with.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in AdminCancelEntry: {ex.Message}");
+                return BadRequest("אירעה שגיאה בביטול ההרשמה");
+            }
+        }
+
         [HttpGet("paid-time-candidates")]
         public IActionResult GetPaidTimeCandidatesByRanch(
             [FromQuery] int competitionId,

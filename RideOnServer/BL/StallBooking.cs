@@ -1,4 +1,5 @@
-﻿using RideOnServer.DAL;
+﻿using RideOnServer.BL.DTOs.StallBookings;
+using RideOnServer.DAL;
 
 namespace RideOnServer.BL
 {
@@ -63,6 +64,26 @@ namespace RideOnServer.BL
             return StallBookingDAL.SecretaryDeleteStallBooking(stallBookingId, secretarySystemUserId);
         }
 
+        public static int AdminCancelStallBooking(int stallBookingId, int ranchId, int personId)
+        {
+            if (stallBookingId <= 0)
+            {
+                throw new Exception("Invalid StallBookingId");
+            }
+
+            if (ranchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            if (personId <= 0)
+            {
+                throw new Exception("Invalid PersonId");
+            }
+
+            return StallBookingDAL.AdminCancelStallBooking(stallBookingId, ranchId, personId);
+        }
+
         public static void SecretaryUpdateStallBooking(
             int stallBookingId,
             int secretarySystemUserId,
@@ -102,6 +123,47 @@ namespace RideOnServer.BL
                 horseId);
         }
 
+        // Admin-payer direct-changes feature: RanchAdmin direct edit of an
+        // existing stall booking. Dates/notes are always direct; a real
+        // product/type change is additionally rejected server-side
+        // (usp_admineditstallbooking) once the booking is assigned to a
+        // physical stall -- the registration window plays no part in that
+        // decision, unlike Stage C's entry edit routing.
+        public static void AdminEditStallBooking(AdminEditStallBookingRequest request, int personId)
+        {
+            if (request == null)
+            {
+                throw new Exception("Invalid request");
+            }
+
+            if (request.StallBookingId <= 0)
+            {
+                throw new Exception("Invalid StallBookingId");
+            }
+
+            if (request.RanchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            if (personId <= 0)
+            {
+                throw new Exception("Invalid PersonId");
+            }
+
+            if (request.NewStartDate == default || request.NewEndDate == default)
+            {
+                throw new Exception("Start and end dates are required");
+            }
+
+            if (request.NewEndDate.Date < request.NewStartDate.Date)
+            {
+                throw new Exception("End date must be on or after start date");
+            }
+
+            StallBookingDAL.AdminEditStallBooking(request, personId);
+        }
+
         public static int SecretaryCreateStallBookingForPayer(
             int competitionId,
             int secretarySystemUserId,
@@ -111,7 +173,8 @@ namespace RideOnServer.BL
             DateTime endDate,
             bool isForTack,
             short productId,
-            string? notes)
+            string? notes,
+            int? requestingRanchId)
         {
             if (competitionId <= 0)
             {
@@ -148,6 +211,14 @@ namespace RideOnServer.BL
                 throw new Exception("Horse is required for a non-tack stall");
             }
 
+            // Ranch-model fix (Phase 2, 2026-08-05): mirrors the horse-required
+            // guard above -- for tack there is no horse to derive a requesting
+            // ranch from, so it must be supplied and valid.
+            if (isForTack && (!requestingRanchId.HasValue || requestingRanchId.Value <= 0))
+            {
+                throw new Exception("RequestingRanchId is required for a tack stall");
+            }
+
             return StallBookingDAL.SecretaryCreateStallBookingForPayer(
                 competitionId,
                 secretarySystemUserId,
@@ -157,7 +228,8 @@ namespace RideOnServer.BL
                 endDate,
                 isForTack,
                 productId,
-                notes);
+                notes,
+                requestingRanchId);
         }
     }
 }

@@ -1,3 +1,14 @@
+-- RANCH-MODEL CORRECTION (2026-08-05, owner-approved architecture fix):
+-- p_ranchid IS validated against competition.hostranchid below -- this
+-- proc already correctly treats its ranch parameter as host ranch. But it
+-- GROUPS by sb.ranchid as "BookingRanchId"/"BookingRanchName", which
+-- before this fix was the same (buggy) value as the host ranch itself,
+-- collapsing any guest-ranch breakdown to one row. Grouping source changed
+-- from sb.ranchid to sb.requestingranchid (see
+-- migrations/add_stallbooking_requestingranchid.sql), restoring the
+-- per-guest-ranch shavings breakdown this proc's own shape assumes. The
+-- host-ranch validation itself is unchanged.
+
 CREATE OR REPLACE FUNCTION public.usp_getcompetitionsummaryshavingsdetails(p_competitionid integer, p_ranchid integer)
  RETURNS TABLE("BookingRanchId" integer, "BookingRanchName" text, "OrderCount" integer, "StallCount" integer, "BagQuantity" integer, "ExpectedAmount" numeric, "PaidAmount" numeric, "UnpaidAmount" numeric)
  LANGUAGE plpgsql
@@ -57,7 +68,7 @@ begin
     order_ranch_data as (
         select
             so.shavingsorderid,
-            sb.ranchid as bookingranchid,
+            sb.requestingranchid as bookingranchid,
             r.ranchname::text as bookingranchname,
             count(sofsb.stallbookingid)::integer as stallcount,
             coalesce(sum(sofsb.bagquantityperstall), 0)::integer as bagquantity,
@@ -76,14 +87,14 @@ begin
         inner join public.stallbooking sb
             on sb.stallbookingid = sofsb.stallbookingid
         inner join public.ranch r
-            on r.ranchid = sb.ranchid
+            on r.ranchid = sb.requestingranchid
         inner join order_amounts oa
             on oa.prequestid = pr.prequestid
         where pr.competitionid = p_competitionid
           and p.categoryid = 3
         group by
             so.shavingsorderid,
-            sb.ranchid,
+            sb.requestingranchid,
             r.ranchname
     )
 

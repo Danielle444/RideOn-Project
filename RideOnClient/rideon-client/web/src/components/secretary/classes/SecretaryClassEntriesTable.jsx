@@ -47,6 +47,28 @@ function getEntryStatus(item) {
   return getValue(item, "entryStatus", "EntryStatus", "Active");
 }
 
+function NeedsRedrawBadge() {
+  return (
+    <span
+      className="inline-flex w-fit rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-800"
+      title="לכניסות של ריצה פיזית זו יש מספרי הגרלה שונים בנתונים הקיימים -- יש להריץ הגרלה מחדש"
+    >
+      דורש הגרלה מחדש
+    </span>
+  );
+}
+
+function DuplicateEntryBadge() {
+  return (
+    <span
+      className="inline-flex w-fit rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-bold text-red-800"
+      title="נמצאה יותר מכניסה פעילה אחת לאותו רוכב, סוס ומקצה -- יש לטפל בכפילות לפני הגרלה"
+    >
+      כניסה כפולה
+    </span>
+  );
+}
+
 function getIsCancelledAfterStart(item) {
   var status = String(getEntryStatus(item) || "").toLowerCase();
 
@@ -183,14 +205,20 @@ function SortableEntryRow(props) {
   var warningText = getEntryWarningText(item);
   var isCancelledAfterStart = getIsCancelledAfterStart(item);
 
-  var disableDrawActions = savingDrawOrder || isCancelledAfterStart;
+  // CAP-9: CancelledAfterStart entries never enter drawOrderDraftEntries (see
+  // useSecretaryCompetitionClassesPage.js), so whenever drawOrderEditMode is true
+  // isCancelledAfterStart is guaranteed false here -- draw-order-editing-specific
+  // disabling/labeling for a cancelled row would be dead code and is not present.
+  // The cancelled-row styling/badge below still applies outside edit mode, where a
+  // CancelledAfterStart row can appear for out-of-order inspection (cancelledFilter).
+  var disableDrawActions = savingDrawOrder;
 
   var droppable = useDroppable({
     id: getDragId(entryId),
     data: {
       entryId: entryId,
     },
-    disabled: !drawOrderEditMode || savingDrawOrder || isCancelledAfterStart,
+    disabled: !drawOrderEditMode || savingDrawOrder,
   });
 
   return (
@@ -201,10 +229,8 @@ function SortableEntryRow(props) {
         isCancelledAfterStart
           ? "bg-[#F4F0ED] text-[#8B7A72] opacity-80"
           : "text-[#4A3A34]",
-        drawOrderEditMode && !isCancelledAfterStart ? "bg-white" : "",
-        droppable.isOver && drawOrderEditMode && !isCancelledAfterStart
-          ? "bg-[#FAF5F1]"
-          : "",
+        drawOrderEditMode ? "bg-white" : "",
+        droppable.isOver && drawOrderEditMode ? "bg-[#FAF5F1]" : "",
       ].join(" ")}
     >
       <td className="px-4 py-3 font-bold text-[#7B5A4D]">
@@ -212,7 +238,7 @@ function SortableEntryRow(props) {
           <input
             type="number"
             min="1"
-            value={isCancelledAfterStart ? "" : drawOrder || ""}
+            value={drawOrder || ""}
             onChange={function (event) {
               props.onUpdateDraftDrawOrder(entryId, event.target.value);
             }}
@@ -226,9 +252,20 @@ function SortableEntryRow(props) {
 
       <td className="px-4 py-3 font-semibold">
         <div className="flex flex-col gap-1">
-          <span>{getValue(item, "className", "ClassName", "-")}</span>
+          {/* Shared physical runs: a draw-draft row may cover several
+              classifications entered together as one arena pass -- show
+              every active classification label, not just one joined string,
+              when the item carries a classNames list (run items only; plain
+              entry rows outside draw edit mode fall through unchanged). */}
+          {Array.isArray(item.classNames) && item.classNames.length > 1
+            ? item.classNames.map(function (name, nameIndex) {
+                return <span key={nameIndex}>{name}</span>;
+              })
+            : <span>{getValue(item, "className", "ClassName", "-")}</span>}
 
           {isCancelledAfterStart ? <CancelledAfterStartBadge /> : null}
+          {item.hasInconsistentDrawOrder ? <NeedsRedrawBadge /> : null}
+          {item.isInvalidDuplicate ? <DuplicateEntryBadge /> : null}
         </div>
       </td>
 
@@ -298,11 +335,7 @@ function SortableEntryRow(props) {
       {drawOrderEditMode ? (
         <>
           <td className="px-4 py-3">
-            {isCancelledAfterStart ? (
-              <span className="rounded-full bg-[#F4F0ED] px-3 py-1 text-xs font-bold text-[#7A655C]">
-                לא משתתף בהגרלה
-              </span>
-            ) : warningText ? (
+            {warningText ? (
               <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-bold text-orange-800">
                 {warningText}
               </span>
@@ -351,6 +384,9 @@ export default function SecretaryClassEntriesTable(props) {
     colSpan += 1;
   }
 
+  // CAP-9: no CancelledAfterStart entry ever enters drawOrderDraftEntries (see
+  // useSecretaryCompetitionClassesPage.js), so every draggable row here is Active --
+  // no per-drag cancelled-row guard is needed.
   function handleDragEnd(event) {
     if (!event || !event.active || !event.over) {
       return;
@@ -358,21 +394,6 @@ export default function SecretaryClassEntriesTable(props) {
 
     var activeEntryId = getEntryIdFromDragId(event.active.id);
     var overEntryId = getEntryIdFromDragId(event.over.id);
-
-    var activeItem = items.find(function (item) {
-      return String(getEntryId(item)) === String(activeEntryId);
-    });
-
-    var overItem = items.find(function (item) {
-      return String(getEntryId(item)) === String(overEntryId);
-    });
-
-    if (
-      getIsCancelledAfterStart(activeItem) ||
-      getIsCancelledAfterStart(overItem)
-    ) {
-      return;
-    }
 
     if (props.onMoveDrawOrderEntryToEntry) {
       props.onMoveDrawOrderEntryToEntry(activeEntryId, overEntryId);

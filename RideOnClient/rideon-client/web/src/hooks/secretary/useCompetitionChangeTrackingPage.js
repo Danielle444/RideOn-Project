@@ -86,7 +86,10 @@ export default function useCompetitionChangeTrackingPage(options) {
 
   var [activeStatus, setActiveStatus] = useState("Pending");
   var [items, setItems] = useState([]);
-  var [loading, setLoading] = useState(false);
+  // Start loading=true so the table shows a spinner on first paint instead of its empty row
+  // before the mount fetch runs. loadPageData's guard settles it to false when there is no
+  // competition/ranch to fetch for.
+  var [loading, setLoading] = useState(true);
   var [error, setError] = useState("");
 
   var [pendingCount, setPendingCount] = useState(0);
@@ -140,6 +143,9 @@ export default function useCompetitionChangeTrackingPage(options) {
 
   async function loadPageData() {
     if (!competitionId || !ranchId) {
+      // Nothing to fetch: settle the initial loading=true so the table shows its
+      // empty state rather than a stuck spinner.
+      setLoading(false);
       return;
     }
 

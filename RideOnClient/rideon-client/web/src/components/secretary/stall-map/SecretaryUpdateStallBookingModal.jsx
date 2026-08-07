@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { getHorsesForStallBooking } from "../../../services/stallBookingsService";
+import DatePicker from "../../common/DatePicker";
 
 function toInputDate(value) {
   if (!value) return "";
@@ -163,8 +164,7 @@ export default function SecretaryUpdateStallBookingModal(props) {
               <label className="block text-sm font-bold text-[#5D4037] mb-1">
                 מתאריך
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={startDate}
                 onChange={function (e) {
                   setStartDate(e.target.value);
@@ -176,8 +176,7 @@ export default function SecretaryUpdateStallBookingModal(props) {
               <label className="block text-sm font-bold text-[#5D4037] mb-1">
                 עד תאריך
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={endDate}
                 onChange={function (e) {
                   setEndDate(e.target.value);

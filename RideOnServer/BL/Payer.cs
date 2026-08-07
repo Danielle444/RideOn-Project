@@ -29,7 +29,7 @@ namespace RideOnServer.BL
             return dal.GetManagedPayersBySystemUser(systemUserId, filters);
         }
 
-        internal static PotentialPayerLookupResponse? FindPotentialPayerByContact(string? email, string? cellPhone)
+        internal static PotentialPayerExistenceResponse? FindPotentialPayerByContact(string? email, string? cellPhone)
         {
             if (string.IsNullOrWhiteSpace(email) && string.IsNullOrWhiteSpace(cellPhone))
             {
@@ -37,7 +37,22 @@ namespace RideOnServer.BL
             }
 
             PayerDAL dal = new PayerDAL();
-            return dal.FindPotentialPayerByContact(email, cellPhone);
+            PotentialPayerLookupResponse? match = dal.FindPotentialPayerByContact(email, cellPhone);
+
+            if (match == null)
+            {
+                return null;
+            }
+
+            // The DAL result stays broad (it mirrors the live proc's columns,
+            // which usp_RequestManagedPayer also reuses internally in SQL) --
+            // only the public response is trimmed, here at the BL/Controller
+            // boundary. See PotentialPayerExistenceResponse for why.
+            return new PotentialPayerExistenceResponse
+            {
+                PersonId = match.PersonId,
+                HasSystemUser = match.HasSystemUser
+            };
         }
 
         internal static int RequestManagedPayer(int systemUserId, RequestManagedPayerRequest request)
@@ -378,6 +393,43 @@ namespace RideOnServer.BL
                 competitionId,
                 ranchId,
                 payerPersonId
+            );
+        }
+
+        // Self-service path (fix/payer-proc212-self-service-hardening): a
+        // separate method, not a bool branch inside GetPayerCompetitionAccount
+        // above - the endpoint/call path decides the mode structurally, so
+        // there is no flag here for a caller to get wrong. payerPersonId is
+        // the caller's own id; PayersController.GetMyCompetitionAccount is the
+        // only caller and forces it to currentPersonId from the JWT, never
+        // from client input.
+        internal static string GetMyPayerCompetitionAccount(
+            int payerPersonId,
+            int competitionId,
+            int ranchId
+        )
+        {
+            if (payerPersonId <= 0)
+            {
+                throw new Exception("Invalid PayerPersonId");
+            }
+
+            if (competitionId <= 0)
+            {
+                throw new Exception("Invalid CompetitionId");
+            }
+
+            if (ranchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            PayerDAL dal = new PayerDAL();
+
+            return dal.GetMyPayerCompetitionAccount(
+                payerPersonId,
+                competitionId,
+                ranchId
             );
         }
 

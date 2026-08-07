@@ -8,10 +8,15 @@
 -- (payer) are kept strictly separate throughout.
 --
 -- Every boolean here is computed fresh at read time; nothing is cached or
--- stored. The comp CTE independently re-verifies competitionid/hostranchid
--- (never relies on caller-side authorization alone), so a caller that somehow
--- reached this proc with a mismatched pair gets zero rows back, not a
--- wrong-ranch answer.
+-- stored. The comp CTE only re-verifies that competitionid exists -- it does
+-- NOT require hostranchid = p_ranchid. A RanchAdmin from a non-host ranch is
+-- expected to query this proc for their OWN ranch's registration state on a
+-- competition hosted elsewhere (confirmed business rule, 2026-08: the caller
+-- operates for p_ranchid, which need not equal the competition's host ranch).
+-- Tenant isolation is instead enforced independently by every signal below,
+-- each filtered directly on p_ranchid (h.ranchid, sb.ranchid, pc.ranchid,
+-- prr.ranchid = p_ranchid) -- so a caller can never see another ranch's data,
+-- even though the competition row itself is shared across ranches.
 --
 -- Paid Time price category is productcategory.categoryid = 1 (live-confirmed:
 -- 1 = פייד טיים, 2 = תאים, 3 = נסורת), matching the pattern already established
@@ -76,7 +81,6 @@ WITH comp AS (
            c.registrationenddate, c.competitionstartdate
     FROM public.competition c
     WHERE c.competitionid = p_competitionid
-      AND c.hostranchid   = p_ranchid
 ),
 signals AS (
     SELECT

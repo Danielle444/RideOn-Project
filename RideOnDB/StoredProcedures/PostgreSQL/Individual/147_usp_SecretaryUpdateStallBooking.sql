@@ -44,6 +44,40 @@
 -- for no other current use -- left in place rather than pulled out, to keep
 -- this an overlap-predicate-only change with no unrelated churn.) See 187's
 -- header for the full cross-competition consistency note.
+--
+-- RANCH-MODEL CORRECTION (2026-08-05, final Phase 1 SQL blocker): this was
+-- the last confirmed UPDATE...SET horseid site left unaudited (live search
+-- across every function's SET clause on 2026-08-05 confirms exactly one
+-- other UPDATE touches stallbooking.horseid at all --
+-- usp_reschedulecompetition -- and it never does; it only shifts
+-- startdate/enddate). Two pre-existing gaps, neither previously guarded:
+-- (1) nothing prevented a non-tack booking from having horseid set NULL,
+-- or a tack booking from having a non-null horseid; (2) reassigning
+-- horseid to a horse from a different ranch left requestingranchid
+-- pointing at the PRIOR horse's ranch. Both are fixed together: the final
+-- (post-COALESCE) IsForTack value now gates a mandatory HorseId
+-- presence/absence check, and for non-tack, requestingranchid is
+-- re-derived server-side from the NEW horse's own horse.ranchid in the
+-- same UPDATE (never trusted from the client, never left over from the
+-- prior horse); for tack, the existing requestingranchid is preserved
+-- unchanged (there is no horse to derive it from). stallbooking.ranchid
+-- (the service/host ranch) is untouched by this change. Authorization,
+-- overlap protection, paid/pending guards, dates, notes, and return type
+-- are all unchanged.
+--
+-- WHOLE-SHEKEL SPLIT CORRECTION (2026-08-06, approved business rule): this
+-- proc previously set the FULL recalculated total on EVERY payer's
+-- billcharge/billproductrequest row (`SET amounttopay = v_new_amount` with
+-- no per-payer filter) -- on any multi-payer booking this duplicated (Nx'd)
+-- the charged amount instead of splitting it, a real financial-integrity
+-- defect distinct from the agorot-rounding bug found elsewhere. Replaced
+-- with the shared public.usp_splitwholeshekels(total, payercount) helper,
+-- allocating whole-shekel shares (remainder to the lowest paidbypersonid
+-- first, joined via bill.paidbypersonid since billproductrequest has no
+-- payer column of its own) across the booking's EXISTING payer set -- the
+-- payer count/identities are not editable here, only the recalculated
+-- total. Also added a closing usp_recalculatebillamount loop over every
+-- affected bill, which this proc never called before.
 -- ============================================================================
 
 DROP FUNCTION IF EXISTS public.usp_secretaryupdatestallbooking(
@@ -62,22 +96,29 @@ CREATE OR REPLACE FUNCTION public.usp_secretaryupdatestallbooking(
 RETURNS void
 LANGUAGE plpgsql AS $$
 DECLARE
-    v_ranchid          integer;
-    v_old_horseid      integer;
-    v_competitionid    integer;
+    v_ranchid            integer;
+    v_old_horseid        integer;
+    v_old_isfortack       boolean;
+    v_new_isfortack       boolean;
+    v_requestingranchid   integer;
+    v_competitionid      integer;
     v_paid_exists      boolean;
     v_existing_pend    integer;
     v_pricecatalogid   integer;
     v_itemprice        numeric;
     v_new_days         integer;
     v_new_amount       numeric;
+    v_payercount       integer;
+    v_baseshare        integer;
+    v_remainder        integer;
+    v_billid           integer;
 BEGIN
     IF p_newenddate < p_newstartdate THEN
         RAISE EXCEPTION 'End date must be on or after start date';
     END IF;
 
-    SELECT sb.ranchid, sb.horseid, pr.competitionid
-    INTO v_ranchid, v_old_horseid, v_competitionid
+    SELECT sb.ranchid, sb.horseid, sb.isfortack, pr.competitionid
+    INTO v_ranchid, v_old_horseid, v_old_isfortack, v_competitionid
     FROM public.stallbooking sb
     INNER JOIN public.productrequest pr ON pr.prequestid = sb.stallbookingid
     WHERE sb.stallbookingid = p_stallbookingid;
@@ -121,8 +162,6 @@ BEGIN
         RAISE EXCEPTION 'A pending change request exists — resolve it first';
     END IF;
 
-    -- Lock the old and/or new horse (ascending order, deduplicated) before
-    -- writing -- either could conflict with a concurrent writer.
     IF v_old_horseid IS NOT NULL AND p_horseid IS NOT NULL AND v_old_horseid <> p_horseid THEN
         IF v_old_horseid < p_horseid THEN
             PERFORM pg_advisory_xact_lock(1735, v_old_horseid);
@@ -135,6 +174,37 @@ BEGIN
         PERFORM pg_advisory_xact_lock(1735, v_old_horseid);
     ELSIF p_horseid IS NOT NULL THEN
         PERFORM pg_advisory_xact_lock(1735, p_horseid);
+    END IF;
+
+    -- Determine the FINAL (post-COALESCE) tack status, then require and
+    -- validate HorseId accordingly, and derive requestingranchid: from the
+    -- new horse's own live ranch for non-tack (never from the client, never
+    -- left over from the prior horse), or preserved unchanged for tack
+    -- (there is no horse to derive it from).
+    v_new_isfortack := COALESCE(p_isfortack, v_old_isfortack);
+
+    IF v_new_isfortack = false THEN
+        IF p_horseid IS NULL THEN
+            RAISE EXCEPTION 'HorseId is required for a non-tack stall booking';
+        END IF;
+
+        SELECT h.ranchid
+        INTO v_requestingranchid
+        FROM public.horse h
+        WHERE h.horseid = p_horseid;
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Horse not found';
+        END IF;
+    ELSE
+        IF p_horseid IS NOT NULL THEN
+            RAISE EXCEPTION 'HorseId must be NULL for a tack stall booking';
+        END IF;
+
+        SELECT requestingranchid
+        INTO v_requestingranchid
+        FROM public.stallbooking
+        WHERE stallbookingid = p_stallbookingid;
     END IF;
 
     -- Reject an overlapping horse booking for the resulting horseid. Exact
@@ -168,17 +238,18 @@ BEGIN
 
     -- Apply updates
     UPDATE public.stallbooking
-    SET startdate  = p_newstartdate,
-        enddate    = p_newenddate,
-        isfortack  = COALESCE(p_isfortack, isfortack),
-        horseid    = p_horseid
+    SET startdate         = p_newstartdate,
+        enddate           = p_newenddate,
+        isfortack         = v_new_isfortack,
+        horseid           = p_horseid,
+        requestingranchid = v_requestingranchid
     WHERE stallbookingid = p_stallbookingid;
 
     UPDATE public.productrequest
     SET notes = NULLIF(TRIM(p_newnotes), '')
     WHERE prequestid = p_stallbookingid;
 
-    -- Recompute billcharge amount based on new day count
+    -- Recompute total based on new day count
     SELECT pc.pricecatalogid, pc.itemprice
     INTO v_pricecatalogid, v_itemprice
     FROM public.productrequest pr
@@ -188,15 +259,69 @@ BEGIN
     v_new_days := GREATEST((p_newenddate - p_newstartdate)::integer + 1, 1);
     v_new_amount := COALESCE(v_itemprice, 0) * v_new_days;
 
-    UPDATE public.billcharge
-    SET amounttopay = v_new_amount
-    WHERE sourcetype = 'ProductRequest'
-      AND sourceid   = p_stallbookingid
-      AND chargestatus IN ('Open', 'PendingApproval');
+    -- WHOLE-SHEKEL SPLIT CORRECTION: split the recalculated total across the
+    -- booking's EXISTING payer set instead of setting the full amount on
+    -- every row. v_payercount counts every billproductrequest row for this
+    -- booking -- by this point the paid guard above has already proven none
+    -- of them are paid.
+    SELECT COUNT(*)
+    INTO v_payercount
+    FROM public.billproductrequest bpr
+    WHERE bpr.prequestid = p_stallbookingid;
 
-    UPDATE public.billproductrequest
-    SET amounttopay = v_new_amount
-    WHERE prequestid = p_stallbookingid
-      AND paymentid IS NULL;
+    IF v_payercount IS NULL OR v_payercount <= 0 THEN
+        RAISE EXCEPTION 'Could not find payers for this stall booking';
+    END IF;
+
+    SELECT o_baseshare, o_remainder
+    INTO v_baseshare, v_remainder
+    FROM public.usp_splitwholeshekels(v_new_amount, v_payercount);
+
+    WITH ordered_payers AS (
+        SELECT bpr.billid,
+               ROW_NUMBER() OVER (ORDER BY b.paidbypersonid ASC) AS rn
+        FROM public.billproductrequest bpr
+        JOIN public.bill b ON b.billid = bpr.billid
+        WHERE bpr.prequestid = p_stallbookingid
+    ),
+    allocated AS (
+        SELECT billid,
+               v_baseshare + CASE WHEN rn <= v_remainder THEN 1 ELSE 0 END AS allocated_amount
+        FROM ordered_payers
+    )
+    UPDATE public.billproductrequest bpr
+    SET amounttopay = allocated.allocated_amount
+    FROM allocated
+    WHERE bpr.prequestid = p_stallbookingid
+      AND bpr.billid = allocated.billid
+      AND bpr.paymentid IS NULL;
+
+    WITH ordered_payers AS (
+        SELECT bpr.billid,
+               ROW_NUMBER() OVER (ORDER BY b.paidbypersonid ASC) AS rn
+        FROM public.billproductrequest bpr
+        JOIN public.bill b ON b.billid = bpr.billid
+        WHERE bpr.prequestid = p_stallbookingid
+    ),
+    allocated AS (
+        SELECT billid,
+               v_baseshare + CASE WHEN rn <= v_remainder THEN 1 ELSE 0 END AS allocated_amount
+        FROM ordered_payers
+    )
+    UPDATE public.billcharge bc
+    SET amounttopay = allocated.allocated_amount
+    FROM allocated
+    WHERE bc.sourcetype = 'ProductRequest'
+      AND bc.sourceid   = p_stallbookingid
+      AND bc.chargestatus IN ('Open', 'PendingApproval')
+      AND bc.billid = allocated.billid;
+
+    FOR v_billid IN
+        SELECT DISTINCT bpr.billid
+        FROM public.billproductrequest bpr
+        WHERE bpr.prequestid = p_stallbookingid
+    LOOP
+        PERFORM public.usp_recalculatebillamount(v_billid);
+    END LOOP;
 END;
 $$;

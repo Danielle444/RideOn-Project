@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
+using RideOnServer.RateLimiting;
 using System.Text;
+using System.Threading.RateLimiting;
 
 namespace RideOnServer
 {
@@ -65,6 +68,36 @@ namespace RideOnServer
                     };
                 });
 
+            builder.Services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+                // Safe metadata only: timestamp + route. Never the query string,
+                // so a rejected national-ID lookup can never write the ID to logs.
+                options.OnRejected = async (context, cancellationToken) =>
+                {
+                    Console.WriteLine(
+                        $"[RateLimit] rejected at {DateTime.UtcNow:O} path={context.HttpContext.Request.Path}");
+
+                    context.HttpContext.Response.ContentType = "text/plain; charset=utf-8";
+                    await context.HttpContext.Response.WriteAsync(
+                        "יותר מדי בקשות. יש לנסות שוב בעוד מספר דקות.",
+                        cancellationToken);
+                };
+
+                options.AddPolicy(RegistrationLookupRateLimiting.PolicyName, httpContext =>
+                    RateLimitPartition.GetSlidingWindowLimiter(
+                        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        factory: _ => new SlidingWindowRateLimiterOptions
+                        {
+                            PermitLimit = RegistrationLookupRateLimiting.PermitLimit,
+                            Window = RegistrationLookupRateLimiting.Window,
+                            SegmentsPerWindow = RegistrationLookupRateLimiting.SegmentsPerWindow,
+                            QueueLimit = RegistrationLookupRateLimiting.QueueLimit,
+                            AutoReplenishment = true
+                        }));
+            });
+
             var app = builder.Build();
 
             app.UseSwagger();
@@ -80,6 +113,8 @@ namespace RideOnServer
 
             app.UseAuthentication();
             app.UseAuthorization();
+
+            app.UseRateLimiter();
 
             app.MapControllers();
 

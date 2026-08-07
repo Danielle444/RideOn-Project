@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -17,7 +18,6 @@ import { getWorkerMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { getWorkerBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import homeScreenStyles from "../../../../styles/homeScreenStyles";
 import HomeCompetitionCard from "../../../../components/home/HomeCompetitionCard";
-import HomeShortcutGrid from "../../../../components/home/HomeShortcutGrid";
 import { getMobileWorkerCompetitionsBoard } from "../../../../services/competitionService";
 import {
   getWorkerHomeShavingsFeed,
@@ -29,16 +29,14 @@ import {
 } from "../../../../utils/workerHomeShavingsFeed";
 import WorkerShavingsOrderCard from "../components/WorkerShavingsOrderCard";
 import { canWorkerEnterCompetition } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
-
-function sortAndTakeNearest(items) {
-  return [...items]
-    .sort(function (a, b) {
-      return String(a.competitionStartDate || "").localeCompare(
-        String(b.competitionStartDate || ""),
-      );
-    })
-    .slice(0, 2);
-}
+import {
+  selectCompetitionsShortlist,
+  DEFAULT_SHORTLIST_CAP,
+  HOME_TEASER_ALLOWED_STATUSES,
+} from "../../../../../../shared/auth/utils/competitions/competitionHomeShortlist";
+import { MOBILE_COMPETITION_STATUS_ORDER } from "../../../../../../shared/auth/utils/competitions/competitionStatusOrder";
+import { withTransientRetry } from "../../../../utils/transientRequestRetry";
+import { createStartupAlertGuard } from "../../../../utils/startupAlertGuard";
 
 export default function WorkerHomeScreen(props) {
   var userContext = useUser();
@@ -53,6 +51,14 @@ export default function WorkerHomeScreen(props) {
   var [shavingsFeed, setShavingsFeed] = useState([]);
   var [loadingFeed, setLoadingFeed] = useState(false);
   var [claimingOrderId, setClaimingOrderId] = useState(null);
+  var [refreshing, setRefreshing] = useState(false);
+
+  // One instance for the screen's lifetime, held in a ref (not state) so a
+  // synchronous check-and-set is possible from either loader's catch block.
+  var startupAlertGuardRef = useRef(null);
+  if (startupAlertGuardRef.current === null) {
+    startupAlertGuardRef.current = createStartupAlertGuard();
+  }
 
   useEffect(
     function () {
@@ -60,23 +66,48 @@ export default function WorkerHomeScreen(props) {
         return;
       }
 
-      loadHomeCompetitions();
-      loadShavingsFeed();
+      loadWorkerHome();
     },
     [activeRole],
   );
+
+  // Runs both startup requests together. Each one retries and fails on its
+  // own via withTransientRetry, but the two share startupAlertGuardRef so
+  // that if both fail in the same cycle, only the first alert is shown -
+  // not two generic alerts back to back. The guard is reset before AND
+  // after the cycle, so it never suppresses a later, unrelated call to
+  // loadShavingsFeed (e.g. from handleClaimShavingsOrder below).
+  async function loadWorkerHome() {
+    startupAlertGuardRef.current.reset();
+
+    try {
+      await Promise.all([loadHomeCompetitions(), loadShavingsFeed()]);
+    } finally {
+      startupAlertGuardRef.current.reset();
+    }
+  }
 
   async function loadHomeCompetitions() {
     try {
       setLoading(true);
 
-      var response = await getMobileWorkerCompetitionsBoard(activeRole.ranchId);
-      var items = Array.isArray(response.data) ? response.data : [];
-      setCompetitions(sortAndTakeNearest(items));
+      var response = await withTransientRetry(function () {
+        return getMobileWorkerCompetitionsBoard(activeRole.ranchId);
+      });
+      setCompetitions(
+        selectCompetitionsShortlist(
+          response.data,
+          MOBILE_COMPETITION_STATUS_ORDER,
+          DEFAULT_SHORTLIST_CAP,
+          HOME_TEASER_ALLOWED_STATUSES,
+        ),
+      );
     } catch (error) {
       console.error(error);
       setCompetitions([]);
-      Alert.alert("שגיאה", "אירעה שגיאה בטעינת דף הבית");
+      if (startupAlertGuardRef.current.shouldAlert()) {
+        Alert.alert("שגיאה", "אירעה שגיאה בטעינת דף הבית");
+      }
     } finally {
       setLoading(false);
     }
@@ -90,13 +121,17 @@ export default function WorkerHomeScreen(props) {
     try {
       setLoadingFeed(true);
 
-      var response = await getWorkerHomeShavingsFeed(activeRole.ranchId);
+      var response = await withTransientRetry(function () {
+        return getWorkerHomeShavingsFeed(activeRole.ranchId);
+      });
       var items = Array.isArray(response.data?.data) ? response.data.data : [];
       setShavingsFeed(sortWorkerHomeFeed(items, user?.personId));
     } catch (error) {
       console.error(error);
       setShavingsFeed([]);
-      Alert.alert("שגיאה", "אירעה שגיאה בטעינת הזמנות הנסורת להיום");
+      if (startupAlertGuardRef.current.shouldAlert()) {
+        Alert.alert("שגיאה", "אירעה שגיאה בטעינת הזמנות הנסורת להיום");
+      }
     } finally {
       setLoadingFeed(false);
     }
@@ -124,6 +159,15 @@ export default function WorkerHomeScreen(props) {
       competitionId: order.competitionId,
       competitionName: order.competitionName,
     });
+  }
+
+  async function handleRefresh() {
+    try {
+      setRefreshing(true);
+      await loadWorkerHome();
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   async function handleLogout() {
@@ -172,47 +216,6 @@ export default function WorkerHomeScreen(props) {
     ];
   }
 
-  var shortcutItems = useMemo(
-    function () {
-      return [
-        {
-          key: "board",
-          label: "לוח התחרויות",
-          icon: "trophy-outline",
-          onPress: function () {
-            props.navigation.navigate("WorkerCompetitionsBoard");
-          },
-        },
-        {
-          key: "profile",
-          label: "פרופיל",
-          icon: "person-outline",
-          onPress: function () {
-            props.navigation.navigate("WorkerProfile");
-          },
-        },
-        {
-          key: "switch-role",
-          label: "החלפת פרופיל",
-          icon: "sync-outline",
-          onPress: function () {
-            props.navigation.replace("SelectActiveRole");
-          },
-        },
-        {
-          key: "refresh",
-          label: "רענון נתונים",
-          icon: "refresh-outline",
-          onPress: function () {
-            loadHomeCompetitions();
-            loadShavingsFeed();
-          },
-        },
-      ];
-    },
-    [props.navigation, activeRole],
-  );
-
   var userName = (
     (user && ((user.firstName || "") + " " + (user.lastName || "")).trim()) ||
     ""
@@ -245,6 +248,14 @@ export default function WorkerHomeScreen(props) {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={homeScreenStyles.pageContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={["#8B6352"]}
+            tintColor="#8B6352"
+          />
+        }
       >
         <View style={homeScreenStyles.welcomeCard}>
           <Text style={homeScreenStyles.welcomeTitle}>
@@ -254,7 +265,7 @@ export default function WorkerHomeScreen(props) {
           <Text style={homeScreenStyles.welcomeRole}>
             {activeRole?.roleName}
           </Text>
-          
+
           <Text style={homeScreenStyles.welcomeSubtitle}>
             זה התפקיד הפעיל שלך בחווה {activeRole?.ranchName}
           </Text>
@@ -305,11 +316,6 @@ export default function WorkerHomeScreen(props) {
         </View>
 
         <View style={homeScreenStyles.sectionCard}>
-          <Text style={homeScreenStyles.sectionTitle}>קיצורים</Text>
-          <HomeShortcutGrid items={shortcutItems} />
-        </View>
-
-        <View style={homeScreenStyles.sectionCard}>
           <Text style={homeScreenStyles.sectionTitle}>הזמנות נסורת להיום</Text>
 
           {loadingFeed ? (
@@ -337,11 +343,15 @@ export default function WorkerHomeScreen(props) {
                   arrivalTime={order.arrivalTime}
                   workerSystemUserId={order.workerSystemUserId}
                   stallNumber={order.stallNumber}
+                  deliveryDestinations={order.deliveryDestinations}
+                  hasUnassignedStalls={order.hasUnassignedStalls}
                   bagQuantity={order.bagQuantity}
                   payerFirstName={order.payerFirstName}
                   payerLastName={order.payerLastName}
                   workerFirstName={order.workerFirstName}
                   workerLastName={order.workerLastName}
+                  isCancelled={order.isCancelled}
+                  hasPendingCancellation={order.hasPendingCancellation}
                   isMyOrder={flags.isMyOrder}
                   isUnclaimed={flags.isUnclaimed}
                   isTakenByOther={flags.isTakenByOther}

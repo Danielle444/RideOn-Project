@@ -23,13 +23,33 @@ namespace RideOnServer.Controllers
 
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
+                // Ranch-model fix: requesting ranch is the HORSE's own ranch,
+                // derived server-side -- never trusted from request.RanchId.
+                // Authorization is checked against this derived value.
+                int? horseRanchId = new HorseDAL().GetHorseRanchId(request.HorseId);
+                if (horseRanchId == null)
+                {
+                    return NotFound("הסוס לא נמצא");
+                }
+
                 UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
-                    request.RanchId,
+                    horseRanchId.Value,
                     RoleNames.RanchAdmin,
                     RoleNames.HostSecretary
                 );
 
+                // Host/service ranch is the COMPETITION's own host ranch,
+                // derived server-side -- never trusted from request.RanchId.
+                // usp_createstallbooking validates PriceCatalog and writes
+                // StallBooking.RanchId against this value.
+                RideOnServer.BL.Competition? competition = new CompetitionDAL().GetCompetitionById(request.CompetitionId);
+                if (competition == null)
+                {
+                    return NotFound("התחרות לא נמצאה");
+                }
+
+                request.RanchId = competition.HostRanchId;
                 request.OrderedBySystemUserId = personId;
 
                 int id = StallBookingDAL.CreateStallBooking(request);
@@ -212,9 +232,31 @@ namespace RideOnServer.Controllers
 
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
+                // Ranch-model fix: there is no horse to derive a requesting
+                // ranch from for a tack stall, so it must be supplied
+                // explicitly. It is not blindly trusted, though -- the actor
+                // must actually hold an approved role in it.
+                //
+                // Backward-compat fallback: the currently-installed mobile
+                // client still sends the old field, RanchId, for this
+                // meaning (it predates RequestingRanchId existing at all).
+                // RequestingRanchId wins whenever a new client supplies it;
+                // RanchId is read here ONLY as a fallback for that old
+                // client, BEFORE it gets overwritten below with the
+                // competition's host ranch -- it must never be confused with
+                // that host-ranch value. Both fields, when used, mean the
+                // requesting/guest ranch in this tack flow, never the host.
+                int resolvedRequestingRanchId = ResolveTackRequestingRanchId(
+                    request.RequestingRanchId, request.RanchId);
+
+                if (resolvedRequestingRanchId <= 0)
+                {
+                    return BadRequest("RequestingRanchId is required.");
+                }
+
                 UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
-                    request.RanchId,
+                    resolvedRequestingRanchId,
                     RoleNames.RanchAdmin,
                     RoleNames.HostSecretary
                 );
@@ -229,6 +271,16 @@ namespace RideOnServer.Controllers
                     return BadRequest("At least one payer is required.");
                 }
 
+                // Host/service ranch is the COMPETITION's own host ranch,
+                // derived server-side -- never trusted from request.RanchId.
+                RideOnServer.BL.Competition? competition = new CompetitionDAL().GetCompetitionById(request.CompetitionId);
+                if (competition == null)
+                {
+                    return NotFound("התחרות לא נמצאה");
+                }
+
+                request.RequestingRanchId = resolvedRequestingRanchId;
+                request.RanchId = competition.HostRanchId;
                 request.OrderedBySystemUserId = personId;
 
                 List<int> createdIds = StallBookingDAL.CreateTackStallBookings(request);
@@ -247,6 +299,20 @@ namespace RideOnServer.Controllers
                 Console.WriteLine($"Error in CreateTackStallBookings: {ex.Message}");
                 return BadRequest("אירעה שגיאה ביצירת תאי ציוד");
             }
+        }
+
+        // Ranch-model fix, backward-compat fallback (2026-08-06): pure,
+        // side-effect-free resolution logic extracted for direct unit
+        // testing -- same rationale as StallBookingDAL's Build...Command
+        // extraction (this project avoids mocking/an HTTP test host, so
+        // only I/O-free logic like this is tested by direct invocation).
+        // RequestingRanchId always wins when supplied; RanchId is a
+        // fallback for the currently-installed mobile client, which
+        // predates RequestingRanchId and still sends the requesting/guest
+        // ranch under the RanchId field for this flow.
+        public static int ResolveTackRequestingRanchId(int requestingRanchId, int ranchId)
+        {
+            return requestingRanchId > 0 ? requestingRanchId : ranchId;
         }
 
         [HttpPost("cancel-request")]
@@ -471,6 +537,53 @@ namespace RideOnServer.Controllers
             }
         }
 
+        // Admin-payer direct-changes feature: RanchAdmin direct stall
+        // booking cancel, the stall sibling of EntriesController.AdminCancelEntry
+        // and the cancel-side counterpart to AdminEditStallBooking below.
+        // Deliberately a NEW, separate endpoint -- the existing
+        // POST /cancel-request (payer-style pending change request) is left
+        // completely unchanged.
+        [HttpDelete("admin-cancel/{stallBookingId}")]
+        public IActionResult AdminCancelStallBooking(
+            int stallBookingId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (stallBookingId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                int requestId = StallBooking.AdminCancelStallBooking(stallBookingId, ranchId, personId);
+
+                return Ok(new { ChangeRequestId = requestId, Message = "Stall booking cancelled" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_admincancelstallbooking.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in AdminCancelStallBooking: {ex.Message}");
+                return BadRequest("אירעה שגיאה בביטול הזמנת התא");
+            }
+        }
+
         [HttpPut("secretary/{stallBookingId}")]
         public IActionResult SecretaryUpdateStallBooking(
             int stallBookingId,
@@ -518,17 +631,18 @@ namespace RideOnServer.Controllers
             }
         }
 
-        [HttpPost("secretary/create-for-payer")]
-        public IActionResult SecretaryCreateStallBookingForPayer(
-            [FromBody] SecretaryCreateStallBookingRequest request)
+        // Admin-payer direct-changes feature: RanchAdmin direct stall
+        // booking edit, the stall sibling of EntriesController.AdminEditEntry.
+        // Deliberately a NEW, separate endpoint -- the existing
+        // POST /change-request (payer-style pending change request) is left
+        // completely unchanged, so the mobile edit modal's old behavior
+        // stays available to any client that still calls it.
+        [HttpPost("admin-edit")]
+        public IActionResult AdminEditStallBooking([FromBody] AdminEditStallBookingRequest request)
         {
             try
             {
-                if (request == null ||
-                    request.CompetitionId <= 0 ||
-                    request.RanchId <= 0 ||
-                    request.PayerPersonId <= 0 ||
-                    request.ProductId <= 0)
+                if (request == null || request.StallBookingId <= 0 || request.RanchId <= 0)
                 {
                     return BadRequest("Invalid request");
                 }
@@ -538,6 +652,60 @@ namespace RideOnServer.Controllers
                 UserAccessValidator.EnsureUserHasRoleInRanch(
                     personId,
                     request.RanchId,
+                    RoleNames.RanchAdmin
+                );
+
+                StallBooking.AdminEditStallBooking(request, personId);
+
+                return Ok(new { Message = "Stall booking updated" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_admineditstallbooking, including the assigned-booking
+                // product-change rejection.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in AdminEditStallBooking: {ex.Message}");
+                return BadRequest("אירעה שגיאה בעדכון הזמנת התא");
+            }
+        }
+
+        [HttpPost("secretary/create-for-payer")]
+        public IActionResult SecretaryCreateStallBookingForPayer(
+            [FromBody] SecretaryCreateStallBookingRequest request)
+        {
+            try
+            {
+                if (request == null ||
+                    request.CompetitionId <= 0 ||
+                    request.PayerPersonId <= 0 ||
+                    request.ProductId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                // Ranch-model fix: host-secretary authorization is checked
+                // against the COMPETITION's own host ranch, derived
+                // server-side -- never trusted from request.RanchId (kept on
+                // the DTO only for client backward compatibility; unused here).
+                RideOnServer.BL.Competition? competition = new CompetitionDAL().GetCompetitionById(request.CompetitionId);
+                if (competition == null)
+                {
+                    return NotFound("התחרות לא נמצאה");
+                }
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    competition.HostRanchId,
                     RoleNames.HostSecretary
                 );
 
@@ -550,7 +718,8 @@ namespace RideOnServer.Controllers
                     request.EndDate,
                     request.IsForTack,
                     request.ProductId,
-                    request.Notes);
+                    request.Notes,
+                    request.RequestingRanchId);
 
                 return Ok(new { StallBookingId = newId, Message = "Stall booking created" });
             }

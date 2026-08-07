@@ -13,6 +13,36 @@
 -- the caller's controller gate proves ownership of SOME competition/ranch
 -- pair, never that this specific request belongs to it. No federation-
 -- specific issue was flagged for this proc in the audit.
+--
+-- WHOLE-SHEKEL SPLIT CORRECTION (2026-08-06, approved business rule): the
+-- stalls branch previously computed ONE value,
+-- round(v_new_totalamount / v_payercount, 2), and copied that SAME value
+-- onto every existing payer's new billproductrequest/billcharge row -- can
+-- produce agorot and does not guarantee the sum equals the new total.
+-- Replaced with the shared public.usp_splitwholeshekels(total, payercount)
+-- helper, allocating whole-shekel shares ordered by paidbypersonid
+-- ascending (joined via bill) across the SAME existing payer set inherited
+-- from old_bpr -- payer identities/count are not editable by this proc,
+-- only the amount. No duplicate-payer guard was added here: this proc never
+-- accepts a JSON payer list (it only reads existing billproductrequest
+-- rows, whose (billid, prequestid) primary key already structurally
+-- prevents a duplicate payer at this call site). The non-stalls branch
+-- (categorykey = 'shavings', copies old_bpr.amounttopay unchanged) is
+-- untouched -- shavings repricing is not part of this change-request path,
+-- only stall date changes are. All authorization, status, paid-guard, and
+-- cancel/replace behavior is unchanged.
+--
+-- SHAVINGS-ORPHAN CASCADE FIX (2026-08-06, CAP-11 financial correctness):
+-- same fix as usp_answerproductchangerequestsecured (222) -- see 222's own
+-- header for the full rationale, identical in both procs. This proc has
+-- NO repository or live callers as of 2026-08-06 (ChangeTrackingDAL calls
+-- only the secured 222 function; no other function in the live database
+-- references this one by name) -- confirmed dead code, kept only for
+-- behavioral parity with 222, matching the precedent already set by the
+-- whole-shekel split correction above, which was applied to both procs for
+-- the same reason. Applying the fix here too means a future revival of this
+-- 4-argument path does not silently reintroduce a bug already fixed in its
+-- secured sibling.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_answerproductchangerequest(p_productchangerequestid integer, p_answerstatus text, p_answeredbysystemuserid integer, p_notes text DEFAULT NULL::text)
@@ -33,8 +63,11 @@ declare
     v_new_enddate date;
     v_new_staydays integer;
     v_new_totalamount numeric(10,2);
-    v_payercount numeric;
-    v_new_amountperpayer numeric(10,2);
+    v_payercount integer;
+    v_baseshare integer;
+    v_remainder integer;
+
+    v_shavings_bill_ids integer[];
 begin
     if p_productchangerequestid is null or p_productchangerequestid <= 0 then
         raise exception 'Invalid product change request id';
@@ -127,6 +160,63 @@ begin
           and chargestatus = 'Open'
           and paymentbatchid is null;
 
+        if v_categorykey = 'stalls' then
+            -- Reused verbatim from usp_admincancelstallbooking (239), only
+            -- the anchor id changed (p_stallbookingid -> v_originalprequestid).
+            with eligible_shavings_orders as (
+                select sofb.shavingsorderid
+                from public.shavingsorderforstallbooking sofb
+                where sofb.stallbookingid = v_originalprequestid
+                  and not exists (
+                      select 1
+                      from public.shavingsorderforstallbooking other
+                      where other.shavingsorderid = sofb.shavingsorderid
+                        and other.stallbookingid <> v_originalprequestid
+                        and not (
+                            exists (
+                                select 1
+                                from public.productchangerequest pcr
+                                where pcr.originalprequestid = other.stallbookingid
+                                  and pcr.status = 'Approved'
+                                  and pcr.iscancelled = true
+                            )
+                            and not exists (
+                                select 1
+                                from public.billcharge bc
+                                where bc.sourcetype = 'ProductRequest'
+                                  and bc.sourceid = other.stallbookingid
+                                  and bc.chargestatus in ('Open', 'Paid', 'PendingApproval')
+                            )
+                        )
+                  )
+            ),
+            payable_shavings_orders as (
+                -- Policy A: any Paid row anywhere on this shavings sourceId
+                -- excludes the WHOLE order, not just that one payer's row.
+                select eso.shavingsorderid
+                from eligible_shavings_orders eso
+                where not exists (
+                    select 1
+                    from public.billcharge bc
+                    where bc.sourcetype = 'ProductRequest'
+                      and bc.sourceid = eso.shavingsorderid
+                      and bc.chargestatus = 'Paid'
+                )
+            ),
+            cancelled_shavings_charges as (
+                update public.billcharge
+                set chargestatus = 'Cancelled',
+                    cancelledat = now()
+                where sourcetype = 'ProductRequest'
+                  and chargestatus in ('Open', 'PendingApproval')
+                  and sourceid in (select shavingsorderid from payable_shavings_orders)
+                returning billid
+            )
+            select coalesce(array_agg(distinct billid), array[]::integer[])
+            into v_shavings_bill_ids
+            from cancelled_shavings_charges;
+        end if;
+
     else
         if v_newprequestid is null then
             raise exception 'New product request id is required for approved product change request';
@@ -178,7 +268,7 @@ begin
                 raise exception 'Invalid new stall stay days';
             end if;
 
-            select count(*)::numeric
+            select count(*)
             into v_payercount
             from public.billproductrequest old_bpr
             where old_bpr.prequestid = v_originalprequestid;
@@ -188,8 +278,14 @@ begin
             end if;
 
             v_new_totalamount := v_new_itemprice * v_new_staydays;
-            v_new_amountperpayer := round(v_new_totalamount / v_payercount, 2);
 
+            select o_baseshare, o_remainder
+            into v_baseshare, v_remainder
+            from public.usp_splitwholeshekels(v_new_totalamount, v_payercount);
+
+            -- WHOLE-SHEKEL SPLIT CORRECTION: deterministic remainder
+            -- allocation, ordered by paidbypersonid ascending (joined via
+            -- bill, since billproductrequest carries no payer column).
             insert into public.billproductrequest
             (
                 billid,
@@ -197,17 +293,22 @@ begin
                 amounttopay
             )
             select
-                old_bpr.billid,
+                ordered.billid,
                 v_newprequestid,
-                v_new_amountperpayer
-            from public.billproductrequest old_bpr
-            where old_bpr.prequestid = v_originalprequestid
-              and not exists (
-                  select 1
-                  from public.billproductrequest existing_bpr
-                  where existing_bpr.billid = old_bpr.billid
-                    and existing_bpr.prequestid = v_newprequestid
-              );
+                v_baseshare + case when ordered.rn <= v_remainder then 1 else 0 end
+            from (
+                select old_bpr.billid,
+                       row_number() over (order by b.paidbypersonid asc) as rn
+                from public.billproductrequest old_bpr
+                inner join public.bill b on b.billid = old_bpr.billid
+                where old_bpr.prequestid = v_originalprequestid
+            ) ordered
+            where not exists (
+                select 1
+                from public.billproductrequest existing_bpr
+                where existing_bpr.billid = ordered.billid
+                  and existing_bpr.prequestid = v_newprequestid
+            );
 
             insert into public.billcharge
             (
@@ -328,6 +429,13 @@ begin
         perform public.usp_recalculatebillamount(v_bill_id);
     end loop;
 
+    if v_shavings_bill_ids is not null then
+        foreach v_bill_id in array v_shavings_bill_ids
+        loop
+            perform public.usp_recalculatebillamount(v_bill_id);
+        end loop;
+    end if;
+
     return p_productchangerequestid;
 end;
-$function$
+$function$;

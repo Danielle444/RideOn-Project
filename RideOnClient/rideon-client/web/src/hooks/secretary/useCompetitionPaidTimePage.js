@@ -11,6 +11,7 @@ import {
   getAllPaidTimeBaseSlots,
   createPaidTimeSlotInCompetition,
   updatePaidTimeSlotInCompetition,
+  setPaidTimeSlotPublishState,
   deletePaidTimeSlotInCompetition,
 } from "../../services/paidTimeSlotInCompetitionService";
 
@@ -118,7 +119,10 @@ export default function useCompetitionPaidTimePage(options) {
   var [competitionStartDate, setCompetitionStartDate] = useState("");
   var [competitionEndDate, setCompetitionEndDate] = useState("");
 
-  var [loadingSlots, setLoadingSlots] = useState(false);
+  // Start loadingSlots=true so the slots table shows a spinner on first paint instead of the
+  // "לא נמצאו סלוטים להצגה" empty row before the mount fetch runs. loadSlots settles it to
+  // false when there is no competition/ranch to fetch for.
+  var [loadingSlots, setLoadingSlots] = useState(true);
   var [loadingRequests, setLoadingRequests] = useState(false);
   var [savingAssignment, setSavingAssignment] = useState(false);
 
@@ -153,7 +157,10 @@ export default function useCompetitionPaidTimePage(options) {
   );
 
   async function loadSlots() {
-    if (!competitionId || !ranchId) return;
+    if (!competitionId || !ranchId) {
+      setLoadingSlots(false);
+      return;
+    }
 
     try {
       setLoadingSlots(true);
@@ -249,7 +256,6 @@ export default function useCompetitionPaidTimePage(options) {
         StartTime: data.startTime,
         EndTime: data.endTime,
 
-        SlotStatus: data.slotStatus,
         SlotNotes: data.slotNotes,
       };
 
@@ -280,6 +286,21 @@ export default function useCompetitionPaidTimePage(options) {
     }
   }
 
+  async function handleSetPublishState(slot, isPublished) {
+    try {
+      var id = getSlotId(slot);
+
+      await setPaidTimeSlotPublishState(id, {
+        hostRanchId: Number(ranchId),
+        isPublished: isPublished,
+      });
+
+      await loadSlots();
+    } catch (err) {
+      onShowToast?.("error", getErrorMessage(err));
+    }
+  }
+
   async function handleDeletePaidTimeSlot(slot) {
     if (!window.confirm("למחוק את הסלוט?")) {
       return;
@@ -304,7 +325,7 @@ export default function useCompetitionPaidTimePage(options) {
       if (onShowToast) {
         onShowToast(
           "error",
-          err.response?.data || "שגיאה במחיקת סלוט פייד־טיים",
+          getErrorMessage(err, "שגיאה במחיקת סלוט פייד־טיים"),
         );
       }
     }
@@ -679,6 +700,7 @@ export default function useCompetitionPaidTimePage(options) {
     openEditPaidTimeSlotModal,
     closePaidTimeSlotModal,
     handleSubmitPaidTimeSlot,
+    handleSetPublishState,
     handleDeletePaidTimeSlot,
 
     /* assignment */

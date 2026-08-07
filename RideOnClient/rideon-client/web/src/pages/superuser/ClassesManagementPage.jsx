@@ -15,7 +15,9 @@ import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function ClassesManagementPage() {
   const [classTypes, setClassTypes] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // Start loading=true so the table shows a spinner on first paint instead of its empty row
+  // before the mount fetch runs. loadClassTypes sets loading true→false, so this always resolves.
+  const [loading, setLoading] = useState(true);
 
   const [fields, setFields] = useState([]);
   const [selectedFieldId, setSelectedFieldId] = useState("");

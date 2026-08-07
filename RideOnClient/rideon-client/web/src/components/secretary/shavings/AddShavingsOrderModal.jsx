@@ -13,6 +13,7 @@ import {
 } from "../../../services/shavingsOrderService";
 import { getServicePricesDashboard } from "../../../services/servicePricesService";
 import { getErrorMessage } from "../../../utils/competitionForm.utils";
+import DatePicker from "../../common/DatePicker";
 
 function readKey(item, camel, pascal, fallback) {
   if (!item) {
@@ -339,7 +340,12 @@ export default function AddShavingsOrderModal(props) {
       const payload = {
         competitionId: competitionId,
         priceCatalogId: Number(selectedPriceId),
-        ranchId: Number(ranchId),
+        // Ranch-model fix: the server derives both the requesting ranch
+        // (from the selected stalls' requestingranchid) and the host ranch
+        // (from competitionId) itself -- it never trusts a client-supplied
+        // ranchId for this endpoint, so it is intentionally not sent. The
+        // ranchId state above is still needed to scope the stall picker and
+        // price-catalog fetch, which remain per-ranch reads.
         notes: notes ? notes.trim() : null,
         requestedDeliveryTime: buildRequestedDeliveryTime(),
         stalls: selectedStalls.map(function (s) {
@@ -482,8 +488,7 @@ export default function AddShavingsOrderModal(props) {
 
             {deliveryMode === "later" ? (
               <div className="mt-3 flex flex-wrap gap-3">
-                <input
-                  type="date"
+                <DatePicker
                   value={deliveryDate}
                   onChange={function (e) {
                     setDeliveryDate(e.target.value);

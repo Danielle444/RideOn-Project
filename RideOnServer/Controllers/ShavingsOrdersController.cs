@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using RideOnServer.BL;
 using RideOnServer.BL.DTOs.ShavingsOrders;
 using RideOnServer.DAL;
+using System.Linq;
 
 namespace RideOnServer.Controllers
 {
@@ -93,6 +94,8 @@ namespace RideOnServer.Controllers
             {
                 int workerSystemUserId = UserAccessValidator.GetPersonIdFromClaims(User);
 
+                EnsureCallerIsApprovedRanchWorkerForShavingsOrder(workerSystemUserId, request.ShavingsOrderId);
+
                 bool claimed = ShavingsOrderDAL.ClaimShavingsOrder(request.ShavingsOrderId, workerSystemUserId);
 
                 if (!claimed)
@@ -105,6 +108,12 @@ namespace RideOnServer.Controllers
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Ownership/state guard raised inside usp_claimshavingsorder (not found,
+                // competition ended, order cancelled, caller not an approved worker here).
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
             }
             catch (Exception ex)
             {
@@ -120,13 +129,15 @@ namespace RideOnServer.Controllers
             {
                 int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                // TODO:
-                // לחזק בהמשך:
-                // לוודא שה-currentPersonId הוא העובד שההזמנה משויכת אליו
-                // או שהוא עובד חווה מורשה להזמנה הזו.
-                // כרגע אין ב-request ranchId ואין כאן בדיקת שיוך להזמנה.
+                EnsureCallerIsApprovedRanchWorkerForShavingsOrder(currentPersonId, request.ShavingsOrderId);
 
-                ShavingsOrder.SaveDeliveryPhoto(request);
+                bool saved = ShavingsOrder.SaveDeliveryPhoto(request, currentPersonId);
+
+                if (!saved)
+                {
+                    return Conflict("לא ניתן לשמור את התמונה עבור הזמנה זו");
+                }
+
                 return Ok(new { message = "התמונה נשמרה בהצלחה" });
             }
             catch (UnauthorizedAccessException ex)
@@ -136,6 +147,13 @@ namespace RideOnServer.Controllers
             catch (ArgumentException ex)
             {
                 return BadRequest(ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Ownership/state guard raised inside usp_savedeliveryphoto (not found,
+                // competition ended, order cancelled, not claimed by this worker, or a
+                // delivery photo was already recorded and must not be silently replaced).
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
             }
             catch (Exception ex)
             {
@@ -151,10 +169,9 @@ namespace RideOnServer.Controllers
             {
                 int workerSystemUserId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                // TODO (parity with save-delivery-photo):
-                // אין כאן בדיקת שיוך ההזמנה לעובד הנוכחי. לחזק בהמשך כמו ב-save-delivery-photo.
+                EnsureCallerIsApprovedRanchWorkerForShavingsOrder(workerSystemUserId, request.ShavingsOrderId);
 
-                bool delivered = ShavingsOrder.MarkDelivered(request);
+                bool delivered = ShavingsOrder.MarkDelivered(request, workerSystemUserId);
 
                 if (!delivered)
                 {
@@ -170,6 +187,12 @@ namespace RideOnServer.Controllers
             catch (ArgumentException ex)
             {
                 return BadRequest(ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Ownership/state guard raised inside usp_markdelivered (not found,
+                // competition ended, order cancelled, or not claimed by this worker).
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
             }
             catch (Exception ex)
             {
@@ -190,12 +213,49 @@ namespace RideOnServer.Controllers
                     return BadRequest("At least one stall is required.");
                 }
 
-                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
-                    personId,
-                    request.RanchId,
-                    RoleNames.RanchAdmin,
-                    RoleNames.HostSecretary
-                );
+                // Ranch-model fix: requesting ranch is derived server-side
+                // from the referenced stall bookings themselves -- never
+                // trusted from request.RanchId. Fails fast here (before the
+                // write) if a stall is missing or if the selection spans more
+                // than one requesting ranch; usp_createshavingsorder repeats
+                // this exact check internally as defense in depth.
+                List<int> stallBookingIds = request.Stalls
+                    .Select(s => s.StallBookingId)
+                    .Distinct()
+                    .ToList();
+
+                Dictionary<int, int> requestingRanchByStall =
+                    StallBookingDAL.GetRequestingRanchIdsForStallBookings(stallBookingIds);
+
+                List<int> missingStallIds = stallBookingIds
+                    .Where(id => !requestingRanchByStall.ContainsKey(id))
+                    .ToList();
+
+                if (missingStallIds.Count > 0)
+                {
+                    return NotFound($"Stall booking(s) not found: {string.Join(", ", missingStallIds)}");
+                }
+
+                List<int> distinctRequestingRanchIds = requestingRanchByStall.Values.Distinct().ToList();
+
+                if (distinctRequestingRanchIds.Count != 1)
+                {
+                    return BadRequest("All selected stalls must belong to the same requesting ranch.");
+                }
+
+                int requestingRanchId = distinctRequestingRanchIds[0];
+
+                EnsureCanAccessCompetitionRanchShavings(personId, request.CompetitionId, requestingRanchId);
+
+                // Host/service ranch is the COMPETITION's own host ranch,
+                // derived server-side -- never trusted from request.RanchId.
+                RideOnServer.BL.Competition? competition = new CompetitionDAL().GetCompetitionById(request.CompetitionId);
+                if (competition == null)
+                {
+                    return NotFound("התחרות לא נמצאה");
+                }
+
+                request.RanchId = competition.HostRanchId;
 
                 // לא סומכים על ה-client.
                 // גם אם הוא שלח OrderedBySystemUserId אחר, אנחנו דורסים אותו לפי הטוקן.
@@ -218,6 +278,134 @@ namespace RideOnServer.Controllers
             }
         }
 
+        // Standalone shavings cancellation, Payer-gated: creates a Pending
+        // productchangerequest via usp_cancelshavingsorderbypayer (240) --
+        // the shavings sibling of StallBookingsController's
+        // POST /cancel-request. Secretary approval happens later through the
+        // existing Change Tracking page (proc 222 already handles this
+        // category correctly, unmodified).
+        [HttpPost("cancel-request")]
+        public IActionResult CancelShavingsOrderByPayer([FromBody] CancelShavingsOrderRequest request)
+        {
+            try
+            {
+                if (request == null || request.ShavingsOrderId <= 0 || request.RanchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    request.RanchId,
+                    RoleNames.Payer
+                );
+
+                int requestId = ShavingsOrder.CancelShavingsOrderByPayer(request.ShavingsOrderId, personId);
+
+                return Ok(new { ChangeRequestId = requestId, Message = "בקשת הביטול נשלחה למזכירה" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in CancelShavingsOrderByPayer: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
+        // Standalone shavings cancellation, RanchAdmin-direct: calls
+        // usp_admincancelshavingsorder (241) -- the shavings sibling of
+        // StallBookingsController.AdminCancelStallBooking. Deliberately a
+        // separate endpoint from the payer-gated POST /cancel-request above.
+        [HttpDelete("admin-cancel/{shavingsOrderId}")]
+        public IActionResult AdminCancelShavingsOrder(
+            int shavingsOrderId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (shavingsOrderId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin
+                );
+
+                int requestId = ShavingsOrder.AdminCancelShavingsOrder(shavingsOrderId, ranchId, personId);
+
+                return Ok(new { ChangeRequestId = requestId, Message = "הזמנת הנסורת בוטלה" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_admincancelshavingsorder.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in AdminCancelShavingsOrder: {ex.Message}");
+                return BadRequest("אירעה שגיאה בביטול הזמנת הנסורת");
+            }
+        }
+
+        // Standalone shavings cancellation, HostSecretary-direct: calls
+        // usp_secretarycancelshavingsorder (242) -- the shavings sibling of
+        // StallBookingsController.SecretaryDeleteStallBooking, built to the
+        // same RN001/409 standard as AdminCancelShavingsOrder above (242,
+        // unlike its stall sibling 146, raises RN001).
+        [HttpDelete("secretary/{shavingsOrderId}")]
+        public IActionResult SecretaryCancelShavingsOrder(
+            int shavingsOrderId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                if (shavingsOrderId <= 0 || ranchId <= 0)
+                {
+                    return BadRequest("Invalid request");
+                }
+
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                int requestId = ShavingsOrder.SecretaryCancelShavingsOrder(shavingsOrderId, personId, ranchId);
+
+                return Ok(new { ChangeRequestId = requestId, Message = "הזמנת הנסורת בוטלה" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in SecretaryCancelShavingsOrder: {ex.Message}");
+                return BadRequest("אירעה שגיאה בביטול הזמנת הנסורת");
+            }
+        }
+
         [HttpGet("stall-bookings-for-order")]
         public IActionResult GetStallBookingsForShavings(
             [FromQuery] int competitionId,
@@ -227,12 +415,7 @@ namespace RideOnServer.Controllers
             {
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
-                    personId,
-                    ranchId,
-                    RoleNames.RanchAdmin,
-                    RoleNames.HostSecretary
-                );
+                EnsureCanAccessCompetitionRanchShavings(personId, competitionId, ranchId);
 
                 var result = ShavingsOrderDAL.GetStallBookingsForShavings(competitionId, ranchId);
                 return Ok(result);
@@ -256,12 +439,7 @@ namespace RideOnServer.Controllers
             {
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
-                    personId,
-                    ranchId,
-                    RoleNames.RanchAdmin,
-                    RoleNames.HostSecretary
-                );
+                EnsureCanAccessCompetitionRanchShavings(personId, competitionId, ranchId);
 
                 var result = ShavingsOrderDAL.GetShavingsOrdersForCompetitionAndRanch(competitionId, ranchId);
                 return Ok(result);
@@ -283,6 +461,11 @@ namespace RideOnServer.Controllers
             {
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
+                // NOTE: still the strict single-ranch check, so a host secretary cannot read a
+                // guest ranch's order here the way they can on the competition-scoped endpoints.
+                // This route has no competitionId to resolve the host ranch from, and no client
+                // currently calls it. If a caller is added, resolve the competition from
+                // shavingsOrderId and switch to EnsureCanAccessCompetitionRanchShavings.
                 UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
                     ranchId,
@@ -310,6 +493,8 @@ namespace RideOnServer.Controllers
             {
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
+                // NOTE: strict single-ranch check (same limitation as {id}/details) -- no
+                // competitionId on this route to derive the host ranch, and no client calls it.
                 UserAccessValidator.EnsureUserHasAnyRoleInRanch(
                     personId,
                     ranchId,
@@ -339,12 +524,7 @@ namespace RideOnServer.Controllers
             {
                 int personId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                UserAccessValidator.EnsureUserHasAnyRoleInRanch(
-                    personId,
-                    ranchId,
-                    RoleNames.RanchAdmin,
-                    RoleNames.HostSecretary
-                );
+                EnsureCanAccessCompetitionRanchShavings(personId, competitionId, ranchId);
 
                 var result = ShavingsOrderDAL.GetAllShavingsOrderPayersForCompetitionAndRanch(competitionId, ranchId);
                 return Ok(result);
@@ -371,13 +551,7 @@ namespace RideOnServer.Controllers
                     UserAccessValidator
                         .GetPersonIdFromClaims(User);
 
-                UserAccessValidator
-                    .EnsureUserHasAnyRoleInRanch(
-                        personId,
-                        ranchId,
-                        RoleNames.HostSecretary,
-                        RoleNames.RanchAdmin
-                    );
+                EnsureCanAccessCompetitionRanchShavings(personId, competitionId, ranchId);
 
                 var list =
                     ShavingsOrderDAL
@@ -405,6 +579,107 @@ namespace RideOnServer.Controllers
                     "אירעה שגיאה בשליפת פרטי נסורת"
                 );
             }
+        }
+
+        // Read-authorization for a single (competition, requesting-ranch) shavings slice.
+        //
+        // Two legitimate callers, either one is sufficient:
+        //   1. Own-ranch view (mobile RanchAdmin looking at their own ranch): the caller
+        //      has RanchAdmin/HostSecretary in the passed ranchId itself.
+        //   2. Host cross-ranch view (web HostSecretary of the competition's host ranch
+        //      paging over every PARTICIPATING guest ranch): the caller has
+        //      HostSecretary/RanchAdmin in the competition's own host ranch.
+        //
+        // Case 2 is why the plain EnsureUserHasAnyRoleInRanch(personId, ranchId, ...) check
+        // was wrong here -- a host secretary is not a member of the guest ranches whose
+        // orders they legitimately manage, so every guest ranch returned 403. The proc is
+        // scoped by competitionId + requestingranchid, so host access cannot leak data from
+        // a competition the caller does not host.
+        private void EnsureCanAccessCompetitionRanchShavings(int personId, int competitionId, int ranchId)
+        {
+            // 1. Own-ranch access -- cheapest, covers the mobile admin path unchanged.
+            if (UserAccessValidator.HasUserAnyRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.RanchAdmin,
+                    RoleNames.HostSecretary))
+            {
+                return;
+            }
+
+            // 2. Host-ranch access -- host ranch is derived server-side from the competition,
+            //    never trusted from the request.
+            RideOnServer.BL.Competition? competition =
+                new CompetitionDAL().GetCompetitionById(competitionId);
+
+            if (competition != null &&
+                UserAccessValidator.HasUserAnyRoleInRanch(
+                    personId,
+                    competition.HostRanchId,
+                    RoleNames.HostSecretary,
+                    RoleNames.RanchAdmin))
+            {
+                return;
+            }
+
+            throw new UnauthorizedAccessException(
+                "אין לך הרשאה לבצע פעולה זו עבור החווה שנבחרה");
+        }
+
+        // Worker shavings-mutation authorization fix (P0). claim / save-delivery-photo /
+        // mark-delivered receive no ranchId from the client at all, so the real host ranch is
+        // resolved server-side via ShavingsOrderDAL.GetShavingsOrderCompetitionContext -- never
+        // trusted from the request -- before UserAccessValidator runs. This is defense layer 1
+        // (role/ranch -> 403); usp_claimshavingsorder / usp_savedeliveryphoto / usp_markdelivered
+        // each independently re-derive and re-check the same host ranch plus ownership/state as
+        // defense layer 2 (-> 409 via RN001), so a direct DB/API call bypassing this controller
+        // cannot skip authorization either.
+        //
+        // An order that does not resolve to a competition (does not exist) is deliberately let
+        // through here -- ResolveShavingsMutationAuthorization returns Authorized for a null host
+        // ranch -- so the mutating stored procedure's own "Shavings order not found" RN001 guard
+        // stays the single source of truth for that message, instead of duplicating it here.
+        private static void EnsureCallerIsApprovedRanchWorkerForShavingsOrder(int personId, int shavingsOrderId)
+        {
+            ShavingsOrderCompetitionContext? context =
+                ShavingsOrderDAL.GetShavingsOrderCompetitionContext(shavingsOrderId);
+
+            bool isApprovedRanchWorkerAtHostRanch =
+                context != null &&
+                UserAccessValidator.HasUserRoleInRanch(personId, context.HostRanchId, RoleNames.RanchWorker);
+
+            ShavingsMutationAuthorization authorization = ResolveShavingsMutationAuthorization(
+                context?.HostRanchId,
+                isApprovedRanchWorkerAtHostRanch);
+
+            if (authorization == ShavingsMutationAuthorization.Denied)
+            {
+                throw new UnauthorizedAccessException(
+                    "אין לך הרשאה לבצע פעולה זו עבור החווה שנבחרה");
+            }
+        }
+
+        private enum ShavingsMutationAuthorization
+        {
+            Authorized,
+            Denied
+        }
+
+        // Pure decision, reachable by reflection from RideOnServer.Tests without a DB
+        // (see StallBookingRanchModelAuthorizationTests / HealthCertificateAuthorizationTests
+        // for the established pattern this project uses for authorization coverage).
+        private static ShavingsMutationAuthorization ResolveShavingsMutationAuthorization(
+            int? hostRanchId,
+            bool isApprovedRanchWorkerAtHostRanch)
+        {
+            if (hostRanchId == null)
+            {
+                return ShavingsMutationAuthorization.Authorized;
+            }
+
+            return isApprovedRanchWorkerAtHostRanch
+                ? ShavingsMutationAuthorization.Authorized
+                : ShavingsMutationAuthorization.Denied;
         }
     }
 }

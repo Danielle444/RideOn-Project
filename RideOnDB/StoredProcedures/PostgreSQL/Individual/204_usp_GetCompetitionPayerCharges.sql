@@ -12,12 +12,63 @@
 -- 191-217). No issue specific to this proc was flagged in the audit beyond
 -- what is inherited from billcharge's own known gaps (no double-payment
 -- check, "CanSelectForPayment" is a pure chargestatus/paymentbatchid check).
+--
+-- MODIFIED 2026-08-07 (HostSecretary fine-presentation slice, live-verified
+-- against pg_get_functiondef immediately before this change): an Entry-created
+-- late-entry fine row (sourcetype='Fine', categorykey='fine', sourceid=
+-- EntryId, chargeowner='Organizer' always) previously fell through every
+-- sourcetype='Entry' gate below and rendered with MainName='fine',
+-- RiderName/HorseName/BarnName/CoachName all null. The `entry e` join and the
+-- MainName/RiderName/HorseName/BarnName/CoachName CASE expressions now also
+-- match `bc.sourcetype = 'Fine' and bc.categorykey = 'fine'`, so a fine row
+-- resolves the same class/rider/horse/barn/coach context as its sibling base
+-- charge. This does NOT touch ChangeEntryRequest fines (sourcetype='Fine',
+-- categorykey='classes', sourceid=ChangeEntryRequestId) - the added condition
+-- requires categorykey='fine', which CER fine rows never carry (verified
+-- live 2026-08-07). CER fine rows keep falling through to the pre-existing
+-- `else` branches exactly as before (MainName=literal 'classes', no rider/
+-- horse/coach) - unchanged, flagged as a known follow-up, not fixed here.
+-- No output column added or removed; return signature unchanged.
+--
+-- MODIFIED 2026-08-07 (HostSecretary fine-presentation slice, ChangeEntryRequest
+-- coverage): closes the follow-up noted above. Locked business rule: an Entry
+-- has at most ONE payable Organizer fine - never aggregated, never summed,
+-- never picked arbitrarily. A new trailing output column, "ResolvedEntryId",
+-- carries "the entry this row is really about": bc.sourceid for a base Entry
+-- charge or an Entry-created fine (sourceid already IS the entryid for both),
+-- and coalesce(cer.newentryid, cer.originalentryid) for a ChangeEntryRequest
+-- fine (categorykey='classes', sourcetype='Fine', sourceid=
+-- ChangeEntryRequestId) - approved change -> newEntryId, cancellation with no
+-- replacement -> originalEntryId fallback, both proven live against
+-- usp_answerchangeentryrequest's own code (its change branch raises unless
+-- newentryid is set; its cancellation branch never touches newentryid at
+-- all). This is a genuinely NEW column, not a redefinition of SourceId's
+-- existing meaning (SourceId still always means "the raw FK target implied by
+-- SourceType", e.g. a ChangeEntryRequestId for a CER fine row) - the DAL/DTO/
+-- frontend chain was traced end to end before this change (a new SQL column
+-- does not reach the API by itself; CompetitionPayerChargeItem.cs and
+-- CompetitionPaymentDAL.cs were updated in the same slice). The `entry e`
+-- join and the MainName/RiderName/HorseName/BarnName/CoachName CASE
+-- expressions now also match `sourcetype='Fine' and categorykey='classes'`,
+-- resolving via ResolvedEntryId, so a CER fine row (e.g. CER #2/billchargeid
+-- 128, a cancellation with no live base charge) now shows its real class/
+-- rider/horse context instead of a generic literal "classes" - live-verified.
+-- A new upfront integrity guard (v_integrity_entryid/v_integrity_billchargeids)
+-- raises before the main query runs if any resolved entry for this payer has
+-- more than one payable (Open/Paid) Organizer fine - loud, not silent, scoped
+-- to this payer's own charges only. Adding this column changes the return
+-- type, so this deployment is DROP FUNCTION + CREATE FUNCTION (a plain
+-- CREATE OR REPLACE cannot add an output column) - owner/ACL restoration
+-- verified as part of the deployment package, since a DROP removes them.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_getcompetitionpayercharges(p_competitionid integer, p_payerpersonid integer, p_chargeowner text DEFAULT NULL::text, p_categorykey text DEFAULT NULL::text)
- RETURNS TABLE("BillChargeId" integer, "BillId" integer, "ChargeOwner" text, "CategoryKey" text, "SourceType" text, "SourceId" integer, "DisplayRowKey" text, "StallBookingId" integer, "DisplayDate" date, "StartDate" date, "EndDate" date, "RequestedDeliveryTime" timestamp without time zone, "MainName" text, "RiderName" text, "HorseName" text, "BarnName" text, "CoachName" text, "PayerName" text, "OrderedByName" text, "StallTypeName" text, "StallNumber" text, "CompoundName" text, "BagQuantity" integer, "SplitPayersCount" integer, "SplitPaymentText" text, "SplitPayersJson" text, "StallAssignmentText" text, "AmountToPay" numeric, "ChargeStatus" text, "PaymentBatchId" integer, "InvoiceNumber" text, "CanSelectForPayment" boolean)
+ RETURNS TABLE("BillChargeId" integer, "BillId" integer, "ChargeOwner" text, "CategoryKey" text, "SourceType" text, "SourceId" integer, "DisplayRowKey" text, "StallBookingId" integer, "DisplayDate" date, "StartDate" date, "EndDate" date, "RequestedDeliveryTime" timestamp without time zone, "MainName" text, "RiderName" text, "HorseName" text, "BarnName" text, "CoachName" text, "PayerName" text, "OrderedByName" text, "StallTypeName" text, "StallNumber" text, "CompoundName" text, "BagQuantity" integer, "SplitPayersCount" integer, "SplitPaymentText" text, "SplitPayersJson" text, "StallAssignmentText" text, "AmountToPay" numeric, "ChargeStatus" text, "PaymentBatchId" integer, "InvoiceNumber" text, "CanSelectForPayment" boolean, "ResolvedEntryId" integer)
  LANGUAGE plpgsql
 AS $function$
+declare
+    v_integrity_entryid integer;
+    v_integrity_billchargeids integer[];
 begin
     if p_competitionid is null or p_competitionid <= 0 then
         raise exception 'Invalid competition id';
@@ -25,6 +76,44 @@ begin
 
     if p_payerpersonid is null or p_payerpersonid <= 0 then
         raise exception 'Invalid payer person id';
+    end if;
+
+    -- Data-integrity guard (locked business rule: at most one payable
+    -- Organizer fine per Entry). Scoped to this payer's own charges only -
+    -- a bad row for an unrelated payer never breaks this call.
+    select
+        resolved.resolvedentryid,
+        array_agg(resolved.billchargeid order by resolved.billchargeid)
+    into
+        v_integrity_entryid,
+        v_integrity_billchargeids
+    from (
+        select
+            bc.billchargeid,
+            bc.chargeowner,
+            case
+                when bc.categorykey = 'fine' and bc.sourcetype = 'Fine'
+                    then bc.sourceid
+                when bc.categorykey = 'classes' and bc.sourcetype = 'Fine'
+                    then coalesce(cer.newentryid, cer.originalentryid)
+            end as resolvedentryid
+        from public.billcharge bc
+        left join public.changeentryrequest cer
+            on bc.categorykey = 'classes' and bc.sourcetype = 'Fine'
+           and cer.changeentryrequestid = bc.sourceid
+        where bc.competitionid = p_competitionid
+          and bc.paidbypersonid = p_payerpersonid
+          and bc.sourcetype = 'Fine'
+          and bc.chargestatus in ('Open', 'Paid')
+    ) resolved
+    where resolved.resolvedentryid is not null
+    group by resolved.resolvedentryid, resolved.chargeowner
+    having count(*) > 1
+    limit 1;
+
+    if v_integrity_entryid is not null then
+        raise exception 'Data integrity violation: % payable fines resolve to Entry % (billChargeIds: %) - refusing to compute charges',
+            array_length(v_integrity_billchargeids, 1), v_integrity_entryid, v_integrity_billchargeids;
     end if;
 
     return query
@@ -203,7 +292,10 @@ begin
         end as "StallBookingId",
 
         case
-            when bc.sourcetype = 'Entry' then cic.classdatetime::date
+            when bc.sourcetype = 'Entry'
+              or (bc.sourcetype = 'Fine' and bc.categorykey = 'fine')
+              or (bc.sourcetype = 'Fine' and bc.categorykey = 'classes')
+            then cic.classdatetime::date
             when bc.sourcetype = 'PaidTimeRequest' then ptsic.slotdate::date
             when bc.categorykey = 'stalls' then sd.startdate
             when bc.sourcetype = 'ProductRequest' then pr.prequestdatetime::date
@@ -223,7 +315,10 @@ begin
         null::timestamp without time zone as "RequestedDeliveryTime",
 
         case
-            when bc.sourcetype = 'Entry' then ct.classname::text
+            when bc.sourcetype = 'Entry'
+              or (bc.sourcetype = 'Fine' and bc.categorykey = 'fine')
+              or (bc.sourcetype = 'Fine' and bc.categorykey = 'classes')
+            then ct.classname::text
             when bc.sourcetype = 'PaidTimeRequest' then prod.productname::text
             when bc.categorykey = 'stalls' then coalesce(sd.stalltypename, prod_pr.productname)::text
             when bc.sourcetype = 'ProductRequest' then prod_pr.productname::text
@@ -232,24 +327,34 @@ begin
 
         case
             when bc.sourcetype in ('Entry', 'PaidTimeRequest')
+              or (bc.sourcetype = 'Fine' and bc.categorykey = 'fine')
+              or (bc.sourcetype = 'Fine' and bc.categorykey = 'classes')
             then concat_ws(' ', rider_p.firstname, rider_p.lastname)::text
             else null::text
         end as "RiderName",
 
         case
-            when bc.sourcetype in ('Entry', 'PaidTimeRequest') then h.horsename::text
+            when bc.sourcetype in ('Entry', 'PaidTimeRequest')
+              or (bc.sourcetype = 'Fine' and bc.categorykey = 'fine')
+              or (bc.sourcetype = 'Fine' and bc.categorykey = 'classes')
+            then h.horsename::text
             when bc.categorykey = 'stalls' then sd.horsename::text
             else null::text
         end as "HorseName",
 
         case
-            when bc.sourcetype in ('Entry', 'PaidTimeRequest') then h.barnname::text
+            when bc.sourcetype in ('Entry', 'PaidTimeRequest')
+              or (bc.sourcetype = 'Fine' and bc.categorykey = 'fine')
+              or (bc.sourcetype = 'Fine' and bc.categorykey = 'classes')
+            then h.barnname::text
             when bc.categorykey = 'stalls' then sd.barnname::text
             else null::text
         end as "BarnName",
 
         case
             when bc.sourcetype in ('Entry', 'PaidTimeRequest')
+              or (bc.sourcetype = 'Fine' and bc.categorykey = 'fine')
+              or (bc.sourcetype = 'Fine' and bc.categorykey = 'classes')
             then concat_ws(' ', coach_p.firstname, coach_p.lastname)::text
             else null::text
         end as "CoachName",
@@ -304,7 +409,15 @@ begin
             fir.federationinvoicereferences
         ) as "InvoiceNumber",
 
-        (bc.chargestatus = 'Open' and bc.paymentbatchid is null)::boolean as "CanSelectForPayment"
+        (bc.chargestatus = 'Open' and bc.paymentbatchid is null)::boolean as "CanSelectForPayment",
+
+        case
+            when bc.sourcetype = 'Entry' then bc.sourceid
+            when bc.sourcetype = 'Fine' and bc.categorykey = 'fine' then bc.sourceid
+            when bc.sourcetype = 'Fine' and bc.categorykey = 'classes'
+                then coalesce(cer.newentryid, cer.originalentryid)
+            else null::integer
+        end as "ResolvedEntryId"
 
     from public.billcharge bc
 
@@ -324,9 +437,21 @@ begin
        and ssp.sourcetype = bc.sourcetype
        and ssp.sourceid = bc.sourceid
 
+    left join public.changeentryrequest cer
+        on bc.sourcetype = 'Fine' and bc.categorykey = 'classes'
+       and cer.changeentryrequestid = bc.sourceid
+
     left join public.entry e
-        on bc.sourcetype = 'Entry'
-       and e.entryid = bc.sourceid
+        on (
+            bc.sourcetype = 'Entry'
+            or (bc.sourcetype = 'Fine' and bc.categorykey = 'fine')
+            or (bc.sourcetype = 'Fine' and bc.categorykey = 'classes')
+        )
+       and e.entryid = case
+            when bc.sourcetype = 'Fine' and bc.categorykey = 'classes'
+                then coalesce(cer.newentryid, cer.originalentryid)
+            else bc.sourceid
+        end
 
     left join public.servicerequest sr_entry
         on sr_entry.srequestid = e.entryid
@@ -497,7 +622,9 @@ begin
             fir.federationinvoicereferences
         ) as "InvoiceNumber",
 
-        (bc.chargestatus = 'Open' and bc.paymentbatchid is null)::boolean as "CanSelectForPayment"
+        (bc.chargestatus = 'Open' and bc.paymentbatchid is null)::boolean as "CanSelectForPayment",
+
+        null::integer as "ResolvedEntryId"
 
     from public.billcharge bc
 

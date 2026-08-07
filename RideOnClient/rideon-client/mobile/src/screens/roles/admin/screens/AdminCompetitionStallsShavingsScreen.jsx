@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 
 import {
@@ -42,7 +42,78 @@ import RegistrationStepNotice from "../../../../components/competitions/Registra
 import { createStallBookingCancelRequest } from "../../../../services/stallBookingsService";
 import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
 
+import {
+  LIFECYCLE_STATE,
+  resolveStallLifecycleState,
+} from "../../../../utils/payerAccountLifecycle";
+import { bandAndSortStalls } from "../../../../utils/payerAccountBands";
+import { getLifecycleBandHeader } from "../../../../utils/payerAccountCopy";
+
 import styles from "../../../../styles/adminCompetitionStallsStyles";
+
+// CAP-10: this admin surface's cards carry isCancelled/hasPendingCancellation/
+// hasPendingChange straight off usp_getstallbookingsforcompetitionandranch
+// (verified live 2026-08-06) - the exact shape resolveStallLifecycleState and
+// bandAndSortStalls were already built for, so both are reused directly with
+// no adapter.
+//
+// There is no filterTitle-equivalent style token in this screen's stylesheet
+// (it has no filter UI), so the divider mirrors that token's values inline
+// rather than inventing a new stylesheet entry for one line.
+var BAND_HEADER_STYLE = {
+  fontSize: 14,
+  fontWeight: "800",
+  color: "#4F3B31",
+  textAlign: "right",
+};
+
+function renderBandDivider(headerText, keyValue) {
+  if (!headerText) {
+    return null;
+  }
+
+  return (
+    <Text key={keyValue} style={BAND_HEADER_STYLE}>
+      {headerText}
+    </Text>
+  );
+}
+
+// Renders one non-empty divider per lifecycle band, in Active / pending /
+// cancelled order, using the caller's existing per-item card renderer
+// unchanged.
+function renderBandedSections(banded, renderCard) {
+  var sections = [
+    {
+      key: "active",
+      items: banded.active,
+      header: getLifecycleBandHeader(LIFECYCLE_STATE.ACTIVE),
+    },
+    {
+      key: "pending",
+      items: banded.pending,
+      header: getLifecycleBandHeader(LIFECYCLE_STATE.PENDING_CHANGE),
+    },
+    {
+      key: "cancelled",
+      items: banded.cancelled,
+      header: getLifecycleBandHeader(LIFECYCLE_STATE.CANCELLED),
+    },
+  ];
+
+  return sections.map(function (section) {
+    if (section.items.length === 0) {
+      return null;
+    }
+
+    return (
+      <View key={"band-" + section.key}>
+        {renderBandDivider(section.header, "band-header-" + section.key)}
+        {section.items.map(renderCard)}
+      </View>
+    );
+  });
+}
 
 export default function AdminCompetitionStallsShavingsScreen(props) {
   var activeRoleContext = useActiveRole();
@@ -160,6 +231,13 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
 
   var cards = Array.isArray(overview.cards) ? overview.cards : [];
 
+  var bandedCards = useMemo(
+    function () {
+      return bandAndSortStalls(cards);
+    },
+    [cards],
+  );
+
   function handleCompetitionMenuPress(item) {
     props.navigation.navigate(item.screen);
   }
@@ -236,11 +314,7 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
       return;
     }
 
-    if (
-      item.isCancelled ||
-      item.hasPendingCancellation ||
-      item.hasPendingChange
-    ) {
+    if (resolveStallLifecycleState(item) !== LIFECYCLE_STATE.ACTIVE) {
       Alert.alert("לא ניתן לערוך", "קיימת בקשה פתוחה או שהתא כבר בוטל");
       return;
     }
@@ -277,11 +351,7 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
       return;
     }
 
-    if (
-      item.isCancelled ||
-      item.hasPendingCancellation ||
-      item.hasPendingChange
-    ) {
+    if (resolveStallLifecycleState(item) !== LIFECYCLE_STATE.ACTIVE) {
       Alert.alert("לא ניתן לבטל", "קיימת בקשה פתוחה או שהתא כבר בוטל");
       return;
     }
@@ -360,7 +430,7 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
       );
     }
 
-    return cards.map(function (item) {
+    return renderBandedSections(bandedCards, function (item) {
       return (
         <CompetitionStallCard
           key={String(item.stallBookingId)}

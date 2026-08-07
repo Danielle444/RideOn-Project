@@ -16,6 +16,17 @@ import {
   getStallMapPublishStatus,
 } from "../services/stallMapService";
 
+import {
+  extractServerStallTotal,
+  resolveStallAmount,
+} from "../utils/stallBookingAmounts";
+
+import {
+  resolveStallLifecycleState,
+  resolveShavingsLifecycleState,
+  LIFECYCLE_STATE,
+} from "../utils/payerAccountLifecycle";
+
 function normalizeAssignedPrice(item) {
   if (!item) return null;
   return {
@@ -165,6 +176,12 @@ function normalizeBooking(item) {
 
     stallId: item.stallId || item.StallId || item.stallid || null,
 
+    // CAP-6: the server-computed stall-charge total for this booking, kept
+    // null when the field is absent (as opposed to 0) so cards() below can
+    // tell "no server total, fall back to a client recompute" apart from
+    // "server total is legitimately 0."
+    serverStallAmount: extractServerStallTotal(item),
+
     priceCatalogId:
       Number(
         item.priceCatalogId || item.PriceCatalogId || item.pricecatalogid || 0,
@@ -282,6 +299,18 @@ function normalizeShavingsOrder(item) {
     totalAmount:
       Number(item.totalAmount || item.TotalAmount || item.totalamount || 0) ||
       0,
+
+    // Standalone shavings cancellation (proc 176 IsCancelled/HasPendingCancellation):
+    // own-order state, independent of the delivery-status pipeline above.
+    isCancelled: normalizeBoolean(
+      item.isCancelled ?? item.IsCancelled ?? item.iscancelled,
+    ),
+
+    hasPendingCancellation: normalizeBoolean(
+      item.hasPendingCancellation ??
+        item.HasPendingCancellation ??
+        item.haspendingcancellation,
+    ),
   };
 }
 
@@ -336,7 +365,11 @@ export default function useAdminCompetitionStallsOverview(params) {
 
   var activeRole = params.activeRole;
 
-  var [loading, setLoading] = useState(false);
+  // Start loading=true so the first mount frame shows a spinner, not the empty
+  // "עדיין אין הזמנות תאים" card, which would otherwise flash before loadData's
+  // setLoading(true) runs. The guard in loadData settles this back to false when
+  // there is no valid context to fetch.
+  var [loading, setLoading] = useState(true);
 
   var [screenError, setScreenError] = useState("");
 
@@ -357,6 +390,9 @@ export default function useAdminCompetitionStallsOverview(params) {
   var loadData = useCallback(
     async function () {
       if (!competitionId || !activeRole || !activeRole.ranchId) {
+        // Nothing to fetch: settle the initial loading=true so the screen shows
+        // its empty state rather than a stuck spinner.
+        setLoading(false);
         return;
       }
 
@@ -517,6 +553,11 @@ export default function useAdminCompetitionStallsOverview(params) {
           );
         });
 
+        // Own-order cancellation state (proc 176) takes precedence, falling back to
+        // the parent booking's lifecycle only when the order has no independent
+        // cancellation signal of its own - see resolveShavingsLifecycleState.
+        var stallLifecycleState = resolveStallLifecycleState(booking);
+
         var relatedOrders = relatedDetails
           .map(function (detail) {
             var order = safeOrders.find(function (item) {
@@ -541,6 +582,11 @@ export default function useAdminCompetitionStallsOverview(params) {
               amountForThisStall: amountForThisStall,
 
               totalAmount: amountForThisStall,
+
+              lifecycleState: resolveShavingsLifecycleState(
+                order,
+                stallLifecycleState,
+              ),
             };
           })
           .filter(Boolean);
@@ -556,10 +602,23 @@ export default function useAdminCompetitionStallsOverview(params) {
           ? Number(priceRow.assignedPrice || 0)
           : Number(booking.itemPrice || 0);
 
-        var stallAmount =
-          Number(numberOfDays || 1) * effectivePerDayPrice;
+        // CAP-6: the server total wins whenever it is present (including a
+        // legitimate 0) - the numberOfDays × price recompute is only a
+        // fallback for a booking whose row never carried a server total.
+        var stallAmount = resolveStallAmount({
+          serverStallAmount: booking.serverStallAmount,
+          numberOfDays: numberOfDays,
+          effectivePerDayPrice: effectivePerDayPrice,
+        });
 
+        // SH-2: a terminally cancelled shavings order is no longer a live financial
+        // obligation, so its amount is excluded here. Pending cancellation is NOT
+        // terminal and stays included, matching the existing live financial state.
         var shavingsTotalAmount = relatedOrders.reduce(function (sum, order) {
+          if (order.lifecycleState === LIFECYCLE_STATE.CANCELLED) {
+            return sum;
+          }
+
           return sum + Number(order.amountForThisStall || 0);
         }, 0);
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { resolveOperationId } from "../../utils/operationId.utils.js";
+import { buildPayableEntryUnits } from "../../utils/paymentEntryGrouping.utils.js";
 import {
   bulkAllocateFederationCreditToCharges,
   createCompetitionPayment,
@@ -59,18 +60,6 @@ function getUniqueBillChargeIdsFromRows(rows) {
   });
 
   return ids;
-}
-
-function isChargeOpen(charge) {
-  var status = getValue(charge, "chargeStatus", "ChargeStatus", "");
-  var canSelect = getValue(
-    charge,
-    "canSelectForPayment",
-    "CanSelectForPayment",
-    false,
-  );
-
-  return status === "Open" && canSelect === true;
 }
 
 function getCreditAvailableAmount(credit) {
@@ -175,14 +164,31 @@ export default function useCompetitionPaymentsPage(options) {
           return false;
         }
 
-        if (selectedCategoryKey && categoryKey !== selectedCategoryKey) {
-          return false;
+        if (!selectedCategoryKey) {
+          return true;
         }
 
-        return true;
+        // Entry-created late-entry fines fold into the "מקצים" payable unit
+        // (categoryKey='fine' on the raw row) -- keep them visible when
+        // filtering to "classes" so buildPayableEntryUnits can still pair
+        // them with their base charge. There is no standalone "fine" filter
+        // in the UI anymore (see PaymentCategoriesSidebar.jsx), so this only
+        // ever matters for the "classes" filter.
+        if (selectedCategoryKey === "classes" && categoryKey === "fine") {
+          return true;
+        }
+
+        return categoryKey === selectedCategoryKey;
       });
     },
     [charges, selectedOwner, selectedCategoryKey],
+  );
+
+  var visibleChargeUnits = useMemo(
+    function () {
+      return buildPayableEntryUnits(visibleCharges);
+    },
+    [visibleCharges],
   );
 
   var selectedCharges = useMemo(
@@ -210,6 +216,13 @@ export default function useCompetitionPaymentsPage(options) {
       });
     },
     [charges, selectedChargeIds, selectedOwner],
+  );
+
+  var selectedChargeUnits = useMemo(
+    function () {
+      return buildPayableEntryUnits(selectedCharges);
+    },
+    [selectedCharges],
   );
 
   var selectedTotal = useMemo(
@@ -279,13 +292,23 @@ export default function useCompetitionPaymentsPage(options) {
 
   var visibleSelectableChargeIds = useMemo(
     function () {
-      return getUniqueBillChargeIdsFromRows(
-        visibleCharges.filter(function (charge) {
-          return isChargeOpen(charge);
-        }),
-      );
+      var ids = [];
+
+      visibleChargeUnits.forEach(function (unit) {
+        if (!unit.canSelectForPayment) {
+          return;
+        }
+
+        unit.billChargeIds.forEach(function (id) {
+          if (id && !ids.includes(id)) {
+            ids.push(id);
+          }
+        });
+      });
+
+      return ids;
     },
-    [visibleCharges],
+    [visibleChargeUnits],
   );
 
   var allVisibleChargesSelected = useMemo(
@@ -488,68 +511,23 @@ export default function useCompetitionPaymentsPage(options) {
     setSelectedCategoryKey(categoryKey || "");
   }
 
-  function getRelatedChargeIds(charge) {
-    var sourceType = getValue(charge, "sourceType", "SourceType", "");
-    var sourceId = getValue(charge, "sourceId", "SourceId", 0);
-    var categoryKey = getValue(charge, "categoryKey", "CategoryKey", "");
-    var chargeOwner = getChargeOwner(charge);
-
-    if (sourceType === "Entry" && categoryKey === "classes") {
-      return charges
-        .filter(function (candidate) {
-          var candidateSourceType = getValue(
-            candidate,
-            "sourceType",
-            "SourceType",
-            "",
-          );
-
-          var candidateSourceId = getValue(
-            candidate,
-            "sourceId",
-            "SourceId",
-            0,
-          );
-
-          var candidateCategoryKey = getValue(
-            candidate,
-            "categoryKey",
-            "CategoryKey",
-            "",
-          );
-
-          return (
-            candidateSourceType === "Entry" &&
-            candidateCategoryKey === "classes" &&
-            candidateSourceId === sourceId &&
-            getChargeOwner(candidate) === chargeOwner &&
-            isChargeOpen(candidate)
-          );
-        })
-        .map(function (candidate) {
-          return getChargeId(candidate);
-        });
-    }
-
-    return [getChargeId(charge)];
-  }
-
-  function toggleCharge(charge) {
-    if (!isChargeOpen(charge)) {
+  // Selection operates on a payable unit (from buildPayableEntryUnits), not a
+  // raw billcharge row -- a unit's billChargeIds already carries every id
+  // that must move together (an Entry-created fine folded into its base
+  // charge, or a single id for every other row type). This supersedes the
+  // old getRelatedChargeIds special-case, which only ever matched a classes
+  // charge back to itself (same sourceId/chargeOwner is unique per entry) and
+  // never actually merged fine rows.
+  function toggleCharge(unit) {
+    if (!unit || !unit.canSelectForPayment) {
       return;
     }
 
-    if (getChargeOwner(charge) !== selectedOwner) {
+    if (unit.chargeOwner !== selectedOwner) {
       return;
     }
 
-    var relatedIds = getRelatedChargeIds(charge);
-    var billChargeId = getChargeId(charge);
-    var categoryKey = getValue(charge, "categoryKey", "CategoryKey", "");
-
-    if (categoryKey === "shavings") {
-      relatedIds = [billChargeId];
-    }
+    var relatedIds = unit.billChargeIds;
 
     setSelectedChargeIds(function (previous) {
       var allSelected = relatedIds.every(function (id) {
@@ -1035,6 +1013,7 @@ export default function useCompetitionPaymentsPage(options) {
     categorySummary: categorySummary,
     charges: charges,
     visibleCharges: visibleCharges,
+    visibleChargeUnits: visibleChargeUnits,
     accountLoading: accountLoading,
     accountError: accountError,
 
@@ -1045,6 +1024,7 @@ export default function useCompetitionPaymentsPage(options) {
 
     selectedChargeIds: selectedChargeIds,
     selectedCharges: selectedCharges,
+    selectedChargeUnits: selectedChargeUnits,
     selectedTotal: selectedTotal,
     visibleSelectableChargeIds: visibleSelectableChargeIds,
     allVisibleChargesSelected: allVisibleChargesSelected,

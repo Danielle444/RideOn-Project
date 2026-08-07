@@ -52,6 +52,14 @@ function getPublishedSlotsForCompetition(competitionId, ranchId) {
   });
 }
 
+function getPaidTimeRequestEditDetail(paidTimeRequestId, ranchId) {
+  return axios.get("/PaidTimeRequests/" + paidTimeRequestId + "/edit-detail", {
+    params: {
+      ranchId: ranchId,
+    },
+  });
+}
+
 export {
   createPaidTimeRequest,
   bulkCreatePaidTimeRequests,
@@ -62,4 +70,5 @@ export {
   updatePaidTimeRequestNotes,
   getSlotScheduleForViewing,
   getPublishedSlotsForCompetition,
+  getPaidTimeRequestEditDetail,
 };

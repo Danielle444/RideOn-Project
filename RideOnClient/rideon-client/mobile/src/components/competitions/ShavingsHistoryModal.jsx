@@ -6,6 +6,8 @@ import { Ionicons } from "@expo/vector-icons";
 
 import styles from "../../styles/adminCompetitionStallsStyles";
 
+import { LIFECYCLE_STATE } from "../../utils/payerAccountLifecycle";
+
 function formatPrice(value) {
   if (value === null || value === undefined || value === "") {
     return "₪0";
@@ -44,8 +46,21 @@ function getOrderAmount(order) {
   return Number(order.totalAmount || 0);
 }
 
-function getStatusText(status) {
-  var value = String(status || "").trim();
+// SH-1: the shavings order's own cancellation lifecycle (proc 176's
+// IsCancelled/HasPendingCancellation) is an axis independent of deliveryStatus
+// (Spec 1 only ever stores Pending/Delivered there) - it must be checked first,
+// or a cancelled/pending-cancellation order keeps rendering its stale delivery
+// status (typically "ממתין") forever.
+function getStatusText(order) {
+  if (order && order.lifecycleState === LIFECYCLE_STATE.CANCELLED) {
+    return "בוטל";
+  }
+
+  if (order && order.lifecycleState === LIFECYCLE_STATE.PENDING_CANCELLATION) {
+    return "ממתין לביטול";
+  }
+
+  var value = String((order && order.deliveryStatus) || "").trim();
 
   if (!value) {
     return "לא ידוע";
@@ -74,8 +89,16 @@ function getStatusText(status) {
   return value;
 }
 
-function getStatusBadgeStyle(status) {
-  var value = String(status || "").trim();
+function getStatusBadgeStyle(order) {
+  if (order && order.lifecycleState === LIFECYCLE_STATE.CANCELLED) {
+    return styles.historyStatusDanger;
+  }
+
+  if (order && order.lifecycleState === LIFECYCLE_STATE.PENDING_CANCELLATION) {
+    return styles.historyStatusWarning;
+  }
+
+  var value = String((order && order.deliveryStatus) || "").trim();
 
   if (value === "Approved" || value === "Delivered") {
     return styles.historyStatusSuccess;
@@ -103,12 +126,19 @@ export default function ShavingsHistoryModal(props) {
     function () {
       return orders.reduce(
         function (acc, order) {
+          // SH-2: mirrors the stall-card total's exclusion rule so this modal's own
+          // summary never disagrees with the card it was opened from. Bag count is
+          // left as an unfiltered historical count - only the amount is excluded.
+          var isTerminallyCancelled =
+            order.lifecycleState === LIFECYCLE_STATE.CANCELLED;
+
           return {
             totalBags:
               acc.totalBags + Number(order.bagQuantityPerStall || 0),
 
             totalAmount:
-              acc.totalAmount + getOrderAmount(order),
+              acc.totalAmount +
+              (isTerminallyCancelled ? 0 : getOrderAmount(order)),
           };
         },
         {
@@ -197,11 +227,11 @@ export default function ShavingsHistoryModal(props) {
                       <View
                         style={[
                           styles.historyStatusBadge,
-                          getStatusBadgeStyle(order.deliveryStatus),
+                          getStatusBadgeStyle(order),
                         ]}
                       >
                         <Text style={styles.historyStatusText}>
-                          {getStatusText(order.deliveryStatus)}
+                          {getStatusText(order)}
                         </Text>
                       </View>
 

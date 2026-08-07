@@ -6,6 +6,7 @@ import { authTheme } from "../../../../shared/auth/theme/authTheme";
 import Field from "../../components/common/Field";
 import AuthButton from "../../components/common/AuthButton";
 import CustomDropdown from "../../components/common/CustomDropdown";
+import DatePicker from "../../components/common/DatePicker";
 import {
   register,
   createRanchRequest,
@@ -22,6 +23,7 @@ import {
   mapGenderToFormValue,
   filterRegisterRoles,
 } from "../../../../shared/auth/mappings/authMappings";
+import { GENDER_OPTIONS, normalizeGenderValue } from "../../utils/gender.utils";
 
 import {
   validateRegisterForm,
@@ -244,7 +246,7 @@ export default function RegisterScreen() {
           ...prevForm,
           firstName: person.firstName || "",
           lastName: person.lastName || "",
-          gender: mapGenderToFormValue(person.gender),
+          gender: normalizeGenderValue(mapGenderToFormValue(person.gender)) || "",
           dateOfBirth: person.dateOfBirth
             ? String(person.dateOfBirth).slice(0, 10)
             : "",
@@ -673,9 +675,14 @@ export default function RegisterScreen() {
                       dir="rtl"
                       disabled={genderLocked}
                     >
-                      <option value="">בחר מגדר</option>
-                      <option value="M">זכר</option>
-                      <option value="F">נקבה</option>
+                      <option value="">בחר/י מגדר</option>
+                      {GENDER_OPTIONS.map(function (option) {
+                        return (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        );
+                      })}
                     </select>
                   </Field>
 
@@ -724,8 +731,7 @@ export default function RegisterScreen() {
                   </Field>
 
                   <Field label="תאריך לידה" required>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={form.dateOfBirth}
                       onChange={set("dateOfBirth")}
                       className={dateOfBirthLocked ? readOnlyCls : inputCls}

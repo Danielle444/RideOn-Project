@@ -1,3 +1,11 @@
+-- RANCH-MODEL CORRECTION (2026-08-05, owner-approved architecture fix):
+-- p_ranchid is host-validated; p_bookingranchid already existed as a
+-- separate parameter filtering by sb.ranchid (the buggy value pre-fix).
+-- Filter and "BookingRanchName" display source changed from sb.ranchid to
+-- sb.requestingranchid (see
+-- migrations/add_stallbooking_requestingranchid.sql). Parameter names and
+-- all other columns/behavior unchanged.
+
 CREATE OR REPLACE FUNCTION public.usp_getcompetitionsummaryshavingsentries(p_competitionid integer, p_ranchid integer, p_bookingranchid integer)
  RETURNS TABLE("ShavingsOrderId" integer, "BookingRanchName" text, "StallCount" integer, "BagQuantity" integer, "RequestedDeliveryTime" timestamp without time zone, "DeliveryStatus" text, "HorseNames" text, "PayerNames" text, "IsPaid" boolean, "ExpectedAmount" numeric, "PaidAmount" numeric, "UnpaidAmount" numeric)
  LANGUAGE plpgsql
@@ -93,7 +101,7 @@ begin
     inner join public.stallbooking sb
         on sb.stallbookingid = sofsb.stallbookingid
     inner join public.ranch r
-        on r.ranchid = sb.ranchid
+        on r.ranchid = sb.requestingranchid
     left join public.horse h
         on h.horseid = sb.horseid
     inner join payer_data pd
@@ -103,7 +111,7 @@ begin
     where pr.competitionid = p_competitionid
       and c.hostranchid = p_ranchid
       and p.categoryid = 3
-      and sb.ranchid = p_bookingranchid
+      and sb.requestingranchid = p_bookingranchid
     group by
         so.shavingsorderid,
         r.ranchname,

@@ -18,7 +18,9 @@ import { getErrorMessage } from "../../utils/competitionForm.utils";
 export default function ReiningPatternsManagementPage() {
   var [items, setItems] = useState([]);
   var [allManeuvers, setAllManeuvers] = useState([]);
-  var [loading, setLoading] = useState(false);
+  // Start loading=true so the table shows a spinner on first paint instead of its empty row
+  // before the mount fetch runs. loadPage sets loading true→false, so this always resolves.
+  var [loading, setLoading] = useState(true);
   var [saving, setSaving] = useState(false);
 
   var [modalOpen, setModalOpen] = useState(false);

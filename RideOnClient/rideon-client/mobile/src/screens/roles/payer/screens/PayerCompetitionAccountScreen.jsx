@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -26,6 +26,31 @@ import { useCompetition } from "../../../../context/CompetitionContext";
 
 import usePayerMyCompetitionAccount from "../../../../hooks/usePayerMyCompetitionAccount";
 
+import {
+  bandAndSortPaidTimes,
+  bandAndSortStalls,
+  bandAndSortClasses,
+  sortShavingsOrders,
+} from "../../../../utils/payerAccountBands";
+
+import { groupAndBandShavingsByStall } from "../../../../utils/payerAccountShavingsGrouping";
+
+import {
+  LIFECYCLE_STATE,
+  resolveClassLifecycleState,
+} from "../../../../utils/payerAccountLifecycle";
+
+import {
+  getLifecycleBandHeader,
+  SHAVINGS_NEEDS_REVIEW_COPY,
+} from "../../../../utils/payerAccountCopy";
+
+import ShavingsGroupCard from "../../../../components/payerAccount/ShavingsGroupCard";
+
+import StallMapModal from "../../../../components/competitions/StallMapModal";
+
+import { getStallMapPublishStatus } from "../../../../services/stallMapService";
+
 import styles from "../../../../styles/adminCompetitionPayerAccountStyles";
 
 import { cancelEntryByPayer } from "../../../../services/entriesService";
@@ -39,6 +64,10 @@ import {
   cancelStallBookingByPayer,
   createStallChangeRequestByPayer,
 } from "../../../../services/stallBookingsService";
+
+import { createShavingsOrderCancelRequest } from "../../../../services/shavingsOrderService";
+
+import { createInFlightGuard } from "../../../../utils/inFlightGuard";
 
 function extractErrorMessage(err) {
   if (!err) return "אירעה שגיאה";
@@ -147,6 +176,45 @@ function renderEmpty(text) {
   );
 }
 
+// CAP-3: one divider per non-empty lifecycle band, reusing the existing
+// sectionTitle style (already used for "סיכום לפי סוג חיוב" in the summary
+// tab) rather than introducing new styling.
+function renderBandDivider(headerText, keyValue) {
+  if (!headerText) {
+    return null;
+  }
+
+  return (
+    <Text key={keyValue} style={styles.sectionTitle}>
+      {headerText}
+    </Text>
+  );
+}
+
+// CAP-3: renders one item type's three lifecycle bands (active / pending /
+// cancelled) in the required order, each under its own divider only when
+// non-empty, using the caller's existing per-item card renderer unchanged.
+function renderBandedSections(banded, renderCard) {
+  var sections = [
+    { key: "active", items: banded.active, header: getLifecycleBandHeader(LIFECYCLE_STATE.ACTIVE) },
+    { key: "pending", items: banded.pending, header: getLifecycleBandHeader(LIFECYCLE_STATE.PENDING_CHANGE) },
+    { key: "cancelled", items: banded.cancelled, header: getLifecycleBandHeader(LIFECYCLE_STATE.CANCELLED) },
+  ];
+
+  return sections.map(function (section) {
+    if (section.items.length === 0) {
+      return null;
+    }
+
+    return (
+      <React.Fragment key={"band-" + section.key}>
+        {renderBandDivider(section.header, "band-header-" + section.key)}
+        {section.items.map(renderCard)}
+      </React.Fragment>
+    );
+  });
+}
+
 function resolveInitialTab(routeParams) {
   var requested = String(routeParams?.initialTab || "").toLowerCase();
 
@@ -195,7 +263,114 @@ export default function PayerCompetitionAccountScreen(props) {
   var payer = account.payer;
   var summary = account.summary || {};
 
+  var competitionId = activeCompetition?.competitionId || null;
+  var ranchId = activeRole?.ranchId || null;
+
+  // Stall map entry point (business rule 2/8): the graphical map is reachable
+  // from this stalls tab, but only openable once the host has published it -
+  // reuses the same publish-status read RanchAdmin already relies on.
+  var [stallMapPublished, setStallMapPublished] = useState(null);
+  var [isStallMapOpen, setIsStallMapOpen] = useState(false);
+
+  useEffect(
+    function () {
+      var cancelled = false;
+
+      if (!competitionId || !ranchId) {
+        setStallMapPublished(null);
+        return undefined;
+      }
+
+      getStallMapPublishStatus(competitionId, ranchId)
+        .then(function (response) {
+          if (cancelled) return;
+          var data = response?.data;
+          setStallMapPublished(!!(data && (data.isPublished ?? data.IsPublished)));
+        })
+        .catch(function () {
+          if (!cancelled) setStallMapPublished(null);
+        });
+
+      return function () {
+        cancelled = true;
+      };
+    },
+    [competitionId, ranchId],
+  );
+
+  // Phase 3E Slice D: CAP-8/proc 212 now returns a verified entryStatus on
+  // every class row, so classes are banded the same way paid time and
+  // stalls already are - active / pending (always empty for classes, see
+  // payerAccountBands.js) / cancelled, sorted within each band by the same
+  // verified date/time fields as before.
+  var bandedClasses = useMemo(
+    function () {
+      return bandAndSortClasses(account.classes);
+    },
+    [account.classes],
+  );
+
+  // CAP-3: paid time and stalls DO carry verified lifecycle signals, so they
+  // are grouped into active / pendingChange+pendingCancellation / cancelled
+  // and sorted within each band, mirroring the server's own ORDER BY.
+  var bandedPaidTimes = useMemo(
+    function () {
+      return bandAndSortPaidTimes(account.paidTimes);
+    },
+    [account.paidTimes],
+  );
+
+  var bandedStalls = useMemo(
+    function () {
+      return bandAndSortStalls(account.stalls);
+    },
+    [account.stalls],
+  );
+
+  // CAP-4 (shavings tab): account.shavings[] is the top-level, one-row-per-
+  // shavingsOrderId list (distinct from the nested per-stall shavingsOrders[]
+  // already rendered inside the stalls tab below) - grouped/banded by the
+  // lifecycle of the stall(s) it links to.
+  var bandedShavings = useMemo(
+    function () {
+      return groupAndBandShavingsByStall(account.shavings, account.stalls);
+    },
+    [account.shavings, account.stalls],
+  );
+
   var [cancellingId, setCancellingId] = useState(null);
+
+  // Synchronous in-flight guards, one per action/target namespace (same
+  // pattern as AdminCompetitionPayerAccountScreen.jsx's stall/shavings
+  // guards) - cancellingId above is UI feedback only (async state), not a
+  // correctness guard: two rapid taps on the same or different actions can
+  // both pass a "busy?" check before either render reflects the first one.
+  // A separate ref per action means an in-flight entry cancel can never be
+  // released by, e.g., a paid-time cancel completing.
+  var entryCancelGuardRef = useRef(null);
+  if (entryCancelGuardRef.current === null) {
+    entryCancelGuardRef.current = createInFlightGuard();
+  }
+
+  var paidTimeCancelGuardRef = useRef(null);
+  if (paidTimeCancelGuardRef.current === null) {
+    paidTimeCancelGuardRef.current = createInFlightGuard();
+  }
+
+  var stallCancelGuardRef = useRef(null);
+  if (stallCancelGuardRef.current === null) {
+    stallCancelGuardRef.current = createInFlightGuard();
+  }
+
+  var stallChangeGuardRef = useRef(null);
+  if (stallChangeGuardRef.current === null) {
+    stallChangeGuardRef.current = createInFlightGuard();
+  }
+
+  var shavingsCancelGuardRef = useRef(null);
+  if (shavingsCancelGuardRef.current === null) {
+    shavingsCancelGuardRef.current = createInFlightGuard();
+  }
 
   var [editingPaidTime, setEditingPaidTime] = useState(null);
 
@@ -252,8 +427,14 @@ export default function PayerCompetitionAccountScreen(props) {
   }
 
   async function doStallChangeRequest(item) {
+    var guardKey = "stall-change:" + item.stallBookingId;
+
+    if (!stallChangeGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
-      setCancellingId("stall-change:" + item.stallBookingId);
+      setCancellingId(guardKey);
 
       await createStallChangeRequestByPayer({
         stallBookingId: item.stallBookingId,
@@ -266,6 +447,7 @@ export default function PayerCompetitionAccountScreen(props) {
       Alert.alert("שגיאה", extractErrorMessage(err));
     } finally {
       setCancellingId(null);
+      stallChangeGuardRef.current.release(guardKey);
     }
   }
 
@@ -287,8 +469,14 @@ export default function PayerCompetitionAccountScreen(props) {
   }
 
   async function doCancelEntry(item) {
+    var guardKey = "entry:" + item.entryId;
+
+    if (!entryCancelGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
-      setCancellingId("entry:" + item.entryId);
+      setCancellingId(guardKey);
 
       await cancelEntryByPayer({
         entryId: item.entryId,
@@ -302,6 +490,7 @@ export default function PayerCompetitionAccountScreen(props) {
       Alert.alert("שגיאה", extractErrorMessage(err));
     } finally {
       setCancellingId(null);
+      entryCancelGuardRef.current.release(guardKey);
     }
   }
 
@@ -323,8 +512,14 @@ export default function PayerCompetitionAccountScreen(props) {
   }
 
   async function doCancelPaidTime(item) {
+    var guardKey = "paidTime:" + item.paidTimeRequestId;
+
+    if (!paidTimeCancelGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
-      setCancellingId("paidTime:" + item.paidTimeRequestId);
+      setCancellingId(guardKey);
 
       await cancelPaidTimeRequestByPayer({
         paidTimeRequestId: item.paidTimeRequestId,
@@ -338,6 +533,7 @@ export default function PayerCompetitionAccountScreen(props) {
       Alert.alert("שגיאה", extractErrorMessage(err));
     } finally {
       setCancellingId(null);
+      paidTimeCancelGuardRef.current.release(guardKey);
     }
   }
 
@@ -359,8 +555,14 @@ export default function PayerCompetitionAccountScreen(props) {
   }
 
   async function doCancelStall(item) {
+    var guardKey = "stall:" + item.stallBookingId;
+
+    if (!stallCancelGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
-      setCancellingId("stall:" + item.stallBookingId);
+      setCancellingId(guardKey);
 
       await cancelStallBookingByPayer({
         stallBookingId: item.stallBookingId,
@@ -374,6 +576,55 @@ export default function PayerCompetitionAccountScreen(props) {
       Alert.alert("שגיאה", extractErrorMessage(err));
     } finally {
       setCancellingId(null);
+      stallCancelGuardRef.current.release(guardKey);
+    }
+  }
+
+  function confirmCancelShavings(order) {
+    Alert.alert(
+      "ביטול הזמנת נסורת",
+      "האם לשלוח בקשת ביטול להזמנת הנסורת למזכירה? הביטול יתבצע רק לאחר אישור.",
+      [
+        { text: "לא", style: "cancel" },
+        {
+          text: "כן",
+          style: "destructive",
+          onPress: function () {
+            doCancelShavings(order);
+          },
+        },
+      ],
+    );
+  }
+
+  // Payer-gated standalone shavings cancellation: creates a Pending request
+  // via usp_cancelshavingsorderbypayer, resolved later by the host secretary
+  // through the existing Change Tracking page. Never claims the order was
+  // cancelled outright - "נשלח" mirrors the exact copy already used for the
+  // stall/entry payer-gated flows above, not the admin-direct "בוטל" copy.
+  async function doCancelShavings(order) {
+    var guardKey = "shavings:" + order.shavingsOrderId;
+
+    if (!shavingsCancelGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
+    try {
+      setCancellingId(guardKey);
+
+      await createShavingsOrderCancelRequest({
+        shavingsOrderId: order.shavingsOrderId,
+        ranchId: activeRole?.ranchId,
+      });
+
+      Alert.alert("נשלח", "בקשת הביטול נשלחה למזכירה");
+
+      await account.reload();
+    } catch (err) {
+      Alert.alert("שגיאה", extractErrorMessage(err));
+    } finally {
+      setCancellingId(null);
+      shavingsCancelGuardRef.current.release(guardKey);
     }
   }
 
@@ -597,17 +848,56 @@ export default function PayerCompetitionAccountScreen(props) {
     );
   }
 
+  // Phase 3E Slice D: deployed proc 212's top-level fines[] array
+  // (billChargeId, className, amountToPay, chargeStatus, notes - see
+  // 212_usp_GetPayerCompetitionAccount.sql) rendered as its own section
+  // under the classes tab, since a fine always originates from a change to
+  // a class entry. Returns null (renders nothing) when there are no fines,
+  // matching renderBandedSections' own empty-section convention.
+  function renderFinesSection() {
+    var fines = Array.isArray(account.fines) ? account.fines : [];
+
+    if (fines.length === 0) {
+      return null;
+    }
+
+    return (
+      <>
+        <Text style={styles.sectionTitle}>קנסות</Text>
+
+        {fines.map(function (fine) {
+          var isPaidFine = fine.chargeStatus === "Paid";
+
+          return (
+            <View key={String(fine.billChargeId)} style={styles.itemCard}>
+              <View style={styles.itemTopRow}>
+                <Text style={styles.itemTitle}>{fine.className || "קנס"}</Text>
+                <Text style={styles.itemAmount}>
+                  {formatCurrency(fine.amountToPay)}
+                </Text>
+              </View>
+
+              {fine.notes ? (
+                <Text style={styles.itemText}>{fine.notes}</Text>
+              ) : null}
+
+              {renderPaymentBadge(isPaidFine, fine.amountToPay)}
+            </View>
+          );
+        })}
+      </>
+    );
+  }
+
   function renderClassesTab() {
     if (!account.classes || account.classes.length === 0) {
       return renderEmpty("אין לך הרשמות למקצים בתחרות זו");
     }
 
-    return account.classes.map(function (item) {
+    function renderClassCard(item) {
       var isLocked =
         item.isPaid === true ||
-        item.hasPendingCancellation === true ||
-        item.isCancelled === true ||
-        String(item.entryStatus || "").toLowerCase() === "cancelled";
+        resolveClassLifecycleState(item) === LIFECYCLE_STATE.CANCELLED;
 
       var lockedLabel = item.isPaid
         ? "כבר שולם — לא ניתן לבטל"
@@ -638,14 +928,14 @@ export default function PayerCompetitionAccountScreen(props) {
 
           <View style={styles.splitRow}>
             <View style={styles.splitPill}>
-              <Text style={styles.splitPillLabel}>מארגן</Text>
+              <Text style={styles.splitPillLabel}>עלות מארגן</Text>
               <Text style={styles.splitPillValue}>
                 {formatCurrency(item.organizerCost)}
               </Text>
             </View>
 
             <View style={styles.splitPill}>
-              <Text style={styles.splitPillLabel}>התאחדות</Text>
+              <Text style={styles.splitPillLabel}>עלות התאחדות</Text>
               <Text style={styles.splitPillValue}>
                 {formatCurrency(item.federationCost)}
               </Text>
@@ -662,7 +952,14 @@ export default function PayerCompetitionAccountScreen(props) {
           )}
         </View>
       );
-    });
+    }
+
+    return (
+      <>
+        {renderBandedSections(bandedClasses, renderClassCard)}
+        {renderFinesSection()}
+      </>
+    );
   }
 
   function renderPaidTimesTab() {
@@ -670,7 +967,7 @@ export default function PayerCompetitionAccountScreen(props) {
       return renderEmpty("אין לך הרשמות לפייד טיים בתחרות זו");
     }
 
-    return account.paidTimes.map(function (item) {
+    function renderPaidTimeCard(item) {
       var status = String(item.status || "").toLowerCase();
 
       var isLocked =
@@ -773,18 +1070,58 @@ export default function PayerCompetitionAccountScreen(props) {
           )}
         </View>
       );
-    });
+    }
+
+    return renderBandedSections(bandedPaidTimes, renderPaidTimeCard);
+  }
+
+  // Business rules 2/8: hidden while publish status is unknown/unpublished,
+  // enabled once the host secretary publishes the map. RanchAdmin's own
+  // entry point is intentionally NOT gated this way - that is a deliberate
+  // difference, not an oversight (see report).
+  function renderStallMapEntryPoint() {
+    if (stallMapPublished !== true) {
+      return null;
+    }
+
+    return (
+      <Pressable
+        onPress={function () {
+          setIsStallMapOpen(true);
+        }}
+        style={{
+          marginBottom: 12,
+          backgroundColor: "#F0E5DC",
+          borderWidth: 1,
+          borderColor: "#7B5A4D",
+          borderRadius: 10,
+          paddingVertical: 10,
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ color: "#7B5A4D", fontWeight: "800" }}>
+          צפה במפת תאים
+        </Text>
+      </Pressable>
+    );
   }
 
   function renderStallsTab() {
+    var mapEntryPoint = renderStallMapEntryPoint();
+
     if (!account.stalls || account.stalls.length === 0) {
-      return renderEmpty("אין לך הזמנות תאים בתחרות זו");
+      return (
+        <>
+          {mapEntryPoint}
+          {renderEmpty("אין לך הזמנות תאים בתחרות זו")}
+        </>
+      );
     }
 
-    return account.stalls.map(function (item) {
-      var shavingsOrders = Array.isArray(item.shavingsOrders)
-        ? item.shavingsOrders
-        : [];
+    function renderStallCard(item) {
+      // CAP-3: nested shavings sub-lines are sorted (never banded - they
+      // all share this stall's one inherited lifecycle state already).
+      var shavingsOrders = sortShavingsOrders(item.shavingsOrders);
 
       var isLocked =
         item.isPaid === true ||
@@ -809,7 +1146,7 @@ export default function PayerCompetitionAccountScreen(props) {
                 : item.barnName || item.horseName || "תא"}
             </Text>
             <Text style={styles.itemAmount}>
-              {formatCurrency(item.stallAmountToPay)}
+              {formatCurrency(item.amountToPay)}
             </Text>
           </View>
 
@@ -823,7 +1160,7 @@ export default function PayerCompetitionAccountScreen(props) {
             תא: {item.stallId ? "#" + item.stallId : "טרם שובץ"}
           </Text>
 
-          {renderPaymentBadge(item.isPaid, item.stallAmountToPay)}
+          {renderPaymentBadge(item.isPaid, item.amountToPay)}
 
           {shavingsOrders.length > 0 ? (
             <View style={{ marginTop: 12 }}>
@@ -835,8 +1172,8 @@ export default function PayerCompetitionAccountScreen(props) {
                     key={String(order.shavingsOrderId)}
                     style={styles.itemText}
                   >
-                    {order.bagQuantityPerStall} שקים ·{" "}
-                    {formatCurrency(order.estimatedAmountToPay)} ·{" "}
+                    {order.bagQuantity} שקים ·{" "}
+                    {formatCurrency(order.amountToPay)} ·{" "}
                     {order.deliveryStatus || "-"}
                   </Text>
                 );
@@ -911,6 +1248,76 @@ export default function PayerCompetitionAccountScreen(props) {
           )}
         </View>
       );
+    }
+
+    return (
+      <>
+        {mapEntryPoint}
+        {renderBandedSections(bandedStalls, renderStallCard)}
+      </>
+    );
+  }
+
+  // CAP-4: renders the top-level account.shavings[] tab - each band's
+  // header comes from getLifecycleBandHeader for active/pending/cancelled,
+  // and from SHAVINGS_NEEDS_REVIEW_COPY for the fourth, needsReview band
+  // (never a guessed lifecycle). No add/edit/cancel actions here - this tab
+  // is read-only, same as the nested shavings lines inside the stalls tab.
+  function renderShavingsTab() {
+    if (!account.shavings || account.shavings.length === 0) {
+      return renderEmpty("אין לך הזמנות נסורת בתחרות זו");
+    }
+
+    var sections = [
+      {
+        key: "active",
+        groups: bandedShavings.active,
+        header: getLifecycleBandHeader(LIFECYCLE_STATE.ACTIVE),
+      },
+      {
+        key: "pending",
+        groups: bandedShavings.pending,
+        header: getLifecycleBandHeader(LIFECYCLE_STATE.PENDING_CHANGE),
+      },
+      {
+        key: "cancelled",
+        groups: bandedShavings.cancelled,
+        header: getLifecycleBandHeader(LIFECYCLE_STATE.CANCELLED),
+      },
+      {
+        key: "needsReview",
+        groups: bandedShavings.needsReview,
+        header: SHAVINGS_NEEDS_REVIEW_COPY.bandHeader,
+      },
+    ];
+
+    return sections.map(function (section) {
+      if (section.groups.length === 0) {
+        return null;
+      }
+
+      // Standalone shavings cancellation: the cancel action is only offered
+      // on the active band, matching AdminCompetitionPayerAccountScreen.jsx.
+      // A cancelled/pending/needsReview group stays exactly as read-only as
+      // it was before this feature.
+      var isActiveSection = section.key === "active";
+
+      return (
+        <React.Fragment key={"shavings-band-" + section.key}>
+          {renderBandDivider(section.header, "shavings-band-header-" + section.key)}
+
+          {section.groups.map(function (group) {
+            return (
+              <ShavingsGroupCard
+                key={group.key}
+                group={group}
+                onCancelOrder={isActiveSection ? confirmCancelShavings : undefined}
+                cancellingId={isActiveSection ? cancellingId : undefined}
+              />
+            );
+          })}
+        </React.Fragment>
+      );
     });
   }
 
@@ -919,6 +1326,7 @@ export default function PayerCompetitionAccountScreen(props) {
     if (activeTab === "classes") return renderClassesTab();
     if (activeTab === "paidTimes") return renderPaidTimesTab();
     if (activeTab === "stalls") return renderStallsTab();
+    if (activeTab === "shavings") return renderShavingsTab();
     return null;
   }
 
@@ -953,6 +1361,7 @@ export default function PayerCompetitionAccountScreen(props) {
           {renderTabButton("classes", "מקצים")}
           {renderTabButton("paidTimes", "פייד")}
           {renderTabButton("stalls", "תאים")}
+          {renderTabButton("shavings", "נסורת")}
         </View>
 
         {renderActiveTab()}
@@ -1089,6 +1498,16 @@ export default function PayerCompetitionAccountScreen(props) {
           </View>
         </View>
       </Modal>
+
+      <StallMapModal
+        isOpen={isStallMapOpen}
+        competitionId={competitionId}
+        ranchId={ranchId}
+        viewerMode="payer"
+        onClose={function () {
+          setIsStallMapOpen(false);
+        }}
+      />
     </MobileScreenLayout>
   );
 }

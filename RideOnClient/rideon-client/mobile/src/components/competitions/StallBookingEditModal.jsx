@@ -15,9 +15,20 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { useActiveRole } from "../../context/ActiveRoleContext";
 
-import { createStallBookingChangeRequest } from "../../services/stallBookingsService";
+import { adminEditStallBooking } from "../../services/stallBookingsService";
+
+import { getCompetitionInvitationDetails } from "../../services/competitionService";
+
+import {
+  getServicePriceSectionsFromInvitation,
+  extractHorseStallPriceItems,
+  extractTackStallPriceItems,
+  formatStallTypeLabel,
+} from "../../hooks/useAdminCompetitionStallBookings";
 
 import CompetitionDateField from "../competitionRegistrations/CompetitionDateField";
+
+import CompetitionRegistrationDropdown from "./CompetitionRegistrationDropdown";
 
 import styles from "../../styles/adminCompetitionStallsStyles";
 
@@ -89,6 +100,17 @@ export default function StallBookingEditModal(props) {
   var [endDate, setEndDate] = useState("");
   var [notes, setNotes] = useState("");
 
+  // Admin-payer direct-changes feature: the type/product field is exposed
+  // only while the booking is unassigned to a physical stall -- the server
+  // (usp_admineditstallbooking) independently rejects a real product change
+  // once stallassignment has a row for this booking, regardless of what the
+  // client sends, so this is a convenience gate, not the enforcement point.
+  var isAssigned = item && item.isAssigned === true;
+
+  var [stallTypeOptions, setStallTypeOptions] = useState([]);
+  var [selectedStallType, setSelectedStallType] = useState(null);
+  var [loadingStallTypes, setLoadingStallTypes] = useState(false);
+
   var isTackBooking = item && item.isTackBooking === true;
 
   useEffect(
@@ -100,8 +122,75 @@ export default function StallBookingEditModal(props) {
       setStartDate(normalizeDateForInput(item.startDate));
       setEndDate(normalizeDateForInput(item.endDate));
       setNotes(item.notes || "");
+      setSelectedStallType(null);
+      setStallTypeOptions([]);
     },
     [props.visible, item],
+  );
+
+  useEffect(
+    function () {
+      if (!props.visible || !item || isAssigned) {
+        return;
+      }
+
+      if (!props.competitionId || !activeRole || !activeRole.ranchId) {
+        return;
+      }
+
+      var isCurrent = true;
+
+      async function loadStallTypeOptions() {
+        try {
+          setLoadingStallTypes(true);
+
+          var invitationResponse = await getCompetitionInvitationDetails(
+            props.competitionId,
+            activeRole.roleId,
+            activeRole.ranchId,
+          );
+
+          if (!isCurrent) {
+            return;
+          }
+
+          var sections = Array.isArray(
+            invitationResponse?.data?.servicePriceSections,
+          )
+            ? invitationResponse.data.servicePriceSections
+            : getServicePriceSectionsFromInvitation(invitationResponse);
+
+          var options = isTackBooking
+            ? extractTackStallPriceItems(sections)
+            : extractHorseStallPriceItems(sections);
+
+          setStallTypeOptions(options);
+
+          var currentOption = options.find(function (option) {
+            return (
+              option.priceCatalogId &&
+              item.priceCatalogId &&
+              Number(option.priceCatalogId) === Number(item.priceCatalogId)
+            );
+          });
+
+          setSelectedStallType(currentOption || options[0] || null);
+        } catch (error) {
+          console.log("LOAD STALL TYPE OPTIONS ERROR", error);
+        } finally {
+          if (isCurrent) {
+            setLoadingStallTypes(false);
+          }
+        }
+      }
+
+      loadStallTypeOptions();
+
+      return function () {
+        isCurrent = false;
+      };
+    },
+    [props.visible, item, isAssigned, props.competitionId, activeRole, isTackBooking],
   );
 
   var numberOfDays = useMemo(
@@ -111,11 +200,37 @@ export default function StallBookingEditModal(props) {
     [startDate, endDate],
   );
 
+  var effectiveDailyPrice = useMemo(
+    function () {
+      if (!isAssigned && selectedStallType) {
+        return Number(selectedStallType.itemPrice || 0);
+      }
+
+      return Number(item?.itemPrice || 0);
+    },
+    [isAssigned, selectedStallType, item],
+  );
+
+  var effectiveStallTypeName = useMemo(
+    function () {
+      if (isAssigned) {
+        return item?.assignedProductName || (isTackBooking ? "תא ציוד" : "תא רגיל");
+      }
+
+      if (selectedStallType) {
+        return selectedStallType.productName;
+      }
+
+      return isTackBooking ? "תא ציוד" : "תא רגיל";
+    },
+    [isAssigned, item, isTackBooking, selectedStallType],
+  );
+
   var estimatedAmount = useMemo(
     function () {
-      return numberOfDays * Number(item?.itemPrice || 0);
+      return numberOfDays * effectiveDailyPrice;
     },
-    [numberOfDays, item],
+    [numberOfDays, effectiveDailyPrice],
   );
 
   function validateForm() {
@@ -157,19 +272,23 @@ export default function StallBookingEditModal(props) {
     try {
       setIsSaving(true);
 
-      await createStallBookingChangeRequest({
-        originalStallBookingId: item.stallBookingId,
+      await adminEditStallBooking({
+        stallBookingId: item.stallBookingId,
         ranchId: activeRole.ranchId,
         newStartDate: startDate,
         newEndDate: endDate,
         notes: notes ? notes.trim() : null,
+        newProductId:
+          !isAssigned && selectedStallType
+            ? selectedStallType.productId
+            : null,
       });
 
       if (typeof props.onUpdated === "function") {
         await props.onUpdated();
       }
 
-      Alert.alert("נשלח", "בקשת שינוי התא נשלחה בהצלחה");
+      Alert.alert("עודכן", "הזמנת התא עודכנה בהצלחה");
 
       if (typeof props.onClose === "function") {
         props.onClose();
@@ -177,7 +296,7 @@ export default function StallBookingEditModal(props) {
     } catch (error) {
       Alert.alert(
         "שגיאה",
-        String(error?.response?.data || "אירעה שגיאה בשליחת בקשת שינוי התא"),
+        String(error?.response?.data || "אירעה שגיאה בעדכון הזמנת התא"),
       );
     } finally {
       setIsSaving(false);
@@ -215,20 +334,43 @@ export default function StallBookingEditModal(props) {
               {isTackBooking ? "תא ציוד" : item?.horseName || "תא סוס"}
             </Text>
 
-            <Text style={styles.editFormSubtitle}>
-              אפשר לערוך תאריכים והערות בלבד. סוג התא והמחיר נקבעים לפי השיבוץ
-              בפועל.
-            </Text>
+            {isAssigned ? (
+              <Text style={styles.editFormSubtitle}>
+                אפשר לערוך תאריכים והערות בלבד. סוג התא והמחיר נקבעים לפי
+                השיבוץ בפועל.
+              </Text>
+            ) : null}
 
             <View style={styles.editSummaryBox}>
               <Text style={styles.editSummaryText}>
-                סוג תא: {isTackBooking ? "תא ציוד" : "תא רגיל"}
+                סוג תא: {effectiveStallTypeName}
               </Text>
 
               <Text style={styles.editSummaryText}>
-                מחיר יומי לפי השיבוץ: {formatPrice(item?.itemPrice || 0)}
+                מחיר יומי: {formatPrice(effectiveDailyPrice)}
               </Text>
             </View>
+
+            {!isAssigned ? (
+              <View style={styles.editFieldBlock}>
+                {loadingStallTypes ? (
+                  <Text style={styles.editFieldLabel}>טוען סוגי תא...</Text>
+                ) : (
+                  <CompetitionRegistrationDropdown
+                    label="סוג תא"
+                    placeholder="בחירת סוג תא"
+                    searchPlaceholder="חיפוש סוג תא"
+                    items={stallTypeOptions}
+                    selectedItem={selectedStallType}
+                    getItemId={function (option) {
+                      return option.priceCatalogId;
+                    }}
+                    getItemLabel={formatStallTypeLabel}
+                    onSelect={setSelectedStallType}
+                  />
+                )}
+              </View>
+            ) : null}
 
             <View style={styles.editDateFields}>
               <CompetitionDateField
@@ -251,7 +393,7 @@ export default function StallBookingEditModal(props) {
                 style={styles.editTextInput}
                 value={notes}
                 onChangeText={setNotes}
-                placeholder="הערות לבקשת השינוי"
+                placeholder="הערות להזמנה"
                 textAlign="right"
               />
             </View>
@@ -275,7 +417,7 @@ export default function StallBookingEditModal(props) {
               onPress={handleSubmit}
             >
               <Text style={styles.editSubmitButtonText}>
-                {isSaving ? "שולח..." : "שליחת בקשת שינוי"}
+                {isSaving ? "שומר..." : "שמירת שינויים"}
               </Text>
             </Pressable>
           </View>

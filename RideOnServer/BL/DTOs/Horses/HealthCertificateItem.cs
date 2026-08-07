@@ -10,5 +10,8 @@ namespace RideOnServer.BL.DTOs.Horses
         public string? HcApprovalStatus { get; set; }
         public DateOnly? HcApprovalDate { get; set; }
         public int? HcApproverSystemUserId { get; set; }
+        public string? HcRejectionReason { get; set; }
+        public DateOnly? HcRejectionDate { get; set; }
+        public int? HcRejectedBySystemUserId { get; set; }
     }
 }

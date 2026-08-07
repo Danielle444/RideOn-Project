@@ -9,6 +9,61 @@ namespace RideOnServer.DAL
 {
     public static class StallBookingDAL
     {
+        // Ranch-model fix (Phase 2, 2026-08-05): command-building split out from
+        // execution so it can be unit-tested without a DB connection (same
+        // pattern as ChangeEntryRequestDAL.BuildInsertChangeEntryRequestSecuredCommand
+        // -- an NpgsqlCommand can be constructed and inspected with a null
+        // connection). request.RanchId is expected to already hold the
+        // competition's HostRanchId by the time this is called -- the
+        // Controller derives and overwrites it server-side before calling
+        // CreateStallBooking; this method itself does not re-derive anything.
+        // p_requestingranchid (the 11th, DEFAULT NULL, SP parameter) is
+        // deliberately left unbound here: for a non-tack booking the SP
+        // derives it itself from horse.ranchid, so no client-supplied value
+        // is ever passed for it on this path.
+        public static NpgsqlCommand BuildCreateStallBookingCommand(
+            CreateStallBookingRequest request,
+            NpgsqlConnection? connection)
+        {
+            NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT usp_createstallbooking(" +
+                "@competitionId, " +
+                "@orderedBySystemUserId, " +
+                "@priceCatalogId, " +
+                "@notes::text, " +
+                "@ranchId, " +
+                "@horseId, " +
+                "@startDate::date, " +
+                "@endDate::date, " +
+                "@isForTack, " +
+                "@payers::jsonb)",
+                connection);
+
+            cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
+            cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
+            cmd.Parameters.AddWithValue("@priceCatalogId", request.PriceCatalogId);
+
+            cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
+
+            cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
+            cmd.Parameters.AddWithValue("@horseId", request.HorseId);
+
+            cmd.Parameters.Add("@startDate", NpgsqlDbType.Date).Value = request.startDate.Date;
+            cmd.Parameters.Add("@endDate", NpgsqlDbType.Date).Value = request.endDate.Date;
+
+            cmd.Parameters.AddWithValue("@isForTack", request.IsForTack);
+
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+
+            string payersJson = JsonSerializer.Serialize(request.Payers, jsonOptions);
+            cmd.Parameters.Add("@payers", NpgsqlDbType.Jsonb).Value = payersJson;
+
+            return cmd;
+        }
+
         public static int CreateStallBooking(CreateStallBookingRequest request)
         {
             try
@@ -16,41 +71,7 @@ namespace RideOnServer.DAL
                 using NpgsqlConnection conn = DBServices.GetDefaultConnection();
                 conn.Open();
 
-                using NpgsqlCommand cmd = new NpgsqlCommand(
-                    "SELECT usp_createstallbooking(" +
-                    "@competitionId, " +
-                    "@orderedBySystemUserId, " +
-                    "@priceCatalogId, " +
-                    "@notes::text, " +
-                    "@ranchId, " +
-                    "@horseId, " +
-                    "@startDate::date, " +
-                    "@endDate::date, " +
-                    "@isForTack, " +
-                    "@payers::jsonb)",
-                    conn);
-
-                cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
-                cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
-                cmd.Parameters.AddWithValue("@priceCatalogId", request.PriceCatalogId);
-
-                cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
-
-                cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
-                cmd.Parameters.AddWithValue("@horseId", request.HorseId);
-
-                cmd.Parameters.Add("@startDate", NpgsqlDbType.Date).Value = request.startDate.Date;
-                cmd.Parameters.Add("@endDate", NpgsqlDbType.Date).Value = request.endDate.Date;
-
-                cmd.Parameters.AddWithValue("@isForTack", request.IsForTack);
-
-                var jsonOptions = new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                };
-
-                string payersJson = JsonSerializer.Serialize(request.Payers, jsonOptions);
-                cmd.Parameters.Add("@payers", NpgsqlDbType.Jsonb).Value = payersJson;
+                using NpgsqlCommand cmd = BuildCreateStallBookingCommand(request, conn);
 
                 object? result = cmd.ExecuteScalar();
 
@@ -234,6 +255,56 @@ namespace RideOnServer.DAL
             return payers;
         }
 
+        // Ranch-model fix (Phase 2, 2026-08-05): command-building split out from
+        // execution for DB-free testability (same rationale as
+        // BuildCreateStallBookingCommand above). Adds the 10th SQL parameter,
+        // @requestingRanchId, bound from request.RequestingRanchId -- required
+        // by the corrected usp_createtackstallbookings (225), which has no
+        // default for it (every call is a tack creation, so it's always
+        // mandatory, unlike usp_createstallbooking's optional 11th parameter).
+        // request.RanchId is expected to already hold the competition's
+        // HostRanchId by the time this is called -- the Controller derives and
+        // overwrites it server-side before calling CreateTackStallBookings.
+        public static NpgsqlCommand BuildCreateTackStallBookingsCommand(
+            CreateTackStallBookingsRequest request,
+            NpgsqlConnection? connection)
+        {
+            NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT * FROM usp_createtackstallbookings(" +
+                "@competitionId, " +
+                "@orderedBySystemUserId, " +
+                "@priceCatalogId, " +
+                "@notes::text, " +
+                "@ranchId, " +
+                "@startDate::date, " +
+                "@endDate::date, " +
+                "@quantity, " +
+                "@payers::jsonb, " +
+                "@requestingRanchId)",
+                connection);
+
+            cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
+            cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
+            cmd.Parameters.AddWithValue("@priceCatalogId", request.PriceCatalogId);
+            cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
+            cmd.Parameters.Add("@startDate", NpgsqlDbType.Date).Value = request.StartDate.Date;
+            cmd.Parameters.Add("@endDate", NpgsqlDbType.Date).Value = request.EndDate.Date;
+            cmd.Parameters.AddWithValue("@quantity", request.Quantity);
+
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+
+            string payersJson = JsonSerializer.Serialize(request.Payers, jsonOptions);
+            cmd.Parameters.Add("@payers", NpgsqlDbType.Jsonb).Value = payersJson;
+
+            cmd.Parameters.AddWithValue("@requestingRanchId", request.RequestingRanchId);
+
+            return cmd;
+        }
+
         public static List<int> CreateTackStallBookings(CreateTackStallBookingsRequest request)
         {
             try
@@ -241,35 +312,7 @@ namespace RideOnServer.DAL
                 using NpgsqlConnection conn = DBServices.GetDefaultConnection();
                 conn.Open();
 
-                using NpgsqlCommand cmd = new NpgsqlCommand(
-                    "SELECT * FROM usp_createtackstallbookings(" +
-                    "@competitionId, " +
-                    "@orderedBySystemUserId, " +
-                    "@priceCatalogId, " +
-                    "@notes::text, " +
-                    "@ranchId, " +
-                    "@startDate::date, " +
-                    "@endDate::date, " +
-                    "@quantity, " +
-                    "@payers::jsonb)",
-                    conn);
-
-                cmd.Parameters.AddWithValue("@competitionId", request.CompetitionId);
-                cmd.Parameters.AddWithValue("@orderedBySystemUserId", request.OrderedBySystemUserId);
-                cmd.Parameters.AddWithValue("@priceCatalogId", request.PriceCatalogId);
-                cmd.Parameters.AddWithValue("@notes", (object?)request.Notes ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
-                cmd.Parameters.Add("@startDate", NpgsqlDbType.Date).Value = request.StartDate.Date;
-                cmd.Parameters.Add("@endDate", NpgsqlDbType.Date).Value = request.EndDate.Date;
-                cmd.Parameters.AddWithValue("@quantity", request.Quantity);
-
-                var jsonOptions = new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                };
-
-                string payersJson = JsonSerializer.Serialize(request.Payers, jsonOptions);
-                cmd.Parameters.Add("@payers", NpgsqlDbType.Jsonb).Value = payersJson;
+                using NpgsqlCommand cmd = BuildCreateTackStallBookingsCommand(request, conn);
 
                 List<int> createdIds = new List<int>();
 
@@ -287,6 +330,57 @@ namespace RideOnServer.DAL
                 // (which delegates into usp_createstallbooking internally).
                 throw new BL.ValidationException(ex.MessageText);
             }
+        }
+
+        // Ranch-model fix (Phase 2, 2026-08-05): backs the shavings-creation
+        // Controller's requesting-ranch derivation. See
+        // 233_usp_GetRequestingRanchIdsForStallBookings.sql's header for why
+        // this needed a new proc (no existing GET path returns ranch data for
+        // an arbitrary StallBookingId list without already requiring a ranch
+        // as input, which is circular for this use case). Command-building is
+        // split out for the same DB-free testability reason as the two
+        // Build...Command methods above.
+        public static NpgsqlCommand BuildGetRequestingRanchIdsForStallBookingsCommand(
+            List<int> stallBookingIds,
+            NpgsqlConnection? connection)
+        {
+            NpgsqlCommand cmd = new NpgsqlCommand(
+                "SELECT * FROM usp_getrequestingranchidsforstallbookings(@stallBookingIds)",
+                connection);
+
+            cmd.Parameters.Add("@stallBookingIds", NpgsqlDbType.Array | NpgsqlDbType.Integer)
+                .Value = stallBookingIds.ToArray();
+
+            return cmd;
+        }
+
+        // Returns a StallBookingId -> RequestingRanchId map for every supplied
+        // id that resolves to an existing, non-tack stall booking. A supplied
+        // id absent from the returned dictionary means "not found" (or tack,
+        // which never has shavings) -- the caller is responsible for that
+        // distinction and for the "exactly one distinct ranch" check; this
+        // method is a plain lookup, not an authorization decision.
+        public static Dictionary<int, int> GetRequestingRanchIdsForStallBookings(List<int> stallBookingIds)
+        {
+            Dictionary<int, int> result = new Dictionary<int, int>();
+
+            if (stallBookingIds == null || stallBookingIds.Count == 0)
+            {
+                return result;
+            }
+
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = BuildGetRequestingRanchIdsForStallBookingsCommand(stallBookingIds, conn);
+
+            using NpgsqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result[Convert.ToInt32(reader["stallbookingid"])] = Convert.ToInt32(reader["requestingranchid"]);
+            }
+
+            return result;
         }
 
         public static int CreateStallBookingCancelRequest(
@@ -467,6 +561,54 @@ namespace RideOnServer.DAL
             return Convert.ToInt32(result);
         }
 
+        public static NpgsqlCommand BuildAdminCancelStallBookingCommand(
+            int stallBookingId,
+            int ranchId,
+            int personId,
+            NpgsqlConnection? connection
+        )
+        {
+            NpgsqlCommand cmd = new NpgsqlCommand(
+                @"SELECT public.usp_admincancelstallbooking(
+                    p_personid       := @personId,
+                    p_stallbookingid := @stallBookingId,
+                    p_ranchid        := @ranchId
+                );",
+                connection
+            );
+
+            cmd.Parameters.AddWithValue("@personId", personId);
+            cmd.Parameters.AddWithValue("@stallBookingId", stallBookingId);
+            cmd.Parameters.AddWithValue("@ranchId", ranchId);
+
+            return cmd;
+        }
+
+        public static int AdminCancelStallBooking(int stallBookingId, int ranchId, int personId)
+        {
+            try
+            {
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
+
+                using NpgsqlCommand cmd = BuildAdminCancelStallBookingCommand(stallBookingId, ranchId, personId, conn);
+
+                object? result = cmd.ExecuteScalar();
+                if (result == null || result == DBNull.Value)
+                {
+                    throw new Exception("Failed to cancel stall booking");
+                }
+                return Convert.ToInt32(result);
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_admincancelstallbooking (ranch mismatch, unauthorized
+                // caller, already-resolved request, paid booking, etc.).
+                throw new BL.ValidationException(ex.MessageText);
+            }
+        }
+
         public static void SecretaryUpdateStallBooking(
             int stallBookingId,
             int secretarySystemUserId,
@@ -504,7 +646,13 @@ namespace RideOnServer.DAL
             cmd.ExecuteNonQuery();
         }
 
-        public static int SecretaryCreateStallBookingForPayer(
+        // Ranch-model fix (Phase 2, 2026-08-05): command-building split out for
+        // DB-free testability. Adds p_requestingranchid, bound from the new
+        // requestingRanchId parameter -- required by the corrected
+        // usp_secretarycreatestallbookingforpayer (149) when p_isfortack is
+        // true (no horse to derive it from server-side); left NULL for
+        // non-tack, where the SP derives it itself from p_horseid.
+        public static NpgsqlCommand BuildSecretaryCreateStallBookingForPayerCommand(
             int competitionId,
             int secretarySystemUserId,
             int payerPersonId,
@@ -513,13 +661,12 @@ namespace RideOnServer.DAL
             DateTime endDate,
             bool isForTack,
             short productId,
-            string? notes
+            string? notes,
+            int? requestingRanchId,
+            NpgsqlConnection? connection
         )
         {
-            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
-            conn.Open();
-
-            using NpgsqlCommand cmd = new NpgsqlCommand(
+            NpgsqlCommand cmd = new NpgsqlCommand(
                 @"SELECT public.usp_secretarycreatestallbookingforpayer(
                     p_competitionid         := @competitionId,
                     p_secretarysystemuserid := @secretaryId,
@@ -529,9 +676,10 @@ namespace RideOnServer.DAL
                     p_enddate               := @endDate::date,
                     p_isfortack             := @isForTack,
                     p_productid             := @productId,
-                    p_notes                 := @notes
+                    p_notes                 := @notes,
+                    p_requestingranchid     := @requestingRanchId
                 );",
-                conn
+                connection
             );
 
             cmd.Parameters.AddWithValue("@competitionId", competitionId);
@@ -543,6 +691,86 @@ namespace RideOnServer.DAL
             cmd.Parameters.AddWithValue("@isForTack", isForTack);
             cmd.Parameters.Add("@productId", NpgsqlDbType.Smallint).Value = productId;
             cmd.Parameters.AddWithValue("@notes", (object?)notes ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@requestingRanchId", (object?)requestingRanchId ?? DBNull.Value);
+
+            return cmd;
+        }
+
+        // Admin-payer direct-changes feature: in-place admin edit, the stall
+        // sibling of EntryDAL's AdminEditEntry. Void return, same as
+        // SecretaryUpdateStallBooking above -- the caller re-reads via
+        // GetStallBookingsForCompetitionAndRanch afterward (same pattern the
+        // mobile edit modal already uses today).
+        public static NpgsqlCommand BuildAdminEditStallBookingCommand(
+            AdminEditStallBookingRequest request,
+            int personId,
+            NpgsqlConnection? connection
+        )
+        {
+            NpgsqlCommand cmd = new NpgsqlCommand(
+                @"SELECT public.usp_admineditstallbooking(
+                    p_personid       := @personId,
+                    p_stallbookingid := @stallBookingId,
+                    p_ranchid        := @ranchId,
+                    p_newstartdate   := @newStartDate::date,
+                    p_newenddate     := @newEndDate::date,
+                    p_newnotes       := @newNotes,
+                    p_newproductid   := @newProductId
+                );",
+                connection
+            );
+
+            cmd.Parameters.AddWithValue("@personId", personId);
+            cmd.Parameters.AddWithValue("@stallBookingId", request.StallBookingId);
+            cmd.Parameters.AddWithValue("@ranchId", request.RanchId);
+            cmd.Parameters.Add("@newStartDate", NpgsqlDbType.Date).Value = request.NewStartDate.Date;
+            cmd.Parameters.Add("@newEndDate", NpgsqlDbType.Date).Value = request.NewEndDate.Date;
+            cmd.Parameters.AddWithValue("@newNotes", (object?)request.Notes ?? DBNull.Value);
+            cmd.Parameters.Add("@newProductId", NpgsqlDbType.Smallint).Value =
+                (object?)request.NewProductId ?? DBNull.Value;
+
+            return cmd;
+        }
+
+        public static void AdminEditStallBooking(AdminEditStallBookingRequest request, int personId)
+        {
+            try
+            {
+                using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+                conn.Open();
+
+                using NpgsqlCommand cmd = BuildAdminEditStallBookingCommand(request, personId, conn);
+
+                cmd.ExecuteNonQuery();
+            }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_admineditstallbooking (including the assigned-booking
+                // product-change rejection).
+                throw new BL.ValidationException(ex.MessageText);
+            }
+        }
+
+        public static int SecretaryCreateStallBookingForPayer(
+            int competitionId,
+            int secretarySystemUserId,
+            int payerPersonId,
+            int? horseId,
+            DateTime startDate,
+            DateTime endDate,
+            bool isForTack,
+            short productId,
+            string? notes,
+            int? requestingRanchId
+        )
+        {
+            using NpgsqlConnection conn = DBServices.GetDefaultConnection();
+            conn.Open();
+
+            using NpgsqlCommand cmd = BuildSecretaryCreateStallBookingForPayerCommand(
+                competitionId, secretarySystemUserId, payerPersonId, horseId,
+                startDate, endDate, isForTack, productId, notes, requestingRanchId, conn);
 
             object? result = cmd.ExecuteScalar();
             if (result == null || result == DBNull.Value)

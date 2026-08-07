@@ -12,6 +12,7 @@ import {
   buildDayOptions,
   getTimeOfDayOptions,
   getTimingForDate,
+  getDefaultHoursForTimeOfDay,
   findBaseSlotId,
   formatDateOnlyForDisplay,
   buildHourOptions,
@@ -104,7 +105,6 @@ var EMPTY_FORM_DATA = {
   startTimeMinute: "",
   endTimeHour: "",
   endTimeMinute: "",
-  slotStatus: "",
   slotNotes: "",
 };
 
@@ -158,7 +158,6 @@ export default function PaidTimeSlotInCompetitionModal(props) {
         startTimeMinute: startTimeParts.minute,
         endTimeHour: endTimeParts.hour,
         endTimeMinute: endTimeParts.minute,
-        slotStatus: props.initialValue.slotStatus || "",
         slotNotes: props.initialValue.slotNotes || "",
       });
     },
@@ -211,6 +210,25 @@ export default function PaidTimeSlotInCompetitionModal(props) {
     });
   }
 
+  function handleTimeOfDayChange(value) {
+    setFormData(function (prev) {
+      var defaultHours = getDefaultHoursForTimeOfDay(value);
+      var next = { ...prev, timeOfDay: value };
+
+      if (defaultHours) {
+        if (!prev.startTimeHour) {
+          next.startTimeHour = defaultHours.startHour;
+        }
+
+        if (!prev.endTimeHour) {
+          next.endTimeHour = defaultHours.endHour;
+        }
+      }
+
+      return next;
+    });
+  }
+
   function handleSubmit(e) {
     e.preventDefault();
 
@@ -250,7 +268,6 @@ export default function PaidTimeSlotInCompetitionModal(props) {
       endTime: normalizeTimeForServer(
         combineTimeValue(formData.endTimeHour, formData.endTimeMinute),
       ),
-      slotStatus: formData.slotStatus.trim() || null,
       slotNotes: formData.slotNotes.trim() || null,
     });
   }
@@ -373,7 +390,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                   return item;
                 }}
                 onChange={function (e) {
-                  handleChange("timeOfDay", e.target.value);
+                  handleTimeOfDayChange(e.target.value);
                 }}
               />
 
@@ -418,26 +435,11 @@ export default function PaidTimeSlotInCompetitionModal(props) {
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
-                סטטוס סלוט
-              </label>
-              <input
-                type="text"
-                value={formData.slotStatus}
-                onChange={function (e) {
-                  handleChange("slotStatus", e.target.value);
-                }}
-                placeholder="לא חובה"
-                className="h-11 w-full rounded-xl border border-[#D7CCC8] bg-white px-4 text-right"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-[#6D4C41]">
                 שעת התחלה
                 <span className="text-red-500 mr-0.5">*</span>
               </label>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2" dir="rtl">
                 <div className="flex-1">
                   <CustomDropdown
                     dropdownKey="paid-time-start-time-hour"
@@ -493,7 +495,7 @@ export default function PaidTimeSlotInCompetitionModal(props) {
                 <span className="text-red-500 mr-0.5">*</span>
               </label>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2" dir="rtl">
                 <div className="flex-1">
                   <CustomDropdown
                     dropdownKey="paid-time-end-time-hour"

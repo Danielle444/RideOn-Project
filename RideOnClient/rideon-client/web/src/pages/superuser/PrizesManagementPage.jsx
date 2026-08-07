@@ -14,7 +14,9 @@ import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 export default function PrizesManagementPage() {
   const [prizeTypes, setPrizeTypes] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // Start loading=true so the table shows a spinner on first paint instead of its empty row
+  // before the mount fetch runs. loadPrizeTypes sets loading true→false, so this always resolves.
+  const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
 

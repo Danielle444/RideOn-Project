@@ -23,13 +23,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // for a new id threads that id through loadExistingCompetition and refreshes
 // state via the one existing path — is proven BEHAVIORALLY, by calling the
 // hook's exposed loadExistingCompetition directly, same technique as
-// useCompetitionDetailsStep.reschedule.test.js.
+// useCompetitionDetailsStep.dateChange.test.js.
 vi.mock("react", function () {
   return {
     useState: function (initial) {
       return [initial, function () {}];
     },
     useEffect: function () {},
+    useRef: function (initial) {
+      return { current: initial };
+    },
   };
 });
 

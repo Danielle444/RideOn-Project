@@ -21,6 +21,21 @@ import {
   resolveEffectiveFinancialView,
 } from "../../utils/financialSummaryView.utils";
 
+// Resolution order: registration still open -> the registration-open caption; registration
+// closed but the competition hasn't ended -> the live caption; competition ended -> no banner
+// (the Actual figures are final by then, so no lifecycle caveat is needed).
+function resolveActualBannerText(registrationClosed, competitionEnded) {
+  if (!registrationClosed) {
+    return FINANCIAL_PROJECTION_COPY.actualBands.registrationOpen;
+  }
+
+  if (!competitionEnded) {
+    return FINANCIAL_PROJECTION_COPY.actualBands.live;
+  }
+
+  return null;
+}
+
 function SummaryPageContent(props) {
   var layout = props.layout;
   var activeRole = props.activeRole;
@@ -47,9 +62,14 @@ function SummaryPageContent(props) {
 
   var financialViewAvailability = {
     projection: true,
-    actual: !!page.financialRegistrationClosed,
+    actual: true,
     comparison: !!page.financialRegistrationClosed && !!hasActualData,
   };
+
+  var actualBannerText = resolveActualBannerText(
+    page.financialRegistrationClosed,
+    page.financialCompetitionEnded,
+  );
 
   // Guard against landing on a view that is not available (e.g. state changed under us). The tab
   // strip and the page body both key off this same value, never off the raw activeView.
@@ -156,11 +176,15 @@ function SummaryPageContent(props) {
         onChangeView={changeActiveView}
         registrationClosed={page.financialRegistrationClosed}
         hasActualData={hasActualData}
+        loading={page.financialLoading}
       />
 
       {effectiveView === TAB_PROJECTION ? (
         <div className="space-y-4">
-          <FinancialProjectionPanel projection={page.financialProjection} />
+          <FinancialProjectionPanel
+            projection={page.financialProjection}
+            loading={page.financialLoading}
+          />
 
           {hasActualData ? (
             <p className="rounded-xl border border-[#EFE3DC] bg-[#FBF7F4] px-4 py-2 text-xs text-[#8D6E63]">
@@ -177,6 +201,12 @@ function SummaryPageContent(props) {
           </div>
         ) : (
           <>
+            {actualBannerText ? (
+              <div className="rounded-2xl border border-[#E6DCD5] bg-[#FCFAF8] px-5 py-3 text-right">
+                <p className="text-sm font-bold text-[#7B5A4D]">{actualBannerText}</p>
+              </div>
+            ) : null}
+
             <CompetitionSummarySection
               title="מארגן"
               description="הכנסות המארגן ממקצים, פייד־טיים, תאים ונסורת"
@@ -197,6 +227,9 @@ function SummaryPageContent(props) {
               actionLoading={page.federationInvoiceImporting}
               actionError={page.federationInvoiceImportError}
               actionSuccess={page.federationInvoiceImportSuccess}
+              onDismissActionMessages={
+                page.dismissFederationInvoiceImportMessages
+              }
               invoiceImportResult={page.federationInvoiceImportResult}
               showQuantity={true}
               quantity={federationQuantity}
@@ -268,6 +301,8 @@ function SummaryPageContent(props) {
         items={page.federationMatchingItems}
         loading={page.federationMatchingLoading}
         approving={page.federationMatchingApproving}
+        processingRowKeys={page.federationMatchingProcessingRowKeys}
+        bulkApproving={page.federationMatchingBulkRunning}
         error={page.federationMatchingError}
         success={page.federationMatchingSuccess}
         activeTab={page.federationMatchingActiveTab}
@@ -285,6 +320,7 @@ function SummaryPageContent(props) {
         onClose={page.closeFederationMatchingModal}
         onReload={page.loadFederationMatchingSuggestions}
         onApprove={page.approveFederationMatchingSuggestion}
+        onApproveAll={page.approveAllFederationMatchingSuggestions}
         onChangeTab={page.changeFederationMatchingTab}
         onManualCreditSearchTextChange={page.changeManualCreditSearchText}
         onSearchManualCredits={page.searchManualFederationCredits}

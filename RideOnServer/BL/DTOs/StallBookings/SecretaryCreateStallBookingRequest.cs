@@ -16,6 +16,12 @@ namespace RideOnServer.BL.DTOs.StallBookings
 
         public bool IsForTack { get; set; }
 
+        // Ranch-model fix (Phase 2, 2026-08-05): required only when IsForTack
+        // is true (no horse to derive a requesting ranch from server-side).
+        // Ignored for non-tack, where usp_secretarycreatestallbookingforpayer
+        // derives it itself from HorseId.
+        public int? RequestingRanchId { get; set; }
+
         public short ProductId { get; set; }
 
         public string? Notes { get; set; }

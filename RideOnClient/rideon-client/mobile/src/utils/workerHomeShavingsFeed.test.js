@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   getWorkerHomeFeedCardFlags,
   sortWorkerHomeFeed,
+  bucketWorkerCompetitionOrders,
+  classifyWorkerShavingsBoardOrder,
+  groupWorkerShavingsBoardOrders,
 } from "./workerHomeShavingsFeed.js";
 
 var ME = 501;
@@ -292,5 +295,432 @@ describe("sortWorkerHomeFeed", function () {
   it("returns an empty array for an empty or missing feed without throwing", function () {
     expect(sortWorkerHomeFeed([], ME)).toEqual([]);
     expect(sortWorkerHomeFeed(undefined, ME)).toEqual([]);
+  });
+});
+
+describe("bucketWorkerCompetitionOrders", function () {
+  var NOW = "2026-08-05T12:00:00Z";
+
+  it("buckets an order requested for today into the today section", function () {
+    var order = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-05T09:00:00Z",
+    });
+
+    var buckets = bucketWorkerCompetitionOrders([order], NOW);
+
+    expect(idsOf(buckets.today)).toEqual([1]);
+    expect(buckets.older).toEqual([]);
+    expect(buckets.future).toEqual([]);
+  });
+
+  it("sorts multiple today orders by requested time ascending", function () {
+    var late = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-05T18:00:00Z",
+    });
+    var early = makeOrder({
+      shavingsOrderId: 2,
+      requestedDeliveryTime: "2026-08-05T07:00:00Z",
+    });
+
+    var buckets = bucketWorkerCompetitionOrders([late, early], NOW);
+
+    expect(idsOf(buckets.today)).toEqual([2, 1]);
+  });
+
+  it("buckets a past undelivered order into the older section", function () {
+    var order = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-03T10:00:00Z",
+      deliveryStatus: "Pending",
+    });
+
+    var buckets = bucketWorkerCompetitionOrders([order], NOW);
+
+    expect(idsOf(buckets.older)).toEqual([1]);
+  });
+
+  it("places a null-requested-time order after past-undelivered orders within the older section", function () {
+    var pastUndelivered = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-03T10:00:00Z",
+      deliveryStatus: "Pending",
+    });
+    var nullTime = makeOrder({
+      shavingsOrderId: 2,
+      requestedDeliveryTime: null,
+    });
+
+    var buckets = bucketWorkerCompetitionOrders(
+      [nullTime, pastUndelivered],
+      NOW,
+    );
+
+    expect(idsOf(buckets.older)).toEqual([1, 2]);
+  });
+
+  it("places a past-delivered order after null-time orders within the older section", function () {
+    var pastUndelivered = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-03T10:00:00Z",
+      deliveryStatus: "Pending",
+    });
+    var nullTime = makeOrder({
+      shavingsOrderId: 2,
+      requestedDeliveryTime: null,
+    });
+    var pastDelivered = makeOrder({
+      shavingsOrderId: 3,
+      requestedDeliveryTime: "2026-08-02T10:00:00Z",
+      deliveryStatus: "Delivered",
+    });
+
+    var buckets = bucketWorkerCompetitionOrders(
+      [pastDelivered, nullTime, pastUndelivered],
+      NOW,
+    );
+
+    // Locked business rule: past-delivered orders stay visible, at the
+    // bottom of the section, never dropped - undelivered first, then
+    // null-time, then delivered.
+    expect(idsOf(buckets.older)).toEqual([1, 2, 3]);
+  });
+
+  it("buckets a future order into the future section", function () {
+    var order = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-07T10:00:00Z",
+    });
+
+    var buckets = bucketWorkerCompetitionOrders([order], NOW);
+
+    expect(idsOf(buckets.future)).toEqual([1]);
+  });
+
+  it("sorts multiple future orders by date then time ascending", function () {
+    var laterDay = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-09T06:00:00Z",
+    });
+    var soonerDayLaterTime = makeOrder({
+      shavingsOrderId: 2,
+      requestedDeliveryTime: "2026-08-07T20:00:00Z",
+    });
+    var soonerDayEarlierTime = makeOrder({
+      shavingsOrderId: 3,
+      requestedDeliveryTime: "2026-08-07T06:00:00Z",
+    });
+
+    var buckets = bucketWorkerCompetitionOrders(
+      [laterDay, soonerDayLaterTime, soonerDayEarlierTime],
+      NOW,
+    );
+
+    expect(idsOf(buckets.future)).toEqual([3, 2, 1]);
+  });
+
+  it("detects a delivered order in the older section through deliveryStatus, not just arrivalTime", function () {
+    var pastUndelivered = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-03T10:00:00Z",
+      deliveryStatus: "Pending",
+    });
+    var pastDeliveredByStatus = makeOrder({
+      shavingsOrderId: 2,
+      requestedDeliveryTime: "2026-08-02T10:00:00Z",
+      deliveryStatus: "Delivered",
+      arrivalTime: null,
+    });
+
+    var buckets = bucketWorkerCompetitionOrders(
+      [pastDeliveredByStatus, pastUndelivered],
+      NOW,
+    );
+
+    expect(idsOf(buckets.older)).toEqual([1, 2]);
+  });
+
+  it("detects a delivered order in the older section through arrivalTime, even when deliveryStatus still reads Pending", function () {
+    var pastUndelivered = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-03T10:00:00Z",
+      deliveryStatus: "Pending",
+    });
+    var pastDeliveredByArrival = makeOrder({
+      shavingsOrderId: 2,
+      requestedDeliveryTime: "2026-08-02T10:00:00Z",
+      deliveryStatus: "Pending",
+      arrivalTime: "2026-08-02T11:00:00Z",
+    });
+
+    var buckets = bucketWorkerCompetitionOrders(
+      [pastDeliveredByArrival, pastUndelivered],
+      NOW,
+    );
+
+    expect(idsOf(buckets.older)).toEqual([1, 2]);
+  });
+
+  // Standalone shavings cancellation lifecycle: a terminal-cancelled (isCancelled=true)
+  // past order is resolved exactly like a delivered one, folding into the same
+  // non-actionable "older" grouping rather than the "needs treatment" one. A PENDING
+  // cancellation is NOT resolved and stays in the unresolved group.
+  describe("cancellation lifecycle bucketing", function () {
+    it("buckets a past terminal-cancelled order into the older section", function () {
+      var order = makeOrder({
+        shavingsOrderId: 1,
+        requestedDeliveryTime: "2026-08-03T10:00:00Z",
+        deliveryStatus: "Pending",
+        isCancelled: true,
+      });
+
+      var buckets = bucketWorkerCompetitionOrders([order], NOW);
+
+      expect(idsOf(buckets.older)).toEqual([1]);
+    });
+
+    it("places a past terminal-cancelled order after past-undelivered and null-time orders, same tier as delivered", function () {
+      var pastUndelivered = makeOrder({
+        shavingsOrderId: 1,
+        requestedDeliveryTime: "2026-08-03T10:00:00Z",
+        deliveryStatus: "Pending",
+      });
+      var nullTime = makeOrder({
+        shavingsOrderId: 2,
+        requestedDeliveryTime: null,
+      });
+      var pastCancelled = makeOrder({
+        shavingsOrderId: 3,
+        requestedDeliveryTime: "2026-08-02T10:00:00Z",
+        deliveryStatus: "Pending",
+        isCancelled: true,
+      });
+
+      var buckets = bucketWorkerCompetitionOrders(
+        [pastCancelled, nullTime, pastUndelivered],
+        NOW,
+      );
+
+      expect(idsOf(buckets.older)).toEqual([1, 2, 3]);
+    });
+
+    it("sorts a past-delivered order and a past-cancelled order together, by requested time ascending, within the resolved group", function () {
+      var pastCancelledLate = makeOrder({
+        shavingsOrderId: 1,
+        requestedDeliveryTime: "2026-08-03T18:00:00Z",
+        isCancelled: true,
+      });
+      var pastDeliveredEarly = makeOrder({
+        shavingsOrderId: 2,
+        requestedDeliveryTime: "2026-08-02T08:00:00Z",
+        deliveryStatus: "Delivered",
+      });
+
+      var buckets = bucketWorkerCompetitionOrders(
+        [pastCancelledLate, pastDeliveredEarly],
+        NOW,
+      );
+
+      expect(idsOf(buckets.older)).toEqual([2, 1]);
+    });
+
+    it("keeps a past order with only a PENDING cancellation in the unresolved (not-yet-treated) group, not the resolved one", function () {
+      var pastPendingCancellation = makeOrder({
+        shavingsOrderId: 1,
+        requestedDeliveryTime: "2026-08-03T10:00:00Z",
+        deliveryStatus: "Pending",
+        hasPendingCancellation: true,
+        isCancelled: false,
+      });
+      var pastDelivered = makeOrder({
+        shavingsOrderId: 2,
+        requestedDeliveryTime: "2026-08-02T10:00:00Z",
+        deliveryStatus: "Delivered",
+      });
+
+      var buckets = bucketWorkerCompetitionOrders(
+        [pastDelivered, pastPendingCancellation],
+        NOW,
+      );
+
+      // Pending-cancellation order (1) is unresolved -> first tier; delivered (2) -> resolved
+      // tier at the end - the two must not collapse into one group.
+      expect(idsOf(buckets.older)).toEqual([1, 2]);
+    });
+
+    it("buckets a today or future terminal-cancelled order into its normal date section, not a special one", function () {
+      var todayCancelled = makeOrder({
+        shavingsOrderId: 1,
+        requestedDeliveryTime: "2026-08-05T09:00:00Z",
+        isCancelled: true,
+      });
+      var futureCancelled = makeOrder({
+        shavingsOrderId: 2,
+        requestedDeliveryTime: "2026-08-07T09:00:00Z",
+        isCancelled: true,
+      });
+
+      var buckets = bucketWorkerCompetitionOrders(
+        [todayCancelled, futureCancelled],
+        NOW,
+      );
+
+      expect(idsOf(buckets.today)).toEqual([1]);
+      expect(idsOf(buckets.future)).toEqual([2]);
+      expect(buckets.older).toEqual([]);
+    });
+  });
+
+  it("does not mutate the input orders array", function () {
+    var first = makeOrder({
+      shavingsOrderId: 1,
+      requestedDeliveryTime: "2026-08-07T10:00:00Z",
+    });
+    var second = makeOrder({
+      shavingsOrderId: 2,
+      requestedDeliveryTime: "2026-08-05T10:00:00Z",
+    });
+    var input = [first, second];
+
+    bucketWorkerCompetitionOrders(input, NOW);
+
+    expect(idsOf(input)).toEqual([1, 2]);
+    expect(input[0]).toBe(first);
+    expect(input[1]).toBe(second);
+  });
+});
+
+describe("classifyWorkerShavingsBoardOrder", function () {
+  it("classifies an unclaimed order as requiresAttention", function () {
+    var order = makeOrder({ workerSystemUserId: null });
+
+    expect(classifyWorkerShavingsBoardOrder(order)).toBe("requiresAttention");
+  });
+
+  it("classifies a claimed, undelivered order as inMyCare regardless of claimant", function () {
+    var mine = makeOrder({ workerSystemUserId: ME });
+    var foreign = makeOrder({ workerSystemUserId: OTHER_WORKER });
+
+    expect(classifyWorkerShavingsBoardOrder(mine)).toBe("inMyCare");
+    expect(classifyWorkerShavingsBoardOrder(foreign)).toBe("inMyCare");
+  });
+
+  it("classifies a delivered order (by status or arrivalTime) as completed", function () {
+    var byStatus = makeOrder({ deliveryStatus: "Delivered" });
+    var byArrival = makeOrder({
+      deliveryStatus: "Pending",
+      arrivalTime: "2026-08-05T09:00:00Z",
+    });
+
+    expect(classifyWorkerShavingsBoardOrder(byStatus)).toBe("completed");
+    expect(classifyWorkerShavingsBoardOrder(byArrival)).toBe("completed");
+  });
+
+  it("classifies a terminal-cancelled order as completed, even if it was also delivered first", function () {
+    var order = makeOrder({
+      deliveryStatus: "Delivered",
+      arrivalTime: "2026-08-05T09:00:00Z",
+      isCancelled: true,
+    });
+
+    expect(classifyWorkerShavingsBoardOrder(order)).toBe("completed");
+  });
+
+  it("classifies a pending-cancellation order as inMyCare, never requiresAttention or completed, even when unclaimed", function () {
+    var order = makeOrder({
+      workerSystemUserId: null,
+      hasPendingCancellation: true,
+    });
+
+    expect(classifyWorkerShavingsBoardOrder(order)).toBe("inMyCare");
+  });
+
+  it("completed wins over a pending cancellation flag left stale on a delivered/cancelled row", function () {
+    var order = makeOrder({
+      isCancelled: true,
+      hasPendingCancellation: true,
+    });
+
+    expect(classifyWorkerShavingsBoardOrder(order)).toBe("completed");
+  });
+});
+
+describe("groupWorkerShavingsBoardOrders", function () {
+  it("splits requiresAttention, myCare, otherCare, and completed into four separate buckets", function () {
+    var unclaimed = makeOrder({ shavingsOrderId: 1, workerSystemUserId: null });
+    var mine = makeOrder({ shavingsOrderId: 2, workerSystemUserId: ME });
+    var foreign = makeOrder({ shavingsOrderId: 3, workerSystemUserId: OTHER_WORKER });
+    var delivered = makeOrder({
+      shavingsOrderId: 4,
+      workerSystemUserId: ME,
+      deliveryStatus: "Delivered",
+    });
+
+    var groups = groupWorkerShavingsBoardOrders(
+      [unclaimed, mine, foreign, delivered],
+      ME,
+    );
+
+    expect(idsOf(groups.requiresAttention)).toEqual([1]);
+    expect(idsOf(groups.myCare)).toEqual([2]);
+    expect(idsOf(groups.otherCare)).toEqual([3]);
+    expect(idsOf(groups.completed)).toEqual([4]);
+  });
+
+  it("keeps a pending-cancellation order claimed by another worker in otherCare, not myCare", function () {
+    var mineePendingCancellation = makeOrder({
+      shavingsOrderId: 1,
+      workerSystemUserId: ME,
+      hasPendingCancellation: true,
+    });
+    var foreignPendingCancellation = makeOrder({
+      shavingsOrderId: 2,
+      workerSystemUserId: OTHER_WORKER,
+      hasPendingCancellation: true,
+    });
+
+    var groups = groupWorkerShavingsBoardOrders(
+      [mineePendingCancellation, foreignPendingCancellation],
+      ME,
+    );
+
+    expect(idsOf(groups.myCare)).toEqual([1]);
+    expect(idsOf(groups.otherCare)).toEqual([2]);
+  });
+
+  it("preserves relative input order within each bucket", function () {
+    var a = makeOrder({ shavingsOrderId: 1, workerSystemUserId: null });
+    var b = makeOrder({ shavingsOrderId: 2, workerSystemUserId: null });
+    var c = makeOrder({ shavingsOrderId: 3, workerSystemUserId: null });
+
+    var groups = groupWorkerShavingsBoardOrders([c, a, b], ME);
+
+    expect(idsOf(groups.requiresAttention)).toEqual([3, 1, 2]);
+  });
+
+  it("returns four empty arrays for an empty or missing feed without throwing", function () {
+    expect(groupWorkerShavingsBoardOrders([], ME)).toEqual({
+      requiresAttention: [],
+      myCare: [],
+      otherCare: [],
+      completed: [],
+    });
+    expect(groupWorkerShavingsBoardOrders(undefined, ME)).toEqual({
+      requiresAttention: [],
+      myCare: [],
+      otherCare: [],
+      completed: [],
+    });
+  });
+
+  it("does not mutate the input orders array", function () {
+    var first = makeOrder({ shavingsOrderId: 1, workerSystemUserId: null });
+    var input = [first];
+
+    groupWorkerShavingsBoardOrders(input, ME);
+
+    expect(idsOf(input)).toEqual([1]);
+    expect(input[0]).toBe(first);
   });
 });

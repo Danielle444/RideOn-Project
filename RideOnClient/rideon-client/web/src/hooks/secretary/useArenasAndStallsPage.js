@@ -353,6 +353,7 @@ export default function useArenasAndStallsPage() {
     handleCompoundDelete,
     handleCompoundLayoutParsed,
     closeConfirmDialog,
+    showToast,
     closeToast,
   };
 }

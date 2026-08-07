@@ -36,6 +36,16 @@ function ShavingsContent(props) {
     showToast("success", "הזמנת הנסורת נוספה בהצלחה");
   }
 
+  async function handleCancelOrder(order) {
+    const result = await shavings.handleCancelOrder(order);
+
+    if (result === true) {
+      showToast("success", "הזמנת הנסורת בוטלה");
+    } else if (result === false) {
+      showToast("error", shavings.cancelErrorMessage);
+    }
+  }
+
   const hasOrders = shavings.orders.length > 0;
 
   return (
@@ -87,7 +97,12 @@ function ShavingsContent(props) {
             onChange={shavings.setGroup}
           />
 
-          <ShavingsNeedsAttentionSection orders={shavings.needsAttention} />
+          <ShavingsNeedsAttentionSection
+            overdueOrders={shavings.needsAttentionOverdue}
+            dueTodayOrders={shavings.needsAttentionDueToday}
+            onCancelOrder={handleCancelOrder}
+            cancellingId={shavings.cancellingId}
+          />
 
           {!hasOrders ? (
             <div className="rounded-2xl border border-dashed border-[#D8CBC3] bg-white px-6 py-16 text-center text-sm text-[#8A7268]">
@@ -102,6 +117,8 @@ function ShavingsContent(props) {
                     title={group.title}
                     stats={group.stats}
                     orders={group.orders}
+                    onCancelOrder={handleCancelOrder}
+                    cancellingId={shavings.cancellingId}
                   />
                 );
               })}

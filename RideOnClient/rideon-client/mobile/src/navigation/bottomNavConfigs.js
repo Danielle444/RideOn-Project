@@ -13,10 +13,10 @@ function getAdminBottomNavConfig(navigation) {
       },
     },
     {
-      key: "profile",
-      icon: "person-outline",
+      key: "board",
+      icon: "trophy-outline",
       onPress: function () {
-        navigation.navigate("AdminProfile");
+        navigation.navigate("AdminCompetitionsBoard");
       },
     },
   ];
@@ -37,10 +37,10 @@ function getPayerBottomNavConfig(navigation) {
       },
     },
     {
-      key: "profile",
-      icon: "person-outline",
+      key: "board",
+      icon: "trophy-outline",
       onPress: function () {
-        navigation.navigate("PayerProfile");
+        navigation.navigate("PayerCompetitionsBoard");
       },
     },
   ];
@@ -61,10 +61,10 @@ function getWorkerBottomNavConfig(navigation) {
       },
     },
     {
-      key: "profile",
-      icon: "person-outline",
+      key: "board",
+      icon: "trophy-outline",
       onPress: function () {
-        navigation.navigate("WorkerProfile");
+        navigation.navigate("WorkerCompetitionsBoard");
       },
     },
   ];

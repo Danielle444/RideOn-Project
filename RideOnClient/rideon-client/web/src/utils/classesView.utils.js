@@ -72,6 +72,31 @@ function isRegistrationClosed(competition, now) {
 }
 
 /**
+ * Has this competition ended?
+ *
+ * `competitionEndDate` is read with the same camelCase/PascalCase fallback as every other
+ * competition field here. No valid end date -> not ended (the safer default, same reasoning as
+ * isRegistrationClosed: never claim a phase is over on missing data).
+ *
+ * @param {object} competition
+ * @param {Date} [now] injectable for tests
+ * @returns {boolean}
+ */
+function isCompetitionEnded(competition, now) {
+  var today = toDateOnly(now || new Date());
+
+  var competitionEnd = readDate(
+    readCompetitionField(competition, "competitionEndDate", "CompetitionEndDate"),
+  );
+
+  if (!competitionEnd) {
+    return false;
+  }
+
+  return today > toDateOnly(competitionEnd);
+}
+
+/**
  * The actuals view is the only one that waits on anything. Financial is a lens, not a phase,
  * and the forecast is always worth looking at -- including after the fact, to see what was
  * predicted.
@@ -141,6 +166,7 @@ export {
   CLASSES_VIEW_PLANNING,
   CLASSES_VIEW_ACTUALS,
   isRegistrationClosed,
+  isCompetitionEnded,
   isClassesViewAvailable,
   resolveDefaultClassesView,
   isColumnVisible,

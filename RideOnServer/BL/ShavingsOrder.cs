@@ -32,7 +32,10 @@ namespace RideOnServer.BL
             return ShavingsOrderDAL.GetWorkerHomeShavingsFeed(workerSystemUserId, ranchId);
         }
 
-        public static void SaveDeliveryPhoto(SaveDeliveryPhotoRequest request)
+        // Returns false when the SP's authorization/state guards blocked the write (not the
+        // caller's claimed order, or a photo was already recorded) -- see ShavingsOrderDAL.
+        // SaveDeliveryPhoto for the ValidationException path that covers the other RN001 guards.
+        public static bool SaveDeliveryPhoto(SaveDeliveryPhotoRequest request, int workerSystemUserId)
         {
             if (request.ShavingsOrderId <= 0)
                 throw new ArgumentException("מזהה הזמנה לא תקין");
@@ -41,17 +44,76 @@ namespace RideOnServer.BL
                 throw new ArgumentException("כתובת התמונה חסרה");
 
             ShavingsOrderDAL dal = new ShavingsOrderDAL();
-            dal.SaveDeliveryPhoto(request.ShavingsOrderId, request.DeliveryPhotoUrl, DateTime.UtcNow);
+            return dal.SaveDeliveryPhoto(request.ShavingsOrderId, request.DeliveryPhotoUrl, DateTime.UtcNow, workerSystemUserId);
         }
 
         // No-photo delivery fallback (CAP-4): records a delivery without a photo.
         // Returns false when no open order matched (already delivered or nonexistent).
-        public static bool MarkDelivered(MarkDeliveredRequest request)
+        public static bool MarkDelivered(MarkDeliveredRequest request, int workerSystemUserId)
         {
             if (request.ShavingsOrderId <= 0)
                 throw new ArgumentException("מזהה הזמנה לא תקין");
 
-            return ShavingsOrderDAL.MarkDelivered(request.ShavingsOrderId);
+            return ShavingsOrderDAL.MarkDelivered(request.ShavingsOrderId, workerSystemUserId);
+        }
+
+        // Standalone shavings cancellation -- three role paths, exact mirror of
+        // StallBooking.cs's CancelStallBookingByPayer / AdminCancelStallBooking /
+        // SecretaryDeleteStallBooking validation shape.
+
+        public static int CancelShavingsOrderByPayer(int shavingsOrderId, int payerPersonId)
+        {
+            if (shavingsOrderId <= 0)
+            {
+                throw new Exception("Invalid ShavingsOrderId");
+            }
+
+            if (payerPersonId <= 0)
+            {
+                throw new Exception("Invalid PayerPersonId");
+            }
+
+            return ShavingsOrderDAL.CancelShavingsOrderByPayer(shavingsOrderId, payerPersonId);
+        }
+
+        public static int AdminCancelShavingsOrder(int shavingsOrderId, int ranchId, int personId)
+        {
+            if (shavingsOrderId <= 0)
+            {
+                throw new Exception("Invalid ShavingsOrderId");
+            }
+
+            if (ranchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            if (personId <= 0)
+            {
+                throw new Exception("Invalid PersonId");
+            }
+
+            return ShavingsOrderDAL.AdminCancelShavingsOrder(shavingsOrderId, ranchId, personId);
+        }
+
+        public static int SecretaryCancelShavingsOrder(int shavingsOrderId, int secretarySystemUserId, int ranchId)
+        {
+            if (shavingsOrderId <= 0)
+            {
+                throw new Exception("Invalid ShavingsOrderId");
+            }
+
+            if (secretarySystemUserId <= 0)
+            {
+                throw new Exception("Invalid SecretarySystemUserId");
+            }
+
+            if (ranchId <= 0)
+            {
+                throw new Exception("Invalid RanchId");
+            }
+
+            return ShavingsOrderDAL.SecretaryCancelShavingsOrder(shavingsOrderId, secretarySystemUserId, ranchId);
         }
     }
 }

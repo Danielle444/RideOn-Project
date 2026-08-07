@@ -76,7 +76,18 @@ namespace RideOnServer.Tests
             File.Exists(path).Should().BeTrue(
                 "the D4 stored procedure file was expected at {0}", path);
 
-            return File.ReadAllText(path);
+            return File.ReadAllText(path).Replace("\r\n", "\n");
+        }
+
+        // Scoped to the function body (from AS $function$ onward), not the whole file - the
+        // header comments deliberately narrate what was REMOVED ("DISTINCT ON is no longer
+        // needed") and would otherwise trip a naive whole-file NotContain("DISTINCT ON") check.
+        private static string SqlFunctionBody()
+        {
+            string sql = SqlSource();
+            int at = sql.IndexOf("AS $function$", StringComparison.Ordinal);
+            at.Should().BeGreaterThan(-1);
+            return sql.Substring(at);
         }
 
         // Bounded by the next action's [HttpGet(...)], since GetWorkerHomeFeed sits
@@ -382,20 +393,64 @@ namespace RideOnServer.Tests
         }
 
         [Fact]
-        public void The_sql_uses_the_business_date_for_delivery_and_both_competition_bounds()
+        public void The_sql_uses_the_business_date_for_delivery_and_the_competition_end_bound()
         {
             string sql = SqlSource();
 
-            sql.Should().Contain("so.requesteddeliverytime::date = v_businessdate");
-            sql.Should().Contain("c.competitionstartdate <= v_businessdate");
+            sql.Should().Contain("so.requesteddeliverytime::date <= v_businessdate");
             sql.Should().Contain("c.competitionenddate >= v_businessdate");
+        }
+
+        // =================================================================
+        // Overdue widening (Slice 1, approved business change - kept as its own
+        // test, separate from the destination-aggregation coverage below).
+        // =================================================================
+
+        [Fact]
+        public void The_sql_includes_overdue_undelivered_orders_not_just_todays_exact_date()
+        {
+            string sql = SqlSource();
+
+            sql.Should().Contain("so.requesteddeliverytime::date <= v_businessdate",
+                "the feed must now include today AND any earlier undelivered date");
+
+            sql.Should().NotContain("so.requesteddeliverytime::date = v_businessdate",
+                "the old exact-equality predicate must be fully replaced, not left alongside the new one");
+        }
+
+        [Fact]
+        public void Every_other_predicate_on_the_feed_is_unchanged_by_the_overdue_widening()
+        {
+            // The date comparison operator is the ONLY predicate this slice touches - every
+            // other filter (ownership/claim, competition end date, competition status,
+            // delivered exclusion, approved-cancellation exclusion) must be byte-for-byte the
+            // same text as before.
+            string sql = SqlSource();
+
+            sql.Should().Contain("(so.workersystemuserid = p_WorkerSystemUserId OR so.workersystemuserid IS NULL)");
+            sql.Should().Contain("c.competitionenddate >= v_businessdate");
+            sql.Should().Contain("(c.competitionstatus IS NULL OR c.competitionstatus NOT IN ('טיוטה','בוטלה'))");
+            sql.Should().Contain("so.arrivaltime IS NULL");
+            sql.Should().Contain("COALESCE(so.deliverystatus, 'Pending') <> 'Delivered'");
+        }
+
+        // Shavings/stall prep legitimately happens before a competition's
+        // official start date (live evidence: shavingsorderid 519, 65 live
+        // orders with requesteddeliverytime before competitionstartdate) - an
+        // order due today must not be hidden just because "today" is still
+        // before the competition's own start date. Only the upper bound
+        // (competitionenddate) still gates the feed, so an order stops
+        // appearing once its competition has actually ended.
+        [Fact]
+        public void The_sql_no_longer_gates_on_the_competition_start_date()
+        {
+            SqlSource().Should().NotContain("c.competitionstartdate <= v_businessdate");
         }
 
         [Theory]
         [InlineData("c.hostranchid = p_RanchId")]
         [InlineData("(so.workersystemuserid = p_WorkerSystemUserId OR so.workersystemuserid IS NULL)")]
-        [InlineData("so.requesteddeliverytime::date = v_businessdate")]
-        [InlineData("c.competitionstartdate <= v_businessdate")]
+        [InlineData("so.requesteddeliverytime::date <= v_businessdate")]
         [InlineData("c.competitionenddate >= v_businessdate")]
         [InlineData("(c.competitionstatus IS NULL OR c.competitionstatus NOT IN ('טיוטה','בוטלה'))")]
         [InlineData("so.arrivaltime IS NULL")]
@@ -446,15 +501,228 @@ namespace RideOnServer.Tests
         }
 
         [Fact]
-        public void The_dedup_key_and_final_ordering_are_by_shavingsorderid_not_by_worker()
+        public void The_final_ordering_is_by_shavingsorderid_with_no_distinct_on_needed_anymore()
         {
-            // DISTINCT ON requires shavingsorderid to lead the ORDER BY, so this
-            // query cannot express "mine first" itself - the client re-sorts.
-            SqlSource().Should().Contain(
-                "SELECT DISTINCT ON (so.shavingsorderid)");
+            // Superseded by the destination-aggregation rewrite (Slice 1): DISTINCT ON existed
+            // solely to dedupe the old per-order join to a single (broken) stall lookup - see
+            // the destination-aggregation section below. The client still re-sorts for
+            // "mine first"; this proc no longer needs DISTINCT ON to produce one row per order.
+            SqlSource().Should().Contain("ORDER BY so.shavingsorderid;");
+            SqlSource().Should().NotContain("DISTINCT ON");
+        }
 
+        // =================================================================
+        // 9. RanchWorker shavings cancellation lifecycle (own productchangerequest).
+        // =================================================================
+
+        [Fact]
+        public void The_sql_return_shape_appends_IsCancelled_and_HasPendingCancellation_before_the_destination_columns()
+        {
             SqlSource().Should().Contain(
-                "ORDER BY so.shavingsorderid, so.requesteddeliverytime ASC NULLS LAST;");
+                "\"ResponseTime\" timestamp without time zone, \"IsCancelled\" boolean, \"HasPendingCancellation\" boolean, \"DeliveryDestinations\" jsonb, \"HasUnassignedStalls\" boolean)");
+        }
+
+        [Fact]
+        public void The_sql_derives_IsCancelled_from_an_approved_cancellation_request_on_the_orders_own_id()
+        {
+            string sql = SqlSource();
+
+            sql.Should().Contain(
+                "EXISTS (\n            SELECT 1 FROM public.productchangerequest pcr\n" +
+                "            WHERE pcr.originalprequestid = so.shavingsorderid\n" +
+                "              AND pcr.iscancelled = true\n" +
+                "              AND pcr.status = 'Approved'\n" +
+                "        ) AS \"IsCancelled\",");
+        }
+
+        [Fact]
+        public void The_sql_derives_HasPendingCancellation_from_a_pending_cancellation_request_on_the_orders_own_id()
+        {
+            string sql = SqlSource();
+
+            sql.Should().Contain(
+                "EXISTS (\n            SELECT 1 FROM public.productchangerequest pcr\n" +
+                "            WHERE pcr.originalprequestid = so.shavingsorderid\n" +
+                "              AND pcr.iscancelled = true\n" +
+                "              AND pcr.status = 'Pending'\n" +
+                "        ) AS \"HasPendingCancellation\"");
+        }
+
+        [Fact]
+        public void The_sql_excludes_a_terminal_cancelled_order_from_the_home_feed_entirely()
+        {
+            string sql = SqlSource();
+
+            // The home feed has no historical/non-actionable area (unlike the
+            // competition-scoped list, 114), so a terminal-cancelled order is excluded
+            // the same way an already-delivered one already is above it.
+            sql.Should().Contain(
+                "AND NOT EXISTS (\n          SELECT 1 FROM public.productchangerequest pcr\n" +
+                "          WHERE pcr.originalprequestid = so.shavingsorderid\n" +
+                "            AND pcr.iscancelled = true\n" +
+                "            AND pcr.status = 'Approved'\n" +
+                "      )");
+        }
+
+        [Fact]
+        public void The_sql_does_not_exclude_a_pending_cancellation_from_the_home_feed()
+        {
+            // Only one terminal-exclusion EXISTS clause should exist (status = 'Approved'),
+            // never a second one gated on status = 'Pending' - a pending cancellation must
+            // stay visible per business rule 1, locked on the client instead.
+            string sql = SqlSource();
+
+            int approvedExclusionCount = 0;
+            int index = sql.IndexOf("AND NOT EXISTS (", StringComparison.Ordinal);
+            while (index > -1)
+            {
+                approvedExclusionCount++;
+                index = sql.IndexOf("AND NOT EXISTS (", index + 1, StringComparison.Ordinal);
+            }
+
+            approvedExclusionCount.Should().Be(1);
+        }
+
+        [Fact]
+        public void A_rejected_cancellation_request_is_neither_a_status_the_sql_special_cases_nor_an_exclusion_reason()
+        {
+            // IsCancelled/HasPendingCancellation/the terminal exclusion only ever
+            // branch on 'Approved' or 'Pending' (pinned above) - a 'Rejected'
+            // productchangerequest row therefore matches none of the three EXISTS/
+            // NOT EXISTS clauses, so a rejected-cancellation order falls through to
+            // the same predicates as an order with no cancellation request at all:
+            // included, IsCancelled=false, HasPendingCancellation=false. Pinning the
+            // literal's absence here means introducing a 'Rejected' special case
+            // later would be a deliberate, reviewed change, not a silent drift.
+            SqlSource().Should().NotContain("'Rejected'");
+        }
+
+        [Fact]
+        public void The_dto_exposes_IsCancelled_and_HasPendingCancellation_as_non_nullable_bools()
+        {
+            PropertyInfo? isCancelled = typeof(WorkerShavingsOrderItem).GetProperty("IsCancelled");
+            PropertyInfo? hasPendingCancellation =
+                typeof(WorkerShavingsOrderItem).GetProperty("HasPendingCancellation");
+
+            isCancelled.Should().NotBeNull();
+            isCancelled!.PropertyType.Should().Be(typeof(bool));
+
+            hasPendingCancellation.Should().NotBeNull();
+            hasPendingCancellation!.PropertyType.Should().Be(typeof(bool));
+        }
+
+        [Fact]
+        public void The_dal_maps_IsCancelled_and_HasPendingCancellation_from_the_reader()
+        {
+            string body = GetWorkerHomeShavingsFeedBody();
+
+            body.Should().Contain("IsCancelled = Convert.ToBoolean(reader[\"IsCancelled\"]),");
+            body.Should().Contain(
+                "HasPendingCancellation = Convert.ToBoolean(reader[\"HasPendingCancellation\"]),");
+        }
+
+        // =================================================================
+        // 10. Delivery destination (Slice 1) - same design as proc 114, see that
+        //     test file's own header for the join-key proof; only the parts
+        //     specific to this proc's own query shape are re-pinned here.
+        // =================================================================
+
+        [Fact]
+        public void The_sql_return_shape_appends_DeliveryDestinations_and_HasUnassignedStalls_last()
+        {
+            string sql = SqlSource();
+
+            int destinationsAt = sql.IndexOf("\"DeliveryDestinations\" jsonb", StringComparison.Ordinal);
+            int unassignedAt = sql.IndexOf("\"HasUnassignedStalls\" boolean)", StringComparison.Ordinal);
+
+            destinationsAt.Should().BeGreaterThan(-1);
+            unassignedAt.Should().BeGreaterThan(-1);
+            destinationsAt.Should().BeLessThan(unassignedAt);
+        }
+
+        [Fact]
+        public void The_sql_resolves_the_physical_stall_via_stallassignment_ranchid_not_stallbooking()
+        {
+            string sql = SqlSource();
+
+            sql.Should().Contain(
+                "LEFT JOIN public.stall s\n            ON s.ranchid = sa.ranchid\n           AND s.compoundid = sa.compoundid\n           AND s.stallid = sa.stallid");
+
+            SqlFunctionBody().Should().NotContain("s.ranchid = sb.ranchid");
+            SqlFunctionBody().Should().NotContain("s.ranchid = sb.requestingranchid");
+        }
+
+        [Fact]
+        public void The_sql_does_not_use_distinct_anywhere_as_a_multiplying_join_workaround()
+        {
+            string body = SqlFunctionBody();
+
+            body.Should().NotContain("DISTINCT ON");
+            body.Should().NotContain("SELECT DISTINCT ");
+        }
+
+        [Fact]
+        public void The_sql_pre_aggregates_destinations_to_one_row_per_shavingsorderid_before_the_main_query()
+        {
+            string sql = SqlSource();
+
+            sql.Should().Contain("destination_json AS (");
+            sql.Should().Contain("destination_flags AS (");
+        }
+
+        [Fact]
+        public void The_sql_coalesces_destinations_to_an_empty_array_and_the_flag_to_false()
+        {
+            string sql = SqlSource();
+
+            sql.Should().Contain("COALESCE(dj.deliverydestinations, '[]'::jsonb) AS \"DeliveryDestinations\"");
+            sql.Should().Contain("COALESCE(df.hasunassignedstalls, false) AS \"HasUnassignedStalls\"");
+        }
+
+        [Fact]
+        public void The_sql_keeps_StallNumber_as_a_typed_null_literal_with_no_backing_join()
+        {
+            string sql = SqlSource();
+
+            sql.Should().Contain("NULL::character varying AS \"StallNumber\"");
+
+            int stallBookingJoins = 0;
+            int index = sql.IndexOf("JOIN public.stallbooking", StringComparison.Ordinal);
+            while (index > -1)
+            {
+                stallBookingJoins++;
+                index = sql.IndexOf("JOIN public.stallbooking", index + 1, StringComparison.Ordinal);
+            }
+
+            stallBookingJoins.Should().Be(1, "the only stallbooking join must be the one inside destination_rows");
+        }
+
+        [Fact]
+        public void The_sql_carries_IsForTack_through_to_IsTackStall_on_the_stall_object()
+        {
+            SqlSource().Should().Contain("'IsTackStall', isfortack");
+        }
+
+        [Fact]
+        public void The_dto_exposes_DeliveryDestinations_and_HasUnassignedStalls_with_the_correct_types()
+        {
+            PropertyInfo? destinations = typeof(WorkerShavingsOrderItem).GetProperty("DeliveryDestinations");
+            PropertyInfo? unassigned = typeof(WorkerShavingsOrderItem).GetProperty("HasUnassignedStalls");
+
+            destinations.Should().NotBeNull();
+            destinations!.PropertyType.Should().Be(typeof(List<ShavingsDestinationCompound>));
+
+            unassigned.Should().NotBeNull();
+            unassigned!.PropertyType.Should().Be(typeof(bool));
+        }
+
+        [Fact]
+        public void The_dal_maps_DeliveryDestinations_and_HasUnassignedStalls_from_the_reader()
+        {
+            string body = GetWorkerHomeShavingsFeedBody();
+
+            body.Should().Contain("DeliveryDestinations = ParseDeliveryDestinations(reader[\"DeliveryDestinations\"]),");
+            body.Should().Contain("HasUnassignedStalls = Convert.ToBoolean(reader[\"HasUnassignedStalls\"]),");
         }
     }
 }

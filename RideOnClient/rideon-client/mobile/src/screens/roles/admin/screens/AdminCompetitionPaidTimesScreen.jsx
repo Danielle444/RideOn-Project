@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
@@ -26,16 +26,74 @@ import useRegistrationStepStatus from "../../../../hooks/useRegistrationStepStat
 
 import { cancelPaidTimeRequest } from "../../../../services/paidTimeRequestsService";
 import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
+import { createInFlightGuard } from "../../../../utils/inFlightGuard";
+
+import { LIFECYCLE_STATE } from "../../../../utils/payerAccountLifecycle";
+import { bandAndSortPaidTimes } from "../../../../utils/payerAccountBands";
+import { getLifecycleBandHeader } from "../../../../utils/payerAccountCopy";
 
 import PaidTimeListItemCard from "../../../../components/competitions/adminPaidTimes/PaidTimeListItemCard";
 import PaidTimeScheduleView from "../../../../components/competitions/adminPaidTimes/PaidTimeScheduleView";
-import PaidTimeEditModal from "../../../../components/competitions/adminPaidTimes/PaidTimeEditModal";
+import PaidTimeCreateModal from "../../../../components/competitions/PaidTimeCreateModal";
 import AddPaidTimeButton from "../../../../components/competitions/adminPaidTimes/AddPaidTimeButton";
 import SlotScheduleModal from "../../../../components/competitions/adminPaidTimes/SlotScheduleModal";
-import PublishedSlotsModal from "../../../../components/competitions/adminPaidTimes/PublishedSlotsModal";
 import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
 
 import styles from "../../../../styles/adminCompetitionPaidTimesStyles";
+
+// CAP-10: this admin surface's items carry a `status` field straight off
+// usp_getmypaidtimerequestsforcompetition (verified live 2026-08-06) - the
+// exact shape resolvePaidTimeLifecycleState and bandAndSortPaidTimes were
+// already built for, so both are reused directly with no adapter. Applied
+// only to the "list" view mode below - the "schedule" mode is a separate
+// day/slot/entry grid built by PaidTimeScheduleView (see CAP-2/CAP-3).
+function renderBandDivider(headerText, keyValue) {
+  if (!headerText) {
+    return null;
+  }
+
+  return (
+    <Text key={keyValue} style={styles.filterTitle}>
+      {headerText}
+    </Text>
+  );
+}
+
+// Renders one non-empty divider per lifecycle band, in Active / pending /
+// cancelled order, using the caller's existing per-item card renderer
+// unchanged.
+function renderBandedSections(banded, renderCard) {
+  var sections = [
+    {
+      key: "active",
+      items: banded.active,
+      header: getLifecycleBandHeader(LIFECYCLE_STATE.ACTIVE),
+    },
+    {
+      key: "pending",
+      items: banded.pending,
+      header: getLifecycleBandHeader(LIFECYCLE_STATE.PENDING_CHANGE),
+    },
+    {
+      key: "cancelled",
+      items: banded.cancelled,
+      header: getLifecycleBandHeader(LIFECYCLE_STATE.CANCELLED),
+    },
+  ];
+
+  return sections.map(function (section) {
+    if (section.items.length === 0) {
+      return null;
+    }
+
+    return (
+      <View key={"band-" + section.key}>
+        {renderBandDivider(section.header, "band-header-" + section.key)}
+        {section.items.map(renderCard)}
+      </View>
+    );
+  });
+}
 
 export default function AdminCompetitionPaidTimesScreen(props) {
   var activeRoleContext = useActiveRole();
@@ -87,13 +145,40 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   var [viewMode, setViewMode] = useState("list");
   var [expandedIds, setExpandedIds] = useState({});
   var [viewingSlotId, setViewingSlotId] = useState(null);
-  var [publishedSlotsOpen, setPublishedSlotsOpen] = useState(false);
+
+  // CAP-3: יום/סלוט בתצוגת הלו"ז מתחילים תמיד מכווצים (allSectionsExpanded
+  // = false) - "ברירת מחדל: כותרות ימים בלבד". כל תג/סלוט שנלחץ בנפרד
+  // נכנס ל-overrides מול ברירת המחדל הגלובלית, כדי ש"הרחב הכל"/"מזער הכל"
+  // לא יצטרכו להכיר את מרחב מפתחות היום/הסלוט (מחושב בתוך
+  // PaidTimeScheduleView בלבד) - ראו isDayExpanded/isSlotExpanded למטה.
+  var [allSectionsExpanded, setAllSectionsExpanded] = useState(false);
+  var [dayExpandOverrides, setDayExpandOverrides] = useState({});
+  var [slotExpandOverrides, setSlotExpandOverrides] = useState({});
+
+  // Synchronous in-flight guard for paid-time cancellation on this screen -
+  // cancellingId above is UI feedback only (async state), not a correctness
+  // guard: two rapid taps can both pass a "busy?" check before either render
+  // reflects the first one. Own ref/key-space, independent of any guard on
+  // AdminCompetitionPayerAccountScreen's own paid-time cancel handler - a
+  // different screen instance, so the two can never interfere. Initialized
+  // lazily so createInFlightGuard() runs once, not on every render.
+  var paidTimeCancelGuardRef = useRef(null);
+  if (paidTimeCancelGuardRef.current === null) {
+    paidTimeCancelGuardRef.current = createInFlightGuard();
+  }
+
+  var bandedPaidTimes = useMemo(
+    function () {
+      return bandAndSortPaidTimes(paidTimes.filteredItems);
+    },
+    [paidTimes.filteredItems],
+  );
 
   // Force-closes an already-open edit modal the moment Paid Time becomes
   // disabled or read-only - a still-open modal must not remain a live
   // mutation path just because it was opened before eligibility changed.
-  // PaidTimeEditModal is conditionally MOUNTED (via editingItem), not gated
-  // by its own visible prop, so resetting editingItem fully unmounts it.
+  // The edit PaidTimeCreateModal is conditionally MOUNTED (via editingItem),
+  // so resetting editingItem fully unmounts it.
   useEffect(
     function () {
       if (!availability.paidTimes.isEnabled && editingItem) {
@@ -123,16 +208,52 @@ export default function AdminCompetitionPaidTimesScreen(props) {
     });
   }
 
+  function isDayExpanded(dayKey) {
+    return Object.prototype.hasOwnProperty.call(dayExpandOverrides, dayKey)
+      ? dayExpandOverrides[dayKey]
+      : allSectionsExpanded;
+  }
+
+  function toggleDay(dayKey) {
+    var nextValue = !isDayExpanded(dayKey);
+    setDayExpandOverrides(function (prev) {
+      var next = Object.assign({}, prev);
+      next[dayKey] = nextValue;
+      return next;
+    });
+  }
+
+  function isSlotExpanded(slotKey) {
+    return Object.prototype.hasOwnProperty.call(slotExpandOverrides, slotKey)
+      ? slotExpandOverrides[slotKey]
+      : allSectionsExpanded;
+  }
+
+  function toggleSlot(slotKey) {
+    var nextValue = !isSlotExpanded(slotKey);
+    setSlotExpandOverrides(function (prev) {
+      var next = Object.assign({}, prev);
+      next[slotKey] = nextValue;
+      return next;
+    });
+  }
+
   function expandAll() {
     var next = {};
     paidTimes.filteredItems.forEach(function (it) {
       next[it.paidTimeRequestId] = true;
     });
     setExpandedIds(next);
+    setAllSectionsExpanded(true);
+    setDayExpandOverrides({});
+    setSlotExpandOverrides({});
   }
 
   function collapseAll() {
     setExpandedIds({});
+    setAllSectionsExpanded(false);
+    setDayExpandOverrides({});
+    setSlotExpandOverrides({});
   }
 
   function handleCompetitionMenuPress(item) {
@@ -191,8 +312,14 @@ export default function AdminCompetitionPaidTimesScreen(props) {
       return;
     }
 
+    var guardKey = item.paidTimeRequestId;
+
+    if (!paidTimeCancelGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
-      setCancellingId(item.paidTimeRequestId);
+      setCancellingId(guardKey);
       await cancelPaidTimeRequest({
         paidTimeRequestId: item.paidTimeRequestId,
         ranchId: activeRole?.ranchId,
@@ -203,6 +330,7 @@ export default function AdminCompetitionPaidTimesScreen(props) {
       Alert.alert("שגיאה", String(msg));
     } finally {
       setCancellingId(null);
+      paidTimeCancelGuardRef.current.release(guardKey);
     }
   }
 
@@ -359,6 +487,10 @@ export default function AdminCompetitionPaidTimesScreen(props) {
           items={paidTimes.filteredItems}
           isExpanded={isExpanded}
           onToggleExpand={toggleExpand}
+          isDayExpanded={isDayExpanded}
+          onToggleDay={toggleDay}
+          isSlotExpanded={isSlotExpanded}
+          onToggleSlot={toggleSlot}
           onEdit={openEdit}
           onCancel={confirmCancel}
           cancellingId={cancellingId}
@@ -369,7 +501,7 @@ export default function AdminCompetitionPaidTimesScreen(props) {
       );
     }
 
-    return paidTimes.filteredItems.map(function (item) {
+    return renderBandedSections(bandedPaidTimes, function (item) {
       return (
         <PaidTimeListItemCard
           key={String(item.paidTimeRequestId)}
@@ -440,18 +572,22 @@ export default function AdminCompetitionPaidTimesScreen(props) {
           </Text>
 
           <View style={styles.summaryRow}>
-            {renderSummaryBox("סה״כ בקשות", paidTimes.items.length, "all")}
+            {renderSummaryBox(
+              "סה״כ בקשות",
+              paidTimes.filteredItems.length,
+              "all",
+            )}
             {renderSummaryBox(
               "שובצו",
-              paidTimes.items.filter(function (item) {
-                return item.isAssigned;
+              paidTimes.filteredItems.filter(function (item) {
+                return item.isAssigned && item.assignedSlotIsPublished;
               }).length,
               "assigned"
             )}
             {renderSummaryBox(
               "טרם שובצו",
-              paidTimes.items.filter(function (item) {
-                return !item.isAssigned;
+              paidTimes.filteredItems.filter(function (item) {
+                return !(item.isAssigned && item.assignedSlotIsPublished);
               }).length,
               "pending"
             )}
@@ -460,8 +596,9 @@ export default function AdminCompetitionPaidTimesScreen(props) {
 
         {availability.paidTimes.isEnabled ? (
           <AddPaidTimeButton
-            navigation={props.navigation}
-            competitionId={activeCompetition?.competitionId}
+            paidTimesStepAvailability={availability.paidTimes}
+            isRegistrationStatusLoading={isRegistrationStatusLoading}
+            onCreated={paidTimes.handleRefresh}
           />
         ) : (
           <RegistrationStepNotice
@@ -473,29 +610,6 @@ export default function AdminCompetitionPaidTimesScreen(props) {
             textStyle={styles.errorText}
           />
         )}
-
-        <Pressable
-          onPress={function () {
-            setPublishedSlotsOpen(true);
-          }}
-          style={{
-            flexDirection: "row-reverse",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "#FFFFFF",
-            borderWidth: 1,
-            borderColor: "#7B5A4D",
-            paddingVertical: 10,
-            paddingHorizontal: 14,
-            borderRadius: 10,
-            gap: 8,
-            marginBottom: 12,
-          }}
-        >
-          <Text style={{ color: "#7B5A4D", fontWeight: "700", fontSize: 14 }}>
-            כל הסלוטים שפורסמו
-          </Text>
-        </Pressable>
 
         <View style={styles.searchCard}>
           <Text style={styles.fieldLabel}>חיפוש</Text>
@@ -516,9 +630,7 @@ export default function AdminCompetitionPaidTimesScreen(props) {
               setShowFilters(!showFilters);
             }}
           >
-            <Text style={styles.filterToggleText}>
-              {showFilters ? "הסתר סינונים" : "הצג סינונים"}
-            </Text>
+            <Text style={styles.filterToggleText}>סינון</Text>
             <Text style={styles.filterToggleIcon}>
               {showFilters ? "▲" : "▼"}
             </Text>
@@ -620,11 +732,11 @@ export default function AdminCompetitionPaidTimesScreen(props) {
       </ScrollView>
 
       {editingItem ? (
-        <PaidTimeEditModal
-          item={editingItem}
-          competitionId={activeCompetition?.competitionId}
-          ranchId={activeRole?.ranchId}
-          roleId={activeRole?.roleId}
+        <PaidTimeCreateModal
+          visible={true}
+          editPaidTimeRequestId={editingItem.paidTimeRequestId}
+          paidTimesStepAvailability={availability.paidTimes}
+          isRegistrationStatusLoading={isRegistrationStatusLoading}
           onClose={closeEdit}
           onSaved={paidTimes.handleRefresh}
         />
@@ -641,14 +753,6 @@ export default function AdminCompetitionPaidTimesScreen(props) {
         />
       ) : null}
 
-      <PublishedSlotsModal
-        isOpen={publishedSlotsOpen}
-        competitionId={activeCompetition?.competitionId}
-        ranchId={activeRole?.ranchId}
-        onClose={function () {
-          setPublishedSlotsOpen(false);
-        }}
-      />
     </MobileScreenLayout>
   );
 }

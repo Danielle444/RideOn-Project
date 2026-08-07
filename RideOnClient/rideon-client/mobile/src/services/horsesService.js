@@ -70,7 +70,9 @@ function uploadHealthCertificateFile(params) {
     fileType: params.file?.mimeType,
   });
 
-  return axios.post("/Horses/health-certificates/upload", formData);
+  return axios.post("/Horses/health-certificates/upload", formData, {
+    timeout: 60000,
+  });
 }
 
 export {

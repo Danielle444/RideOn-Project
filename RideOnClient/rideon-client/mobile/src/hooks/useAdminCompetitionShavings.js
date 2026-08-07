@@ -70,6 +70,28 @@ function normalizeShavingsOrder(item) {
   };
 }
 
+// CAP-7: same shape as useAdminCompetitionStallBookings.js's
+// normalizeCompetitionSummary - both read the same
+// getCompetitionInvitationDetails response, this hook just wasn't pulling
+// competition.competitionStartDate/EndDate out of it before.
+function normalizeCompetitionSummary(item) {
+  if (!item) {
+    return {
+      competitionStartDate: "",
+      competitionEndDate: "",
+    };
+  }
+
+  return {
+    competitionStartDate: normalizeDateString(
+      item.competitionStartDate || item.CompetitionStartDate,
+    ),
+    competitionEndDate: normalizeDateString(
+      item.competitionEndDate || item.CompetitionEndDate,
+    ),
+  };
+}
+
 function normalizePriceCatalogItem(item, categoryName) {
   if (!item) {
     return null;
@@ -183,10 +205,18 @@ export default function useAdminCompetitionShavings(params) {
   var competitionId = params.competitionId;
   var isActiveTab = params.isActiveTab;
 
-  var [loading, setLoading] = useState(false);
+  // Start loading=true so the first frame after this tab activates shows a
+  // spinner, not the empty "לא נמצא מחיר פעיל / לא נמצאו סוסים" branch, which
+  // would otherwise flash before loadData's setLoading(true) runs. The guard in
+  // loadData settles this back to false when there is no valid context to fetch.
+  var [loading, setLoading] = useState(true);
   var [screenError, setScreenError] = useState("");
   var [isSaving, setIsSaving] = useState(false);
 
+  var [competitionSummary, setCompetitionSummary] = useState({
+    competitionStartDate: "",
+    competitionEndDate: "",
+  });
   var [availableStalls, setAvailableStalls] = useState([]);
   var [existingOrders, setExistingOrders] = useState([]);
   var [priceCatalogItems, setPriceCatalogItems] = useState([]);
@@ -204,6 +234,9 @@ export default function useAdminCompetitionShavings(params) {
   var loadData = useCallback(
     async function () {
       if (!competitionId || !activeRole || !activeRole.ranchId) {
+        // Nothing to fetch: settle the initial loading=true so the tab shows its
+        // empty state rather than a stuck spinner.
+        setLoading(false);
         return;
       }
 
@@ -227,6 +260,10 @@ export default function useAdminCompetitionShavings(params) {
         var invitationResponse = results[0];
         var stallsResponse = results[1];
         var ordersResponse = results[2];
+
+        setCompetitionSummary(
+          normalizeCompetitionSummary(invitationResponse?.data?.competition),
+        );
 
         var shavingsPrices = extractShavingsPriceItems(invitationResponse);
 
@@ -457,6 +494,33 @@ export default function useAdminCompetitionShavings(params) {
     [selectedStalls],
   );
 
+  // CAP-7: highlights the competition's own days on the "later" delivery
+  // date picker, same as the stall-booking date fields
+  // (useAdminCompetitionStallBookings.js's highlightedCompetitionRange).
+  // orderedDates (days that already have a stall booked) is deliberately
+  // NOT threaded through here - every stall in availableStalls already has
+  // a booking by definition, so that concept doesn't distinguish anything
+  // on this particular picker.
+  var highlightedCompetitionRange = useMemo(
+    function () {
+      if (
+        !competitionSummary.competitionStartDate ||
+        !competitionSummary.competitionEndDate
+      ) {
+        return null;
+      }
+
+      return {
+        start: competitionSummary.competitionStartDate,
+        end: competitionSummary.competitionEndDate,
+      };
+    },
+    [
+      competitionSummary.competitionStartDate,
+      competitionSummary.competitionEndDate,
+    ],
+  );
+
   var isNowDeliveryAvailable = useMemo(
     function () {
       if (!earliestDeliveryDate) {
@@ -539,7 +603,13 @@ export default function useAdminCompetitionShavings(params) {
         competitionId: competitionId,
         orderedBySystemUserId: user.personId,
         priceCatalogId: selectedPriceCatalog.priceCatalogId,
-        ranchId: activeRole.ranchId,
+        // Ranch-model fix: the server derives the requesting ranch from the
+        // selected stallBookingIds themselves and the host ranch from
+        // competitionId -- it never trusts a client-supplied ranchId for
+        // this endpoint, so it is intentionally not sent. The stall picker
+        // above is already scoped to activeRole.ranchId (one requesting
+        // ranch at a time), so a mixed-ranch selection cannot occur through
+        // this screen; server-side validation remains authoritative.
         notes: notes ? notes.trim() : null,
         requestedDeliveryTime: getRequestedDeliveryTime(),
         stalls: selectedStalls.map(function (item) {
@@ -622,6 +692,7 @@ export default function useAdminCompetitionShavings(params) {
     setDeliveryTime: setDeliveryTime,
     earliestDeliveryDate: earliestDeliveryDate,
     isNowDeliveryAvailable: isNowDeliveryAvailable,
+    highlightedCompetitionRange: highlightedCompetitionRange,
 
     quantityMode: quantityMode,
     setQuantityMode: setQuantityMode,

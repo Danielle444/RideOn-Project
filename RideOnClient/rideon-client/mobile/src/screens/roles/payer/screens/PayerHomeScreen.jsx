@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -16,87 +17,11 @@ import { getPayerMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { getPayerBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import homeScreenStyles from "../../../../styles/homeScreenStyles";
 import HomeCompetitionCard from "../../../../components/home/HomeCompetitionCard";
-import HomeShortcutGrid from "../../../../components/home/HomeShortcutGrid";
 import { getMobilePayerCompetitionsBoard } from "../../../../services/competitionService";
 import { canPayerEnterCompetition } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
 import { useCompetition } from "../../../../context/CompetitionContext";
-
-// Effective statuses (Hebrew) as returned by the backend.
-var STATUS_FUTURE = "עתידית";
-var STATUS_ACTIVE = "פעילה";
-var STATUS_CURRENT = "כעת";
-var STATUS_FINISHED = "הסתיימה";
-
-var RECENTLY_FINISHED_DAYS = 7;
-var UPCOMING_SOON_DAYS = 30;
-var HOME_MAX_ITEMS = 3;
-
-function startOfDay(value) {
-  var date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function daysBetween(fromDate, toDate) {
-  return Math.round((toDate.getTime() - fromDate.getTime()) / 86400000);
-}
-
-// Home teaser: enrolled competitions that are still live or finished within the
-// last week, plus ranch competitions starting within the next month.
-function selectHomeCompetitions(items) {
-  var source = Array.isArray(items) ? items : [];
-  var today = startOfDay(new Date());
-
-  var selected = source.filter(function (item) {
-    if (!item) {
-      return false;
-    }
-
-    var status = item.competitionStatus;
-    var startDate = startOfDay(item.competitionStartDate);
-    var endDate = startOfDay(item.competitionEndDate);
-
-    if (item.hasParticipated) {
-      if (
-        status === STATUS_ACTIVE ||
-        status === STATUS_CURRENT ||
-        status === STATUS_FUTURE
-      ) {
-        return true;
-      }
-
-      if (status === STATUS_FINISHED && endDate) {
-        return daysBetween(endDate, today) <= RECENTLY_FINISHED_DAYS;
-      }
-
-      return false;
-    }
-
-    if (status === STATUS_FUTURE && startDate) {
-      var daysUntilStart = daysBetween(today, startDate);
-      return daysUntilStart >= 0 && daysUntilStart <= UPCOMING_SOON_DAYS;
-    }
-
-    return false;
-  });
-
-  return selected
-    .sort(function (a, b) {
-      if (Boolean(a.hasParticipated) !== Boolean(b.hasParticipated)) {
-        return a.hasParticipated ? -1 : 1;
-      }
-
-      return String(a.competitionStartDate || "").localeCompare(
-        String(b.competitionStartDate || ""),
-      );
-    })
-    .slice(0, HOME_MAX_ITEMS);
-}
+import { selectHomeCompetitions } from "../utils/selectPayerHomeCompetitions";
+import { withTransientRetry } from "../../../../utils/transientRequestRetry";
 
 export default function PayerHomeScreen(props) {
   var userContext = useUser();
@@ -107,6 +32,7 @@ export default function PayerHomeScreen(props) {
 
   var [competitions, setCompetitions] = useState([]);
   var [loading, setLoading] = useState(false);
+  var [refreshing, setRefreshing] = useState(false);
 
   var competitionContext = useCompetition();
 
@@ -125,7 +51,9 @@ export default function PayerHomeScreen(props) {
     try {
       setLoading(true);
 
-      var response = await getMobilePayerCompetitionsBoard(activeRole.ranchId);
+      var response = await withTransientRetry(function () {
+        return getMobilePayerCompetitionsBoard(activeRole.ranchId);
+      });
       var items = Array.isArray(response.data) ? response.data : [];
       setCompetitions(selectHomeCompetitions(items));
     } catch (error) {
@@ -137,6 +65,15 @@ export default function PayerHomeScreen(props) {
     }
   }
 
+  async function handleRefresh() {
+    try {
+      setRefreshing(true);
+      await loadHomeCompetitions();
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   async function handleLogout() {
     if (props.onLogout) {
       await props.onLogout();
@@ -144,11 +81,6 @@ export default function PayerHomeScreen(props) {
   }
 
   function handleMenuPress(item) {
-    if (item.screen === "PayerProfile") {
-      Alert.alert("בהמשך", "מסך הפרופיל של המשלם יחובר בהמשך");
-      return;
-    }
-
     props.navigation.navigate(item.screen);
   }
 
@@ -189,44 +121,6 @@ export default function PayerHomeScreen(props) {
     ];
   }
 
-  var shortcutItems = useMemo(
-    function () {
-      return [
-        {
-          key: "board",
-          label: "לוח התחרויות",
-          icon: "trophy-outline",
-          onPress: function () {
-            props.navigation.navigate("PayerCompetitionsBoard");
-          },
-        },
-        {
-          key: "profile",
-          label: "פרופיל",
-          icon: "person-outline",
-          onPress: function () {
-            Alert.alert("בהמשך", "מסך הפרופיל של המשלם יחובר בהמשך");
-          },
-        },
-        {
-          key: "switch-role",
-          label: "החלפת פרופיל",
-          icon: "sync-outline",
-          onPress: function () {
-            props.navigation.replace("SelectActiveRole");
-          },
-        },
-        {
-          key: "refresh",
-          label: "רענון נתונים",
-          icon: "refresh-outline",
-          onPress: loadHomeCompetitions,
-        },
-      ];
-    },
-    [props.navigation, activeRole],
-  );
-
   var userName = (
     (user && ((user.firstName || "") + " " + (user.lastName || "")).trim()) ||
     ""
@@ -259,6 +153,14 @@ export default function PayerHomeScreen(props) {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={homeScreenStyles.pageContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={["#8B6352"]}
+            tintColor="#8B6352"
+          />
+        }
       >
         <View style={homeScreenStyles.welcomeCard}>
           <Text style={homeScreenStyles.welcomeTitle}>
@@ -319,11 +221,6 @@ export default function PayerHomeScreen(props) {
               );
             })
           )}
-        </View>
-
-        <View style={homeScreenStyles.sectionCard}>
-          <Text style={homeScreenStyles.sectionTitle}>קיצורים</Text>
-          <HomeShortcutGrid items={shortcutItems} />
         </View>
       </ScrollView>
     </MobileScreenLayout>

@@ -32,6 +32,11 @@ var FINANCIAL_PROJECTION_COPY = {
     },
   },
 
+  // Shown as the hint on the Actual/Comparison tabs while the competition data is still loading,
+  // instead of the "unavailableHint" locked message -- availability is not yet known during the
+  // fetch, so the tab must not claim it is locked/waiting for registration to close.
+  tabLoadingHint: "טוען נתונים...",
+
   projectionTitle: "תחזית הכנסות",
   // Shown in a highlighted band under the enlarged title, two lines: first the warning (this is
   // an estimate, not actual income), then the methodology (range = one standard deviation, gross
@@ -97,6 +102,10 @@ var FINANCIAL_PROJECTION_COPY = {
       : count + " מקצים ללא חיזוי כניסות אינם נכללים בתחזית.";
   },
 
+  // Shown while the projection data is still being fetched -- so the panel never shows the
+  // noPredictions empty state (below) before the fetch resolves.
+  loading: "טוען תחזית הכנסות...",
+
   noPredictions:
     "עדיין אין חיזוי כניסות למקצי תחרות זו, ולכן לא ניתן להציג תחזית הכנסות.",
 
@@ -113,6 +122,15 @@ var FINANCIAL_PROJECTION_COPY = {
   actualBookingsPending:
     "הכנסות מתאים ומנסורת יחושבו מהזמנות בפועל (בפיתוח).",
   actualUnavailable: "התצוגה תהיה זמינה עם סגירת ההרשמה.",
+
+  // Lifecycle caption shown at the top of the Actual body itself -- distinct from the tab's own
+  // hint/unavailableHint above, which describe tab AVAILABILITY, not how settled the figures
+  // under it are. At most one renders at a time (resolution order: registration open -> live ->
+  // none once the competition has ended, see isCompetitionEnded).
+  actualBands: {
+    registrationOpen: "נתוני אמת — צפויים לשינויים רבים עד תום ההרשמה",
+    live: "נתוני אמת — עדיין עשויים להשתנות מעט עד תום התחרות",
+  },
 
   // Tab 3 (projection vs actual). A reliability scorecard about the FORECAST, not the
   // competition -- the same distinction the planned-vs-actual entries panel makes.

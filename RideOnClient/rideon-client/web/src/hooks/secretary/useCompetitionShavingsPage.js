@@ -1,18 +1,21 @@
 // Secretary shavings page hook — Spec 2 (component-structure.md).
 //
 // Owns everything: data assembly (R1 rollup + per-ranch R2 loop), derived status tagging,
-// URL-bound grouping/filters, SLA needs-attention, and the add-order modal surface. The page
-// stays presentational.
+// URL-bound grouping/filters, due-date needs-attention (overdue/due-today, Asia/Jerusalem — see
+// shavingsDueDate.utils.js), and the add-order modal surface. The page stays presentational.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { getCompetitionSummaryShavingsDetails } from "../../services/competitionSummaryService";
-import { getShavingsOrdersForCompetitionAndRanch } from "../../services/shavingsOrderService";
+import {
+  getShavingsOrdersForCompetitionAndRanch,
+  secretaryCancelShavingsOrder,
+} from "../../services/shavingsOrderService";
 import {
   deriveShavingsStatus,
   getValue,
 } from "../../utils/shavingsStatus.utils";
-import { isDelayed } from "../../utils/shavingsSla.utils";
+import { groupActionRequiredOrders } from "../../utils/shavingsDueDate.utils";
 import {
   groupByRanch,
   groupByStatus,
@@ -38,6 +41,8 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
   const [orders, setOrders] = useState([]);
   const [ranchRollup, setRanchRollup] = useState([]);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [cancellingId, setCancellingId] = useState(null);
+  const [cancelError, setCancelError] = useState(null);
 
   // ---- URL state (CAP-2) ----
   const rawGroup = searchParams.get("group");
@@ -125,7 +130,10 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
         setRanchRollup(rollup);
 
         // Enumerate participating ranches from the rollup; loop R2 per ranch in parallel.
-        const perRanch = await Promise.all(
+        // allSettled (not all): a single ranch's request failing must not blank the whole
+        // page. Render every ranch that loaded and drop the ones that errored, so one bad
+        // response degrades gracefully instead of bouncing the secretary off the screen.
+        const perRanchSettled = await Promise.allSettled(
           rollup.map(function (row) {
             const bookingRanchId = rollupRanchId(row);
 
@@ -148,8 +156,12 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
         );
 
         setOrders(
-          perRanch.reduce(function (all, list) {
-            return all.concat(list);
+          perRanchSettled.reduce(function (all, settled) {
+            if (settled.status === "fulfilled") {
+              return all.concat(settled.value);
+            }
+
+            return all;
           }, []),
         );
       } catch (err) {
@@ -202,13 +214,9 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
     [group, filteredOrders, ranchRollup],
   );
 
-  const needsAttention = useMemo(
+  const needsAttentionGroups = useMemo(
     function () {
-      const now = Date.now();
-
-      return orders.filter(function (order) {
-        return isDelayed(order, now);
-      });
+      return groupActionRequiredOrders(orders);
     },
     [orders],
   );
@@ -262,6 +270,57 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
     [reload],
   );
 
+  // Standalone shavings cancellation, HostSecretary-direct: mirrors
+  // useCompetitionStallsPage.js's handleDeleteStallBooking shape exactly
+  // (confirm -> call -> reload). ranchId here is the participating/booking
+  // ranch the order itself belongs to (order.participatingRanchId, stamped
+  // onto every row during the R2 per-ranch loop above) — NOT the page's own
+  // ranchId, since a host secretary's shavings list spans every
+  // participating guest ranch, not just her own.
+  const handleCancelOrder = useCallback(
+    async function (order) {
+      const shavingsOrderId = getValue(
+        order,
+        "shavingsOrderId",
+        "ShavingsOrderId",
+        null,
+      );
+      const orderRanchId = getValue(
+        order,
+        "participatingRanchId",
+        "ParticipatingRanchId",
+        ranchId,
+      );
+
+      if (!shavingsOrderId) {
+        return null;
+      }
+
+      const confirmed = window.confirm(
+        "האם לבטל את הזמנת הנסורת? פעולה זו תעדכן גם את החיובים.",
+      );
+
+      if (!confirmed) {
+        return null;
+      }
+
+      setCancelError(null);
+      setCancellingId(shavingsOrderId);
+
+      try {
+        await secretaryCancelShavingsOrder(shavingsOrderId, orderRanchId);
+        await reload();
+        return true;
+      } catch (err) {
+        setCancelError(err);
+        return false;
+      } finally {
+        setCancellingId(null);
+      }
+    },
+    [ranchId, reload],
+  );
+
   return {
     loading: loading,
     error: error,
@@ -279,12 +338,18 @@ export default function useCompetitionShavingsPage(competitionId, ranchId) {
     setFilterStatus: setFilterStatus,
 
     groups: groups,
-    needsAttention: needsAttention,
+    needsAttentionOverdue: needsAttentionGroups.overdue,
+    needsAttentionDueToday: needsAttentionGroups.dueToday,
 
     ranchOptions: ranchOptions,
     isAddOpen: isAddOpen,
     openAdd: openAdd,
     closeAdd: closeAdd,
     handleOrderCreated: handleOrderCreated,
+
+    cancellingId: cancellingId,
+    cancelError: cancelError,
+    cancelErrorMessage: getErrorMessage(cancelError, "שגיאה בביטול הזמנת הנסורת"),
+    handleCancelOrder: handleCancelOrder,
   };
 }

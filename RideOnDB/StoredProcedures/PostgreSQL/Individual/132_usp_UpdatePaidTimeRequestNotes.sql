@@ -1,29 +1,65 @@
--- עריכת בקשת פייד-טיים על-ידי האדמין שיצר אותה.
--- כללי גישה (גזורים בתוך הפונקציה):
---   1) הבקשה חייבת להיות שייכת ל-p_OrderedBySystemUserId.
---   2) שולמה (sr.paymentid לא NULL) -> כל העריכות שכאן חסומות.
---      (החלפת סוס לאחר תשלום מטופלת ב-USP נפרד עתידי - לא במסך זה כרגע.)
---   3) בוטלה (status='Cancelled') -> חסום הכל.
---   4) נותרו <= 24h עד תחילת הפייד-טיים -> שינוי PriceCatalogId חסום
---      (לא ניתן לשנות סוג פייד-טיים בטווח 24h - משפיע על מחיר).
---   5) כל פרמטר אופציונלי NULL = "אל תשנה". מחרוזת ריקה ב-p_Notes = "נקה".
---      הסיגנל לעריכת notes: לא NULL (כלומר באופן מפורש - גם '' לניקוי).
---   6) שינוי PriceCatalogId מעדכן גם את bill.amounttopay (דלתא בין מחירים).
---   7) שינוי RequestedCompSlotId חייב להיות סלוט מאותה תחרות.
-DROP FUNCTION IF EXISTS usp_updatepaidtimerequestnotes(INTEGER, INTEGER, TEXT);
-DROP FUNCTION IF EXISTS usp_updatepaidtimerequest(INTEGER, INTEGER, TEXT, INTEGER, INTEGER);
+-- ============================================================================
+-- usp_UpdatePaidTimeRequest - edit notes/price-type/requested-slot on a paid
+-- time request.
+-- ============================================================================
+-- NOT YET APPLIED LIVE. Prepared for review; apply only after explicit
+-- sign-off, via apply_migration, then re-read live as proof it landed (per
+-- the standing DB-write protocol).
+--
+-- DRIFT NOTE (2026-08-07): the previous committed version of this file was
+-- STALE relative to live - it was missing v_hostranchid and the host-ranch
+-- price-catalog validation block ("New price catalog item does not belong to
+-- the competition host ranch"), which IS live today (confirmed via
+-- pg_get_functiondef). This file has been reconciled to the exact live body
+-- FIRST, with only the authorization block changed on top of that - never
+-- hand-reconstructed. Every comment/branch below the authorization block is
+-- copied verbatim from the live definition.
+--
+-- AUTHORIZATION CHANGE (2026-08-07, Admin Paid-Time Unify): the previous
+-- authorization check required the CALLER to equal the request's original
+-- creator (sr.orderedbysystemuserid = p_OrderedBySystemUserId). Confirmed a
+-- real product bug: AdminCompetitionPayerAccountScreen shows a payer's paid
+-- time items regardless of which admin created them (proc 212 scopes by
+-- payerpersonid, not creator), so any admin who didn't personally create a
+-- colleague's request could never edit it through this proc, even with a
+-- legitimate ranch-admin role.
+--
+-- New model, approved by Oren 2026-08-07: derive the request's TRUE ranch
+-- server-side from paidtimerequest -> servicerequest.horseid -> horse.ranchid
+-- (the SAME scoping convention already used by usp_insertpaidtimerequest,
+-- usp_getmypaidtimerequestsforcompetition, usp_getpayercompetitionaccount,
+-- and the new usp_getpaidtimerequestforedit) - NEVER a client-supplied
+-- ranchid, since this proc's own signature has no ranch parameter to trust.
+-- Require the caller (p_OrderedBySystemUserId - always the calling admin's
+-- own personId, server-derived from JWT claims, never client-set - the
+-- parameter is NOT renamed here to avoid a signature change) to hold an
+-- Approved 'אדמין חווה' personranchrole at that derived ranch. This is the
+-- exact pattern already live in usp_admineditstallbooking /
+-- usp_admincancelstallbooking / usp_admineditentry / usp_admincancelentry
+-- (verified live, all four identical shape) - not a new authorization
+-- design, a reuse of an already-shipped one.
+--
+-- sr.orderedbysystemuserid (the creator) is read ONLY for the not-found
+-- null-check below and is NEVER compared for authorization and NEVER
+-- rewritten by this proc - it remains purely historical/audit data.
+--
+-- Explicitly NOT widened to RanchWorker, Payer, an admin of an unrelated
+-- ranch, or any other authenticated caller - the role check requires
+-- 'אדמין חווה' specifically, Approved specifically, at the derived ranch
+-- specifically.
+--
+-- Signature and return type UNCHANGED (still 5 params -> void) - this is a
+-- body-only CREATE OR REPLACE, no DROP required.
+-- ============================================================================
 
-CREATE OR REPLACE FUNCTION usp_UpdatePaidTimeRequest(
-    p_PaidTimeRequestId     INTEGER,
-    p_OrderedBySystemUserId INTEGER,
-    p_Notes                 TEXT,     -- NULL = no change, '' = clear
-    p_PriceCatalogId        INTEGER,  -- NULL = no change
-    p_RequestedCompSlotId   INTEGER   -- NULL = no change
-)
-RETURNS VOID
-LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION public.usp_updatepaidtimerequest(p_paidtimerequestid integer, p_orderedbysystemuserid integer, p_notes text, p_pricecatalogid integer, p_requestedcompslotid integer)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
 DECLARE
     v_ordered_by         INTEGER;
+    v_horseid            INTEGER;
+    v_horse_ranchid      INTEGER;
     v_paymentid          INTEGER;
     v_status             TEXT;
     v_billid             INTEGER;
@@ -38,9 +74,11 @@ DECLARE
     v_new_slot_competition INTEGER;
     v_notes_provided     BOOLEAN := (p_Notes IS NOT NULL);
     v_competitionenddate  DATE;
+    v_hostranchid         INTEGER;
 BEGIN
     SELECT
         sr.orderedbysystemuserid,
+        sr.horseid,
         sr.paymentid,
         ptr.status,
         sr.billid,
@@ -53,6 +91,7 @@ BEGIN
         req_slot.competitionid
     INTO
         v_ordered_by,
+        v_horseid,
         v_paymentid,
         v_status,
         v_billid,
@@ -70,8 +109,29 @@ BEGIN
         RAISE EXCEPTION 'Paid time request not found';
     END IF;
 
-    IF v_ordered_by <> p_OrderedBySystemUserId THEN
-        RAISE EXCEPTION 'Permission denied: not the request owner';
+    -- מזהה-החווה הסמכותי של הבקשה נגזר מחוות הסוס (לא נשלח מהלקוח) - אותו
+    -- שדה שכבר משמש לסקופ יצירה/קריאה (usp_insertpaidtimerequest,
+    -- usp_getmypaidtimerequestsforcompetition, usp_getpayercompetitionaccount,
+    -- usp_getpaidtimerequestforedit).
+    SELECT h.ranchid
+    INTO v_horse_ranchid
+    FROM public.horse h
+    WHERE h.horseid = v_horseid;
+
+    -- הרשאת עריכה: כל אדמין חווה מאושר בחוות הבקשה - לא רק היוצר המקורי.
+    -- p_OrderedBySystemUserId הוא תמיד ה-personId של הקורא בפועל (claims),
+    -- לא ערך מהלקוח. sr.orderedbysystemuserid נשאר היסטורי/ביקורת בלבד ואינו
+    -- נכתב מחדש כאן.
+    IF NOT EXISTS (
+        SELECT 1
+        FROM public.personranchrole prr
+        JOIN public.role r ON r.roleid = prr.roleid
+        WHERE prr.personid = p_OrderedBySystemUserId
+          AND prr.ranchid = v_horse_ranchid
+          AND prr.rolestatus = 'Approved'
+          AND r.rolename = 'אדמין חווה'
+    ) THEN
+        RAISE EXCEPTION 'Caller is not an approved ranch admin for this request''s ranch' USING ERRCODE = 'RN001';
     END IF;
 
     IF v_status = 'Cancelled' THEN
@@ -84,8 +144,11 @@ BEGIN
 
     -- מועד סיום התחרות (מזהה-התחרות קבוע, נגזר פעם אחת כאן; NOT NULL בסכמה).
     -- נקרא לשני הענפים למטה - הבדיקה עצמה נשארת ממוקדת-ענף (לא בדיקה גורפת).
-    SELECT c.competitionenddate
-    INTO v_competitionenddate
+    -- hostranchid נוסף לאותה שאילתה (עמודה אחת נוספת) כדי לבסס את בדיקת
+    -- ranchid-of-price-catalog בענף שינוי המחיר למטה על חוות המארחת, לא על
+    -- ranchid כלשהו אחר.
+    SELECT c.competitionenddate, c.hostranchid
+    INTO v_competitionenddate, v_hostranchid
     FROM public.competition c
     WHERE c.competitionid = v_current_competition;
 
@@ -112,6 +175,14 @@ BEGIN
 
         IF v_new_price IS NULL THEN
             RAISE EXCEPTION 'New price catalog item not found or inactive';
+        END IF;
+
+        -- New: pricing is host-ranch-uniform (same rule as creation). The
+        -- new price catalog row must belong to the competition's host
+        -- ranch. v_catalog_ranchid was already being fetched above; it was
+        -- simply never checked before this fix.
+        IF v_catalog_ranchid <> v_hostranchid THEN
+            RAISE EXCEPTION 'New price catalog item does not belong to the competition host ranch';
         END IF;
 
         SELECT pc.itemprice
@@ -168,4 +239,4 @@ BEGIN
         WHERE paidtimerequestid = p_PaidTimeRequestId;
     END IF;
 END;
-$$;
+$function$
