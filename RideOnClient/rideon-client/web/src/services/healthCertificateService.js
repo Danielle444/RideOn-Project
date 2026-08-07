@@ -9,7 +9,7 @@ function getAuthHeaders() {
 }
 
 function getHealthCertificates(competitionId, ranchId) {
-  return axios.get(`${API}/Horses/health-certificates`, {
+  return axios.get(`${API}/Horses/health-certificates/hosted`, {
     ...getAuthHeaders(),
     params: {
       competitionId,
