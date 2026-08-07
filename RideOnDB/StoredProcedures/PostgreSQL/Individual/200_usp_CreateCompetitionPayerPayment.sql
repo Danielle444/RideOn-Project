@@ -40,6 +40,46 @@
 -- deliberately not called from here, to avoid introducing a charge-then-
 -- credit lock ordering against 193/199/223/225's own credit-then-charge
 -- convention. Releasing coverage remains a separate, explicit action.
+--
+-- 2026-08-07 (fix/entry-fine-payment-integrity): PAYMENT-INTEGRITY FIX for the
+-- fine-presentation work. Locked business rule: for a given ChargeOwner, an
+-- Entry base charge (categorykey='classes', sourcetype='Entry', sourceid=
+-- EntryId) and its Entry-created late-entry fine (categorykey='fine',
+-- sourcetype='Fine', sourceid=EntryId - the SAME sourceid, proven live) are
+-- ONE inseparable payable business unit. Before this fix, the existing
+-- related_entry_charges CTE only expanded a selection to OTHER rows sharing
+-- the identical categorykey/sourcetype (a same-key-duplicate safety net,
+-- unrelated to fines) - a fine's categorykey='fine' never matched a base
+-- charge's categorykey='classes' there, so selecting only the base (or only
+-- the fine) could settle one half while leaving the other Open. Two new CTEs,
+-- symmetric mirror images of each other, close this: related_fine_for_
+-- selected_entry (selected = base -> pulls the matching Open Entry-created
+-- fine(s), same competitionid/paidbypersonid/chargeowner/sourceid) and
+-- related_entry_for_selected_fine (selected = fine -> pulls the matching Open
+-- base charge, same predicate set, mirrored). Both are added to the same
+-- final UNION (not UNION ALL) that already deduplicates selected_base against
+-- related_entry_charges, so explicitly selecting both base and fine still
+-- settles exactly once. ChargeOwner isolation is inherent in the join
+-- predicate (related/selected chargeowner equality), not a separate check -
+-- a Federation charge sharing the same sourceid as a selected Organizer
+-- charge cannot satisfy the join. Multiple Entry-created fines per entry
+-- (structurally legal - no unique constraint on billcharge beyond its own PK,
+-- confirmed live, though no live row exercises it yet) are handled for free:
+-- both new CTEs are plain JOINs, not LIMIT 1 lookups, so every matching Open
+-- fine row is pulled in. An already-Paid or already-batched component never
+-- satisfies either CTE's Open/unbatched join predicate, so it is silently
+-- left alone rather than re-processed - no special-case branch needed.
+-- ChangeEntryRequest fines (categorykey='classes', sourcetype='Fine',
+-- sourceid=ChangeEntryRequestId) are explicitly OUT OF SCOPE for this fix and
+-- structurally cannot match either new CTE's shape (categorykey='fine' AND
+-- sourcetype='Fine' for the fine side, categorykey='classes' AND
+-- sourcetype='Entry' for the base side) - selecting one today behaves exactly
+-- as before this change. Verified via a rollback-only live smoke test
+-- (BEGIN ... temporary CREATE OR REPLACE ... fabricated fixtures ... 12
+-- scenarios ... RAISE EXCEPTION to force rollback ... zero residual rows in
+-- billcharge/entry/servicerequest/bill/paymentbatch/payment, original proc
+-- definition/owner/ACL confirmed restored byte-for-byte). No signature
+-- change - same CREATE OR REPLACE as every prior revision of this proc.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_createcompetitionpayerpayment(p_competitionid integer, p_payerpersonid integer, p_enteredbysystemuserid integer, p_chargeowner text, p_invoicenumber text, p_selectedcharges jsonb, p_paymentmethods jsonb, p_notes text DEFAULT NULL::text)
@@ -138,6 +178,42 @@ begin
            and related.paymentbatchid is null
         where selected.categorykey = 'classes'
           and selected.sourcetype = 'Entry'
+    ),
+    -- Payment-integrity fix (2026-08-07): selected = Entry-created fine's
+    -- base Entry charge -> pull the matching Open Entry-created fine(s) for
+    -- the same entry, same owner. ChangeEntryRequest fines (categorykey=
+    -- 'classes') never match this shape.
+    related_fine_for_selected_entry as (
+        select f.billchargeid
+        from selected_base selected
+        inner join public.billcharge f
+            on f.competitionid = selected.competitionid
+           and f.paidbypersonid = selected.paidbypersonid
+           and f.chargeowner = selected.chargeowner
+           and f.categorykey = 'fine'
+           and f.sourcetype = 'Fine'
+           and f.sourceid = selected.sourceid
+           and f.chargestatus = 'Open'
+           and f.paymentbatchid is null
+        where selected.categorykey = 'classes'
+          and selected.sourcetype = 'Entry'
+    ),
+    -- Mirror image of the CTE above: selected = Entry-created fine -> pull
+    -- the matching Open base Entry charge for the same entry, same owner.
+    related_entry_for_selected_fine as (
+        select e.billchargeid
+        from selected_base selected
+        inner join public.billcharge e
+            on e.competitionid = selected.competitionid
+           and e.paidbypersonid = selected.paidbypersonid
+           and e.chargeowner = selected.chargeowner
+           and e.categorykey = 'classes'
+           and e.sourcetype = 'Entry'
+           and e.sourceid = selected.sourceid
+           and e.chargestatus = 'Open'
+           and e.paymentbatchid is null
+        where selected.categorykey = 'fine'
+          and selected.sourcetype = 'Fine'
     )
     select billchargeid
     from selected_base
@@ -145,7 +221,17 @@ begin
     union
 
     select billchargeid
-    from related_entry_charges;
+    from related_entry_charges
+
+    union
+
+    select billchargeid
+    from related_fine_for_selected_entry
+
+    union
+
+    select billchargeid
+    from related_entry_for_selected_fine;
 
     if not exists (
         select 1
