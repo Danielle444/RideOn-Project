@@ -1,6 +1,13 @@
--- 254_usp_GetPaidTimeCandidatesForCompetition.sql
+-- 257_usp_GetPaidTimeCandidatesForCompetition.sql
 --
 -- NEW (HostSecretary Paid-Time creation, Slice B, 2026-08-07). Read-only.
+-- Repo file renumbered 254 -> 257 (2026-08-07): 252-254 were claimed by
+-- the Managed-Payer feature (usp_AnswerManagedPayerRequest,
+-- usp_RequestManagedPayer, usp_GetManagingAdminsForPayer), and 255-256 by
+-- this same audit's Slice A branch, both merging/landing after this
+-- branch was created. Repo filename/number only -- the live function
+-- name, signature, and body below are unchanged from what was already
+-- deployed and verified live under this same function name.
 --
 -- Competition-wide sibling of the existing usp_getpaidtimecandidatesbyranch
 -- (repo file 127), which hard-filters h.ranchid = p_RanchId. That proc is
@@ -27,7 +34,7 @@
 -- returns 203 candidates across 22 ranches, vs. 53 for ranch 11 alone
 -- under the old proc -- confirms the fix changes behavior and is
 -- consistent with usp_GetParticipatingRanchesForCompetition's 22-ranch
--- result for the same competition (Slice A, proc 252).
+-- result for the same competition (Slice A, proc 255).
 
 CREATE OR REPLACE FUNCTION usp_GetPaidTimeCandidatesForCompetition(
     p_CompetitionId INTEGER
