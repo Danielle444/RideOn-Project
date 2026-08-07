@@ -1,6 +1,12 @@
--- 252_usp_GetParticipatingRanchesForCompetition.sql
+-- 255_usp_GetParticipatingRanchesForCompetition.sql
 --
 -- NEW (HostSecretary cross-ranch service flows, 2026-08-07). Read-only.
+-- Repo file renumbered 252 -> 255 (2026-08-07): 252-254 were claimed by
+-- the Managed-Payer feature (usp_AnswerManagedPayerRequest,
+-- usp_RequestManagedPayer, usp_GetManagingAdminsForPayer), merged to main
+-- after this branch was created. Repo filename/number only -- the live
+-- function name, signature, and body below are unchanged from what was
+-- already deployed and verified live under this same function name.
 --
 -- Why: audited that no existing "list every ranch participating in
 -- competition X" source exists anywhere in the codebase. The closest

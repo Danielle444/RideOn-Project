@@ -1,6 +1,12 @@
--- 253_usp_GetHorsesForStallBookingByCompetition.sql
+-- 256_usp_GetHorsesForStallBookingByCompetition.sql
 --
 -- NEW (HostSecretary cross-ranch service flows, 2026-08-07). Read-only.
+-- Repo file renumbered 253 -> 256 (2026-08-07): 252-254 were claimed by
+-- the Managed-Payer feature (usp_AnswerManagedPayerRequest,
+-- usp_RequestManagedPayer, usp_GetManagingAdminsForPayer), merged to main
+-- after this branch was created. Repo filename/number only -- the live
+-- function name, signature, and body below are unchanged from what was
+-- already deployed and verified live under this same function name.
 --
 -- Why: the live usp_gethorsesforstallbooking(p_competitionid, p_ranchid)
 -- hard-filters "h.ranchid = p_ranchId" (confirmed live 2026-08-07), and the
@@ -30,7 +36,7 @@
 -- Live-verified 2026-08-07 (rollback-only, then applied): competition 78
 -- returns 102 horses across 22 ranches, vs. 21 horses for ranch 11 alone
 -- under the old ranch-filtered proc -- confirms the fix changes behavior
--- and is consistent with 252_usp_GetParticipatingRanchesForCompetition's
+-- and is consistent with 255_usp_GetParticipatingRanchesForCompetition's
 -- 22-ranch result for the same competition.
 
 CREATE OR REPLACE FUNCTION public.usp_gethorsesforstallbookingbycompetition(p_competitionid integer)
