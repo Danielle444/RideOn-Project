@@ -125,8 +125,8 @@ namespace RideOnServer.Tests
             string body = ResolveConnectionStringMethodBody();
 
             int basePathAt = body.IndexOf("SetBasePath(Directory.GetCurrentDirectory())", StringComparison.Ordinal);
-            int appSettingsAt = body.IndexOf("AddJsonFile(\"appsettings.json\", optional: false, reloadOnChange: true)", StringComparison.Ordinal);
-            int devSettingsAt = body.IndexOf("AddJsonFile(\"appsettings.Development.json\", optional: true, reloadOnChange: true)", StringComparison.Ordinal);
+            int appSettingsAt = body.IndexOf("AddJsonFile(\"appsettings.json\", optional: false, reloadOnChange: false)", StringComparison.Ordinal);
+            int devSettingsAt = body.IndexOf("AddJsonFile(\"appsettings.Development.json\", optional: true, reloadOnChange: false)", StringComparison.Ordinal);
             int userSecretsAt = body.IndexOf("AddUserSecrets<Program>(optional: true)", StringComparison.Ordinal);
             int envVarsAt = body.IndexOf("AddEnvironmentVariables()", StringComparison.Ordinal);
             int getConnStringAt = body.IndexOf("GetConnectionString(conStr)", StringComparison.Ordinal);
