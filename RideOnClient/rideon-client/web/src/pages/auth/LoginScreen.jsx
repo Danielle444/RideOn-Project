@@ -4,6 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { getPostLoginRoute } from "../../../../shared/auth/utils/authNavigation";
 import { validateLoginForm } from "../../../../shared/auth/validations/loginValidation";
 import { authTheme } from "../../../../shared/auth/theme/authTheme";
+import logo from "../../../../shared/assets/logo.png";
 import { useAuth } from "../../context/AuthContext";
 import Field from "../../components/common/Field";
 import AuthButton from "../../components/common/AuthButton";
@@ -89,10 +90,16 @@ export default function LoginScreen() {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center"
+      className="flex min-h-screen flex-col items-center justify-center"
       style={{ backgroundColor: palette.background }}
       dir="rtl"
     >
+      <img
+        src={logo}
+        alt="RideOn"
+        className="h-24 sm:h-28 object-contain mb-4"
+      />
+
       <div
         className="w-full max-w-md rounded-2xl p-8 shadow-lg"
         style={{ backgroundColor: palette.surface }}
