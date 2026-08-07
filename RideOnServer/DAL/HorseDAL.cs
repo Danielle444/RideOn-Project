@@ -492,6 +492,17 @@ namespace RideOnServer.DAL
                     }
                 }
             }
+            catch (PostgresException ex) when (ex.SqlState == "RN001")
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_RejectHealthCertificate itself (invalid ids, competition
+                // not found, caller not an approved HostSecretary for the
+                // competition's host ranch) - the proc's own defense against a
+                // direct RPC call bypassing HorsesController entirely. Matches
+                // the established RN001 -> ValidationException convention (see
+                // ShavingsOrderDAL.AdminCancelShavingsOrder).
+                throw new BL.ValidationException(ex.MessageText);
+            }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in RejectHealthCertificate: {ex.Message}");

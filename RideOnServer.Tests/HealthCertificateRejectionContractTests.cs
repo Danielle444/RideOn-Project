@@ -344,13 +344,27 @@ namespace RideOnServer.Tests
         }
 
         [Fact]
-        public void No_raw_database_or_exception_text_reaches_the_409_or_500_response()
+        public void No_raw_database_or_exception_text_reaches_the_500_response()
         {
             string source = ControllerSource();
 
             source.Should().Contain("return StatusCode(500, \"שגיאה בדחיית תעודת הבריאות\");");
-            source.Should().NotContain("StatusCode(409, ex.Message)");
             source.Should().NotContain("StatusCode(500, ex.Message)");
+        }
+
+        [Fact]
+        public void StatusCode_409_ex_Message_appears_exactly_once_for_the_deliberate_ValidationException_catch()
+        {
+            // Deliberate, not a leak: the RN001 guard's own short guard text is
+            // surfaced as-is on this one path, matching the established
+            // ShavingsOrdersController.ClaimOrder / AdminCancelShavingsOrder
+            // precedent. A legitimate caller cannot reach this branch - the
+            // controller's own HostSecretary + host-ranch checks above already
+            // block an unauthorized caller earlier, with a proper Hebrew
+            // message. This assertion still fails if a second, unreviewed
+            // StatusCode(409, ex.Message) is ever added anywhere else in the
+            // controller.
+            CountOccurrences(ControllerSource(), "StatusCode(409, ex.Message)").Should().Be(1);
         }
 
         // =================================================================
@@ -420,6 +434,141 @@ namespace RideOnServer.Tests
             // Still shared by both read procs - no second mapper was introduced.
             CountOccurrences(dal, "new HealthCertificateItem").Should().Be(1);
             CountOccurrences(dal, "ReadHealthCertificateItem(reader)").Should().Be(2);
+        }
+
+        // =================================================================
+        // 10. RPC-bypass security hardening (2026-08-07): usp_RejectHealthCertificate
+        // must not rely solely on HorsesController for authorization, since every
+        // proc in this schema has EXECUTE granted to anon/authenticated and the
+        // Supabase anon key is public. Mirrors the established worker
+        // shavings-mutation-authorization fix (115_usp_ClaimShavingsOrder.sql,
+        // RN001 -> ValidationException convention).
+        // =================================================================
+
+        private static string RejectProcSource()
+        {
+            string path = Path.GetFullPath(
+                Path.Combine(
+                    TestSourceDirectory(),
+                    "..",
+                    "RideOnDB",
+                    "StoredProcedures",
+                    "PostgreSQL",
+                    "Individual",
+                    "245_usp_RejectHealthCertificate.sql"));
+
+            File.Exists(path).Should().BeTrue("245_usp_RejectHealthCertificate.sql was expected at {0}", path);
+
+            return File.ReadAllText(path);
+        }
+
+        [Fact]
+        public void The_proc_derives_the_host_ranch_from_the_competition_and_never_takes_a_ranch_id_parameter()
+        {
+            string sql = RejectProcSource();
+
+            sql.Should().Contain("FROM public.competition c");
+            sql.Should().Contain("WHERE c.competitionid = p_CompetitionId");
+            sql.Should().Contain("INTO v_HostRanchId");
+
+            // Nothing for a caller to spoof: the function signature itself has no
+            // ranch id parameter at all.
+            sql.Should().NotContain("p_RanchId");
+            sql.Should().NotContain("p_HostRanchId INTEGER,");
+        }
+
+        [Fact]
+        public void The_proc_verifies_the_callers_role_against_personranchrole_and_role()
+        {
+            string sql = RejectProcSource();
+
+            sql.Should().Contain("FROM public.personranchrole prr");
+            sql.Should().Contain("JOIN public.role r ON r.roleid = prr.roleid");
+            sql.Should().Contain("prr.personid = p_HcRejectedBySystemUserId");
+            sql.Should().Contain("prr.ranchid = v_HostRanchId");
+            sql.Should().Contain("prr.rolestatus = 'Approved'");
+            sql.Should().Contain("r.rolename = 'מזכירת חווה מארחת'");
+        }
+
+        [Fact]
+        public void The_proc_raises_RN001_for_every_guard_including_authorization()
+        {
+            string sql = RejectProcSource();
+
+            int occurrences = CountOccurrences(sql, "ERRCODE = 'RN001'");
+
+            // Invalid horse id, invalid competition id, invalid rejecting user id,
+            // empty reason, competition not found, caller not an approved host
+            // secretary - six distinct guards, all using the established
+            // convention.
+            occurrences.Should().Be(6);
+        }
+
+        [Fact]
+        public void The_proc_signature_is_unchanged_by_the_hardening()
+        {
+            // The hardening is body-only - CREATE OR REPLACE, no DROP, no new
+            // parameter. p_HcRejectedBySystemUserId already existed before the
+            // guard was added; it is now actually used for its stated purpose.
+            string sql = RejectProcSource();
+
+            sql.Should().Contain("CREATE OR REPLACE FUNCTION public.usp_RejectHealthCertificate(");
+            sql.Should().NotContain("DROP FUNCTION");
+
+            sql.Should().Contain("p_HorseId                  INTEGER");
+            sql.Should().Contain("p_CompetitionId             INTEGER");
+            sql.Should().Contain("p_HcRejectedBySystemUserId  INTEGER");
+            sql.Should().Contain("p_HcRejectionDate           DATE");
+            sql.Should().Contain("p_HcRejectionReason         CHARACTER VARYING");
+        }
+
+        [Fact]
+        public void The_authorization_guard_runs_before_the_update_statement()
+        {
+            string sql = RejectProcSource();
+
+            int guardAt = sql.IndexOf(
+                "Caller is not an approved host secretary", StringComparison.Ordinal);
+            int updateAt = sql.IndexOf(
+                "UPDATE public.horseparticipationincompetition", StringComparison.Ordinal);
+
+            guardAt.Should().BeGreaterThan(-1);
+            updateAt.Should().BeGreaterThan(-1);
+            guardAt.Should().BeLessThan(updateAt, "the mutation must never run before authorization is verified");
+        }
+
+        [Fact]
+        public void The_dal_catches_RN001_and_rethrows_a_validation_exception_carrying_the_sql_message_text()
+        {
+            string body = DalRejectMethodBody();
+
+            body.Should().Contain("catch (PostgresException ex) when (ex.SqlState == \"RN001\")");
+            body.Should().Contain("throw new BL.ValidationException(ex.MessageText);");
+
+            // Must appear before the generic catch, or it is unreachable.
+            int rn001At = body.IndexOf("catch (PostgresException ex) when (ex.SqlState == \"RN001\")", StringComparison.Ordinal);
+            int genericAt = body.IndexOf("catch (Exception ex)", StringComparison.Ordinal);
+
+            rn001At.Should().BeGreaterThan(-1);
+            genericAt.Should().BeGreaterThan(-1);
+            rn001At.Should().BeLessThan(genericAt);
+        }
+
+        [Fact]
+        public void The_controller_catches_ValidationException_and_maps_it_to_409()
+        {
+            string body = ControllerRejectMethodBody();
+
+            body.Should().Contain("catch (ValidationException ex)");
+            body.Should().Contain("return StatusCode(409, ex.Message);");
+
+            // Must appear before the generic catch, or it is unreachable.
+            int validationAt = body.IndexOf("catch (ValidationException ex)", StringComparison.Ordinal);
+            int genericAt = body.IndexOf("catch (Exception ex)", StringComparison.Ordinal);
+
+            validationAt.Should().BeGreaterThan(-1);
+            genericAt.Should().BeGreaterThan(-1);
+            validationAt.Should().BeLessThan(genericAt);
         }
     }
 }

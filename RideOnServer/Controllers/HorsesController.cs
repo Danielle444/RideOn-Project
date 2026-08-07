@@ -446,6 +446,21 @@ namespace RideOnServer.Controllers
                 // is unchanged, out of scope for this endpoint-specific fix.
                 return BadRequest(ex.Message);
             }
+            catch (ValidationException ex)
+            {
+                // Authorization/business-rule guard raised inside
+                // usp_RejectHealthCertificate itself - the proc's own defense
+                // against a direct RPC call bypassing this controller's
+                // HostSecretary + host-ranch checks above entirely. Mapped to
+                // 409, matching the established RN001 -> ValidationException
+                // -> 409 convention (see ShavingsOrdersController.ClaimOrder /
+                // AdminCancelShavingsOrder). ex.Message here is the RAISE's own
+                // short guard text, deliberately surfaced as-is per that same
+                // established precedent - a legitimate caller should never
+                // actually reach this branch, since the checks above already
+                // block it earlier with a proper Hebrew message.
+                return StatusCode(409, ex.Message);
+            }
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(403, ex.Message);
