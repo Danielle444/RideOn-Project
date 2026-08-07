@@ -401,6 +401,44 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpPut("{personId}/managers/{adminPersonId}/answer")]
+        public IActionResult AnswerPayerManagerRequest(
+            int personId,
+            int adminPersonId,
+            [FromBody] AnswerPayerManagerRequest request)
+        {
+            try
+            {
+                if (personId != request.PersonId || adminPersonId != request.AdminPersonId)
+                {
+                    return BadRequest("PersonId or AdminPersonId in URL does not match body");
+                }
+
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                // Only the payer who owns this relationship may answer it - an
+                // admin can never approve their own request on the payer's
+                // behalf, because currentPersonId comes from the JWT and must
+                // equal the payer's own personId, never the admin's.
+                if (currentPersonId != personId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לענות על בקשת ניהול עבור משלם אחר");
+                }
+
+                Payer.AnswerManagedPayerRequest(currentPersonId, request);
+                return Ok("Managed payer request answered successfully");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in AnswerPayerManagerRequest: {ex.Message}");
+                return BadRequest("אירעה שגיאה במענה לבקשת הניהול");
+            }
+        }
+
         [HttpDelete("{personId}/managers")]
         public IActionResult RemovePayerManager(int personId, [FromBody] RemovePayerManagerRequest request)
         {

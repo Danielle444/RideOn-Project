@@ -23,6 +23,7 @@ import {
   getAvailablePayerManagers,
   addPayerManager,
   removePayerManager,
+  answerPayerManagerRequest,
 } from "../services/payerProfileService";
 
 export default function useProfileScreen() {
@@ -73,6 +74,7 @@ export default function useProfileScreen() {
   const [isAddProfileModalOpen, setIsAddProfileModalOpen] = useState(false);
 
   const [managers, setManagers] = useState([]);
+  const [pendingManagerRequests, setPendingManagerRequests] = useState([]);
   const [availableManagers, setAvailableManagers] = useState([]);
   const [loadingManagers, setLoadingManagers] = useState(false);
   const [loadingAvailableManagers, setLoadingAvailableManagers] =
@@ -81,6 +83,7 @@ export default function useProfileScreen() {
   const [managersSearchText, setManagersSearchText] = useState("");
   const [submittingManagerId, setSubmittingManagerId] = useState(null);
   const [removingManagerId, setRemovingManagerId] = useState(null);
+  const [answeringManagerId, setAnsweringManagerId] = useState(null);
 
   const config = useMemo(
     function () {
@@ -185,7 +188,16 @@ export default function useProfileScreen() {
         Array.isArray(response.data) ? response.data : [],
       );
 
-      setManagers(normalized);
+      setManagers(
+        normalized.filter(function (item) {
+          return item.approvalStatus === "Approved";
+        }),
+      );
+      setPendingManagerRequests(
+        normalized.filter(function (item) {
+          return item.approvalStatus === "Pending";
+        }),
+      );
     } catch (err) {
       console.log("loadManagers error full:", err);
       console.log("loadManagers error response:", err?.response);
@@ -431,6 +443,39 @@ export default function useProfileScreen() {
     }
   }
 
+  async function handleAnswerManagerRequest(adminPersonId, answerStatus) {
+    try {
+      setAnsweringManagerId(adminPersonId);
+      await answerPayerManagerRequest(
+        user.personId,
+        adminPersonId,
+        answerStatus,
+      );
+      await loadManagers();
+      Alert.alert(
+        "הצלחה",
+        answerStatus === "Approved"
+          ? "בקשת הניהול אושרה"
+          : "בקשת הניהול נדחתה",
+      );
+    } catch (err) {
+      Alert.alert(
+        "שגיאה",
+        String(getApiErrorMessage(err, "לא ניתן היה לענות על בקשת הניהול")),
+      );
+    } finally {
+      setAnsweringManagerId(null);
+    }
+  }
+
+  async function handleApproveManagerRequest(adminPersonId) {
+    await handleAnswerManagerRequest(adminPersonId, "Approved");
+  }
+
+  async function handleRejectManagerRequest(adminPersonId) {
+    await handleAnswerManagerRequest(adminPersonId, "Rejected");
+  }
+
   return {
     user,
     activeRole,
@@ -463,6 +508,7 @@ export default function useProfileScreen() {
     closeAddProfileModal,
     submitAddProfile,
     managers,
+    pendingManagerRequests,
     availableManagers,
     loadingManagers,
     loadingAvailableManagers,
@@ -470,10 +516,13 @@ export default function useProfileScreen() {
     managersSearchText,
     submittingManagerId,
     removingManagerId,
+    answeringManagerId,
     openManagersModal,
     closeManagersModal,
     onManagersSearchChange,
     handleAddManager,
     handleRemoveManager,
+    handleApproveManagerRequest,
+    handleRejectManagerRequest,
   };
 }

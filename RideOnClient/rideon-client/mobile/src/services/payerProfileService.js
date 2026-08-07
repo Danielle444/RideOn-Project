@@ -28,9 +28,21 @@ function removePayerManager(personId, adminPersonId) {
   });
 }
 
+function answerPayerManagerRequest(personId, adminPersonId, answerStatus) {
+  return axios.put(
+    "/Payers/" + personId + "/managers/" + adminPersonId + "/answer",
+    {
+      personId: personId,
+      adminPersonId: adminPersonId,
+      answerStatus: answerStatus,
+    },
+  );
+}
+
 export {
   getPayerManagers,
   getAvailablePayerManagers,
   addPayerManager,
   removePayerManager,
+  answerPayerManagerRequest,
 };
