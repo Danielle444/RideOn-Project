@@ -53,6 +53,41 @@ namespace RideOnServer.Controllers
             }
         }
 
+        [HttpGet("{competitionId}/participating-ranches")]
+        public IActionResult GetParticipatingRanches(int competitionId, [FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                Competition? competition = Competition.GetCompetitionById(competitionId);
+
+                if (competition == null)
+                    return NotFound("Competition not found");
+
+                if (competition.HostRanchId != ranchId)
+                    return StatusCode(403, "אין לך הרשאה לצפות בחוות המשתתפות בתחרות זו");
+
+                List<ParticipatingRanchItem> ranches = Competition.GetParticipatingRanches(competitionId);
+                return Ok(ranches);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetParticipatingRanches: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת החוות המשתתפות בתחרות");
+            }
+        }
+
         [HttpGet("{competitionId}")]
         public IActionResult GetCompetitionById(int competitionId, [FromQuery] int ranchId)
         {

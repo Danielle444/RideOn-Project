@@ -19,6 +19,13 @@ function getHorsesForStallBooking(competitionId, ranchId) {
   });
 }
 
+function getHorsesForStallBookingByCompetition(competitionId, ranchId) {
+  return axios.get(`${API}/StallBookings/horses-for-booking-by-competition`, {
+    params: { competitionId: competitionId, ranchId: ranchId },
+    ...getAuthHeaders(),
+  });
+}
+
 function secretaryDeleteStallBooking(stallBookingId, ranchId) {
   return axios.delete(`${API}/StallBookings/secretary/${stallBookingId}`, {
     params: { ranchId: ranchId },
@@ -44,6 +51,7 @@ function secretaryCreateStallBookingForPayer(payload) {
 
 export {
   getHorsesForStallBooking,
+  getHorsesForStallBookingByCompetition,
   secretaryDeleteStallBooking,
   secretaryUpdateStallBooking,
   secretaryCreateStallBookingForPayer,

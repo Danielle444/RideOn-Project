@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { getHorsesForStallBooking } from "../../../services/stallBookingsService";
+import { getHorsesForStallBookingByCompetition } from "../../../services/stallBookingsService";
 import DatePicker from "../../common/DatePicker";
 
 function toInputDate(value) {
@@ -43,8 +43,13 @@ export default function SecretaryUpdateStallBookingModal(props) {
       setHorseId(booking.horseId ? String(booking.horseId) : "");
       setError("");
 
+      // Ranch-model fix: competition-wide horse list (not ranch-filtered) so
+      // a HostSecretary can reassign a booking to a horse belonging to any
+      // participating guest ranch. usp_SecretaryUpdateStallBooking already
+      // re-derives requestingRanchId from the newly-selected horse's own
+      // ranch server-side.
       setLoadingHorses(true);
-      getHorsesForStallBooking(competitionId, ranchId)
+      getHorsesForStallBookingByCompetition(competitionId, ranchId)
         .then(function (res) {
           setHorses(Array.isArray(res.data) ? res.data : []);
         })
@@ -152,6 +157,7 @@ export default function SecretaryUpdateStallBookingModal(props) {
                     <option key={h.horseId} value={h.horseId}>
                       {h.horseName}
                       {h.barnName ? " (" + h.barnName + ")" : ""}
+                      {h.ranchName ? " · " + h.ranchName : ""}
                     </option>
                   );
                 })}

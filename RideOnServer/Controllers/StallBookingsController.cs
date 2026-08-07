@@ -100,6 +100,55 @@ namespace RideOnServer.Controllers
             }
         }
 
+        // HostSecretary cross-ranch service flows (2026-08-07): additive
+        // sibling of GetHorsesForStallBooking above. That endpoint filters
+        // horses to ranchId's own ranch and is shared with the mobile
+        // RanchAdmin self-service flow, which must keep seeing only its own
+        // ranch's horses -- left untouched. This endpoint is HostSecretary-
+        // only and returns every horse entered in the competition across all
+        // participating ranches, authorized against the competition's own
+        // host ranch (never a client-supplied scope), same pattern as
+        // SecretaryCreateStallBookingForPayer below.
+        [HttpGet("horses-for-booking-by-competition")]
+        public IActionResult GetHorsesForStallBookingByCompetition(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                int personId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    personId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                RideOnServer.BL.Competition? competition = new CompetitionDAL().GetCompetitionById(competitionId);
+                if (competition == null)
+                {
+                    return NotFound("התחרות לא נמצאה");
+                }
+
+                if (competition.HostRanchId != ranchId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, "אין לך הרשאה לצפות בסוסים של תחרות זו");
+                }
+
+                var result = StallBookingDAL.GetHorsesForStallBookingByCompetition(competitionId);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetHorsesForStallBookingByCompetition: {ex.Message}");
+                return BadRequest("אירעה שגיאה בשליפת סוסים להזמנת תאים");
+            }
+        }
+
         [HttpGet("horse-payers")]
         public IActionResult GetHorsePayersForCompetition(
             [FromQuery] int competitionId,

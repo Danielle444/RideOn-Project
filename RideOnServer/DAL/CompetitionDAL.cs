@@ -47,6 +47,43 @@ namespace RideOnServer.DAL
             }
         }
 
+        public List<ParticipatingRanchItem> GetParticipatingRanches(int competitionId)
+        {
+            Dictionary<string, object?> paramDic = new Dictionary<string, object?>
+            {
+                { "@CompetitionId", competitionId }
+            };
+
+            try
+            {
+                using (NpgsqlConnection connection = Connect("DefaultConnection"))
+                {
+                    connection.Open();
+
+                    using (NpgsqlCommand command = CreateCommandWithStoredProcedure("usp_GetParticipatingRanchesForCompetition", connection, paramDic))
+                    using (NpgsqlDataReader reader = command.ExecuteReader())
+                    {
+                        List<ParticipatingRanchItem> list = new List<ParticipatingRanchItem>();
+
+                        while (reader.Read())
+                        {
+                            list.Add(new ParticipatingRanchItem
+                            {
+                                RanchId = Convert.ToInt32(reader["ranchid"]),
+                                RanchName = reader["ranchname"]?.ToString() ?? string.Empty
+                            });
+                        }
+
+                        return list;
+                    }
+                }
+            }
+            catch (NpgsqlException ex)
+            {
+                throw new Exception($"Database error: {ex.Message}");
+            }
+        }
+
         public Competition? GetCompetitionById(int competitionId)
         {
             Dictionary<string, object?> paramDic = new Dictionary<string, object?>

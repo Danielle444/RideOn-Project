@@ -132,6 +132,13 @@ function ShavingsContent(props) {
         onClose={shavings.closeAdd}
         competitionId={competitionId}
         ranchOptions={shavings.ranchOptions}
+        // ranchId here is the page's own ranch (activeRole.ranchId), which
+        // is always the competition's host ranch — proc 172 validates
+        // c.hostranchid = p_ranchid, so the page could not have loaded
+        // otherwise. Shavings pricing is host-ranch-scoped (ranch-model
+        // fix), independent of whichever requesting ranch is selected in
+        // the modal's own dropdown.
+        hostRanchId={ranchId}
         onCreated={handleOrderCreated}
       />
     </div>

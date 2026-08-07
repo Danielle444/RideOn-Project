@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { getCompetitionPayersForSecretary } from "../../../services/secretaryPayersService";
-import { getHorsesForStallBooking } from "../../../services/stallBookingsService";
+import { getHorsesForStallBookingByCompetition } from "../../../services/stallBookingsService";
 import { getServicePricesDashboard } from "../../../services/servicePricesService";
 import DatePicker from "../../common/DatePicker";
 
@@ -58,8 +58,12 @@ export default function SecretaryCreateStallBookingModal(props) {
           setLoadingPayers(false);
         });
 
+      // Ranch-model fix: competition-wide horse list (not ranch-filtered) so
+      // a HostSecretary can select a horse belonging to any participating
+      // guest ranch, not just her own. The server still re-derives
+      // requestingRanchId from the selected horse's own ranch on write.
       setLoadingHorses(true);
-      getHorsesForStallBooking(competitionId, ranchId)
+      getHorsesForStallBookingByCompetition(competitionId, ranchId)
         .then(function (res) {
           setHorses(Array.isArray(res.data) ? res.data : []);
         })
@@ -272,6 +276,7 @@ export default function SecretaryCreateStallBookingModal(props) {
                     <option key={h.horseId} value={h.horseId}>
                       {h.horseName}
                       {h.barnName ? " (" + h.barnName + ")" : ""}
+                      {h.ranchName ? " · " + h.ranchName : ""}
                     </option>
                   );
                 })}

@@ -52,14 +52,17 @@ export default function CompetitionStallsPage() {
 
   const page = useCompetitionStallsPage(Number(competitionId), ranchId);
 
-  // Ranch-model fix: reuse the already-computed participating-ranch list
-  // (page.ranchGroups) as the requesting-ranch options for a tack stall
-  // booking, adding the host ranch itself as a fallback option if it is
-  // not already one of the participating ranches.
+  // Ranch-model fix: source the requesting-ranch options for a tack stall
+  // booking from page.participatingRanches (usp_GetParticipatingRanchesForCompetition
+  // -- entries/stall-bookings/paid-time-derived, competition-scoped), not
+  // from page.ranchGroups, which only lists ranches with EXISTING stall
+  // bookings and was circular -- a guest ranch's first-ever tack booking
+  // could never be created since it wasn't in ranchGroups yet. Host ranch
+  // fallback kept as a defensive safety net if the read fails/is empty.
   const ranchOptions = useMemo(
     function () {
-      const options = page.ranchGroups.map(function (group) {
-        return { ranchId: group.ranchId, ranchName: group.ranchName };
+      const options = page.participatingRanches.map(function (r) {
+        return { ranchId: r.ranchId, ranchName: r.ranchName };
       });
 
       const hasHostRanch = options.some(function (option) {
@@ -75,7 +78,7 @@ export default function CompetitionStallsPage() {
 
       return options;
     },
-    [page.ranchGroups, ranchId, activeRole],
+    [page.participatingRanches, ranchId, activeRole],
   );
 
   const [activeItem, setActiveItem] = useState(null);
