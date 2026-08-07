@@ -252,7 +252,7 @@ export default function WorkerCompetitionsBoardScreen(props) {
         );
       }}
     >
-      <Text style={roleSharedStyles.sectionTitle}>תחרויות החווה</Text>
+      <Text style={roleSharedStyles.sectionTitle}>כל התחרויות</Text>
 
       <CompetitionsFilterBar
         searchText={searchText}
