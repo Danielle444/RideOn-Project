@@ -168,6 +168,11 @@ namespace RideOnServer.Controllers
             }
         }
 
+        // RanchAdmin-only, always ranch-scoped. A secondary HostSecretary role in
+        // this same ranch (or anywhere else) is never consulted here and can never
+        // widen this read - the only role checked is RanchAdmin, and the only BL
+        // call is the ranch-scoped one (Proc 117). The competition-wide read for a
+        // HostSecretary lives on its own route below.
         [HttpGet("health-certificates")]
         public IActionResult GetHealthCertificates(
             [FromQuery] int competitionId,
@@ -177,54 +182,17 @@ namespace RideOnServer.Controllers
             {
                 int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
 
-                bool isRanchAdminInRanch = UserAccessValidator.HasUserRoleInRanch(
+                UserAccessValidator.EnsureUserHasRoleInRanch(
                     currentPersonId,
                     ranchId,
                     RoleNames.RanchAdmin
                 );
 
-                bool isHostSecretaryInRanch = UserAccessValidator.HasUserRoleInRanch(
-                    currentPersonId,
-                    ranchId,
-                    RoleNames.HostSecretary
-                );
-
-                // The competition is only fetched when the secretary branch is
-                // actually in play, so the RanchAdmin path keeps the exact number
-                // of round trips it had before.
-                int? competitionHostRanchId = null;
-
-                if (isHostSecretaryInRanch && competitionId > 0)
-                {
-                    Competition? competition = Competition.GetCompetitionById(competitionId);
-
-                    competitionHostRanchId = competition?.HostRanchId;
-                }
-
-                HealthCertificateReadScope scope = ResolveHealthCertificateReadScope(
-                    competitionId,
-                    ranchId,
-                    isRanchAdminInRanch,
-                    isHostSecretaryInRanch,
-                    competitionHostRanchId
-                );
-
-                if (scope == HealthCertificateReadScope.Denied)
-                {
-                    throw new UnauthorizedAccessException(
-                        "אין לך הרשאה לצפות בתעודות הבריאות של תחרות זו");
-                }
-
-                // The scope resolved above - never anything the caller sent -
-                // decides which read runs. There is no include-all flag on this
-                // endpoint, and each branch is a single BL call: no per-ranch fan
-                // out, no loop.
                 var certificates =
-                    scope == HealthCertificateReadScope.CompetitionWide
-                        ? HorseParticipationInCompetition
-                            .GetHealthCertificatesForHostedCompetition(competitionId)
-                        : HorseParticipationInCompetition
-                            .GetHealthCertificatesForCompetition(competitionId, ranchId);
+                    HorseParticipationInCompetition.GetHealthCertificatesForCompetition(
+                        competitionId,
+                        ranchId
+                    );
 
                 return Ok(new { data = certificates });
             }
@@ -235,6 +203,57 @@ namespace RideOnServer.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in GetHealthCertificates: {ex.Message}");
+                return StatusCode(500, "שגיאה בשליפת תעודות הבריאות");
+            }
+        }
+
+        // HostSecretary-only, competition-wide (Proc 184). Requires the supplied
+        // ranchId to be the competition's OWN host ranch - the same cross-check
+        // usp_gethealthcertificatesforhostedcompetition's caller has always used
+        // on the approve endpoint. A plain RanchAdmin (no HostSecretary role) and
+        // a HostSecretary of a ranch that is not hosting this competition both get
+        // 403 from EnsureUserHasRoleInRanch / the host-ranch mismatch below.
+        [HttpGet("health-certificates/hosted")]
+        public IActionResult GetHostedHealthCertificates(
+            [FromQuery] int competitionId,
+            [FromQuery] int ranchId)
+        {
+            try
+            {
+                int currentPersonId = UserAccessValidator.GetPersonIdFromClaims(User);
+
+                UserAccessValidator.EnsureUserHasRoleInRanch(
+                    currentPersonId,
+                    ranchId,
+                    RoleNames.HostSecretary
+                );
+
+                Competition? competition = Competition.GetCompetitionById(competitionId);
+
+                if (competition == null)
+                {
+                    return NotFound("Competition not found");
+                }
+
+                if (competition.HostRanchId != ranchId)
+                {
+                    return StatusCode(403, "אין לך הרשאה לצפות בתעודות הבריאות של תחרות זו");
+                }
+
+                var certificates =
+                    HorseParticipationInCompetition.GetHealthCertificatesForHostedCompetition(
+                        competitionId
+                    );
+
+                return Ok(new { data = certificates });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetHostedHealthCertificates: {ex.Message}");
                 return StatusCode(500, "שגיאה בשליפת תעודות הבריאות");
             }
         }
@@ -377,106 +396,11 @@ namespace RideOnServer.Controllers
             }
         }
 
-        // Who may read the health-certificate list, and how wide that read is.
-        //
-        //   RanchScoped     - a RanchAdmin sees only horses of their own ranch.
-        //   CompetitionWide - a HostSecretary of the competition's host ranch sees
-        //                     every participating horse, visiting ranches included.
-        private enum HealthCertificateReadScope
-        {
-            Denied = 0,
-            RanchScoped = 1,
-            CompetitionWide = 2
-        }
-
-        // Which branch, if any, authorizes an upload.
-        private enum HealthCertificateUploadBranch
-        {
-            Denied = 0,
-            RanchAdminOwnHorse = 1,
-            HostSecretaryHostedCompetition = 2
-        }
-
-        // Pure authorization decision for GET health-certificates. Every input is
-        // resolved by the caller - no claims, no DB, no HTTP - so the rule itself
-        // is directly testable (RideOnServer.Tests/HealthCertificateAuthorizationTests).
-        //
-        // competitionHostRanchId is null when the competition does not exist, which
-        // is why the secretary branch can never pass on an unknown competition.
-        private static HealthCertificateReadScope ResolveHealthCertificateReadScope(
-            int competitionId,
-            int ranchId,
-            bool isRanchAdminInRanch,
-            bool isHostSecretaryInRanch,
-            int? competitionHostRanchId
-        )
-        {
-            if (competitionId <= 0 || ranchId <= 0)
-            {
-                return HealthCertificateReadScope.Denied;
-            }
-
-            // Holding the secretary role in SOME ranch is not enough: the role, the
-            // supplied ranch and the competition's own host ranch must all agree.
-            if (isHostSecretaryInRanch &&
-                competitionHostRanchId.HasValue &&
-                competitionHostRanchId.Value == ranchId)
-            {
-                return HealthCertificateReadScope.CompetitionWide;
-            }
-
-            // Checked after the secretary branch so a user holding both roles in the
-            // hosting ranch is not narrowed to their own horses. A plain RanchAdmin
-            // is never widened past their own ranch.
-            if (isRanchAdminInRanch)
-            {
-                return HealthCertificateReadScope.RanchScoped;
-            }
-
-            return HealthCertificateReadScope.Denied;
-        }
-
-        // Pure authorization decision for the multipart upload, same shape and same
-        // reasons as ResolveHealthCertificateReadScope.
-        private static HealthCertificateUploadBranch ResolveHealthCertificateUploadBranch(
-            int horseId,
-            int competitionId,
-            int ranchId,
-            bool isRanchAdminInRanch,
-            bool isHostSecretaryInRanch,
-            bool horseBelongsToRanch,
-            int? competitionHostRanchId
-        )
-        {
-            if (horseId <= 0 || competitionId <= 0 || ranchId <= 0)
-            {
-                return HealthCertificateUploadBranch.Denied;
-            }
-
-            if (!competitionHostRanchId.HasValue)
-            {
-                return HealthCertificateUploadBranch.Denied;
-            }
-
-            // The Stage B1 fix: holding RanchAdmin in ranchId is no longer enough,
-            // the horse has to actually belong to that ranch.
-            if (isRanchAdminInRanch && horseBelongsToRanch)
-            {
-                return HealthCertificateUploadBranch.RanchAdminOwnHorse;
-            }
-
-            // Pre-existing branch with no UI behind it, left exactly as it was: a
-            // HostSecretary of the hosting ranch may upload for any horse in the
-            // competition, including a visiting one. Evaluated after the admin
-            // branch so a dual-role user keeps the wider capability they had.
-            if (isHostSecretaryInRanch && competitionHostRanchId.Value == ranchId)
-            {
-                return HealthCertificateUploadBranch.HostSecretaryHostedCompetition;
-            }
-
-            return HealthCertificateUploadBranch.Denied;
-        }
-
+        // Upload authorization: RanchAdmin-only. No HostSecretary branch exists on
+        // this route (the pre-existing secretary upload branch had no caller
+        // anywhere in the repo - grep-verified - and is removed rather than kept
+        // as a silent widening path). Holding a secondary HostSecretary role is
+        // never even read here, so it cannot influence this decision.
         private void EnsureCanUploadHealthCertificate(
             int currentPersonId,
             int horseId,
@@ -484,64 +408,45 @@ namespace RideOnServer.Controllers
             int competitionId
         )
         {
-            bool isRanchAdminInRanch = UserAccessValidator.HasUserRoleInRanch(
+            UserAccessValidator.EnsureUserHasRoleInRanch(
                 currentPersonId,
                 ranchId,
                 RoleNames.RanchAdmin
             );
 
-            bool isHostSecretaryInRanch = UserAccessValidator.HasUserRoleInRanch(
-                currentPersonId,
-                ranchId,
-                RoleNames.HostSecretary
-            );
-
-            if (!isRanchAdminInRanch && !isHostSecretaryInRanch)
-            {
-                throw new UnauthorizedAccessException(
-                    "אין לך הרשאה להעלות תעודת בריאות עבור סוס זה");
-            }
-
-            Competition? competition = Competition.GetCompetitionById(competitionId);
-
-            // The horse list is only read when the admin branch can still pass, so
-            // the secretary branch costs exactly what it cost before.
-            bool horseBelongsToRanch =
-                isRanchAdminInRanch && HorseBelongsToRanch(horseId, ranchId);
-
-            HealthCertificateUploadBranch branch = ResolveHealthCertificateUploadBranch(
-                horseId,
-                competitionId,
-                ranchId,
-                isRanchAdminInRanch,
-                isHostSecretaryInRanch,
-                horseBelongsToRanch,
-                competition?.HostRanchId
-            );
-
-            if (branch == HealthCertificateUploadBranch.Denied)
+            if (!HorseParticipatesInCompetitionForRanch(horseId, competitionId, ranchId))
             {
                 throw new UnauthorizedAccessException(
                     "אין לך הרשאה להעלות תעודת בריאות עבור סוס זה");
             }
         }
 
-        // Existence and ownership in one read, through the horse retrieval method
-        // this controller already uses (usp_gethorsesbyranch). A horse from another
-        // ranch - or a horse id that does not exist at all - is simply absent.
-        private static bool HorseBelongsToRanch(int horseId, int ranchId)
+        // Proves both requirements in one read: the horse belongs to ranchId AND
+        // holds an active entry in competitionId. Reuses usp_gethorsesforcompetition
+        // (backs GET /Horses/competition) rather than inventing new SQL - it is the
+        // same entry-derived, COALESCE(entrystatus,'Active')='Active' whitelist that
+        // 117/184 use, already filtered by h.ranchid = p_ranchid. A horse from
+        // another ranch, a horse with no entry in this competition, or a horse whose
+        // only entries are cancelled/replaced is simply absent from the result.
+        private static bool HorseParticipatesInCompetitionForRanch(
+            int horseId,
+            int competitionId,
+            int ranchId
+        )
         {
-            if (horseId <= 0 || ranchId <= 0)
+            if (horseId <= 0 || competitionId <= 0 || ranchId <= 0)
             {
                 return false;
             }
 
-            var filters = new GetHorsesFiltersRequest
+            var filters = new GetCompetitionHorsesFiltersRequest
             {
+                CompetitionId = competitionId,
                 RanchId = ranchId
             };
 
-            return Horse.GetHorsesByRanch(filters).Any(horse => horse.HorseId == horseId);
+            return Horse.GetHorsesForCompetition(filters)
+                .Any(horse => horse.HorseId == horseId);
         }
 
         private bool IsPdfFile(IFormFile file)
