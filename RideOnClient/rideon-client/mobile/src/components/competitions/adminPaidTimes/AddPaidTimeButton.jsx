@@ -2,57 +2,27 @@ import { useState } from "react";
 import { View } from "react-native";
 
 import Button from "../../ui/Button";
-import PaidTimeBookingModeModal from "./PaidTimeBookingModeModal";
-
-import { BULK_PAID_TIME_ENTRY_ENABLED } from "../../../utils/paidTimeBulkEntryFlag";
+import PaidTimeCreateModal from "../PaidTimeCreateModal";
 
 // כפתור "הוסף פייד טיים" במסך הפייד טיימים של אדמין.
-// בלחיצה נפתח PaidTimeBookingModeModal עם שתי אפשרויות גלויות:
-// "הזמנה אחת" ו-"כמה הזמנות יחד". קודם זה היה Alert של המערכת.
 //
-// הניווט לא השתנה: שניהם מובילים למסך AdminCompetitionRegistrations בטאב
-// פייד טיים, ו-"כמה הזמנות יחד" ממשיך להעביר openSmartBooking=true - המסך
-// עצמו פותח את הצ'אטבוט (הזרימה החכמה/המרוכזת) אוטומטית, בדיוק כמו קודם.
+// CAP-4: בעבר הכפתור ניווט למסך ההרשמות (טאב פייד טיים), עם בורר אחת/
+// מרוכזת שהוביל לאותו ניווט משתי אפשרויות. עכשיו הלחיצה פותחת ישירות את
+// הטופס העשיר (PaidTimeCreateModal) במקום - אין ניווט החוצה ואין בורר
+// מצב. payerSource="managed" נותן משלם רחב יותר
+// (usp_getmanagedpayersbysystemuser) ולא מוגבל ל-lockedPayerPersonId - ראו
+// useAdminCompetitionPaidTimes. הזרימה המרוכזת (bulk/chatbot) עצמה לא
+// נגעה בה - היא עדיין נגישה דרך טאב הפייד טיים במסך ההרשמות, בלי קשר
+// לכפתור הזה.
 export default function AddPaidTimeButton(props) {
-  var navigation = props.navigation;
-  var competitionId = props.competitionId;
-
-  var [isModeModalOpen, setIsModeModalOpen] = useState(false);
-
-  function navigateToRegistration(openSmart) {
-    setIsModeModalOpen(false);
-
-    if (!navigation) return;
-    navigation.navigate("AdminCompetitionRegistrations", {
-      competitionId: competitionId,
-      initialTab: "paidTimes",
-      openSmartBooking: !!openSmart,
-    });
-  }
+  var [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   function handlePress() {
-    // הזמנה מרוכזת (bulk) מושבתת כרגע מאחורי BULK_PAID_TIME_ENTRY_ENABLED
-    // (CAP-8). כל עוד היא כבויה, מדלגים על בורר האחת/מרוכזת לגמרי ועוברים ישר
-    // לזרימת ההזמנה הבודדת - כדי שלא תוצג אפשרות "כמה הזמנות יחד" מתה. כשהדגל
-    // יידלק מחדש, הבורר יחזור.
-    if (!BULK_PAID_TIME_ENTRY_ENABLED) {
-      navigateToRegistration(false);
-      return;
-    }
-
-    setIsModeModalOpen(true);
+    setIsCreateModalOpen(true);
   }
 
-  function handleCloseModeModal() {
-    setIsModeModalOpen(false);
-  }
-
-  function handleSelectSingle() {
-    navigateToRegistration(false);
-  }
-
-  function handleSelectBulk() {
-    navigateToRegistration(true);
+  function handleClose() {
+    setIsCreateModalOpen(false);
   }
 
   return (
@@ -64,11 +34,13 @@ export default function AddPaidTimeButton(props) {
         onPress={handlePress}
       />
 
-      <PaidTimeBookingModeModal
-        visible={isModeModalOpen}
-        onClose={handleCloseModeModal}
-        onSelectSingle={handleSelectSingle}
-        onSelectBulk={handleSelectBulk}
+      <PaidTimeCreateModal
+        visible={isCreateModalOpen}
+        payerSource="managed"
+        paidTimesStepAvailability={props.paidTimesStepAvailability}
+        isRegistrationStatusLoading={props.isRegistrationStatusLoading}
+        onClose={handleClose}
+        onCreated={props.onCreated}
       />
     </View>
   );

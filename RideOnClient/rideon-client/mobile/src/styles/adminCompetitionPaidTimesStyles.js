@@ -590,6 +590,10 @@ var styles = StyleSheet.create({
     borderWidth: 2,
   },
 
+  typeCardDisabled: {
+    opacity: 0.5,
+  },
+
   typeCardTextWrap: {
     flex: 1,
     gap: 3,

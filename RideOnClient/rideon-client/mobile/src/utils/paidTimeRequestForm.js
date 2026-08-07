@@ -281,6 +281,28 @@ export function buildPaidTimeRequestPayload(values) {
   };
 }
 
+// חוזה העדכון (update-notes). כמו ביצירה - השדות camelCase ואין כאן כלל
+// עסקי חדש. שולח תמיד את הבחירה הנוכחית עבור priceCatalogId/requestedCompSlotId
+// (גם אם לא השתנתה) - usp_updatepaidtimerequest כבר משווה מול הערך הקיים
+// ומדלג בשקט כשהם זהים, כך שאין צורך לשכפל כאן דיפ צד-לקוח. notes נשלח
+// תמיד כמחרוזת (אף פעם לא null) כי "" אצל usp_updatepaidtimerequest פירושה
+// "נקה", בעוד ש-null פירושה "אל תיגע" - בטופס העריכה יש תמיד ערך notes.
+export function buildPaidTimeUpdatePayload(paidTimeRequestId, ranchId, values) {
+  var safeValues = values || {};
+
+  return {
+    paidTimeRequestId: paidTimeRequestId,
+    ranchId: ranchId,
+    notes: safeValues.notes ? safeValues.notes.trim() : "",
+    priceCatalogId: safeValues.priceCatalog
+      ? safeValues.priceCatalog.priceCatalogId
+      : null,
+    requestedCompSlotId: safeValues.requestedSlot
+      ? safeValues.requestedSlot.paidTimeSlotInCompId
+      : null,
+  };
+}
+
 // תמונת מצב לצורך מסך ההצלחה. נלקחת לפני איפוס השדות הלא נעולים,
 // כדי שהאיפוס הקיים לא ירוקן את מה שמוצג למשתמשת.
 export function buildSuccessSnapshot(values, labelFormatters) {

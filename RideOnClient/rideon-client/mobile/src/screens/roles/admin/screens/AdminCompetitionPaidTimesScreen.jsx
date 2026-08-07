@@ -34,7 +34,7 @@ import { getLifecycleBandHeader } from "../../../../utils/payerAccountCopy";
 
 import PaidTimeListItemCard from "../../../../components/competitions/adminPaidTimes/PaidTimeListItemCard";
 import PaidTimeScheduleView from "../../../../components/competitions/adminPaidTimes/PaidTimeScheduleView";
-import PaidTimeEditModal from "../../../../components/competitions/adminPaidTimes/PaidTimeEditModal";
+import PaidTimeCreateModal from "../../../../components/competitions/PaidTimeCreateModal";
 import AddPaidTimeButton from "../../../../components/competitions/adminPaidTimes/AddPaidTimeButton";
 import SlotScheduleModal from "../../../../components/competitions/adminPaidTimes/SlotScheduleModal";
 import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
@@ -45,9 +45,8 @@ import styles from "../../../../styles/adminCompetitionPaidTimesStyles";
 // usp_getmypaidtimerequestsforcompetition (verified live 2026-08-06) - the
 // exact shape resolvePaidTimeLifecycleState and bandAndSortPaidTimes were
 // already built for, so both are reused directly with no adapter. Applied
-// only to the "list" view mode below - the "schedule" mode is a day/slot
-// grid built by PaidTimeScheduleView (out of scope here) and stays exactly
-// as it was.
+// only to the "list" view mode below - the "schedule" mode is a separate
+// day/slot/entry grid built by PaidTimeScheduleView (see CAP-2/CAP-3).
 function renderBandDivider(headerText, keyValue) {
   if (!headerText) {
     return null;
@@ -147,6 +146,15 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   var [expandedIds, setExpandedIds] = useState({});
   var [viewingSlotId, setViewingSlotId] = useState(null);
 
+  // CAP-3: יום/סלוט בתצוגת הלו"ז מתחילים תמיד מכווצים (allSectionsExpanded
+  // = false) - "ברירת מחדל: כותרות ימים בלבד". כל תג/סלוט שנלחץ בנפרד
+  // נכנס ל-overrides מול ברירת המחדל הגלובלית, כדי ש"הרחב הכל"/"מזער הכל"
+  // לא יצטרכו להכיר את מרחב מפתחות היום/הסלוט (מחושב בתוך
+  // PaidTimeScheduleView בלבד) - ראו isDayExpanded/isSlotExpanded למטה.
+  var [allSectionsExpanded, setAllSectionsExpanded] = useState(false);
+  var [dayExpandOverrides, setDayExpandOverrides] = useState({});
+  var [slotExpandOverrides, setSlotExpandOverrides] = useState({});
+
   // Synchronous in-flight guard for paid-time cancellation on this screen -
   // cancellingId above is UI feedback only (async state), not a correctness
   // guard: two rapid taps can both pass a "busy?" check before either render
@@ -169,8 +177,8 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   // Force-closes an already-open edit modal the moment Paid Time becomes
   // disabled or read-only - a still-open modal must not remain a live
   // mutation path just because it was opened before eligibility changed.
-  // PaidTimeEditModal is conditionally MOUNTED (via editingItem), not gated
-  // by its own visible prop, so resetting editingItem fully unmounts it.
+  // The edit PaidTimeCreateModal is conditionally MOUNTED (via editingItem),
+  // so resetting editingItem fully unmounts it.
   useEffect(
     function () {
       if (!availability.paidTimes.isEnabled && editingItem) {
@@ -200,16 +208,52 @@ export default function AdminCompetitionPaidTimesScreen(props) {
     });
   }
 
+  function isDayExpanded(dayKey) {
+    return Object.prototype.hasOwnProperty.call(dayExpandOverrides, dayKey)
+      ? dayExpandOverrides[dayKey]
+      : allSectionsExpanded;
+  }
+
+  function toggleDay(dayKey) {
+    var nextValue = !isDayExpanded(dayKey);
+    setDayExpandOverrides(function (prev) {
+      var next = Object.assign({}, prev);
+      next[dayKey] = nextValue;
+      return next;
+    });
+  }
+
+  function isSlotExpanded(slotKey) {
+    return Object.prototype.hasOwnProperty.call(slotExpandOverrides, slotKey)
+      ? slotExpandOverrides[slotKey]
+      : allSectionsExpanded;
+  }
+
+  function toggleSlot(slotKey) {
+    var nextValue = !isSlotExpanded(slotKey);
+    setSlotExpandOverrides(function (prev) {
+      var next = Object.assign({}, prev);
+      next[slotKey] = nextValue;
+      return next;
+    });
+  }
+
   function expandAll() {
     var next = {};
     paidTimes.filteredItems.forEach(function (it) {
       next[it.paidTimeRequestId] = true;
     });
     setExpandedIds(next);
+    setAllSectionsExpanded(true);
+    setDayExpandOverrides({});
+    setSlotExpandOverrides({});
   }
 
   function collapseAll() {
     setExpandedIds({});
+    setAllSectionsExpanded(false);
+    setDayExpandOverrides({});
+    setSlotExpandOverrides({});
   }
 
   function handleCompetitionMenuPress(item) {
@@ -443,6 +487,10 @@ export default function AdminCompetitionPaidTimesScreen(props) {
           items={paidTimes.filteredItems}
           isExpanded={isExpanded}
           onToggleExpand={toggleExpand}
+          isDayExpanded={isDayExpanded}
+          onToggleDay={toggleDay}
+          isSlotExpanded={isSlotExpanded}
+          onToggleSlot={toggleSlot}
           onEdit={openEdit}
           onCancel={confirmCancel}
           cancellingId={cancellingId}
@@ -524,18 +572,22 @@ export default function AdminCompetitionPaidTimesScreen(props) {
           </Text>
 
           <View style={styles.summaryRow}>
-            {renderSummaryBox("סה״כ בקשות", paidTimes.items.length, "all")}
+            {renderSummaryBox(
+              "סה״כ בקשות",
+              paidTimes.filteredItems.length,
+              "all",
+            )}
             {renderSummaryBox(
               "שובצו",
-              paidTimes.items.filter(function (item) {
-                return item.isAssigned;
+              paidTimes.filteredItems.filter(function (item) {
+                return item.isAssigned && item.assignedSlotIsPublished;
               }).length,
               "assigned"
             )}
             {renderSummaryBox(
               "טרם שובצו",
-              paidTimes.items.filter(function (item) {
-                return !item.isAssigned;
+              paidTimes.filteredItems.filter(function (item) {
+                return !(item.isAssigned && item.assignedSlotIsPublished);
               }).length,
               "pending"
             )}
@@ -544,8 +596,9 @@ export default function AdminCompetitionPaidTimesScreen(props) {
 
         {availability.paidTimes.isEnabled ? (
           <AddPaidTimeButton
-            navigation={props.navigation}
-            competitionId={activeCompetition?.competitionId}
+            paidTimesStepAvailability={availability.paidTimes}
+            isRegistrationStatusLoading={isRegistrationStatusLoading}
+            onCreated={paidTimes.handleRefresh}
           />
         ) : (
           <RegistrationStepNotice
@@ -679,11 +732,11 @@ export default function AdminCompetitionPaidTimesScreen(props) {
       </ScrollView>
 
       {editingItem ? (
-        <PaidTimeEditModal
-          item={editingItem}
-          competitionId={activeCompetition?.competitionId}
-          ranchId={activeRole?.ranchId}
-          roleId={activeRole?.roleId}
+        <PaidTimeCreateModal
+          visible={true}
+          editPaidTimeRequestId={editingItem.paidTimeRequestId}
+          paidTimesStepAvailability={availability.paidTimes}
+          isRegistrationStatusLoading={isRegistrationStatusLoading}
           onClose={closeEdit}
           onSaved={paidTimes.handleRefresh}
         />

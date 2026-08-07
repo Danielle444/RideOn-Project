@@ -71,8 +71,6 @@ import CompetitionEntryCreateModal from "../../../../components/competitions/Com
 
 import PaidTimeCreateModal from "../../../../components/competitions/PaidTimeCreateModal";
 
-import PaidTimeEditModal from "../../../../components/competitions/adminPaidTimes/PaidTimeEditModal";
-
 import StallBookingCreateModal from "../../../../components/competitions/StallBookingCreateModal";
 
 import StallBookingEditModal from "../../../../components/competitions/StallBookingEditModal";
@@ -1746,17 +1744,18 @@ export default function AdminCompetitionPayerAccountScreen(props) {
         onCreated={account.reload}
       />
 
-      <PaidTimeEditModal
-        visible={!!editPaidTimeItem}
-        item={editPaidTimeItem}
-        competitionId={activeCompetition?.competitionId}
-        ranchId={activeRole?.ranchId}
-        roleId={activeRole?.roleId}
-        onClose={function () {
-          setEditPaidTimeItem(null);
-        }}
-        onSaved={account.reload}
-      />
+      {editPaidTimeItem ? (
+        <PaidTimeCreateModal
+          visible={true}
+          editPaidTimeRequestId={editPaidTimeItem.paidTimeRequestId}
+          paidTimesStepAvailability={paidTimesAvailability}
+          isRegistrationStatusLoading={registrationStepStatus.loading}
+          onClose={function () {
+            setEditPaidTimeItem(null);
+          }}
+          onSaved={account.reload}
+        />
+      ) : null}
 
       <StallBookingCreateModal
         visible={showStallCreateModal}
