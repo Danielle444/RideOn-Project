@@ -33,7 +33,6 @@ import PayerProfileScreen from "../screens/roles/payer/screens/PayerProfileScree
 import PayerCompetitionAccountScreen from "../screens/roles/payer/screens/PayerCompetitionAccountScreen";
 
 import WorkerHomeScreen from "../screens/roles/worker/screens/WorkerHomeScreen";
-import WorkerShavingsOrdersScreen from "../screens/roles/worker/screens/WorkerShavingsOrdersScreen";
 import WorkerCompetitionsBoardScreen from "../screens/roles/worker/screens/WorkerCompetitionsBoardScreen";
 import WorkerCompetitionShavingsOrdersScreen from "../screens/roles/worker/screens/WorkerCompetitionShavingsOrdersScreen";
 import WorkerCompetitionStallMapScreen from "../screens/roles/worker/screens/WorkerCompetitionStallMapScreen";
@@ -440,19 +439,6 @@ export default function AppNavigator(props) {
             screenProps,
             ["עובד חווה"],
             <WorkerProfileScreen {...screenProps} onLogout={props.onLogout} />,
-          );
-        }}
-      </Stack.Screen>
-
-      <Stack.Screen name="WorkerShavingsOrders">
-        {function (screenProps) {
-          return withGuard(
-            screenProps,
-            ["עובד חווה"],
-            <WorkerShavingsOrdersScreen
-              {...screenProps}
-              onLogout={props.onLogout}
-            />,
           );
         }}
       </Stack.Screen>
