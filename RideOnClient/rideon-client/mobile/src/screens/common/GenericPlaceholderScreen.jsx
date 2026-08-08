@@ -117,12 +117,13 @@ export default function GenericPlaceholderScreen(props) {
       subtitle=""
       activeBottomTab={props.activeBottomTab || null}
       bottomNavItems={getBottomNavItems()}
-      menuContent={function ({ closeMenu }) {
+      menuContent={function ({ closeMenu, requestExitConfirm }) {
         if (menuMode === "competition" && activeCompetition) {
           return (
             <CompetitionMenuTemplate
               activeKey={props.activeKey || ""}
               closeMenu={closeMenu}
+              requestExitConfirm={requestExitConfirm}
               competitionName={activeCompetition.competitionName}
               items={getCompetitionMenuItems()}
               onItemPress={handleCompetitionMenuPress}

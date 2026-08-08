@@ -61,11 +61,12 @@ export default function AdminCompetitionHealthCertificatesScreen(props) {
       subtitle=""
       activeBottomTab={null}
       bottomNavItems={getAdminBottomNavConfig(props.navigation)}
-      menuContent={function ({ closeMenu }) {
+      menuContent={function ({ closeMenu, requestExitConfirm }) {
         return (
           <CompetitionMenuTemplate
             activeKey="health-certificates"
             closeMenu={closeMenu}
+            requestExitConfirm={requestExitConfirm}
             competitionName={
               activeCompetition ? activeCompetition.competitionName : ""
             }

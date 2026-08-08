@@ -5,6 +5,14 @@ import path from "node:path";
 // CompetitionMenuTemplate.jsx cannot be imported/rendered under vitest
 // (react-native deps) - same convention as every other
 // *.contract.test.js file in this repo: read the source as text.
+//
+// This file was rewritten for the nested-Modal fix: the exit-confirmation
+// AppDialog used to be rendered here, nested inside MobileSideMenu's own
+// native Modal (see MobileScreenLayout.jsx), which caused the exit flow to
+// close two native Modals in the same event cycle right as navigation
+// unmounted the screen - the bottom nav went dead afterward. AppDialog now
+// lives in MobileScreenLayout, outside MobileSideMenu; this template only
+// requests it.
 
 var SOURCE_PATH = path.resolve(__dirname, "CompetitionMenuTemplate.jsx");
 
@@ -18,63 +26,70 @@ describe("CompetitionMenuTemplate - exit-competition confirmation", () => {
     expect(source).not.toMatch(/\bAlert\b/);
   });
 
-  it("imports AppDialog from the styled alert foundation", () => {
+  it("does not import or render AppDialog - the exit-confirmation dialog must never be a native Modal nested inside MobileSideMenu's native Modal", () => {
     var source = readSource();
-    expect(source).toContain('import AppDialog from "../common/AppDialog";');
+    expect(source).not.toMatch(/import AppDialog/);
+    expect(source).not.toMatch(/<AppDialog\b/);
+    expect(source).not.toMatch(/<Modal\b/);
   });
 
-  it("exit-competition requires confirmation - the menu Pressable only opens a dialog, never calls onExitCompetition directly", () => {
+  it("has no local exit-dialog visibility state - that state now lives in MobileScreenLayout, outside MobileSideMenu", () => {
+    var source = readSource();
+    expect(source).not.toContain("useState");
+    expect(source).not.toContain("exitDialogVisible");
+  });
+
+  it("exit-competition requires confirmation - the menu Pressable only requests confirmation, never calls onExitCompetition directly", () => {
     var source = readSource();
     var fnStart = source.indexOf("function handleExitPress()");
     var fnEnd = source.indexOf("\n  }\n", fnStart);
     var fnBody = source.slice(fnStart, fnEnd);
 
-    expect(fnBody).toContain("setExitDialogVisible(true);");
-    expect(fnBody).not.toContain("onExitCompetition");
+    expect(fnBody).toContain("props.requestExitConfirm(props.onExitCompetition);");
+    expect(fnBody).not.toContain("props.onExitCompetition()");
+    expect(fnBody).not.toContain("props.closeMenu");
 
     expect(source).toContain("onPress={handleExitPress}");
   });
 
-  it("onExitCompetition is invoked exactly once in the file, only from the confirm handler, preserving each caller's implementation exactly (called as a plain reference, not wrapped/altered)", () => {
+  it("requestExitConfirm is invoked exactly once in the file, passed onExitCompetition as a plain unwrapped reference", () => {
     var source = readSource();
     var occurrences = (
-      source.match(/props\.onExitCompetition\(\)/g) || []
+      source.match(/props\.requestExitConfirm\(/g) || []
     ).length;
     expect(occurrences).toBe(1);
 
-    var confirmStart = source.indexOf("function handleExitConfirm()");
-    var confirmEnd = source.indexOf("\n  }\n", confirmStart);
-    var confirmBody = source.slice(confirmStart, confirmEnd);
-
-    expect(confirmBody).toContain("setExitDialogVisible(false);");
-    expect(confirmBody).toContain("props.onExitCompetition();");
-    // Not awaited - matches the pre-existing fire-and-forget call shape, so
-    // whatever the caller passed in (sync or async, board-reset or full
-    // clearCompetition()) behaves exactly as it did before this dialog
-    // existed.
-    expect(confirmBody).not.toContain("await props.onExitCompetition");
+    expect(source).toContain(
+      "props.requestExitConfirm(props.onExitCompetition);",
+    );
+    // Never wrapped in an extra function/await here - whatever MobileScreenLayout
+    // eventually calls must be the caller's own callback, unaltered.
+    expect(source).not.toMatch(/requestExitConfirm\(\s*(async\s*)?function/);
+    expect(source).not.toMatch(/requestExitConfirm\(\s*\(\)\s*=>/);
   });
 
-  it("focus-driven cleanup cannot accidentally open this dialog - the template has no lifecycle/focus hooks at all", () => {
+  it("no timing workaround exists anywhere in this file", () => {
     var source = readSource();
-    // The dialog's visibility is driven only by the explicit tap
-    // (handleExitPress -> setExitDialogVisible(true)). This file must not
-    // wire any useEffect/useFocusEffect that could set that state, because
-    // some callers' onExitCompetition (e.g. WorkerCompetitionsBoardScreen's
+    expect(source).not.toContain("setTimeout");
+    expect(source).not.toContain("setInterval");
+    expect(source).not.toContain("requestAnimationFrame");
+  });
+
+  it("focus-driven cleanup cannot accidentally trigger the exit flow - the template has no lifecycle/focus hooks at all", () => {
+    var source = readSource();
+    // Some callers' onExitCompetition (e.g. WorkerCompetitionsBoardScreen's
     // exitCompetitionMenu) are also invoked automatically from their own
-    // useFocusEffect - the dialog logic must stay confined to this
-    // template's explicit menu-tap handler and never reach into that shared
-    // function.
+    // useFocusEffect - this template must stay confined to the explicit
+    // menu-tap handler and never reach into that shared function itself.
     expect(source).not.toContain("useFocusEffect");
     expect(source).not.toContain("useEffect");
     expect(source).not.toContain("exitCompetitionMenu");
     expect(source).not.toContain("handleExitCompetition");
   });
 
-  it("renders the dialog wired to press/confirm/cancel handlers", () => {
+  it("other menu items (item press) are unaffected by the exit-confirmation change", () => {
     var source = readSource();
-    expect(source).toContain("visible={exitDialogVisible}");
-    expect(source).toContain("onConfirm={handleExitConfirm}");
-    expect(source).toContain("onCancel={handleExitCancel}");
+    expect(source).toContain("props.onItemPress(item);");
+    expect(source).toContain("if (props.closeMenu) {");
   });
 });

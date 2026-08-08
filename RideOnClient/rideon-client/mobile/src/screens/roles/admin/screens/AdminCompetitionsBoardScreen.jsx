@@ -155,7 +155,7 @@ export default function AdminCompetitionsBoardScreen(props) {
       title="לוח התחרויות"
       activeBottomTab="board"
       bottomNavItems={getAdminBottomNavConfig(props.navigation)}
-      menuContent={({ closeMenu }) => {
+      menuContent={({ closeMenu, requestExitConfirm }) => {
         if (menuMode === "competition" && selectedCompetition) {
           return (
             <CompetitionMenuTemplate
@@ -164,6 +164,7 @@ export default function AdminCompetitionsBoardScreen(props) {
               onItemPress={handleCompetitionMenuPress}
               onExitCompetition={() => setMenuMode("general")}
               closeMenu={closeMenu}
+              requestExitConfirm={requestExitConfirm}
             />
           );
         }

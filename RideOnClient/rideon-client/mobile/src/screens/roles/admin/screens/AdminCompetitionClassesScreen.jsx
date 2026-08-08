@@ -530,11 +530,12 @@ export default function AdminCompetitionClassesScreen(props) {
       subtitle=""
       activeBottomTab={null}
       bottomNavItems={getAdminBottomNavConfig(props.navigation)}
-      menuContent={function ({ closeMenu }) {
+      menuContent={function ({ closeMenu, requestExitConfirm }) {
         return (
           <CompetitionMenuTemplate
             activeKey="classes"
             closeMenu={closeMenu}
+            requestExitConfirm={requestExitConfirm}
             competitionName={
               activeCompetition ? activeCompetition.competitionName : ""
             }

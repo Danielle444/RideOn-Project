@@ -255,12 +255,13 @@ export default function PayerCompetitionsBoardScreen(props) {
       subtitle=""
       activeBottomTab="board"
       bottomNavItems={getPayerBottomNavConfig(props.navigation)}
-      menuContent={function ({ closeMenu }) {
+      menuContent={function ({ closeMenu, requestExitConfirm }) {
         if (menuMode === "competition" && selectedCompetition) {
           return (
             <CompetitionMenuTemplate
               activeKey=""
               closeMenu={closeMenu}
+              requestExitConfirm={requestExitConfirm}
               competitionName={selectedCompetition.competitionName}
               items={getPayerCompetitionMenuItems()}
               onItemPress={handleCompetitionMenuPress}
