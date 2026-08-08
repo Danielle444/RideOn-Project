@@ -7,6 +7,7 @@ import CompetitionMenuTemplate from "../../../../components/mobile-nav/Competiti
 import CompetitionRegistrationsClassesTab from "../../../../components/competitions/CompetitionRegistrationsClassesTab";
 import CompetitionPaidTimeTab from "../../../../components/competitions/CompetitionPaidTimeTab";
 import CompetitionStallBookingsTab from "../../../../components/competitionRegistrations/CompetitionStallBookingsTab";
+import AppDialog from "../../../../components/common/AppDialog";
 
 import styles from "../../../../styles/adminCompetitionRegistrationsStyles";
 
@@ -712,6 +713,8 @@ export default function AdminCompetitionRegistrationsScreen(props) {
       paidTimeAvailability.canBookBulk ? (
         <SmartBookingFab onConfirm={handleOpenSmartBooking} />
       ) : null}
+
+      <AppDialog {...registration.duplicateConfirmDialogProps} />
     </View>
   );
 }

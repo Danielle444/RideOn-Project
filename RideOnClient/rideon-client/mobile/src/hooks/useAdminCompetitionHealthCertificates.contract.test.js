@@ -190,7 +190,7 @@ describe("useAdminCompetitionHealthCertificates status tabs", () => {
 });
 
 describe("useAdminCompetitionHealthCertificates error presentation", () => {
-  it("never echoes the raw response body or error message into an Alert", () => {
+  it("never echoes the raw response body or error message into a toast", () => {
     var source = readSource();
 
     expect(source).not.toContain("String(error?.response?.data");
@@ -209,13 +209,96 @@ describe("useAdminCompetitionHealthCertificates error presentation", () => {
   it("success still refreshes the certificate list", () => {
     var body = getUploadFunctionBody(readSource());
 
-    var successAlertIndex = body.indexOf('"בוצע"');
+    var successToastIndex = body.indexOf("הועלתה בהצלחה");
     var networkCallIndex = body.indexOf("await uploadHealthCertificateFile(");
     var refreshIndex = body.indexOf("await loadCertificates();");
 
-    expect(successAlertIndex).toBeGreaterThan(-1);
+    expect(successToastIndex).toBeGreaterThan(-1);
     expect(refreshIndex).toBeGreaterThan(-1);
-    expect(successAlertIndex).toBeGreaterThan(networkCallIndex);
-    expect(refreshIndex).toBeGreaterThan(successAlertIndex);
+    expect(successToastIndex).toBeGreaterThan(networkCallIndex);
+    expect(refreshIndex).toBeGreaterThan(successToastIndex);
+  });
+});
+
+describe("useAdminCompetitionHealthCertificates styled-alert migration", () => {
+  it("no native Alert import or Alert.alert call remains", () => {
+    var source = readSource();
+
+    expect(source).not.toMatch(/Alert\.alert\(/);
+    expect(source).not.toMatch(/from "react-native"[\s\S]{0,120}Alert/);
+  });
+
+  it("imports showToast for validation/error/success notices", () => {
+    expect(readSource()).toContain(
+      'import { showToast } from "../services/toastService";',
+    );
+  });
+
+  it("every remaining single-button notice (validation, load error, upload error, success) uses showToast", () => {
+    var source = readSource();
+    var showToastCount = source.split("showToast(").length - 1;
+
+    // loadCertificates catch, no-competition guard, no-ranch guard, no-file
+    // guard, unsupported-type guard, too-large guard, upload success, upload
+    // catch = 8 call sites.
+    expect(showToastCount).toBe(8);
+  });
+});
+
+// The approved-certificate replacement warning is a real confirm/cancel
+// decision (not a passive notice), so it stays an AppDialog - unlike the
+// duplicate-entry confirm, this hook has exactly one consumer
+// (AdminCompetitionHealthCertificatesScreen.jsx), so the dialog-props
+// contract only needs to be rendered in that one screen.
+describe("useAdminCompetitionHealthCertificates replace-approved-certificate dialog contract", () => {
+  it("confirmReplaceApprovedCertificate opens the dialog and awaits its resolution, instead of calling a native Alert", () => {
+    var source = readSource();
+    var start = source.indexOf("function confirmReplaceApprovedCertificate() {");
+    var end = source.indexOf("var loadCertificates = useCallback(");
+    var block = source.slice(start, end);
+
+    expect(block).toContain("return new Promise(function (resolve) {");
+    expect(block).toContain("replaceConfirmResolveRef.current = resolve;");
+    expect(block).toContain("setReplaceConfirmVisible(true);");
+  });
+
+  it("resolveReplaceConfirm closes the dialog, resolves the pending promise, and clears the ref", () => {
+    var source = readSource();
+    var start = source.indexOf("function resolveReplaceConfirm(confirmed) {");
+    var end = source.indexOf("function confirmReplaceApprovedCertificate() {");
+    var block = source.slice(start, end);
+
+    expect(block).toContain("setReplaceConfirmVisible(false);");
+    expect(block).toContain(
+      "var resolve = replaceConfirmResolveRef.current;",
+    );
+    expect(block).toContain("replaceConfirmResolveRef.current = null;");
+    expect(block).toContain("resolve(confirmed);");
+  });
+
+  it("exposes replaceApprovedCertificateDialogProps with the full AppDialog contract: visible, title, message, both labels, destructive, onConfirm and onCancel", () => {
+    var source = readSource();
+    var dialogPropsBlock = source.slice(
+      source.indexOf("replaceApprovedCertificateDialogProps: {"),
+    );
+
+    expect(dialogPropsBlock).toContain("visible: replaceConfirmVisible,");
+    expect(dialogPropsBlock).toContain(
+      "title: REPLACE_APPROVED_CERTIFICATE_TITLE,",
+    );
+    expect(dialogPropsBlock).toContain(
+      "message: REPLACE_APPROVED_CERTIFICATE_MESSAGE,",
+    );
+    expect(dialogPropsBlock).toContain(
+      "confirmLabel: REPLACE_APPROVED_CERTIFICATE_CONFIRM_LABEL,",
+    );
+    expect(dialogPropsBlock).toContain(
+      "cancelLabel: REPLACE_APPROVED_CERTIFICATE_CANCEL_LABEL,",
+    );
+    expect(dialogPropsBlock).toContain("destructive: true,");
+    expect(dialogPropsBlock).toContain("onConfirm: function () {");
+    expect(dialogPropsBlock).toContain("resolveReplaceConfirm(true);");
+    expect(dialogPropsBlock).toContain("onCancel: function () {");
+    expect(dialogPropsBlock).toContain("resolveReplaceConfirm(false);");
   });
 });

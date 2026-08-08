@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -24,6 +23,8 @@ import {
   isDuplicateEntryEligible,
   getDuplicateEntryCounts,
 } from "../../utils/duplicateEntriesVisibility";
+import AppDialog from "../common/AppDialog";
+import { showToast } from "../../services/toastService";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -78,6 +79,14 @@ export default function DuplicateEntriesModal(props) {
 
   var [submitting, setSubmitting] = useState(false);
 
+  var [confirmDuplicateOpen, setConfirmDuplicateOpen] = useState(false);
+
+  // Post-duplicate summary stays a single-button AppDialog (not a toast) -
+  // its acknowledgement gates onDuplicated()+onClose(), same as the native
+  // Alert it replaces.
+  var [summaryDialogOpen, setSummaryDialogOpen] = useState(false);
+  var [summaryMessage, setSummaryMessage] = useState("");
+
   useEffect(
     function () {
       if (!isOpen) return;
@@ -96,6 +105,9 @@ export default function DuplicateEntriesModal(props) {
     setChecked({});
     setScreenError("");
     setSubmitting(false);
+    setConfirmDuplicateOpen(false);
+    setSummaryDialogOpen(false);
+    setSummaryMessage("");
   }
 
   function loadPastComps() {
@@ -191,21 +203,26 @@ export default function DuplicateEntriesModal(props) {
 
   function handleSubmit() {
     if (selectedItems.length === 0) {
-      Alert.alert("בחירה ריקה", "סמן לפחות הרשמה אחת לשכפול");
+      showToast("סמן לפחות הרשמה אחת לשכפול", "warning");
       return;
     }
 
-    Alert.alert(
-      "שכפול הרשמות",
-      "האם לשכפל " + selectedItems.length + " הרשמות לתחרות הפעילה?",
-      [
-        { text: "לא", style: "cancel" },
-        {
-          text: "כן",
-          onPress: doSubmit,
-        },
-      ],
-    );
+    setConfirmDuplicateOpen(true);
+  }
+
+  function handleConfirmDuplicateCancel() {
+    setConfirmDuplicateOpen(false);
+  }
+
+  function handleConfirmDuplicateConfirm() {
+    setConfirmDuplicateOpen(false);
+    doSubmit();
+  }
+
+  function handleSummaryDialogAcknowledge() {
+    setSummaryDialogOpen(false);
+    onDuplicated();
+    onClose();
   }
 
   function doSubmit() {
@@ -234,18 +251,11 @@ export default function DuplicateEntriesModal(props) {
           successCount +
           (failureCount > 0 ? " · נכשלו: " + failureCount : "");
 
-        Alert.alert("הסתיים", message, [
-          {
-            text: "אישור",
-            onPress: function () {
-              onDuplicated();
-              onClose();
-            },
-          },
-        ]);
+        setSummaryMessage(message);
+        setSummaryDialogOpen(true);
       })
       .catch(function (err) {
-        Alert.alert("שגיאה", extractErrorMessage(err));
+        showToast(extractErrorMessage(err), "error");
       })
       .finally(function () {
         setSubmitting(false);
@@ -640,6 +650,25 @@ export default function DuplicateEntriesModal(props) {
 
         {renderFooter()}
       </View>
+
+      <AppDialog
+        visible={confirmDuplicateOpen}
+        title="שכפול הרשמות"
+        message={"האם לשכפל " + selectedItems.length + " הרשמות לתחרות הפעילה?"}
+        confirmLabel="כן"
+        cancelLabel="לא"
+        onConfirm={handleConfirmDuplicateConfirm}
+        onCancel={handleConfirmDuplicateCancel}
+      />
+
+      <AppDialog
+        visible={summaryDialogOpen}
+        type="success"
+        title="הסתיים"
+        message={summaryMessage}
+        confirmLabel="אישור"
+        onConfirm={handleSummaryDialogAcknowledge}
+      />
     </Modal>
   );
 }

@@ -199,11 +199,12 @@ describe("CompetitionEntryCreateModal - Phase 3C direct admin edit", () => {
     );
   });
 
-  it("on mutation failure: shows a mapped error alert, returns before any success/refresh code, and leaves the modal open", () => {
+  it("on mutation failure: shows a mapped error toast, returns before any success/refresh code, and leaves the modal open", () => {
     var directEditBlock = getDirectEditBlock(readSource());
     var catchBlock = getCatchBlock(directEditBlock);
 
-    expect(catchBlock).toContain('Alert.alert(\n        "שגיאה",');
+    expect(catchBlock).toContain("showToast(\n        getApiErrorMessage(error,");
+    expect(catchBlock).toContain('"error",');
     expect(catchBlock).toContain("return;");
     expect(catchBlock).not.toContain("props.onClose");
     expect(catchBlock).not.toContain("props.onCreated");
@@ -227,20 +228,20 @@ describe("CompetitionEntryCreateModal - Phase 3C direct admin edit", () => {
       );
     });
 
-    it("handleDirectAdminEdit selects copy via getResultTypeCopy(resultType) exactly once, and derives the Alert title from category", () => {
+    it("handleDirectAdminEdit selects copy via getResultTypeCopy(resultType) exactly once, and derives the toast type from category", () => {
       var block = getDirectEditBlock(readSource());
 
       expect(countOccurrences(block, "getResultTypeCopy(")).toBe(1);
       expect(block).toContain("var copy = getResultTypeCopy(resultType);");
       expect(block).toContain(
-        'copy.category === RESULT_CATEGORY.SECRETARY_PENDING ? "נשלח" : "עודכן"',
+        'copy.category === RESULT_CATEGORY.SECRETARY_PENDING ? "info" : "success"',
       );
-      expect(block).toContain("Alert.alert(alertTitle, copy.text);");
+      expect(block).toContain("showToast(copy.text, toastType);");
     });
   });
 
   describe("mutation success is decoupled from refresh (Blocker 1)", () => {
-    it("resultType/copy selection/success alert/close all happen strictly after the mutation's own finally settles", () => {
+    it("resultType/copy selection/success toast/close all happen strictly after the mutation's own finally settles", () => {
       var directEditBlock = getDirectEditBlock(readSource());
 
       var finallyIndex = directEditBlock.indexOf("} finally {");
@@ -248,7 +249,7 @@ describe("CompetitionEntryCreateModal - Phase 3C direct admin edit", () => {
       var copyIndex = directEditBlock.indexOf(
         "var copy = getResultTypeCopy(resultType);",
       );
-      var alertIndex = directEditBlock.indexOf("Alert.alert(alertTitle, copy.text);");
+      var toastIndex = directEditBlock.indexOf("showToast(copy.text, toastType);");
       var closeIndex = directEditBlock.indexOf("props.onClose();");
       var refreshGuardIndex = directEditBlock.indexOf(
         'if (typeof props.onCreated === "function") {',
@@ -256,16 +257,16 @@ describe("CompetitionEntryCreateModal - Phase 3C direct admin edit", () => {
 
       expect(resultTypeIndex).toBeGreaterThan(finallyIndex);
       expect(copyIndex).toBeGreaterThan(resultTypeIndex);
-      expect(alertIndex).toBeGreaterThan(copyIndex);
-      expect(closeIndex).toBeGreaterThan(alertIndex);
+      expect(toastIndex).toBeGreaterThan(copyIndex);
+      expect(closeIndex).toBeGreaterThan(toastIndex);
       expect(refreshGuardIndex).toBeGreaterThan(closeIndex);
     });
 
-    it("the success alert and modal close are NOT inside the refresh's try/catch - they already ran before refresh starts", () => {
+    it("the success toast and modal close are NOT inside the refresh's try/catch - they already ran before refresh starts", () => {
       var directEditBlock = getDirectEditBlock(readSource());
       var refreshBlock = getRefreshStepBlock(directEditBlock);
 
-      expect(refreshBlock).not.toContain("Alert.alert(alertTitle");
+      expect(refreshBlock).not.toContain("showToast(copy.text");
       expect(refreshBlock).not.toContain("props.onClose();");
     });
 
@@ -311,5 +312,31 @@ describe("CompetitionEntryCreateModal - Phase 3C direct admin edit", () => {
     );
     expect(nonDirectBlock).toContain("await createChangeEntryRequest({");
     expect(nonDirectBlock).toContain("originalEntryId: editItem.entryId,");
+  });
+
+  describe("styled-alert migration", () => {
+    it("no native Alert import or Alert.alert call remains in this component", () => {
+      var source = readSource();
+
+      expect(source).not.toMatch(/\bAlert\.alert\b/);
+      expect(source).not.toMatch(/from "react-native"[\s\S]{0,80}Alert/);
+    });
+
+    it("imports showToast for validation/error/success notices", () => {
+      expect(readSource()).toContain(
+        'import { showToast } from "../../services/toastService";',
+      );
+    });
+
+    it("renders the shared duplicate-confirm AppDialog by spreading the hook's dialog-props contract", () => {
+      var source = readSource();
+
+      expect(source).toContain(
+        'import AppDialog from "../common/AppDialog";',
+      );
+      expect(source).toContain(
+        "<AppDialog {...registrations.duplicateConfirmDialogProps} />",
+      );
+    });
   });
 });

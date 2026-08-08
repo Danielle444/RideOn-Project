@@ -1,5 +1,4 @@
 import {
-  Alert,
   Modal,
   Pressable,
   SafeAreaView,
@@ -19,6 +18,7 @@ import { useCompetition } from "../../context/CompetitionContext";
 import useAdminCompetitionRegistrations from "../../hooks/useAdminCompetitionRegistrations";
 
 import CompetitionRegistrationsClassesTab from "./CompetitionRegistrationsClassesTab";
+import AppDialog from "../common/AppDialog";
 
 import styles from "../../styles/adminCompetitionClassesStyles";
 
@@ -27,6 +27,7 @@ import {
   adminEditEntry,
 } from "../../services/entriesService";
 import { getApiErrorMessage } from "../../../../shared/auth/utils/authApiErrors";
+import { showToast } from "../../services/toastService";
 
 import { resolveEntryEditInitialization } from "../../utils/entryEditInitialization";
 
@@ -221,9 +222,9 @@ export default function CompetitionEntryCreateModal(props) {
           : null,
       });
     } catch (error) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         getApiErrorMessage(error, "אירעה שגיאה בעדכון ההרשמה"),
+        "error",
       );
 
       return;
@@ -238,10 +239,10 @@ export default function CompetitionEntryCreateModal(props) {
 
     var copy = getResultTypeCopy(resultType);
 
-    var alertTitle =
-      copy.category === RESULT_CATEGORY.SECRETARY_PENDING ? "נשלח" : "עודכן";
+    var toastType =
+      copy.category === RESULT_CATEGORY.SECRETARY_PENDING ? "info" : "success";
 
-    Alert.alert(alertTitle, copy.text);
+    showToast(copy.text, toastType);
 
     if (typeof props.onClose === "function") {
       props.onClose();
@@ -381,6 +382,8 @@ export default function CompetitionEntryCreateModal(props) {
             createdCount={registrations.createdCount}
           />
         </ScrollView>
+
+        <AppDialog {...registrations.duplicateConfirmDialogProps} />
       </SafeAreaView>
     </Modal>
   );

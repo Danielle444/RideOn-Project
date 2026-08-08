@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
+import { showToast } from "../services/toastService";
 import {
   getRidersByRanch,
   getTrainersByRanch,
@@ -213,6 +213,27 @@ export default function useAdminCompetitionRegistrations(params) {
   var horsesRequestIdRef = useRef(0);
 
   var [lastCreatedEntry, setLastCreatedEntry] = useState(null);
+
+  // CAP-2 duplicate-confirm dialog: this hook has two live consumers
+  // (CompetitionEntryCreateModal.jsx and AdminCompetitionRegistrationsScreen.jsx),
+  // and AppDialog - unlike showToast - is a plain controlled component, not a
+  // global host, so each consumer must render it via
+  // duplicateConfirmDialogProps below. The resolve function is held in a ref
+  // (not state) so handleDuplicateConfirmChoice can settle the very Promise
+  // checkForDuplicateAndConfirm is currently awaiting.
+  var [duplicateConfirmVisible, setDuplicateConfirmVisible] = useState(false);
+  var duplicateConfirmResolveRef = useRef(null);
+
+  function handleDuplicateConfirmChoice(confirmed) {
+    setDuplicateConfirmVisible(false);
+
+    var resolve = duplicateConfirmResolveRef.current;
+    duplicateConfirmResolveRef.current = null;
+
+    if (resolve) {
+      resolve(confirmed);
+    }
+  }
 
   // CAP-1: transient "just created" confirmation, and how many entries this
   // hook instance has created in the current mount ("session"). Only ever
@@ -475,7 +496,8 @@ export default function useAdminCompetitionRegistrations(params) {
   }
 
   // CAP-2 soft duplicate guard. Fetches the competition's entry list and
-  // warns (Alert confirm/cancel) when the exact class+horse+rider triple
+  // warns (AppDialog confirm/cancel, rendered by every consumer via
+  // duplicateConfirmDialogProps) when the exact class+horse+rider triple
   // already has an Active entry - never blocks outright ON A FOUND
   // duplicate (cancel/confirm is the user's own choice). A fetch or
   // normalization FAILURE is a different case: since we could not verify
@@ -504,7 +526,7 @@ export default function useAdminCompetitionRegistrations(params) {
         excludeEntryId: excludeEntryId,
       });
     } catch (error) {
-      Alert.alert("שגיאה", GENERIC_FETCH_ERROR_MESSAGE);
+      showToast(GENERIC_FETCH_ERROR_MESSAGE, "error");
       return false;
     }
 
@@ -513,26 +535,8 @@ export default function useAdminCompetitionRegistrations(params) {
     }
 
     return await new Promise(function (resolve) {
-      Alert.alert(DUPLICATE_ENTRY_CONFIRM_MESSAGE, undefined, [
-        {
-          text: DUPLICATE_ENTRY_CANCEL_LABEL,
-          style: "cancel",
-          onPress: function () {
-            resolve(false);
-          },
-        },
-        {
-          text: DUPLICATE_ENTRY_CONFIRM_LABEL,
-          onPress: function () {
-            resolve(true);
-          },
-        },
-      ], {
-        cancelable: true,
-        onDismiss: function () {
-          resolve(false);
-        },
-      });
+      duplicateConfirmResolveRef.current = resolve;
+      setDuplicateConfirmVisible(true);
     });
   }
 
@@ -551,7 +555,7 @@ export default function useAdminCompetitionRegistrations(params) {
     var validationMessage = validateForm();
 
     if (validationMessage) {
-      Alert.alert("שגיאה", validationMessage);
+      showToast(validationMessage, "error");
       return null;
     }
 
@@ -598,9 +602,9 @@ export default function useAdminCompetitionRegistrations(params) {
 
       return response.data;
     } catch (error) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         getApiErrorMessage(error, "אירעה שגיאה בשמירת ההרשמה"),
+        "error",
       );
 
       return null;
@@ -673,5 +677,24 @@ export default function useAdminCompetitionRegistrations(params) {
     justCreated,
     createdCount,
     resetCreationSummary,
+
+    // Single source of truth for the shared duplicate rider+horse confirm -
+    // every consumer renders <AppDialog {...duplicateConfirmDialogProps} />
+    // so the decision (Continue/Cancel) always resolves the same
+    // checkForDuplicateAndConfirm Promise, regardless of which screen
+    // triggered it.
+    duplicateConfirmDialogProps: {
+      visible: duplicateConfirmVisible,
+      type: "warning",
+      message: DUPLICATE_ENTRY_CONFIRM_MESSAGE,
+      confirmLabel: DUPLICATE_ENTRY_CONFIRM_LABEL,
+      cancelLabel: DUPLICATE_ENTRY_CANCEL_LABEL,
+      onConfirm: function () {
+        handleDuplicateConfirmChoice(true);
+      },
+      onCancel: function () {
+        handleDuplicateConfirmChoice(false);
+      },
+    },
   };
 }

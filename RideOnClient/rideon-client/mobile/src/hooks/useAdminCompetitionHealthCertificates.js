@@ -1,7 +1,5 @@
 import { useCallback, useRef, useState } from "react";
 
-import { Alert } from "react-native";
-
 import { useFocusEffect } from "@react-navigation/native";
 
 import * as DocumentPicker from "expo-document-picker";
@@ -10,6 +8,8 @@ import {
   getHealthCertificates,
   uploadHealthCertificateFile,
 } from "../services/horsesService";
+
+import { showToast } from "../services/toastService";
 
 import { createInFlightGuard } from "../utils/inFlightGuard";
 
@@ -38,32 +38,11 @@ function normalizeCertificatesResponse(response) {
   return [];
 }
 
+var REPLACE_APPROVED_CERTIFICATE_TITLE = "החלפת תעודה מאושרת";
 var REPLACE_APPROVED_CERTIFICATE_MESSAGE =
   "החלפת תעודה מאושרת תחזיר אותה למצב ממתין לאישור המזכירות. להמשיך?";
-
-// Wraps the RN Alert.alert callback API in a promise so the upload flow can
-// simply `await` the admin's choice. Resolves false on cancel/dismiss so the
-// caller's default behavior (do nothing) requires no extra branching.
-function confirmReplaceApprovedCertificate() {
-  return new Promise(function (resolve) {
-    Alert.alert("החלפת תעודה מאושרת", REPLACE_APPROVED_CERTIFICATE_MESSAGE, [
-      {
-        text: "ביטול",
-        style: "cancel",
-        onPress: function () {
-          resolve(false);
-        },
-      },
-      {
-        text: "החלף תעודה",
-        style: "destructive",
-        onPress: function () {
-          resolve(true);
-        },
-      },
-    ]);
-  });
-}
+var REPLACE_APPROVED_CERTIFICATE_CONFIRM_LABEL = "החלף תעודה";
+var REPLACE_APPROVED_CERTIFICATE_CANCEL_LABEL = "ביטול";
 
 export default function useAdminCompetitionHealthCertificates(params) {
   var activeCompetition = params.activeCompetition;
@@ -80,6 +59,35 @@ export default function useAdminCompetitionHealthCertificates(params) {
   var uploadGuardRef = useRef(null);
   if (uploadGuardRef.current === null) {
     uploadGuardRef.current = createInFlightGuard();
+  }
+
+  // Sole consumer is AdminCompetitionHealthCertificatesScreen.jsx, which
+  // renders <AppDialog {...replaceApprovedCertificateDialogProps} /> - the
+  // resolve function lives in a ref so the dialog's onConfirm/onCancel can
+  // settle the Promise confirmReplaceApprovedCertificate is awaiting.
+  var [replaceConfirmVisible, setReplaceConfirmVisible] = useState(false);
+  var replaceConfirmResolveRef = useRef(null);
+
+  function resolveReplaceConfirm(confirmed) {
+    setReplaceConfirmVisible(false);
+
+    var resolve = replaceConfirmResolveRef.current;
+    replaceConfirmResolveRef.current = null;
+
+    if (resolve) {
+      resolve(confirmed);
+    }
+  }
+
+  // Wraps the confirm/cancel choice in a promise so the upload flow can
+  // simply `await` the admin's decision, same shape as the native
+  // Alert.alert callback API it replaces. Resolves false on cancel so the
+  // caller's default behavior (do nothing) requires no extra branching.
+  function confirmReplaceApprovedCertificate() {
+    return new Promise(function (resolve) {
+      replaceConfirmResolveRef.current = resolve;
+      setReplaceConfirmVisible(true);
+    });
   }
 
   var loadCertificates = useCallback(
@@ -105,12 +113,12 @@ export default function useAdminCompetitionHealthCertificates(params) {
         console.log("HEALTH CERTIFICATES LOAD ERROR", error);
         console.log("HEALTH CERTIFICATES LOAD RESPONSE", error?.response?.data);
 
-        Alert.alert(
-          "שגיאה",
+        showToast(
           resolveHealthCertificateErrorMessage(
             error,
             "לא ניתן לטעון את תעודות הבריאות",
           ),
+          "error",
         );
       } finally {
         setLoading(false);
@@ -151,12 +159,12 @@ export default function useAdminCompetitionHealthCertificates(params) {
 
     try {
       if (!activeCompetition?.competitionId) {
-        Alert.alert("שגיאה", "לא נמצאה תחרות פעילה");
+        showToast("לא נמצאה תחרות פעילה", "error");
         return;
       }
 
       if (!activeRole?.ranchId) {
-        Alert.alert("שגיאה", "לא נמצאה חווה פעילה");
+        showToast("לא נמצאה חווה פעילה", "error");
         return;
       }
 
@@ -181,17 +189,17 @@ export default function useAdminCompetitionHealthCertificates(params) {
         result.assets && result.assets.length > 0 ? result.assets[0] : null;
 
       if (!file || !file.uri) {
-        Alert.alert("שגיאה", "לא נמצא קובץ תקין להעלאה");
+        showToast("לא נמצא קובץ תקין להעלאה", "error");
         return;
       }
 
       if (!isSupportedHealthCertificateFile(file)) {
-        Alert.alert("שגיאה", "ניתן להעלות קובץ PDF בלבד");
+        showToast("ניתן להעלות קובץ PDF בלבד", "error");
         return;
       }
 
       if (isHealthCertificateFileTooLarge(file)) {
-        Alert.alert("שגיאה", "הקובץ גדול מדי. הגודל המרבי המותר הוא 20MB");
+        showToast("הקובץ גדול מדי. הגודל המרבי המותר הוא 20MB", "error");
         return;
       }
 
@@ -204,9 +212,9 @@ export default function useAdminCompetitionHealthCertificates(params) {
         file: file,
       });
 
-      Alert.alert(
-        "בוצע",
+      showToast(
         "תעודת הבריאות של " + horse.horseName + " הועלתה בהצלחה",
+        "success",
       );
 
       await loadCertificates();
@@ -215,12 +223,12 @@ export default function useAdminCompetitionHealthCertificates(params) {
       console.log("HEALTH CERTIFICATE UPLOAD MESSAGE", error?.message);
       console.log("HEALTH CERTIFICATE UPLOAD RESPONSE", error?.response?.data);
 
-      Alert.alert(
-        "שגיאה",
+      showToast(
         resolveHealthCertificateErrorMessage(
           error,
           "לא ניתן להעלות את הקובץ. נסי שוב.",
         ),
+        "error",
       );
     } finally {
       setUploadingHorseId(null);
@@ -238,5 +246,21 @@ export default function useAdminCompetitionHealthCertificates(params) {
     activeTab: activeTab,
     setActiveTab: setActiveTab,
     tabs: tabs,
+
+    replaceApprovedCertificateDialogProps: {
+      visible: replaceConfirmVisible,
+      type: "warning",
+      title: REPLACE_APPROVED_CERTIFICATE_TITLE,
+      message: REPLACE_APPROVED_CERTIFICATE_MESSAGE,
+      confirmLabel: REPLACE_APPROVED_CERTIFICATE_CONFIRM_LABEL,
+      cancelLabel: REPLACE_APPROVED_CERTIFICATE_CANCEL_LABEL,
+      destructive: true,
+      onConfirm: function () {
+        resolveReplaceConfirm(true);
+      },
+      onCancel: function () {
+        resolveReplaceConfirm(false);
+      },
+    },
   };
 }
