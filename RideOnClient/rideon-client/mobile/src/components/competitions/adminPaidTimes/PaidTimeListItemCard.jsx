@@ -165,6 +165,7 @@ export default function PaidTimeListItemCard(props) {
             cancellingId={props.cancellingId}
             onEdit={props.onEdit}
             onCancel={props.onCancel}
+            paidTimesAvailability={props.paidTimesAvailability}
           />
         </View>
       ) : null}

@@ -45,6 +45,22 @@ function getHandleCancelBlock(source) {
   );
 }
 
+function getConfirmCancelBlock(source) {
+  return getFunctionBlock(
+    source,
+    "function confirmCancel(item) {",
+    "async function handleCancel(item) {",
+  );
+}
+
+function getOpenEditBlock(source) {
+  return getFunctionBlock(
+    source,
+    "function openEdit(item) {",
+    "function closeEdit() {",
+  );
+}
+
 describe("AdminCompetitionPaidTimesScreen - PT-8 paid-time cancellation in-flight guard", () => {
   it("imports createInFlightGuard and lazily initializes paidTimeCancelGuardRef", () => {
     var source = readSource();
@@ -64,18 +80,24 @@ describe("AdminCompetitionPaidTimesScreen - PT-8 paid-time cancellation in-fligh
     expect(source).not.toContain("useRef(createInFlightGuard())");
   });
 
-  it("handleCancel still returns early when the paid-time step is disabled, before ever touching the guard", () => {
+  it("handleCancel no longer gates on availability.paidTimes.isEnabled - cancellation is an always-available business path, mirroring AdminCompetitionPayerAccountScreen", () => {
     var block = getHandleCancelBlock(readSource());
 
-    var stepCheckIndex = block.indexOf(
-      "if (!availability.paidTimes.isEnabled) {",
+    expect(block).not.toContain("if (!availability.paidTimes.isEnabled) {");
+  });
+
+  it("handleCancel's first statement is the guard key, with the tryAcquire check immediately after - no step-level check runs first", () => {
+    var block = getHandleCancelBlock(readSource());
+
+    var guardKeyIndex = block.indexOf(
+      "var guardKey = item.paidTimeRequestId;",
     );
     var guardCheckIndex = block.indexOf(
       "if (!paidTimeCancelGuardRef.current.tryAcquire(guardKey)) {",
     );
 
-    expect(stepCheckIndex).toBeGreaterThan(-1);
-    expect(guardCheckIndex).toBeGreaterThan(stepCheckIndex);
+    expect(guardKeyIndex).toBeGreaterThan(-1);
+    expect(guardCheckIndex).toBeGreaterThan(guardKeyIndex);
   });
 
   it("acquires the guard synchronously, keyed by paidTimeRequestId (matching the existing cancellingId key), before setCancellingId and the service call", () => {
@@ -147,5 +169,57 @@ describe("AdminCompetitionPaidTimesScreen - PT-8 paid-time cancellation in-fligh
     var block = getHandleCancelBlock(readSource());
 
     expect(block).toContain("await paidTimes.handleRefresh();");
+  });
+});
+
+// Regression coverage for the submission-critical bug: both the "ערוך" and
+// "בטל פייד טיים" buttons on an expanded Paid Time card silently no-op'd
+// because openEdit AND confirmCancel both returned early on
+// availability.paidTimes.isEnabled, with no user-visible feedback.
+// AdminCompetitionPayerAccountScreen already established the correct
+// contract (commit 0f21e11): cancellation is always available, edit is
+// gated by canEditPaidTimeRow. This screen previously used the pre-fix
+// pattern from commit 5153432 and was never updated to match.
+describe("AdminCompetitionPaidTimesScreen - Cancel is never gated on step availability", () => {
+  it("confirmCancel does not check availability.paidTimes.isEnabled before showing the confirm alert", () => {
+    var block = getConfirmCancelBlock(readSource());
+
+    expect(block).not.toContain("if (!availability.paidTimes.isEnabled) {");
+  });
+
+  it("confirmCancel's first statement builds the alert title, not a step-availability check", () => {
+    var block = getConfirmCancelBlock(readSource());
+    var trimmed = block.slice(block.indexOf("{") + 1).trimStart();
+
+    expect(trimmed.startsWith("var withinDay =")).toBe(true);
+  });
+});
+
+describe("AdminCompetitionPaidTimesScreen - Edit eligibility uses the established canEditPaidTimeRow pattern", () => {
+  it("imports canEditPaidTimeRow from the shared paidTimeEditAvailability util (no second implementation)", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { canEditPaidTimeRow } from "../../../../utils/paidTimeEditAvailability";',
+    );
+  });
+
+  it("openEdit gates on canEditPaidTimeRow(item, availability.paidTimes), not the raw isEnabled flag", () => {
+    var block = getOpenEditBlock(readSource());
+
+    expect(block).toContain(
+      "if (!canEditPaidTimeRow(item, availability.paidTimes)) {",
+    );
+    expect(block).not.toContain("if (!availability.paidTimes.isEnabled) {");
+  });
+});
+
+describe("AdminCompetitionPaidTimesScreen - paidTimesAvailability is threaded to both card renderers", () => {
+  it("passes paidTimesAvailability to PaidTimeScheduleView and PaidTimeListItemCard so PaidTimeCardActions can compute edit eligibility before render", () => {
+    var source = readSource();
+
+    expect(
+      countOccurrences(source, "paidTimesAvailability={availability.paidTimes}"),
+    ).toBe(2);
   });
 });

@@ -28,6 +28,7 @@ import useRegistrationStepStatus from "../../../../hooks/useRegistrationStepStat
 import { cancelPaidTimeRequest } from "../../../../services/paidTimeRequestsService";
 import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
 import { createInFlightGuard } from "../../../../utils/inFlightGuard";
+import { canEditPaidTimeRow } from "../../../../utils/paidTimeEditAvailability";
 
 import { LIFECYCLE_STATE } from "../../../../utils/payerAccountLifecycle";
 import { bandAndSortPaidTimes } from "../../../../utils/payerAccountBands";
@@ -267,7 +268,7 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   }
 
   function openEdit(item) {
-    if (!availability.paidTimes.isEnabled) {
+    if (!canEditPaidTimeRow(item, availability.paidTimes)) {
       return;
     }
 
@@ -278,11 +279,13 @@ export default function AdminCompetitionPaidTimesScreen(props) {
     setEditingItem(null);
   }
 
+  // Cancellation is a separate, always-available business path (the server
+  // never blocks it after competition end) - it must never be gated on
+  // availability.paidTimes.isEnabled. Mirrors
+  // AdminCompetitionPayerAccountScreen's confirmCancelPaidTime/doCancelPaidTime,
+  // which carry no such gate. Item paid/cancelled state and the in-flight
+  // guard below still apply.
   function confirmCancel(item) {
-    if (!availability.paidTimes.isEnabled) {
-      return;
-    }
-
     var withinDay = item.hoursUntilStart != null && item.hoursUntilStart <= 24;
     var title = withinDay
       ? "ביטול בתוך 24 שעות - חיוב מלא"
@@ -309,10 +312,6 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   }
 
   async function handleCancel(item) {
-    if (!availability.paidTimes.isEnabled) {
-      return;
-    }
-
     var guardKey = item.paidTimeRequestId;
 
     if (!paidTimeCancelGuardRef.current.tryAcquire(guardKey)) {
@@ -498,6 +497,7 @@ export default function AdminCompetitionPaidTimesScreen(props) {
           formatDate={paidTimes.formatDate}
           formatTime={paidTimes.formatTime}
           onViewSlotSchedule={handleViewSlotSchedule}
+          paidTimesAvailability={availability.paidTimes}
         />
       );
     }
@@ -517,6 +517,7 @@ export default function AdminCompetitionPaidTimesScreen(props) {
           formatDate={paidTimes.formatDate}
           formatTime={paidTimes.formatTime}
           onViewSlotSchedule={handleViewSlotSchedule}
+          paidTimesAvailability={availability.paidTimes}
         />
       );
     });
