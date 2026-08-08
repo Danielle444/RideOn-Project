@@ -10,6 +10,8 @@ import HealthCertificateCard from "../../../../components/competitions/HealthCer
 
 import HealthCertificateStatusTabs from "../../../../components/competitions/HealthCertificateStatusTabs";
 
+import AppDialog from "../../../../components/common/AppDialog";
+
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 
 import { getAdminCompetitionMenuItems } from "../../../../navigation/competitionMenuConfigs";
@@ -134,6 +136,8 @@ export default function AdminCompetitionHealthCertificatesScreen(props) {
             })
           : null}
       </ScrollView>
+
+      <AppDialog {...healthCertificates.replaceApprovedCertificateDialogProps} />
     </MobileScreenLayout>
   );
 }

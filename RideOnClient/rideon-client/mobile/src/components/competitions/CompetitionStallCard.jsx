@@ -194,8 +194,8 @@ export default function CompetitionStallCard(props) {
 
           <View style={styles.stallDetails}>
             <View style={styles.stallTitleBlock}>
-              <View style={{ flexDirection: "row-reverse", alignItems: "center", gap: 6, flex: 1 }}>
-                <Text style={styles.stallHorseName}>
+              <View style={{ flexDirection: "row-reverse", alignItems: "center", gap: 6, alignSelf: "stretch" }}>
+                <Text style={[styles.stallHorseName, { flex: 1 }]}>
                   {isTackBooking ? "תא ציוד" : item.horseName || "ללא סוס"}
                 </Text>
 
@@ -289,11 +289,16 @@ export default function CompetitionStallCard(props) {
               {props.onDelete && !isLocked ? (
                 <Pressable
                   style={styles.cancelStallButton}
+                  disabled={props.cancellingStallId === item.stallBookingId}
                   onPress={function () {
                     props.onDelete(item);
                   }}
                 >
-                  <Text style={styles.cancelStallButtonText}>ביטול תא</Text>
+                  <Text style={styles.cancelStallButtonText}>
+                    {props.cancellingStallId === item.stallBookingId
+                      ? "מבטלת..."
+                      : "ביטול תא"}
+                  </Text>
                 </Pressable>
               ) : null}
 
@@ -319,6 +324,8 @@ export default function CompetitionStallCard(props) {
             setShowHistory(false);
           }}
           orders={shavingsOrders}
+          onCancel={props.onCancelShavings}
+          cancellingId={props.cancellingShavingsId}
         />
       ) : null}
     </>

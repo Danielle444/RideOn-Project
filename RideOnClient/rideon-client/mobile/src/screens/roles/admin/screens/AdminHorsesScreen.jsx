@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   Text,
   View,
@@ -19,9 +18,18 @@ import { useActiveRole } from "../../../../context/ActiveRoleContext";
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import { getAdminMenuItems } from "../../../../navigation/sideMenuConfigs";
 import {
-  getHorsesByRanch,
+  getRealHorsesByRanch,
   updateHorseBarnName,
 } from "../../../../services/horsesService";
+import { showToast } from "../../../../services/toastService";
+
+// This screen loads via usp_getrealhorsesbyranch (getRealHorsesByRanch), which
+// excludes historical fabricated horses server-side and caps every result set
+// at 200 rows itself. MAX_VISIBLE_HORSES stays as client-side defense-in-depth
+// against rendering an unbounded list via .map() into this screen's plain
+// (non-virtualized) ScrollView, same bound already used by the picker-scoped
+// usp_getrealhorsesbyranch call.
+var MAX_VISIBLE_HORSES = 200;
 
 export default function AdminHorsesScreen(props) {
   const { user } = useUser();
@@ -59,7 +67,7 @@ export default function AdminHorsesScreen(props) {
       setLoading(true);
       setScreenError("");
 
-      const response = await getHorsesByRanch(ranchId, nextSearchText);
+      const response = await getRealHorsesByRanch(ranchId, nextSearchText);
       setHorses(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.log("AdminHorsesScreen load error:", error?.response?.data || error);
@@ -105,11 +113,11 @@ export default function AdminHorsesScreen(props) {
       closeEditModal();
       await loadHorses(searchText);
 
-      Alert.alert("הצלחה", "הכינוי עודכן בהצלחה");
+      showToast("הכינוי עודכן בהצלחה", "success");
     } catch (error) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         getApiErrorMessage(error, "אירעה שגיאה בעדכון הכינוי"),
+        "error",
       );
     } finally {
       setIsSavingBarnName(false);
@@ -128,6 +136,15 @@ export default function AdminHorsesScreen(props) {
     },
     [user]
   );
+
+  const visibleHorses = useMemo(
+    function () {
+      return horses.slice(0, MAX_VISIBLE_HORSES);
+    },
+    [horses]
+  );
+
+  const isHorsesListTruncated = horses.length > MAX_VISIBLE_HORSES;
 
   return (
     <MobileScreenLayout
@@ -198,7 +215,15 @@ export default function AdminHorsesScreen(props) {
           <View style={horsesStyles.listCard}>
             <Text style={horsesStyles.sectionTitle}>סוסי החווה</Text>
 
-            {horses.map(function (item) {
+            {isHorsesListTruncated ? (
+              <View style={horsesStyles.errorCard}>
+                <Text style={horsesStyles.errorText}>
+                  {`נמצאו ${horses.length} סוסים. מוצגים ${MAX_VISIBLE_HORSES} הראשונים - השתמשו בחיפוש כדי לצמצם את התוצאות.`}
+                </Text>
+              </View>
+            ) : null}
+
+            {visibleHorses.map(function (item) {
               return (
                 <HorseListItemCard
                   key={String(item.horseId)}

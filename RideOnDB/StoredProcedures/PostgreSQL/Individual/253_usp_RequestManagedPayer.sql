@@ -15,9 +15,35 @@
 -- either way). Pending and Approved rows are untouched by the ELSE branch's
 -- WHERE clause -- a pending request is not silently reset, and an approved
 -- relationship is never overwritten/reactivated by a later request.
+--
+-- MODIFIED on fix/payer-manager-same-ranch-rule (P0, NOT YET APPLIED LIVE --
+-- signature change, deploy-coupled, see that branch's report). New business
+-- rule: an admin may only manage a payer when both hold an Approved role at
+-- the SAME ranch (admin "אדמין חווה", payer "משלם"). New required parameter
+-- p_ranchid inserted as the 2nd positional parameter (before the existing
+-- optional p_email/p_cellphone, since Postgres requires DEFAULT params to
+-- trail) -- this is the admin's active ranch, already validated server-side
+-- by PayersController.RequestManagedPayer's existing
+-- EnsureUserHasRoleInRanch(currentPersonId, request.RanchId, RanchAdmin)
+-- call before this proc is ever invoked, so the admin side of the rule is
+-- NOT re-checked here (matches the precedent in usp_InsertEntry /
+-- usp_GetPayerCompetitionAccount / usp_GetRegistrationStepStatus, none of
+-- which re-validate the admin's own role either -- see the branch report).
+-- Only the payer side (previously unchecked anywhere on this write path) is
+-- new here: the resolved payer (existing match OR newly-created partial
+-- person) must hold an Approved "משלם" role at p_ranchid. A brand-new
+-- partial-person invitee (no personranchrole rows yet) will always fail
+-- this check -- flagged explicitly in the branch report as a material
+-- behavior change from today's "invite anyone, pending forever" flow, not
+-- something to silently absorb.
+--
+-- REQUIRES DROP + CREATE (new required parameter is not appended at the
+-- end -- see report for exact DROP statement). Do not apply to live ahead
+-- of the matching PayerDAL.cs deploy: the currently-deployed backend still
+-- calls the 5-parameter signature and would break immediately.
 -- ============================================================================
 
-CREATE OR REPLACE FUNCTION public.usp_requestmanagedpayer(p_systemuserid integer, p_firstname character varying, p_lastname character varying, p_email character varying DEFAULT NULL::character varying, p_cellphone character varying DEFAULT NULL::character varying)
+CREATE OR REPLACE FUNCTION public.usp_requestmanagedpayer(p_systemuserid integer, p_ranchid integer, p_firstname character varying, p_lastname character varying, p_email character varying DEFAULT NULL::character varying, p_cellphone character varying DEFAULT NULL::character varying)
  RETURNS integer
  LANGUAGE plpgsql
 AS $function$
@@ -36,6 +62,18 @@ BEGIN
             p_email,
             p_cellphone
         );
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM personranchrole prr
+        JOIN role r ON r.roleid = prr.roleid
+        WHERE prr.personid = v_personid
+          AND prr.ranchid = p_ranchid
+          AND prr.rolestatus = 'Approved'
+          AND r.rolename = 'משלם'
+    ) THEN
+        RAISE EXCEPTION 'Payer does not hold an approved Payer role in this ranch';
     END IF;
 
     IF NOT EXISTS (

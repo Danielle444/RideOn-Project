@@ -1,11 +1,10 @@
 import { useCallback, useMemo, useState } from "react";
 
-import { Alert } from "react-native";
-
 import { useFocusEffect } from "@react-navigation/native";
 
 import { getPayerCompetitionAccount } from "../services/payerService";
 import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
+import { showToast } from "../services/toastService";
 
 function normalizeAccountResponse(response) {
   if (response && response.data) {
@@ -103,9 +102,9 @@ export default function useAdminCompetitionPayerAccount(params) {
           getApiErrorMessage(error, "אירעה שגיאה בטעינת חשבון המשלם"),
         );
 
-        Alert.alert(
-          "שגיאה",
+        showToast(
           getApiErrorMessage(error, "אירעה שגיאה בטעינת חשבון המשלם"),
+          "error",
         );
       } finally {
         setLoading(false);

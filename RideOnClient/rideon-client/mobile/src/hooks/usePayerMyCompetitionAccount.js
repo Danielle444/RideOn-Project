@@ -1,7 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
 
-import { Alert } from "react-native";
-
 import { useFocusEffect } from "@react-navigation/native";
 
 import { getMyCompetitionAccount } from "../services/payerService";
@@ -77,6 +75,8 @@ function safeArray(value) {
  * @property {number} amountToPay
  * @property {string|null} status
  * @property {boolean} isPaid
+ * @property {number} hoursUntilStart
+ * @property {boolean} canCancel
  */
 
 /**
@@ -253,8 +253,6 @@ export default function usePayerMyCompetitionAccount(params) {
         var msg = getApiErrorMessage(error, "אירעה שגיאה בטעינת החשבון שלך");
 
         setScreenError(msg);
-
-        Alert.alert("שגיאה", msg);
       } finally {
         setLoading(false);
       }

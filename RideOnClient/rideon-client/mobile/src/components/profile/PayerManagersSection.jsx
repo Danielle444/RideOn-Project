@@ -1,34 +1,92 @@
-import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View, ActivityIndicator } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Modal, Pressable, ScrollView, Text, TextInput, View, ActivityIndicator } from "react-native";
 import ProfileSectionCard from "./ProfileSectionCard";
+import AppDialog from "../common/AppDialog";
 import profileStyles from "../../styles/profileStyles";
 
 export default function PayerManagersSection(props) {
+  var [isLastManagerDialogVisible, setIsLastManagerDialogVisible] = useState(false);
+  var [removeTarget, setRemoveTarget] = useState(null);
+  var [rejectTarget, setRejectTarget] = useState(null);
+
+  // Tracks the adminPersonId a destructive confirm was fired for, so the
+  // dialog stays open (and isBusy) for the duration of the mutation instead
+  // of closing the instant the button is pressed. useProfileScreen.js owns
+  // the actual correctness guard (a synchronous in-flight guard) - this ref
+  // only keeps the dialog visible long enough for isBusy to have any
+  // visible effect, and is cleared once the matching busy id from the hook
+  // returns to null (the mutation has settled, success or error).
+  var pendingRemoveIdRef = useRef(null);
+  var pendingRejectIdRef = useRef(null);
+
+  useEffect(
+    function () {
+      if (
+        pendingRemoveIdRef.current !== null &&
+        props.removingManagerId === null
+      ) {
+        pendingRemoveIdRef.current = null;
+        setRemoveTarget(null);
+      }
+    },
+    [props.removingManagerId],
+  );
+
+  useEffect(
+    function () {
+      if (
+        pendingRejectIdRef.current !== null &&
+        props.answeringManagerId === null
+      ) {
+        pendingRejectIdRef.current = null;
+        setRejectTarget(null);
+      }
+    },
+    [props.answeringManagerId],
+  );
+
   function handleRemovePress(item) {
     if ((props.managers || []).length <= 1) {
-      Alert.alert("לא ניתן להסיר", "למשלם חייב להישאר לפחות מנהל אחד");
+      setIsLastManagerDialogVisible(true);
       return;
     }
 
-    var fullName = (item.firstName || "") + " " + (item.lastName || "");
-
-    Alert.alert(
-      "הסרת מנהל",
-      "האם להסיר את " + fullName.trim() + " מרשימת המנהלים שלך?",
-      [
-        {
-          text: "ביטול",
-          style: "cancel",
-        },
-        {
-          text: "הסר",
-          style: "destructive",
-          onPress: function () {
-            props.onRemoveManager(item.adminPersonId);
-          },
-        },
-      ]
-    );
+    setRemoveTarget(item);
   }
+
+  function handleRemoveCancel() {
+    setRemoveTarget(null);
+  }
+
+  function handleRemoveConfirm() {
+    if (!removeTarget) {
+      return;
+    }
+
+    pendingRemoveIdRef.current = removeTarget.adminPersonId;
+    props.onRemoveManager(removeTarget.adminPersonId);
+  }
+
+  function handleRejectCancel() {
+    setRejectTarget(null);
+  }
+
+  function handleRejectConfirm() {
+    if (!rejectTarget) {
+      return;
+    }
+
+    pendingRejectIdRef.current = rejectTarget.adminPersonId;
+    props.onRejectManagerRequest(rejectTarget.adminPersonId);
+  }
+
+  var removeTargetName = removeTarget
+    ? ((removeTarget.firstName || "") + " " + (removeTarget.lastName || "")).trim()
+    : "";
+
+  var rejectTargetName = rejectTarget
+    ? ((rejectTarget.firstName || "") + " " + (rejectTarget.lastName || "")).trim()
+    : "";
 
   return (
     <>
@@ -72,22 +130,7 @@ export default function PayerManagersSection(props) {
                       style={profileStyles.destructiveButton}
                       disabled={isAnswering}
                       onPress={function () {
-                        Alert.alert(
-                          "דחיית בקשה",
-                          "האם לדחות את בקשת הניהול מ" +
-                            ((item.firstName || "") + " " + (item.lastName || "")).trim() +
-                            "?",
-                          [
-                            { text: "ביטול", style: "cancel" },
-                            {
-                              text: "דחייה",
-                              style: "destructive",
-                              onPress: function () {
-                                props.onRejectManagerRequest(item.adminPersonId);
-                              },
-                            },
-                          ],
-                        );
+                        setRejectTarget(item);
                       }}
                     >
                       <Text style={profileStyles.destructiveButtonText}>
@@ -243,6 +286,47 @@ export default function PayerManagersSection(props) {
           </View>
         </View>
       </Modal>
+
+      <AppDialog
+        visible={isLastManagerDialogVisible}
+        type="warning"
+        title="לא ניתן להסיר"
+        message="למשלם חייב להישאר לפחות מנהל אחד"
+        confirmLabel="הבנתי"
+        onConfirm={function () {
+          setIsLastManagerDialogVisible(false);
+        }}
+      />
+
+      <AppDialog
+        visible={!!removeTarget}
+        type="warning"
+        destructive={true}
+        title="הסרת מנהל"
+        message={"האם להסיר את " + removeTargetName + " מרשימת המנהלים שלך?"}
+        confirmLabel="הסר"
+        cancelLabel="ביטול"
+        isBusy={
+          !!removeTarget && props.removingManagerId === removeTarget.adminPersonId
+        }
+        onConfirm={handleRemoveConfirm}
+        onCancel={handleRemoveCancel}
+      />
+
+      <AppDialog
+        visible={!!rejectTarget}
+        type="warning"
+        destructive={true}
+        title="דחיית בקשה"
+        message={"האם לדחות את בקשת הניהול מ" + rejectTargetName + "?"}
+        confirmLabel="דחייה"
+        cancelLabel="ביטול"
+        isBusy={
+          !!rejectTarget && props.answeringManagerId === rejectTarget.adminPersonId
+        }
+        onConfirm={handleRejectConfirm}
+        onCancel={handleRejectCancel}
+      />
     </>
   );
 }

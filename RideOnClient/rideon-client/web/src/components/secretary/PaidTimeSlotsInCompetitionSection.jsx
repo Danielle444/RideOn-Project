@@ -65,7 +65,7 @@ export default function PaidTimeSlotsInCompetitionSection(props) {
           props.items.map(function (item, index) {
             return (
               <div
-                key={item.PaidTimeSlotInCompId}
+                key={item.paidTimeSlotInCompId}
                 className={
                   "grid grid-cols-[1fr_1fr_1fr_1fr_0.9fr] items-center border-t border-[#F1E8E3] px-5 py-5 text-[#3F312B] " +
                   (index % 2 === 0 ? "bg-white" : "bg-[#FFFEFD]")

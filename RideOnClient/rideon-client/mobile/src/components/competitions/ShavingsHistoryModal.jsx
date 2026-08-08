@@ -119,8 +119,45 @@ function getStatusBadgeStyle(order) {
   return styles.historyStatusNeutral;
 }
 
+// Admin history cancel pre-gating: the button is offered only when the server-computed
+// canCancelShavings is true (usp_admincancelshavingsorder's full guard set, mirrored in
+// proc 176 - see its header). No cancellation rule is re-derived here; a false value is
+// rendered as a locked footer, exactly like the paid/delivered locked states already
+// shipped in ShavingsGroupCard.jsx for the payer-account screen.
+function renderCancelAction(order, actions) {
+  if (!actions || typeof actions.onCancel !== "function") {
+    return null;
+  }
+
+  if (!order.canCancelShavings) {
+    return null;
+  }
+
+  var busyKey = "shavings:" + order.shavingsOrderId;
+  var isBusy = actions.cancellingId === busyKey;
+
+  return (
+    <Pressable
+      style={styles.cancelStallButton}
+      disabled={isBusy}
+      onPress={function () {
+        actions.onCancel(order);
+      }}
+    >
+      <Text style={styles.cancelStallButtonText}>
+        {isBusy ? "מבטלת..." : "בטל הזמנה"}
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function ShavingsHistoryModal(props) {
   var orders = Array.isArray(props.orders) ? props.orders : [];
+
+  var actions = {
+    onCancel: props.onCancel,
+    cancellingId: props.cancellingId,
+  };
 
   var summary = useMemo(
     function () {
@@ -283,6 +320,8 @@ export default function ShavingsHistoryModal(props) {
                         </Text>
                       </View>
                     ) : null}
+
+                    {renderCancelAction(order, actions)}
                   </View>
                 );
               })

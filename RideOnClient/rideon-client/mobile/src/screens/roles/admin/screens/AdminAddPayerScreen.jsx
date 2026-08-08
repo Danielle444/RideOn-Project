@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -11,6 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
+import AppDialog from "../../../../components/common/AppDialog";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import styles from "../../../../styles/adminAddPayerStyles";
 
@@ -27,6 +27,7 @@ import {
   requestManagedPayer,
   createPayerWithCredentials,
 } from "../../../../services/payerService";
+import { showToast } from "../../../../services/toastService";
 
 export default function AdminAddPayerScreen(props) {
   var userContext = useUser();
@@ -42,6 +43,16 @@ export default function AdminAddPayerScreen(props) {
   var [email, setEmail] = useState("");
   var [isSubmitting, setIsSubmitting] = useState(false);
   var [isCreatingWithCredentials, setIsCreatingWithCredentials] = useState(false);
+  // { title, message } for the single-button success dialog, or null when
+  // hidden. Shared by both submit flows since all three success messages
+  // behave identically: navigation.goBack() fires only once the user
+  // acknowledges (same gating the native Alert's OK button used to do).
+  var [successDialog, setSuccessDialog] = useState(null);
+
+  function handleSuccessDialogConfirm() {
+    setSuccessDialog(null);
+    props.navigation.goBack();
+  }
 
   async function handleLogout() {
     if (props.onLogout) {
@@ -55,17 +66,17 @@ export default function AdminAddPayerScreen(props) {
 
   function validateForm() {
     if (!firstName.trim()) {
-      Alert.alert("שגיאה", "יש להזין שם פרטי");
+      showToast("יש להזין שם פרטי", "error");
       return false;
     }
 
     if (!lastName.trim()) {
-      Alert.alert("שגיאה", "יש להזין שם משפחה");
+      showToast("יש להזין שם משפחה", "error");
       return false;
     }
 
     if (!cellPhone.trim() && !email.trim()) {
-      Alert.alert("שגיאה", "יש להזין לפחות טלפון או אימייל");
+      showToast("יש להזין לפחות טלפון או אימייל", "error");
       return false;
     }
 
@@ -74,7 +85,7 @@ export default function AdminAddPayerScreen(props) {
 
   async function handleSubmit() {
     if (!activeRole || !activeRole.ranchId) {
-      Alert.alert("שגיאה", "לא נמצאה חווה פעילה");
+      showToast("לא נמצאה חווה פעילה", "error");
       return;
     }
 
@@ -104,41 +115,26 @@ export default function AdminAddPayerScreen(props) {
       await requestManagedPayer(requestPayload);
 
       if (existingPerson && existingPerson.personId) {
-        Alert.alert(
-          "הבקשה נשלחה",
-          "נמצא אדם קיים במערכת ונשלחה עבורו בקשת ניהול לאישור.",
-          [
-            {
-              text: "אישור",
-              onPress: function () {
-                props.navigation.goBack();
-              },
-            },
-          ],
-        );
+        setSuccessDialog({
+          title: "הבקשה נשלחה",
+          message: "נמצא אדם קיים במערכת ונשלחה עבורו בקשת ניהול לאישור.",
+        });
         return;
       }
 
-      Alert.alert(
-        "הבקשה נשלחה",
-        "נוצרה רשומה חלקית ונשלחה בקשת ניהול. בהמשך יחובר תהליך אימות והשלמת פרטים.",
-        [
-          {
-            text: "אישור",
-            onPress: function () {
-              props.navigation.goBack();
-            },
-          },
-        ],
-      );
+      setSuccessDialog({
+        title: "הבקשה נשלחה",
+        message:
+          "נוצרה רשומה חלקית ונשלחה בקשת ניהול. בהמשך יחובר תהליך אימות והשלמת פרטים.",
+      });
     } catch (error) {
       console.error("Add payer error:", error);
       console.error("Response data:", error?.response?.data);
       console.error("Response status:", error?.response?.status);
 
-      Alert.alert(
-        "שגיאה",
+      showToast(
         getApiErrorMessage(error, "אירעה שגיאה בשליחת בקשת הוספת משלם"),
+        "error",
       );
     } finally {
       setIsSubmitting(false);
@@ -147,22 +143,22 @@ export default function AdminAddPayerScreen(props) {
 
   async function handleCreateWithCredentials() {
     if (!activeRole || !activeRole.ranchId) {
-      Alert.alert("שגיאה", "לא נמצאה חווה פעילה");
+      showToast("לא נמצאה חווה פעילה", "error");
       return;
     }
 
     if (!firstName.trim()) {
-      Alert.alert("שגיאה", "יש להזין שם פרטי");
+      showToast("יש להזין שם פרטי", "error");
       return;
     }
 
     if (!lastName.trim()) {
-      Alert.alert("שגיאה", "יש להזין שם משפחה");
+      showToast("יש להזין שם משפחה", "error");
       return;
     }
 
     if (!email.trim() || !email.includes("@")) {
-      Alert.alert("שגיאה", "יש להזין כתובת אימייל תקינה (חובה לשליחת פרטי התחברות)");
+      showToast("יש להזין כתובת אימייל תקינה (חובה לשליחת פרטי התחברות)", "error");
       return;
     }
 
@@ -177,22 +173,15 @@ export default function AdminAddPayerScreen(props) {
         ranchId: activeRole.ranchId,
       });
 
-      Alert.alert(
-        "המשלם נוצר בהצלחה",
-        "נשלח מייל למשלם עם פרטי ההתחברות הזמניים. המשלם יתחבר ויחליף סיסמה בכניסה הראשונה.",
-        [
-          {
-            text: "אישור",
-            onPress: function () {
-              props.navigation.goBack();
-            },
-          },
-        ],
-      );
+      setSuccessDialog({
+        title: "המשלם נוצר בהצלחה",
+        message:
+          "נשלח מייל למשלם עם פרטי ההתחברות הזמניים. המשלם יתחבר ויחליף סיסמה בכניסה הראשונה.",
+      });
     } catch (error) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         getApiErrorMessage(error, "אירעה שגיאה ביצירת המשלם"),
+        "error",
       );
     } finally {
       setIsCreatingWithCredentials(false);
@@ -357,6 +346,14 @@ export default function AdminAddPayerScreen(props) {
           </Pressable>
         </View>
       </ScrollView>
+
+      <AppDialog
+        visible={successDialog !== null}
+        title={successDialog ? successDialog.title : ""}
+        message={successDialog ? successDialog.message : ""}
+        type="success"
+        onConfirm={handleSuccessDialogConfirm}
+      />
     </MobileScreenLayout>
   );
 }

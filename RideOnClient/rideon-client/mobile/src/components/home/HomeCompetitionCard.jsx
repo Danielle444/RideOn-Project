@@ -1,4 +1,4 @@
-import { Alert, Text, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 import homeScreenStyles from "../../styles/homeScreenStyles";
 import { formatCompetitionDateRange } from "../../../../shared/auth/utils/competitions/competitionFormatters";
 import {

@@ -36,14 +36,21 @@ describe("AdminHomeScreen - restored-session home retry", () => {
     );
   });
 
-  it("preserves the existing error alert and empty-state fallback unchanged", () => {
+  it("preserves the existing error notice text and empty-state fallback, now via AppToast", () => {
     var source = readSource();
 
     expect(source).toContain("console.error(error);");
     expect(source).toContain("setCompetitions([]);");
     expect(source).toContain(
-      'Alert.alert("שגיאה", "אירעה שגיאה בטעינת דף הבית");',
+      'showToast("אירעה שגיאה בטעינת דף הבית", "error");',
     );
+  });
+
+  it("no longer uses the native Alert.alert", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("Alert.alert");
+    expect(source).not.toMatch(/from ["']react-native["'][\s\S]{0,200}Alert/);
   });
 
   it("handleRefresh still calls loadHomeCompetitions - pull-to-refresh path is untouched", () => {

@@ -398,15 +398,21 @@ namespace RideOnServer.DAL
 
         public static List<CompetitionShavingsOrderListItem> GetShavingsOrdersForCompetitionAndRanch(
             int competitionId,
-            int ranchId
+            int ranchId,
+            int? adminPersonId = null
         )
         {
             ShavingsOrderDAL dal = new ShavingsOrderDAL();
 
+            // adminPersonId is only ever non-null for a caller who holds RanchAdmin at
+            // ranchId (see controller) -- positional order (competitionId, ranchId,
+            // personId) matches usp_getshavingsordersforcompetitionandranch's new
+            // trailing p_personid DEFAULT NULL parameter.
             Dictionary<string, object?> paramDic = new Dictionary<string, object?>
             {
                 { "@competitionId", competitionId },
-                { "@ranchId", ranchId }
+                { "@ranchId", ranchId },
+                { "@personId", adminPersonId }
             };
 
             List<CompetitionShavingsOrderListItem> orders =
@@ -502,7 +508,10 @@ namespace RideOnServer.DAL
 
                     DeliveryDestinations = ParseDeliveryDestinations(reader["deliverydestinations"]),
 
-                    HasUnassignedStalls = Convert.ToBoolean(reader["hasunassignedstalls"])
+                    HasUnassignedStalls = Convert.ToBoolean(reader["hasunassignedstalls"]),
+
+                    // Admin history cancel pre-gating: appended LAST to #176.
+                    CanCancelShavings = Convert.ToBoolean(reader["cancancelshavings"])
                 });
             }
 

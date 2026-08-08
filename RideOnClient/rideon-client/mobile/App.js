@@ -4,6 +4,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import AuthNavigator from "./src/navigation/AuthNavigator";
 import AppNavigator from "./src/navigation/AppNavigator";
+import ToastHost from "./src/components/common/ToastHost";
 
 import { UserProvider } from "./src/context/UserContext";
 import { ActiveRoleProvider } from "./src/context/ActiveRoleContext";
@@ -51,6 +52,7 @@ export default function App() {
           </CompetitionProvider>
         </ActiveRoleProvider>
       </UserProvider>
+      <ToastHost />
     </SafeAreaProvider>
   );
 }

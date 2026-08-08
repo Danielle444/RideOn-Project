@@ -48,5 +48,12 @@ namespace RideOnServer.BL.DTOs.ShavingsOrders
         public List<ShavingsDestinationCompound> DeliveryDestinations { get; set; } = new();
 
         public bool HasUnassignedStalls { get; set; }
+
+        // Admin history cancel pre-gating: mirrors usp_admincancelshavingsorder (241)'s
+        // full guard set (delivered/competition-ended/any-change-request-exists/paid/
+        // ownership), computed server-side so the UI never re-implements these rules.
+        // Only accurate for the mobile admin caller (see proc 176's header) -- p_personid
+        // is passed only when the caller holds RanchAdmin at ranchId.
+        public bool CanCancelShavings { get; set; }
     }
 }

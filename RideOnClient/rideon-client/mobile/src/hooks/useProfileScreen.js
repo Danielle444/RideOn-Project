@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
-import { Alert } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "../context/UserContext";
 import { useActiveRole } from "../context/ActiveRoleContext";
 import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
@@ -25,6 +24,8 @@ import {
   removePayerManager,
   answerPayerManagerRequest,
 } from "../services/payerProfileService";
+import { showToast } from "../services/toastService";
+import { createInFlightGuard } from "../utils/inFlightGuard";
 
 export default function useProfileScreen() {
   const { user } = useUser();
@@ -84,6 +85,23 @@ export default function useProfileScreen() {
   const [submittingManagerId, setSubmittingManagerId] = useState(null);
   const [removingManagerId, setRemovingManagerId] = useState(null);
   const [answeringManagerId, setAnsweringManagerId] = useState(null);
+
+  // Synchronous, per-target in-flight guards for the destructive manager
+  // actions below - removingManagerId/answeringManagerId above are UI
+  // feedback only (async state), not a correctness guard: two rapid
+  // invocations for the same adminPersonId can both pass a "busy?" check
+  // before either render reflects the first one. Separate refs per action
+  // namespace, initialized lazily so createInFlightGuard() runs once, not on
+  // every render.
+  const removeManagerGuardRef = useRef(null);
+  if (removeManagerGuardRef.current === null) {
+    removeManagerGuardRef.current = createInFlightGuard();
+  }
+
+  const answerManagerGuardRef = useRef(null);
+  if (answerManagerGuardRef.current === null) {
+    answerManagerGuardRef.current = createInFlightGuard();
+  }
 
   const config = useMemo(
     function () {
@@ -204,9 +222,9 @@ export default function useProfileScreen() {
       console.log("loadManagers error status:", err?.response?.status);
       console.log("loadManagers error data:", err?.response?.data);
 
-      Alert.alert(
-        "שגיאה",
+      showToast(
         getApiErrorMessage(err, "אירעה שגיאה בטעינת רשימת המנהלים"),
+        "error",
       );
     } finally {
       setLoadingManagers(false);
@@ -236,9 +254,9 @@ export default function useProfileScreen() {
       console.log("loadAvailableManagers error status:", err?.response?.status);
       console.log("loadAvailableManagers error data:", err?.response?.data);
 
-      Alert.alert(
-        "שגיאה",
+      showToast(
         getApiErrorMessage(err, "אירעה שגיאה בטעינת המנהלים הזמינים"),
+        "error",
       );
     } finally {
       setLoadingAvailableManagers(false);
@@ -308,12 +326,12 @@ export default function useProfileScreen() {
         email: userForm.email.trim() || null,
       });
 
-      Alert.alert("הצלחה", "פרטי המשתמש עודכנו בהצלחה");
+      showToast("פרטי המשתמש עודכנו בהצלחה", "success");
       await loadPage();
     } catch (err) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         String(getApiErrorMessage(err, "אירעה שגיאה בעדכון פרטי המשתמש")),
+        "error",
       );
     } finally {
       setSavingUser(false);
@@ -341,12 +359,12 @@ export default function useProfileScreen() {
         longitude: Number.isNaN(longitudeValue) ? null : longitudeValue,
       });
 
-      Alert.alert("הצלחה", "פרטי החווה עודכנו בהצלחה");
+      showToast("פרטי החווה עודכנו בהצלחה", "success");
       await loadPage();
     } catch (err) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         String(getApiErrorMessage(err, "אירעה שגיאה בעדכון פרטי החווה")),
+        "error",
       );
     } finally {
       setSavingRanch(false);
@@ -372,13 +390,13 @@ export default function useProfileScreen() {
         roleId: Number(addProfileForm.roleId),
       });
 
-      Alert.alert("הצלחה", "הבקשה להוספת פרופיל נשלחה בהצלחה");
+      showToast("הבקשה להוספת פרופיל נשלחה בהצלחה", "success");
       setIsAddProfileModalOpen(false);
       await loadPage();
     } catch (err) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         String(getApiErrorMessage(err, "אירעה שגיאה בשליחת בקשת הפרופיל")),
+        "error",
       );
     } finally {
       setAddingProfile(false);
@@ -408,11 +426,11 @@ export default function useProfileScreen() {
       await addPayerManager(user.personId, adminPersonId);
       await loadManagers();
       await loadAvailableManagers(managersSearchText);
-      Alert.alert("הצלחה", "המנהל נוסף בהצלחה");
+      showToast("המנהל נוסף בהצלחה", "success");
     } catch (err) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         String(getApiErrorMessage(err, "לא ניתן להוסיף את המנהל")),
+        "error",
       );
     } finally {
       setSubmittingManagerId(null);
@@ -420,22 +438,35 @@ export default function useProfileScreen() {
   }
 
   async function handleRemoveManager(adminPersonId) {
+    const guardKey = "removeManager:" + adminPersonId;
+
+    if (!removeManagerGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
       setRemovingManagerId(adminPersonId);
       await removePayerManager(user.personId, adminPersonId);
       await loadManagers();
-      Alert.alert("הצלחה", "המנהל הוסר בהצלחה");
+      showToast("המנהל הוסר בהצלחה", "success");
     } catch (err) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         String(getApiErrorMessage(err, "לא ניתן להסיר את המנהל")),
+        "error",
       );
     } finally {
       setRemovingManagerId(null);
+      removeManagerGuardRef.current.release(guardKey);
     }
   }
 
   async function handleAnswerManagerRequest(adminPersonId, answerStatus) {
+    const guardKey = "answerManager:" + adminPersonId;
+
+    if (!answerManagerGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
       setAnsweringManagerId(adminPersonId);
       await answerPayerManagerRequest(
@@ -444,19 +475,20 @@ export default function useProfileScreen() {
         answerStatus,
       );
       await loadManagers();
-      Alert.alert(
-        "הצלחה",
+      showToast(
         answerStatus === "Approved"
           ? "בקשת הניהול אושרה"
           : "בקשת הניהול נדחתה",
+        "success",
       );
     } catch (err) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         String(getApiErrorMessage(err, "לא ניתן היה לענות על בקשת הניהול")),
+        "error",
       );
     } finally {
       setAnsweringManagerId(null);
+      answerManagerGuardRef.current.release(guardKey);
     }
   }
 

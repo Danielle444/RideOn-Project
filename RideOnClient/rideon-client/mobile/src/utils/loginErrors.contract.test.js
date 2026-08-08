@@ -31,10 +31,10 @@ describe("חוזה פסק הזמן והפטור מ-401", () => {
 
     expect(instance).toContain("timeout: 8000");
 
-    // כל שאר הקריאות ב-authService נשארו על 8000: שבע קריאות, ורק
-    // ההתחברות עברה לקבוע.
+    // כל שאר הקריאות ב-authService נשארו על 8000: שמונה קריאות (כולל
+    // sendOtp שנוסף לתיקון ה-OTP בהרשמה מהנייד), ורק ההתחברות עברה לקבוע.
     var remaining = service.match(/timeout: 8000/g) || [];
-    expect(remaining.length).toBe(7);
+    expect(remaining.length).toBe(8);
   });
 
   it("401 מההתחברות מוחזר כמו שהוא, לפני ניקוי מצב האימות", () => {

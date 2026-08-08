@@ -4,6 +4,19 @@ import roleSharedStyles from "../../styles/roleSharedStyles";
 import logo from "shared/assets/logo.png";
 
 export default function CompetitionMenuTemplate(props) {
+  // No confirmation dialog for exit - closeMenu() runs first so
+  // MobileSideMenu's native Modal is already dismissing before
+  // onExitCompetition() (often async, ends in navigation) fires. Some
+  // consumers navigate synchronously with no internal await (e.g.
+  // AdminCompetitionHealthCertificatesScreen) - calling onExitCompetition
+  // first would let navigation start while the Modal is still open.
+  function handleExitPress() {
+    if (props.closeMenu) {
+      props.closeMenu();
+    }
+    props.onExitCompetition();
+  }
+
   return (
     <View style={roleSharedStyles.menuWrapperWithTopInset}>
       <View style={roleSharedStyles.menuLogoWrap}>
@@ -53,12 +66,7 @@ export default function CompetitionMenuTemplate(props) {
 
       <Pressable
         style={roleSharedStyles.logoutItem}
-        onPress={function () {
-          props.onExitCompetition();
-          if (props.closeMenu) {
-            props.closeMenu();
-          }
-        }}
+        onPress={handleExitPress}
       >
         <Text style={roleSharedStyles.logoutText}>יציאה מהתחרות</Text>
         <Ionicons name="log-out-outline" size={24} color="#D94141" />

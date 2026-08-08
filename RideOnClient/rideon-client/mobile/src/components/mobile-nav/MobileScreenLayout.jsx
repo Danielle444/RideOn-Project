@@ -40,7 +40,11 @@ export default function MobileScreenLayout(props) {
           />
 
           <MobileSideMenu visible={isMenuOpen} onClose={closeMenu}>
-            {props.menuContent ? props.menuContent({ closeMenu: closeMenu }) : null}
+            {props.menuContent
+              ? props.menuContent({
+                  closeMenu: closeMenu,
+                })
+              : null}
           </MobileSideMenu>
         </View>
       </KeyboardAvoidingView>

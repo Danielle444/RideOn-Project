@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 
@@ -9,6 +8,7 @@ import {
   getShavingsOrdersForCompetitionAndRanch,
   getStallBookingsForShavings,
 } from "../services/shavingsOrderService";
+import { showToast } from "../services/toastService";
 
 function normalizeDateString(value) {
   if (!value) {
@@ -380,7 +380,7 @@ export default function useAdminCompetitionShavings(params) {
       stall.stallBookingId === null ||
       stall.stallBookingId === undefined
     ) {
-      Alert.alert("שגיאה", "לא נמצא מזהה תא תקין לסוס שנבחר");
+      showToast("לא נמצא מזהה תא תקין לסוס שנבחר", "error");
       return;
     }
 
@@ -593,7 +593,7 @@ export default function useAdminCompetitionShavings(params) {
     var validationMessage = validateForm();
 
     if (validationMessage) {
-      Alert.alert("שגיאה", validationMessage);
+      showToast(validationMessage, "error");
       return false;
     }
 
@@ -627,7 +627,7 @@ export default function useAdminCompetitionShavings(params) {
       await createShavingsOrder(payload);
       await loadData();
 
-      Alert.alert("נשמר", "הזמנת הנסורת נשלחה בהצלחה");
+      showToast("הזמנת הנסורת נשלחה בהצלחה", "success");
 
       setSelectedStalls([]);
       setEqualBagQuantity("");
@@ -639,9 +639,9 @@ export default function useAdminCompetitionShavings(params) {
 
       return true;
     } catch (error) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         getApiErrorMessage(error, "אירעה שגיאה ביצירת הזמנת הנסורת"),
+        "error",
       );
 
       return false;

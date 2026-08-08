@@ -12,7 +12,7 @@ export default function PublicRoute({ children }) {
 
   function getSuperUserRoute() {
     if (user && user.mustChangePassword) {
-      return "/superuser-change-password";
+      return "/change-password";
       //OrenNoteToFix - if we change in RideOnClient/rideon-client/web/src/routes/ProtectedRoute.jsx also change here
       //Can help to Move getSuperUserRoute into shared/auth/utils/authNavigation.js alongside getPostLoginRoute.
     }

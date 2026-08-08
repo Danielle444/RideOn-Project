@@ -169,7 +169,7 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
     expect(source).toContain("disabled={isBusy}");
   });
 
-  it("paid-time cancellation flow is untouched by the admin-direct-stall-cancellation slice (out of scope)", () => {
+  it("paid-time cancellation keeps its own divergent success copy - not unified with DIRECT_CANCELLATION_COPY by the AppDialog/AppToast migration", () => {
     var source = readSource();
 
     expect(source).toContain(
@@ -181,7 +181,7 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
       "async function doCancelPaidTime(item) {",
       "function confirmCancelStall(item) {",
     );
-    expect(paidTimeBlock).toContain('Alert.alert("בוטל", "הבקשה בוטלה");');
+    expect(paidTimeBlock).toContain('showToast("הבקשה בוטלה", "success");');
   });
 
   // The stall flow was the "untouched/out of scope" case Phase 3C locked in
@@ -212,10 +212,10 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
       );
     });
 
-    it("doCancelEntry's success alert uses the SPEC title and DIRECT_CANCELLATION_COPY.text, never the send-to-secretary wording", () => {
+    it("doCancelEntry's success notice uses DIRECT_CANCELLATION_COPY.text via showToast, never the send-to-secretary wording", () => {
       var block = getDoCancelEntryBlock(readSource());
 
-      expect(block).toContain('Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);');
+      expect(block).toContain('showToast(DIRECT_CANCELLATION_COPY.text, "success");');
       expect(block).not.toContain("נשלח למזכירה");
     });
   });
@@ -236,7 +236,7 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
       var catchBlock = doCancelEntryBlock.slice(catchStart, finallyStart);
 
       expect(catchBlock).toContain(
-        'Alert.alert("שגיאה", extractErrorMessage(err));',
+        'showToast(getApiErrorMessage(err, "אירעה שגיאה בביטול ההרשמה"), "error");',
       );
       expect(catchBlock).toContain("return;");
       expect(catchBlock).not.toContain("DIRECT_CANCELLATION_COPY");
@@ -259,18 +259,18 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
       var doCancelEntryBlock = getDoCancelEntryBlock(readSource());
 
       var finallyIndex = doCancelEntryBlock.indexOf("} finally {");
-      var alertIndex = doCancelEntryBlock.indexOf(
-        'Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);',
+      var noticeIndex = doCancelEntryBlock.indexOf(
+        'showToast(DIRECT_CANCELLATION_COPY.text, "success");',
       );
       var refreshIndex = doCancelEntryBlock.indexOf(
         "await account.reload();",
       );
 
-      expect(alertIndex).toBeGreaterThan(finallyIndex);
-      expect(refreshIndex).toBeGreaterThan(alertIndex);
+      expect(noticeIndex).toBeGreaterThan(finallyIndex);
+      expect(refreshIndex).toBeGreaterThan(noticeIndex);
     });
 
-    it("the success alert is NOT inside the refresh's try/catch - it already ran before refresh starts", () => {
+    it("the success notice is NOT inside the refresh's try/catch - it already ran before refresh starts", () => {
       var doCancelEntryBlock = getDoCancelEntryBlock(readSource());
       var refreshBlock = getRefreshStepBlock(doCancelEntryBlock);
 
@@ -291,14 +291,14 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
       );
     });
 
-    it("a refresh failure cannot be reported as a cancel failure - the refresh catch never shows the mutation's error alert and never re-throws", () => {
+    it("a refresh failure cannot be reported as a cancel failure - the refresh catch never shows the mutation's error notice and never re-throws", () => {
       var doCancelEntryBlock = getDoCancelEntryBlock(readSource());
       var refreshBlock = getRefreshStepBlock(doCancelEntryBlock);
 
       var refreshCatchStart = refreshBlock.indexOf("} catch (refreshError) {");
       var refreshCatchBlock = refreshBlock.slice(refreshCatchStart);
 
-      expect(refreshCatchBlock).not.toContain("Alert.alert");
+      expect(refreshCatchBlock).not.toContain("showToast");
       expect(refreshCatchBlock).not.toContain("throw");
     });
 
@@ -395,20 +395,20 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
       expect(releaseCount).toBe(1);
     });
 
-    it("the success alert (DIRECT_CANCELLATION_COPY) fires strictly after the mutation resolves and before the refresh attempt starts", () => {
+    it("the success notice (DIRECT_CANCELLATION_COPY) fires strictly after the mutation resolves and before the refresh attempt starts", () => {
       var block = getDoCancelStallBlock(readSource());
 
       var serviceCallIndex = block.indexOf("await adminCancelStallBooking(");
-      var alertIndex = block.indexOf(
-        'Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);',
+      var noticeIndex = block.indexOf(
+        'showToast(DIRECT_CANCELLATION_COPY.text, "success");',
       );
       var reloadIndex = block.indexOf("await account.reload();");
 
-      expect(alertIndex).toBeGreaterThan(serviceCallIndex);
-      expect(reloadIndex).toBeGreaterThan(alertIndex);
+      expect(noticeIndex).toBeGreaterThan(serviceCallIndex);
+      expect(reloadIndex).toBeGreaterThan(noticeIndex);
     });
 
-    it("account.reload() runs in its own nested try/catch inside the mutation's try - a refresh failure only logs, never alerts, never rethrows, and cannot suppress the success alert that already ran", () => {
+    it("account.reload() runs in its own nested try/catch inside the mutation's try - a refresh failure only logs, never shows a toast, never rethrows, and cannot suppress the success notice that already ran", () => {
       var block = getDoCancelStallBlock(readSource());
 
       var reloadTryIndex = block.indexOf("try {\n        await account.reload();");
@@ -428,11 +428,11 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
       expect(reloadCatchBlock).toContain(
         'console.log("CANCEL STALL REFRESH ERROR", refreshError);',
       );
-      expect(reloadCatchBlock).not.toContain("Alert.alert");
+      expect(reloadCatchBlock).not.toContain("showToast");
       expect(reloadCatchBlock).not.toContain("throw");
     });
 
-    it("on mutation failure: shows the mapped error alert, and setCancellingId/guard release still happen via the outer finally", () => {
+    it("on mutation failure: shows the mapped error notice, and setCancellingId/guard release still happen via the outer finally", () => {
       var block = getDoCancelStallBlock(readSource());
 
       var outerCatchIndex = block.indexOf("} catch (err) {");
@@ -440,7 +440,7 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
       var outerCatchBlock = block.slice(outerCatchIndex, outerFinallyIndex);
 
       expect(outerCatchBlock).toContain(
-        'Alert.alert("שגיאה", extractErrorMessage(err));',
+        'showToast(getApiErrorMessage(err, "אירעה שגיאה בביטול הזמנת התא"), "error");',
       );
       expect(outerCatchBlock).not.toContain("DIRECT_CANCELLATION_COPY");
       expect(outerCatchBlock).not.toContain("account.reload");
@@ -490,7 +490,7 @@ describe("AdminCompetitionPayerAccountScreen - CE-4/PT-8 entry and paid-time in-
       expect(setCancellingIdIndex).toBeLessThan(serviceCallIndex);
     });
 
-    it("on mutation failure, releases the guard inside the catch block, before the alert's outer finally resets cancellingId", () => {
+    it("on mutation failure, releases the guard inside the catch block, before the notice's outer finally resets cancellingId", () => {
       var block = getDoCancelEntryBlock(readSource());
 
       var catchStart = block.indexOf("} catch (err) {");
@@ -498,7 +498,7 @@ describe("AdminCompetitionPayerAccountScreen - CE-4/PT-8 entry and paid-time in-
       var catchBlock = block.slice(catchStart, finallyStart);
 
       expect(catchBlock).toContain(
-        'Alert.alert("שגיאה", extractErrorMessage(err));',
+        'showToast(getApiErrorMessage(err, "אירעה שגיאה בביטול ההרשמה"), "error");',
       );
       expect(catchBlock).toContain(
         "entryCancelGuardRef.current.release(guardKey);",
@@ -838,5 +838,256 @@ describe("AdminCompetitionPayerAccountScreen - CAP-4 shavings tab", () => {
 
     expect(source).toContain("var shavingsOrders = sortShavingsOrders(item.shavingsOrders);");
     expect(source).toContain("נסורת לתא זה:");
+  });
+});
+
+describe("AdminCompetitionPayerAccountScreen - AppDialog/AppToast migration", () => {
+  it("no longer imports or calls the native Alert.alert anywhere in the screen", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("Alert");
+  });
+
+  it("imports showToast and AppDialog from the styled-alert foundation", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { showToast } from "../../../../services/toastService";',
+    );
+    expect(source).toContain(
+      'import AppDialog from "../../../../components/common/AppDialog";',
+    );
+  });
+
+  it("owns a single confirmDialog state slot, lazily null, shared by all four cancel confirmations", () => {
+    var source = readSource();
+
+    expect(source).toContain("var [confirmDialog, setConfirmDialog] = useState(null);");
+  });
+
+  it("renders exactly one AppDialog instance, wired to confirmDialog and cleared via onCancel", () => {
+    var source = readSource();
+
+    expect(countOccurrences(source, "<AppDialog")).toBe(1);
+    expect(source).toContain("visible={!!confirmDialog}");
+    expect(source).toContain("title={confirmDialog?.title}");
+    expect(source).toContain("message={confirmDialog?.message}");
+    expect(source).toContain("onConfirm={confirmDialog?.onConfirm}");
+    expect(source).toContain(
+      "onCancel={function () {\n          setConfirmDialog(null);\n        }}",
+    );
+  });
+
+  it("every confirm* function sets confirmDialog instead of calling Alert.alert, and its onConfirm clears the dialog before running the mutation", () => {
+    var source = readSource();
+
+    [
+      { fn: "confirmCancelEntry(item)", mutation: "doCancelEntry(item)" },
+      { fn: "confirmCancelPaidTime(item)", mutation: "doCancelPaidTime(item)" },
+      { fn: "confirmCancelStall(item)", mutation: "doCancelStall(item)" },
+      { fn: "confirmCancelShavings(order)", mutation: "doCancelShavings(order)" },
+    ].forEach(function (pair) {
+      var start = source.indexOf("function " + pair.fn + " {");
+      var end = source.indexOf("\n  }\n", start);
+      var block = source.slice(start, end);
+
+      expect(start).toBeGreaterThan(-1);
+      expect(block).toContain("setConfirmDialog({");
+      expect(block).toContain("setConfirmDialog(null);");
+      expect(block).toContain(pair.mutation);
+    });
+  });
+
+  it("preserves the exact pre-migration dialog copy - titles and messages are unchanged, only the mechanism moved", () => {
+    var source = readSource();
+
+    expect(source).toContain('title: "ביטול הרשמה"');
+    expect(source).toContain('message: "האם לבטל את ההרשמה?"');
+    expect(source).toContain('title: "ביטול פייד טיים"');
+    expect(source).toContain('message: "האם לבטל את הבקשה?"');
+    expect(source).toContain('title: "ביטול תא"');
+    expect(source).toContain(
+      "message: getCancellationConfirmationText(PAYER_ACCOUNT_ITEM_LABEL.stall)",
+    );
+    expect(source).toContain('title: "ביטול הזמנת נסורת"');
+    expect(source).toContain(
+      "message: getCancellationConfirmationText(PAYER_ACCOUNT_ITEM_LABEL.shavings)",
+    );
+  });
+});
+
+describe("AdminCompetitionPayerAccountScreen - doCancelPaidTime refresh isolation hardening (structural gap fix)", () => {
+  function getDoCancelPaidTimeBlock(source) {
+    return getFunctionBlock(
+      source,
+      "async function doCancelPaidTime(item) {",
+      "function confirmCancelStall(item) {",
+    );
+  }
+
+  it("account.reload() is nested inside the mutation's own try, not left bare after the success notice - matching doCancelStall/doCancelShavings, not doCancelEntry's separate-step shape", () => {
+    var block = getDoCancelPaidTimeBlock(readSource());
+
+    var noticeIndex = block.indexOf('showToast("הבקשה בוטלה", "success");');
+    var nestedTryIndex = block.indexOf(
+      "try {\n        await account.reload();",
+      noticeIndex,
+    );
+
+    expect(noticeIndex).toBeGreaterThan(-1);
+    expect(nestedTryIndex).toBeGreaterThan(noticeIndex);
+  });
+
+  it("a refresh failure is caught by its own nested catch, logs only, never shows an error toast, and never rethrows into the outer catch", () => {
+    var block = getDoCancelPaidTimeBlock(readSource());
+
+    var nestedTryIndex = block.indexOf("try {\n        await account.reload();");
+    var nestedCatchIndex = block.indexOf("} catch (refreshError) {", nestedTryIndex);
+    var outerCatchIndex = block.indexOf("} catch (err) {");
+
+    expect(nestedTryIndex).toBeGreaterThan(-1);
+    expect(nestedCatchIndex).toBeGreaterThan(nestedTryIndex);
+    expect(outerCatchIndex).toBeGreaterThan(nestedCatchIndex);
+
+    var nestedCatchBlock = block.slice(nestedCatchIndex, outerCatchIndex);
+    expect(nestedCatchBlock).toContain(
+      'console.log("CANCEL PAID TIME REFRESH ERROR", refreshError);',
+    );
+    expect(nestedCatchBlock).not.toContain("showToast");
+    expect(nestedCatchBlock).not.toContain("throw");
+  });
+
+  it("a successful cancellation can never be reported as failed by a refresh error - the outer (mutation) catch is unreachable once the nested reload catch has already handled it", () => {
+    var block = getDoCancelPaidTimeBlock(readSource());
+
+    var outerCatchIndex = block.indexOf("} catch (err) {");
+    var outerFinallyIndex = block.indexOf("} finally {", outerCatchIndex);
+    var outerCatchBlock = block.slice(outerCatchIndex, outerFinallyIndex);
+
+    expect(outerCatchBlock).toContain(
+      'showToast(getApiErrorMessage(err, "אירעה שגיאה"), "error");',
+    );
+    expect(outerCatchBlock).not.toContain("account.reload");
+  });
+
+  it("stays structurally symmetric with doCancelStall/doCancelShavings: exactly one guard release, in the single outer finally, regardless of refresh outcome", () => {
+    var block = getDoCancelPaidTimeBlock(readSource());
+
+    var finallyIndex = block.lastIndexOf("} finally {");
+    var finallyBlock = block.slice(finallyIndex);
+
+    expect(finallyBlock).toContain("setCancellingId(null);");
+    expect(finallyBlock).toContain(
+      "paidTimeCancelGuardRef.current.release(guardKey);",
+    );
+    expect(
+      countOccurrences(
+        block,
+        "paidTimeCancelGuardRef.current.release(guardKey);",
+      ),
+    ).toBe(1);
+  });
+
+  it("does not unify doCancelPaidTime's success copy with DIRECT_CANCELLATION_COPY - the hardening is structural only, copy is out of scope", () => {
+    var block = getDoCancelPaidTimeBlock(readSource());
+
+    expect(block).toContain('showToast("הבקשה בוטלה", "success");');
+    expect(block).not.toContain("DIRECT_CANCELLATION_COPY");
+  });
+});
+
+// P3.3: replaces the screen-local extractErrorMessage (which could surface a
+// raw backend JSON body, a "Database error: ..." string, or a bare SQLSTATE
+// prefix straight to the user) with the shared, hardened getApiErrorMessage
+// from shared/auth/utils/authApiErrors.js - same helper already adopted by
+// AdminCompetitionPaidTimesScreen and AdminCompetitionStallsShavingsScreen.
+describe("AdminCompetitionPayerAccountScreen - P3.3 safe error parsing (getApiErrorMessage migration)", () => {
+  function getDoCancelPaidTimeBlock(source) {
+    return getFunctionBlock(
+      source,
+      "async function doCancelPaidTime(item) {",
+      "function confirmCancelStall(item) {",
+    );
+  }
+
+  it("no longer defines a local extractErrorMessage helper - it was fully replaced, not left dead", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("function extractErrorMessage(");
+    expect(source).not.toContain("extractErrorMessage(");
+  });
+
+  it("imports getApiErrorMessage from the shared, hardened error helper", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";',
+    );
+  });
+
+  it("the old unsafe escape hatches (raw JSON.stringify, err.response.data.error, bare err.message fallback) are gone from this screen", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("JSON.stringify(data)");
+    expect(source).not.toContain("data.error");
+  });
+
+  it("all four cancellation catch blocks call getApiErrorMessage(err, <established fallback>) instead of the old local helper", () => {
+    var source = readSource();
+
+    expect(
+      countOccurrences(source, "showToast(getApiErrorMessage(err,"),
+    ).toBe(4);
+
+    // Entry cancel (doCancelEntry) - fallback matches the established copy
+    // already used for this exact action in AdminCompetitionClassesScreen.
+    expect(
+      getDoCancelEntryBlock(source),
+    ).toContain(
+      'showToast(getApiErrorMessage(err, "אירעה שגיאה בביטול ההרשמה"), "error");',
+    );
+
+    // Paid-time cancel (doCancelPaidTime) - generic fallback, matching
+    // AdminCompetitionPaidTimesScreen's own getApiErrorMessage call for the
+    // same cancelPaidTimeRequest action.
+    expect(
+      getDoCancelPaidTimeBlock(source),
+    ).toContain(
+      'showToast(getApiErrorMessage(err, "אירעה שגיאה"), "error");',
+    );
+
+    // Stall cancel (doCancelStall) - fallback matches
+    // AdminCompetitionStallsShavingsScreen's identical adminCancelStallBooking flow.
+    expect(
+      getDoCancelStallBlock(source),
+    ).toContain(
+      'showToast(getApiErrorMessage(err, "אירעה שגיאה בביטול הזמנת התא"), "error");',
+    );
+
+    // Shavings cancel (doCancelShavings) - fallback matches
+    // AdminCompetitionStallsShavingsScreen's identical adminCancelShavingsOrder flow.
+    var doCancelShavingsBlock = getFunctionBlock(
+      source,
+      "async function doCancelShavings(order) {",
+      "function renderActions(",
+    );
+    expect(doCancelShavingsBlock).toContain(
+      'showToast(getApiErrorMessage(err, "אירעה שגיאה בביטול הזמנת הנסורת"), "error");',
+    );
+  });
+
+  it("success/cancellation flow is unchanged - success toasts and refresh calls are untouched by this migration", () => {
+    var source = readSource();
+
+    expect(source).toContain('showToast(DIRECT_CANCELLATION_COPY.text, "success");');
+    expect(source).toContain('showToast("הבקשה בוטלה", "success");');
+    expect(countOccurrences(source, "await account.reload();")).toBeGreaterThan(0);
+  });
+
+  it("no unrelated error path in this screen was touched - account.screenError rendering and the retry button are unchanged", () => {
+    var source = readSource();
+
+    expect(source).toContain("{account.screenError}");
+    expect(source).toContain('onPress={account.reload}');
   });
 });

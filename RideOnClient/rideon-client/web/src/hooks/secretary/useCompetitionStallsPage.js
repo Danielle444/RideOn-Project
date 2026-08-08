@@ -16,6 +16,7 @@ import {
   secretaryCreateStallBookingForPayer,
 } from "../../services/stallBookingsService";
 import { getParticipatingRanches } from "../../services/competitionService";
+import { getErrorMessage } from "../../utils/competitionForm.utils";
 
 function parseLayout(layoutJson) {
   if (!layoutJson) return null;
@@ -167,8 +168,8 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
 
       setCompounds(compoundList);
       setActiveCompoundId(compound.compoundId);
-    } catch {
-      setError("שגיאה בשמירת הפריסה");
+    } catch (err) {
+      setError(getErrorMessage(err, "שגיאה בשמירת הפריסה"));
     } finally {
       setSaving(false);
     }
@@ -247,10 +248,10 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
       );
 
       await refreshAssignmentsAndOverview();
-    } catch {
+    } catch (err) {
       setAssignments(previousAssignments);
       setOverviewItems(previousOverviewItems);
-      setError("שגיאה בשיבוץ הזמנת התא");
+      setError(getErrorMessage(err, "שגיאה בשיבוץ הזמנת התא"));
     }
   }
 
@@ -270,8 +271,8 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
       );
 
       await refreshAssignmentsAndOverview();
-    } catch {
-      setError("שגיאה בהסרת השיבוץ");
+    } catch (err) {
+      setError(getErrorMessage(err, "שגיאה בהסרת השיבוץ"));
     }
   }
 
@@ -289,8 +290,8 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
 
       const response = await getPublishStatus(competitionId, ranchId);
       setPublishStatus(response.data || null);
-    } catch {
-      setError("שגיאה בפרסום מפת התאים");
+    } catch (err) {
+      setError(getErrorMessage(err, "שגיאה בפרסום מפת התאים"));
     } finally {
       setPublishLoading(false);
     }
@@ -307,8 +308,8 @@ export default function useCompetitionStallsPage(competitionId, ranchId) {
 
       const response = await getPublishStatus(competitionId, ranchId);
       setPublishStatus(response.data || null);
-    } catch {
-      setError("שגיאה בביטול פרסום מפת התאים");
+    } catch (err) {
+      setError(getErrorMessage(err, "שגיאה בביטול פרסום מפת התאים"));
     } finally {
       setPublishLoading(false);
     }

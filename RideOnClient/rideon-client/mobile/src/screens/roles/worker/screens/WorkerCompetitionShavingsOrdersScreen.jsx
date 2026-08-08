@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
+import AppDialog from "../../../../components/common/AppDialog";
 import WorkerShavingsOrderCard from "../components/WorkerShavingsOrderCard";
 import WorkerShavingsStatusTabs from "../components/WorkerShavingsStatusTabs";
 import { getWorkerBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
@@ -9,14 +11,15 @@ import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate
 import { getWorkerMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
+import { useCompetition } from "../../../../context/CompetitionContext";
 import {
   getWorkerShavingsOrdersByCompetition,
   claimShavingsOrder,
   saveDeliveryPhoto,
   markDelivered,
 } from "../../../../services/shavingsOrderService";
-import { getMobileWorkerCompetitionsBoard } from "../../../../services/competitionService";
-import { getCompetitionStatusLabel } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
+import { showToast } from "../../../../services/toastService";
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 import { supabase } from "../../../../lib/supabaseClient";
 import {
   bucketWorkerCompetitionOrders,
@@ -25,6 +28,39 @@ import {
   isFutureDatedOrder,
 } from "../../../../utils/workerHomeShavingsFeed";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
+
+// Smallest local accordion for the two inMyCare sub-sections (בטיפול שלי / בטיפול של עובד
+// אחר) - manual expand/collapse only, no styling beyond what sectionTitle/chevron already
+// establish elsewhere on this screen (see WorkerShavingsOrderCard's own resolved-state
+// chevron for the same visual language). Deliberately NOT a shared component: this is the
+// only screen with a two-group collapsible split today, so a local component is the smallest
+// change that satisfies "reusable/local" without a broader refactor.
+function CollapsibleCareSection(props) {
+  const [expanded, setExpanded] = useState(props.defaultExpanded);
+
+  return (
+    <View style={{ gap: 12 }}>
+      <Pressable
+        onPress={function () {
+          setExpanded(!expanded);
+        }}
+        style={{
+          flexDirection: "row-reverse",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Text style={roleSharedStyles.sectionTitle}>{props.title}</Text>
+        <Ionicons
+          name={expanded ? "chevron-up-outline" : "chevron-down-outline"}
+          size={20}
+          color="#8B6352"
+        />
+      </Pressable>
+      {expanded && props.children}
+    </View>
+  );
+}
 
 // The middle tab is deliberately labeled "בטיפול" (not "בטיפול שלי") - it also contains
 // orders claimed by another worker (read-only, secondary), and a "my care" label would
@@ -61,32 +97,33 @@ const DELIVERY_BUCKET = "delivery-photos";
 export default function WorkerCompetitionShavingsOrdersScreen(props) {
   const { user } = useUser();
   const { activeRole } = useActiveRole();
+  const competitionContext = useCompetition();
 
-  const [competitions, setCompetitions] = useState([]);
   const [selectedCompetition, setSelectedCompetition] = useState(null);
   const [orders, setOrders] = useState([]);
   const [activeTab, setActiveTab] = useState("requiresAttention");
-  // Start loading=true so the first frame shows a spinner, not "לא נמצאו תחרויות" before the
-  // fetch runs. loadCompetitions settles it to false when there is no active ranch.
-  const [loadingCompetitions, setLoadingCompetitions] = useState(true);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [uploadingOrderId, setUploadingOrderId] = useState(null);
   const [claimingOrderId, setClaimingOrderId] = useState(null);
   const [markingOrderId, setMarkingOrderId] = useState(null);
   // Orders whose photo upload just failed — reveals the no-photo fallback button (CAP-4).
   const [photoFailedOrderId, setPhotoFailedOrderId] = useState(null);
+  // App-owned follow-up shown after the OS camera-permission prompt is denied - never the
+  // OS prompt itself, just this screen's own single-button AppDialog acknowledgement.
+  const [permissionDialogVisible, setPermissionDialogVisible] = useState(false);
+  // Single shared future-dated confirmation dialog for all three mutating actions (claim/
+  // photo/deliver) - confirmIfFutureDated below stashes whichever action is pending here
+  // instead of each action owning its own dialog instance.
+  const [futureConfirmState, setFutureConfirmState] = useState({
+    visible: false,
+    pendingAction: null,
+  });
 
-  // Keyed on ranchId (not []) so a ranch that becomes known after mount actually triggers the
-  // fetch. With [] deps a late-arriving activeRole left loadingCompetitions=false and the list
-  // empty forever, showing a false "לא נמצאו תחרויות" that no fetch would ever clear.
-  useEffect(
-    function () {
-      loadCompetitions();
-    },
-    [activeRole?.ranchId],
-  );
-
-  // Route-param preselect runs once on mount only.
+  // Route-param hydration runs once on mount only. Every live entry into this screen (board
+  // "כניסה", Home "כניסה", Home's today-shavings-feed card) always supplies a competitionId -
+  // a missing one means this screen was reached without going through any of those, so redirect
+  // to the canonical board instead of rendering anything here (no embedded picker to fall back
+  // to anymore).
   useEffect(function () {
     const pid = props.route?.params?.competitionId;
     if (pid) {
@@ -94,27 +131,10 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
         competitionId: pid,
         competitionName: props.route?.params?.competitionName || "",
       });
+    } else {
+      props.navigation.navigate("WorkerCompetitionsBoard");
     }
   }, []);
-
-  async function loadCompetitions() {
-    if (!activeRole?.ranchId) {
-      // No active ranch yet: settle the initial loading=true so the screen shows its
-      // empty state rather than a stuck spinner (the effect re-runs when ranchId arrives).
-      setLoadingCompetitions(false);
-      return;
-    }
-
-    try {
-      setLoadingCompetitions(true);
-      const response = await getMobileWorkerCompetitionsBoard(activeRole.ranchId);
-      setCompetitions(response.data || []);
-    } catch (err) {
-      Alert.alert("שגיאה", "לא ניתן לטעון את התחרויות");
-    } finally {
-      setLoadingCompetitions(false);
-    }
-  }
 
   async function loadOrders(competition) {
     try {
@@ -125,7 +145,7 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       );
       setOrders(response.data?.data || []);
     } catch (err) {
-      Alert.alert("שגיאה", "לא ניתן לטעון את ההזמנות");
+      showToast(getApiErrorMessage(err, "לא ניתן לטעון את ההזמנות"), "error");
     } finally {
       setLoadingOrders(false);
     }
@@ -143,12 +163,19 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       setClaimingOrderId(order.shavingsOrderId);
       await claimShavingsOrder(order.shavingsOrderId);
       await loadOrders(selectedCompetition);
+      // Business rule: a successful claim always surfaces the claimed order on whichever tab
+      // will actually display it after the reload above. A future-dated order is pulled out of
+      // "בטיפול" into "הוזמנו להמשך" by splitFutureDatedShavingsBoardOrders regardless of who
+      // claimed it, so switching to "inMyCare" for a future-dated claim would land on a tab
+      // that never renders it. Only on success: the catch branches below (409 / generic
+      // failure) must never switch tabs.
+      setActiveTab(isFutureDatedOrder(order, new Date()) ? "future" : "inMyCare");
     } catch (err) {
       if (err?.response?.status === 409) {
-        Alert.alert("לא ניתן", "ההזמנה כבר נלקחה לטיפול על ידי עובד אחר");
+        showToast("ההזמנה כבר נלקחה לטיפול על ידי עובד אחר", "warning");
         await loadOrders(selectedCompetition);
       } else {
-        Alert.alert("שגיאה", "לא ניתן לקחת את ההזמנה לטיפול");
+        showToast(getApiErrorMessage(err, "לא ניתן לקחת את ההזמנה לטיפול"), "error");
       }
     } finally {
       setClaimingOrderId(null);
@@ -159,7 +186,7 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
 
     if (!permission.granted) {
-      Alert.alert("הרשאה נדרשת", "נא לאשר גישה למצלמה בהגדרות הטלפון");
+      setPermissionDialogVisible(true);
       return;
     }
 
@@ -204,14 +231,15 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       await saveDeliveryPhoto(order.shavingsOrderId, urlData.publicUrl);
 
       setPhotoFailedOrderId(null);
-      Alert.alert("בוצע", "ההזמנה סופקה");
+      showToast("ההזמנה סופקה", "success");
       await loadOrders(selectedCompetition);
     } catch (err) {
       console.error("Photo upload error:", err);
       setPhotoFailedOrderId(order.shavingsOrderId);
-      Alert.alert(
-        "העלאת התמונה נכשלה",
-        "ניתן לסמן את ההזמנה כסופקה גם ללא תמונה."
+      showToast(
+        "העלאת התמונה נכשלה: " +
+          getApiErrorMessage(err, "ניתן לסמן את ההזמנה כסופקה גם ללא תמונה."),
+        "error",
       );
     } finally {
       setUploadingOrderId(null);
@@ -223,14 +251,14 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       setMarkingOrderId(order.shavingsOrderId);
       await markDelivered(order.shavingsOrderId);
       setPhotoFailedOrderId(null);
-      Alert.alert("בוצע", "ההזמנה סופקה");
+      showToast("ההזמנה סופקה", "success");
       await loadOrders(selectedCompetition);
     } catch (err) {
       if (err?.response?.status === 409) {
-        Alert.alert("לא ניתן", "ההזמנה כבר סופקה");
+        showToast("ההזמנה כבר סופקה", "warning");
         await loadOrders(selectedCompetition);
       } else {
-        Alert.alert("שגיאה", "לא ניתן לסמן את ההזמנה כסופקה");
+        showToast(getApiErrorMessage(err, "לא ניתן לסמן את ההזמנה כסופקה"), "error");
       }
     } finally {
       setMarkingOrderId(null);
@@ -297,11 +325,22 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
         return;
       }
 
-      Alert.alert(FUTURE_ORDER_CONFIRM_TITLE, FUTURE_ORDER_CONFIRM_MESSAGE, [
-        { text: "ביטול", style: "cancel" },
-        { text: "המשך", onPress: action },
-      ]);
+      setFutureConfirmState({ visible: true, pendingAction: action });
     };
+  }
+
+  // AppDialog auto-hides on confirm before the pending action runs, so there is never a
+  // window where it's visible mid-action and a second tap could double-fire it.
+  function handleFutureConfirm() {
+    var pendingAction = futureConfirmState.pendingAction;
+    setFutureConfirmState({ visible: false, pendingAction: null });
+    if (pendingAction) {
+      pendingAction();
+    }
+  }
+
+  function handleFutureCancel() {
+    setFutureConfirmState({ visible: false, pendingAction: null });
   }
 
   function renderOrderCard(order) {
@@ -413,18 +452,17 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       return (
         <>
           {dateSplitGroups.myCare.length > 0 && (
-            <View style={{ gap: 12 }}>
-              <Text style={roleSharedStyles.sectionTitle}>בטיפול שלי</Text>
+            <CollapsibleCareSection title="בטיפול שלי" defaultExpanded={true}>
               {renderDateSections(dateSplitGroups.myCare)}
-            </View>
+            </CollapsibleCareSection>
           )}
           {dateSplitGroups.otherCare.length > 0 && (
-            <View style={{ gap: 12 }}>
-              <Text style={roleSharedStyles.sectionTitle}>
-                בטיפול של עובד אחר
-              </Text>
+            <CollapsibleCareSection
+              title="בטיפול של עובד אחר"
+              defaultExpanded={false}
+            >
               {renderDateSections(dateSplitGroups.otherCare)}
-            </View>
+            </CollapsibleCareSection>
           )}
         </>
       );
@@ -470,7 +508,7 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       title="הזמנות נסורת"
       subtitle={selectedCompetition ? selectedCompetition.competitionName : ""}
       activeBottomTab="home"
-      loading={loadingCompetitions || loadingOrders}
+      loading={loadingOrders}
       bottomNavItems={getWorkerBottomNavConfig(props.navigation)}
       menuContent={function ({ closeMenu }) {
         return (
@@ -495,80 +533,20 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
         );
       }}
     >
-      {!selectedCompetition ? (
-        <View style={{ gap: 10 }}>
-          <Text
-            style={{
-              textAlign: "center",
-              color: "#5D4037",
-              fontSize: 15,
-              fontWeight: "600",
-              marginBottom: 6,
-            }}
-          >
-            בחר תחרות להצגת הזמנות
-          </Text>
-
-          {competitions.length === 0 && !loadingCompetitions && (
-            <Text
-              style={{
-                textAlign: "center",
-                color: "#8D6E63",
-                fontSize: 15,
-                marginTop: 20,
-              }}
-            >
-              לא נמצאו תחרויות
-            </Text>
-          )}
-
-          {competitions.map(function (comp) {
-            return (
-              <Pressable
-                key={comp.competitionId}
-                onPress={function () {
-                  handleSelectCompetition(comp);
-                }}
-                style={{
-                  backgroundColor: "#fff",
-                  borderRadius: 12,
-                  padding: 16,
-                  borderWidth: 1,
-                  borderColor: "#D7CCC8",
-                  shadowColor: "#000",
-                  shadowOpacity: 0.05,
-                  shadowRadius: 4,
-                  elevation: 2,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 15,
-                    fontWeight: "600",
-                    color: "#4E342E",
-                    textAlign: "right",
-                  }}
-                >
-                  {comp.competitionName}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: "#8D6E63",
-                    marginTop: 4,
-                    textAlign: "right",
-                  }}
-                >
-                  {getCompetitionStatusLabel(comp.competitionStatus)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : (
+      {selectedCompetition && (
         <View style={{ gap: 12 }}>
           <Pressable
-            onPress={function () {
+            onPress={async function () {
+              await competitionContext.clearCompetition();
+              props.navigation.navigate("WorkerCompetitionsBoard");
+              // Defensive local cleanup, deferred until after navigation is dispatched:
+              // AppNavigator is a flat native-stack with no unmountOnBlur (same as
+              // WorkerCompetitionsBoardScreen's exitCompetitionMenu), so this screen instance
+              // stays mounted-but-blurred and can be revisited later - reset it now so a future
+              // reopen doesn't show a stale selectedCompetition/orders from this session.
+              // Clearing selectedCompetition BEFORE navigate() would render this screen's own
+              // {selectedCompetition && (...)} branch as empty for a frame while it's still the
+              // visible focused screen - doing it after navigate() avoids that flash.
               setSelectedCompetition(null);
               setOrders([]);
             }}
@@ -607,6 +585,27 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
           {orders.length > 0 && renderActiveTabContent()}
         </View>
       )}
+
+      <AppDialog
+        visible={permissionDialogVisible}
+        title="הרשאה נדרשת"
+        message="נא לאשר גישה למצלמה בהגדרות הטלפון"
+        type="warning"
+        onConfirm={function () {
+          setPermissionDialogVisible(false);
+        }}
+      />
+
+      <AppDialog
+        visible={futureConfirmState.visible}
+        title={FUTURE_ORDER_CONFIRM_TITLE}
+        message={FUTURE_ORDER_CONFIRM_MESSAGE}
+        type="warning"
+        confirmLabel="המשך"
+        cancelLabel="ביטול"
+        onConfirm={handleFutureConfirm}
+        onCancel={handleFutureCancel}
+      />
     </MobileScreenLayout>
   );
 }

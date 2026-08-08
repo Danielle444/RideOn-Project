@@ -50,7 +50,7 @@ export default function CompetitionPaidTimeSection(props) {
           {selectedGroup?.items?.map(function (item) {
             return (
               <View
-                key={String(item.PaidTimeSlotInCompId)}
+                key={String(item.paidTimeSlotInCompId)}
                 style={competitionInvitationStyles.itemCard}
               >
                 <Text style={competitionInvitationStyles.itemTitle}>

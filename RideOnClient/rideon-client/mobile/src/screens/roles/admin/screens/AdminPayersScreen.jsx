@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -16,6 +15,7 @@ import styles from "../../../../styles/adminPayersStyles";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
+import AppDialog from "../../../../components/common/AppDialog";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 
@@ -29,6 +29,8 @@ import { useCompetition } from "../../../../context/CompetitionContext";
 import { getManagedPayers } from "../../../../services/payerService";
 
 import { removeManagedPayer } from "../../../../services/payerService";
+import { showToast } from "../../../../services/toastService";
+import { createInFlightGuard } from "../../../../utils/inFlightGuard";
 
 export default function AdminPayersScreen(props) {
   var userContext = useUser();
@@ -41,6 +43,25 @@ export default function AdminPayersScreen(props) {
   var [payers, setPayers] = useState([]);
   var [loading, setLoading] = useState(false);
   var [searchText, setSearchText] = useState("");
+
+  // Confirmation dialog target (personId) - set when the row's "הסר" button
+  // is pressed, cleared on cancel or once the removal settles.
+  var [removeTargetId, setRemoveTargetId] = useState(null);
+  // Tracks which payer's removal API call is currently in flight - drives
+  // the dialog's isBusy spinner and disables that row's "הסר" button so a
+  // second confirmation dialog can't even be opened for the same payer
+  // while the first request is still pending.
+  var [removingPersonId, setRemovingPersonId] = useState(null);
+
+  // Synchronous, key-scoped guard (same pattern as
+  // AdminCompetitionPayerAccountScreen.jsx's cancel guards) - the real
+  // correctness backstop against a duplicate removal, since React state
+  // updates (removingPersonId above) are asynchronous and can't be trusted
+  // alone to block two rapid confirms of the same row.
+  var removeGuardRef = useRef(null);
+  if (removeGuardRef.current === null) {
+    removeGuardRef.current = createInFlightGuard();
+  }
 
   useEffect(
     function () {
@@ -79,7 +100,7 @@ export default function AdminPayersScreen(props) {
       setPayers(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error(error);
-      Alert.alert("שגיאה", "אירעה שגיאה בטעינת המשלמים");
+      showToast("אירעה שגיאה בטעינת המשלמים", "error");
       setPayers([]);
     } finally {
       setLoading(false);
@@ -96,16 +117,35 @@ export default function AdminPayersScreen(props) {
     }
   }
 
-  async function handleRemovePayer(personId) {
+  // The synchronous guard (removeGuardRef) is acquired BEFORE anything else,
+  // including setRemovingPersonId - a second invocation for the same
+  // personId (e.g. a re-confirm fired before the first render reflects
+  // removingPersonId) returns immediately instead of firing a second
+  // removeManagedPayer call.
+  async function doRemovePayer(personId) {
+    var guardKey = "payer:" + personId;
+
+    if (!removeGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
+      setRemovingPersonId(personId);
+
       await removeManagedPayer(personId, activeRole.ranchId);
-      Alert.alert("הוסר", "המשלם הוסר מרשימת הניהול");
+
+      setRemoveTargetId(null);
+      showToast("המשלם הוסר מרשימת הניהול", "success");
       await loadPayers(searchText.trim());
     } catch (error) {
-      Alert.alert(
-        "שגיאה",
+      setRemoveTargetId(null);
+      showToast(
         getApiErrorMessage(error, "אירעה שגיאה בהסרת המשלם"),
+        "error",
       );
+    } finally {
+      setRemovingPersonId(null);
+      removeGuardRef.current.release(guardKey);
     }
   }
 
@@ -275,21 +315,9 @@ export default function AdminPayersScreen(props) {
 
                   <Pressable
                     style={styles.dangerButton}
+                    disabled={removingPersonId === payer.personId}
                     onPress={function () {
-                      Alert.alert(
-                        "הסרת משלם",
-                        "האם להסיר את המשלם מרשימת הניהול שלך?",
-                        [
-                          { text: "ביטול", style: "cancel" },
-                          {
-                            text: "הסר",
-                            style: "destructive",
-                            onPress: function () {
-                              handleRemovePayer(payer.personId);
-                            },
-                          },
-                        ],
-                      );
+                      setRemoveTargetId(payer.personId);
                     }}
                   >
                     <Text style={styles.dangerButtonText}>הסר</Text>
@@ -300,6 +328,22 @@ export default function AdminPayersScreen(props) {
           })
         )}
       </ScrollView>
+
+      <AppDialog
+        visible={removeTargetId !== null}
+        title="הסרת משלם"
+        message="האם להסיר את המשלם מרשימת הניהול שלך?"
+        confirmLabel="הסר"
+        cancelLabel="ביטול"
+        destructive={true}
+        isBusy={removingPersonId !== null}
+        onConfirm={function () {
+          doRemovePayer(removeTargetId);
+        }}
+        onCancel={function () {
+          setRemoveTargetId(null);
+        }}
+      />
     </MobileScreenLayout>
   );
 }

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
@@ -24,6 +25,7 @@ import {
   buildStatusOptions,
   filterCompetitionsForBoard,
 } from "../../../../utils/competitionsBoardFilters";
+import { showToast } from "../../../../services/toastService";
 
 export default function WorkerCompetitionsBoardScreen(props) {
   var userContext = useUser();
@@ -38,10 +40,14 @@ export default function WorkerCompetitionsBoardScreen(props) {
   var [competitions, setCompetitions] = useState([]);
   var [loading, setLoading] = useState(false);
 
+  // CAP-1: status/host-ranch/field are multi-select sets now (an empty
+  // array means "no filtering for that facet"), owned here as the board's
+  // APPLIED filters - CompetitionsFilterBar owns its own draft copy
+  // internally and only calls handleApplyFilters on "החל".
   var [searchText, setSearchText] = useState("");
-  var [hostRanchFilter, setHostRanchFilter] = useState("");
-  var [fieldFilter, setFieldFilter] = useState("");
-  var [statusFilter, setStatusFilter] = useState("");
+  var [hostRanchFilter, setHostRanchFilter] = useState([]);
+  var [fieldFilter, setFieldFilter] = useState([]);
+  var [statusFilter, setStatusFilter] = useState([]);
   var [dateFrom, setDateFrom] = useState("");
   var [dateTo, setDateTo] = useState("");
 
@@ -69,7 +75,7 @@ export default function WorkerCompetitionsBoardScreen(props) {
       );
     } catch (error) {
       console.error(error);
-      Alert.alert("שגיאה", "אירעה שגיאה בטעינת התחרויות");
+      showToast("אירעה שגיאה בטעינת התחרויות", "error");
       setCompetitions([]);
     } finally {
       setLoading(false);
@@ -86,6 +92,21 @@ export default function WorkerCompetitionsBoardScreen(props) {
     setMenuMode("general");
     await competitionContext.clearCompetition();
   }
+
+  // AppNavigator is one flat native-stack (no unmountOnBlur): navigating to
+  // "WorkerCompetitionShavingsOrders" via "כניסה" pushes it on top and
+  // leaves this screen mounted-but-blurred underneath with menuMode/
+  // selectedCompetition still set to "competition"/the entered item.
+  // Coming back here via the bottom-nav board icon or the "לוח תחרויות"
+  // side-menu item just pops back to this SAME instance, so without this
+  // reset the side menu would keep showing the in-competition items
+  // instead of the normal board menu. Reuses the exact same reset already
+  // wired to the explicit "יציאה מהתחרות" action.
+  useFocusEffect(
+    useCallback(function () {
+      exitCompetitionMenu();
+    }, []),
+  );
 
   async function handleLogout() {
     if (props.onLogout) {
@@ -139,13 +160,20 @@ export default function WorkerCompetitionsBoardScreen(props) {
     ];
   }
 
-  function handleResetFilters() {
-    setSearchText("");
-    setHostRanchFilter("");
-    setFieldFilter("");
-    setStatusFilter("");
-    setDateFrom("");
-    setDateTo("");
+  // CAP-1: the sheet's own "החל" - commits its whole draft filter set to
+  // the board in one call. "איפוס" inside the sheet only clears the draft;
+  // it reaches the board only once the user also presses "החל".
+  function handleApplyFilters(nextFilters) {
+    setSearchText(nextFilters.searchText || "");
+    setHostRanchFilter(
+      Array.isArray(nextFilters.hostRanchIds) ? nextFilters.hostRanchIds : [],
+    );
+    setFieldFilter(Array.isArray(nextFilters.fieldIds) ? nextFilters.fieldIds : []);
+    setStatusFilter(
+      Array.isArray(nextFilters.statusValues) ? nextFilters.statusValues : [],
+    );
+    setDateFrom(nextFilters.dateFrom || "");
+    setDateTo(nextFilters.dateTo || "");
   }
 
   var hostRanchOptions = useMemo(
@@ -255,22 +283,18 @@ export default function WorkerCompetitionsBoardScreen(props) {
       <Text style={roleSharedStyles.sectionTitle}>כל התחרויות</Text>
 
       <CompetitionsFilterBar
-        searchText={searchText}
-        onSearchTextChange={setSearchText}
         hostRanchOptions={hostRanchOptions}
-        hostRanchFilter={hostRanchFilter}
-        onHostRanchFilterChange={setHostRanchFilter}
         fieldOptions={fieldOptions}
-        fieldFilter={fieldFilter}
-        onFieldFilterChange={setFieldFilter}
         statusOptions={statusOptions}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        dateFrom={dateFrom}
-        onDateFromChange={setDateFrom}
-        dateTo={dateTo}
-        onDateToChange={setDateTo}
-        onReset={handleResetFilters}
+        appliedFilters={{
+          searchText: searchText,
+          hostRanchIds: hostRanchFilter,
+          fieldIds: fieldFilter,
+          statusValues: statusFilter,
+          dateFrom: dateFrom,
+          dateTo: dateTo,
+        }}
+        onApply={handleApplyFilters}
       />
 
       {loading ? (

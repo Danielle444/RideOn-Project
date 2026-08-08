@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   RefreshControl,
   ScrollView,
   Text,
@@ -29,6 +28,7 @@ import {
 } from "../../../../utils/workerHomeShavingsFeed";
 import WorkerShavingsOrderCard from "../components/WorkerShavingsOrderCard";
 import { canWorkerEnterCompetition } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 import {
   selectCompetitionsShortlist,
   DEFAULT_SHORTLIST_CAP,
@@ -37,6 +37,7 @@ import {
 import { MOBILE_COMPETITION_STATUS_ORDER } from "../../../../../../shared/auth/utils/competitions/competitionStatusOrder";
 import { withTransientRetry } from "../../../../utils/transientRequestRetry";
 import { createStartupAlertGuard } from "../../../../utils/startupAlertGuard";
+import { showToast } from "../../../../services/toastService";
 
 export default function WorkerHomeScreen(props) {
   var userContext = useUser();
@@ -106,7 +107,7 @@ export default function WorkerHomeScreen(props) {
       console.error(error);
       setCompetitions([]);
       if (startupAlertGuardRef.current.shouldAlert()) {
-        Alert.alert("שגיאה", "אירעה שגיאה בטעינת דף הבית");
+        showToast("אירעה שגיאה בטעינת דף הבית", "error");
       }
     } finally {
       setLoading(false);
@@ -130,7 +131,7 @@ export default function WorkerHomeScreen(props) {
       console.error(error);
       setShavingsFeed([]);
       if (startupAlertGuardRef.current.shouldAlert()) {
-        Alert.alert("שגיאה", "אירעה שגיאה בטעינת הזמנות הנסורת להיום");
+        showToast("אירעה שגיאה בטעינת הזמנות הנסורת להיום", "error");
       }
     } finally {
       setLoadingFeed(false);
@@ -144,10 +145,13 @@ export default function WorkerHomeScreen(props) {
       await loadShavingsFeed();
     } catch (error) {
       if (error?.response?.status === 409) {
-        Alert.alert("לא ניתן", "ההזמנה כבר נלקחה לטיפול על ידי עובד אחר");
+        showToast("ההזמנה כבר נלקחה לטיפול על ידי עובד אחר", "warning");
         await loadShavingsFeed();
       } else {
-        Alert.alert("שגיאה", "לא ניתן לקחת את ההזמנה לטיפול");
+        showToast(
+          getApiErrorMessage(error, "לא ניתן לקחת את ההזמנה לטיפול"),
+          "error",
+        );
       }
     } finally {
       setClaimingOrderId(null);

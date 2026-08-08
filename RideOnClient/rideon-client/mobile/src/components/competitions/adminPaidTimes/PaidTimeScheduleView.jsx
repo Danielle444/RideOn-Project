@@ -117,6 +117,7 @@ function ScheduleRow(props) {
             cancellingId={props.cancellingId}
             onEdit={props.onEdit}
             onCancel={props.onCancel}
+            paidTimesAvailability={props.paidTimesAvailability}
           />
         </View>
       ) : null}
@@ -284,6 +285,7 @@ export default function PaidTimeScheduleView(props) {
                             onCancel={props.onCancel}
                             cancellingId={props.cancellingId}
                             onViewSlotSchedule={props.onViewSlotSchedule}
+                            paidTimesAvailability={props.paidTimesAvailability}
                           />
                         );
                       })

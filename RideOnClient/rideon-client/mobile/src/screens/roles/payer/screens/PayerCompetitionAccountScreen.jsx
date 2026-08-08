@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   RefreshControl,
@@ -13,6 +12,8 @@ import {
 } from "react-native";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
+import AppDialog from "../../../../components/common/AppDialog";
+import { showToast } from "../../../../services/toastService";
 import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
@@ -75,7 +76,7 @@ import { createInFlightGuard } from "../../../../utils/inFlightGuard";
 // Consolidated onto the shared, hardened extractor (RideOn notification
 // audit, 2026-08-07, Slice 2) - the local version used to JSON.stringify an
 // unrecognized object body as a last resort, which could leak raw backend
-// shape to the user. Name/signature kept so every Alert.alert call site
+// shape to the user. Name/signature kept so every showToast call site
 // below is untouched.
 function extractErrorMessage(err) {
   return getApiErrorMessage(err, "אירעה שגיאה");
@@ -335,6 +336,19 @@ export default function PayerCompetitionAccountScreen(props) {
 
   var [cancellingId, setCancellingId] = useState(null);
 
+  // Single shared AppDialog state for the 4 destructive cancellation
+  // confirmations below. Only one can ever be open at a time (mirrors the
+  // native confirm dialog it replaces - the user can only tap one cancel
+  // button at once), so one state slot is enough. isBusy is derived from
+  // cancellingId (existing UI state), it does not replace or weaken the
+  // per-action createInFlightGuard refs below, which remain the sole
+  // correctness guard against a double-fire.
+  var [confirmDialog, setConfirmDialog] = useState(null);
+
+  function closeConfirmDialog() {
+    setConfirmDialog(null);
+  }
+
   // Synchronous in-flight guards, one per action/target namespace (same
   // pattern as AdminCompetitionPayerAccountScreen.jsx's stall/shavings
   // guards) - cancellingId above is UI feedback only (async state), not a
@@ -399,11 +413,11 @@ export default function PayerCompetitionAccountScreen(props) {
         notes: editPaidTimeNotes,
       });
 
-      Alert.alert("נשמר", "ההערות עודכנו");
+      showToast("ההערות עודכנו", "success");
       closeEditPaidTime();
       await account.reload();
     } catch (err) {
-      Alert.alert("שגיאה", extractErrorMessage(err));
+      showToast(extractErrorMessage(err), "error");
     } finally {
       setSavingEdit(false);
     }
@@ -446,11 +460,11 @@ export default function PayerCompetitionAccountScreen(props) {
         notes: dates.notes,
       });
 
-      Alert.alert("נשלח", "בקשת שינוי התא נשלחה למזכירה");
+      showToast("בקשת שינוי התא נשלחה למזכירה", "success");
       setStallChangeRequestItem(null);
       await account.reload();
     } catch (err) {
-      Alert.alert("שגיאה", extractErrorMessage(err));
+      showToast(extractErrorMessage(err), "error");
     } finally {
       setIsSubmittingStallChange(false);
       setCancellingId(null);
@@ -459,20 +473,17 @@ export default function PayerCompetitionAccountScreen(props) {
   }
 
   function confirmCancelEntry(item) {
-    Alert.alert(
-      "ביטול הרשמה",
-      "האם לשלוח בקשת ביטול למזכירה? יתבצע רק לאחר אישור.",
-      [
-        { text: "לא", style: "cancel" },
-        {
-          text: "כן",
-          style: "destructive",
-          onPress: function () {
-            doCancelEntry(item);
-          },
-        },
-      ],
-    );
+    setConfirmDialog({
+      key: "entry:" + item.entryId,
+      title: "ביטול הרשמה",
+      message: "האם לשלוח בקשת ביטול למזכירה? יתבצע רק לאחר אישור.",
+      confirmLabel: "כן",
+      cancelLabel: "לא",
+      destructive: true,
+      onConfirm: function () {
+        doCancelEntry(item);
+      },
+    });
   }
 
   async function doCancelEntry(item) {
@@ -490,11 +501,13 @@ export default function PayerCompetitionAccountScreen(props) {
         ranchId: activeRole?.ranchId,
       });
 
-      Alert.alert("נשלח", "בקשת הביטול נשלחה למזכירה");
+      closeConfirmDialog();
+      showToast("בקשת הביטול נשלחה למזכירה", "success");
 
       await account.reload();
     } catch (err) {
-      Alert.alert("שגיאה", extractErrorMessage(err));
+      closeConfirmDialog();
+      showToast(extractErrorMessage(err), "error");
     } finally {
       setCancellingId(null);
       entryCancelGuardRef.current.release(guardKey);
@@ -502,20 +515,17 @@ export default function PayerCompetitionAccountScreen(props) {
   }
 
   function confirmCancelPaidTime(item) {
-    Alert.alert(
-      "ביטול פייד טיים",
-      "האם לבטל? ניתן לבטל רק עד 24 שעות לפני המועד.",
-      [
-        { text: "לא", style: "cancel" },
-        {
-          text: "כן",
-          style: "destructive",
-          onPress: function () {
-            doCancelPaidTime(item);
-          },
-        },
-      ],
-    );
+    setConfirmDialog({
+      key: "paidTime:" + item.paidTimeRequestId,
+      title: "ביטול פייד טיים",
+      message: "האם לבטל? ניתן לבטל רק עד 24 שעות לפני המועד.",
+      confirmLabel: "כן",
+      cancelLabel: "לא",
+      destructive: true,
+      onConfirm: function () {
+        doCancelPaidTime(item);
+      },
+    });
   }
 
   async function doCancelPaidTime(item) {
@@ -533,11 +543,13 @@ export default function PayerCompetitionAccountScreen(props) {
         ranchId: activeRole?.ranchId,
       });
 
-      Alert.alert("בוטל", "הבקשה בוטלה");
+      closeConfirmDialog();
+      showToast("הבקשה בוטלה", "success");
 
       await account.reload();
     } catch (err) {
-      Alert.alert("שגיאה", extractErrorMessage(err));
+      closeConfirmDialog();
+      showToast(extractErrorMessage(err), "error");
     } finally {
       setCancellingId(null);
       paidTimeCancelGuardRef.current.release(guardKey);
@@ -545,20 +557,17 @@ export default function PayerCompetitionAccountScreen(props) {
   }
 
   function confirmCancelStall(item) {
-    Alert.alert(
-      "ביטול תא",
-      "האם לשלוח בקשת ביטול תא למזכירה? יתבצע רק לאחר אישור.",
-      [
-        { text: "לא", style: "cancel" },
-        {
-          text: "כן",
-          style: "destructive",
-          onPress: function () {
-            doCancelStall(item);
-          },
-        },
-      ],
-    );
+    setConfirmDialog({
+      key: "stall:" + item.stallBookingId,
+      title: "ביטול תא",
+      message: "האם לשלוח בקשת ביטול תא למזכירה? יתבצע רק לאחר אישור.",
+      confirmLabel: "כן",
+      cancelLabel: "לא",
+      destructive: true,
+      onConfirm: function () {
+        doCancelStall(item);
+      },
+    });
   }
 
   async function doCancelStall(item) {
@@ -576,11 +585,13 @@ export default function PayerCompetitionAccountScreen(props) {
         ranchId: activeRole?.ranchId,
       });
 
-      Alert.alert("נשלח", "בקשת הביטול נשלחה למזכירה");
+      closeConfirmDialog();
+      showToast("בקשת הביטול נשלחה למזכירה", "success");
 
       await account.reload();
     } catch (err) {
-      Alert.alert("שגיאה", extractErrorMessage(err));
+      closeConfirmDialog();
+      showToast(extractErrorMessage(err), "error");
     } finally {
       setCancellingId(null);
       stallCancelGuardRef.current.release(guardKey);
@@ -588,20 +599,18 @@ export default function PayerCompetitionAccountScreen(props) {
   }
 
   function confirmCancelShavings(order) {
-    Alert.alert(
-      "ביטול הזמנת נסורת",
-      "האם לשלוח בקשת ביטול להזמנת הנסורת למזכירה? הביטול יתבצע רק לאחר אישור.",
-      [
-        { text: "לא", style: "cancel" },
-        {
-          text: "כן",
-          style: "destructive",
-          onPress: function () {
-            doCancelShavings(order);
-          },
-        },
-      ],
-    );
+    setConfirmDialog({
+      key: "shavings:" + order.shavingsOrderId,
+      title: "ביטול הזמנת נסורת",
+      message:
+        "האם לשלוח בקשת ביטול להזמנת הנסורת למזכירה? הביטול יתבצע רק לאחר אישור.",
+      confirmLabel: "כן",
+      cancelLabel: "לא",
+      destructive: true,
+      onConfirm: function () {
+        doCancelShavings(order);
+      },
+    });
   }
 
   // Payer-gated standalone shavings cancellation: creates a Pending request
@@ -624,11 +633,13 @@ export default function PayerCompetitionAccountScreen(props) {
         ranchId: activeRole?.ranchId,
       });
 
-      Alert.alert("נשלח", "בקשת הביטול נשלחה למזכירה");
+      closeConfirmDialog();
+      showToast("בקשת הביטול נשלחה למזכירה", "success");
 
       await account.reload();
     } catch (err) {
-      Alert.alert("שגיאה", extractErrorMessage(err));
+      closeConfirmDialog();
+      showToast(extractErrorMessage(err), "error");
     } finally {
       setCancellingId(null);
       shavingsCancelGuardRef.current.release(guardKey);
@@ -991,6 +1002,13 @@ export default function PayerCompetitionAccountScreen(props) {
         ? "כבר שולם — לא ניתן לבטל"
         : "בוטל";
 
+      // Server-computed 24h cutoff (usp_getpayercompetitionaccount_body's
+      // canCancel field, mirrors the guard usp_cancelpaidtimerequestbypayer
+      // already enforces). Only meaningful when the item isn't already
+      // paid/cancelled -- those cases are handled by isLocked above. Treat a
+      // missing field defensively as still-cancellable rather than blocking.
+      var pastCancelCutoff = !isLocked && item.canCancel === false;
+
       return (
         <View key={String(item.paidTimeRequestId)} style={styles.itemCard}>
           <View style={styles.itemTopRow}>
@@ -1022,6 +1040,7 @@ export default function PayerCompetitionAccountScreen(props) {
           <Text style={styles.itemMutedText}>סטטוס: {item.status || "-"}</Text>
 
           {!isLocked ? (
+            <>
             <View
               style={{
                 flexDirection: "row-reverse",
@@ -1052,11 +1071,15 @@ export default function PayerCompetitionAccountScreen(props) {
                 onPress={function () {
                   confirmCancelPaidTime(item);
                 }}
-                disabled={cancellingId === "paidTime:" + item.paidTimeRequestId}
+                disabled={
+                  cancellingId === "paidTime:" + item.paidTimeRequestId ||
+                  pastCancelCutoff
+                }
                 style={{
                   flex: 1,
-                  backgroundColor:
-                    cancellingId === "paidTime:" + item.paidTimeRequestId
+                  backgroundColor: pastCancelCutoff
+                    ? "#C9B7AC"
+                    : cancellingId === "paidTime:" + item.paidTimeRequestId
                       ? "#C9B7AC"
                       : "#A0522D",
                   borderRadius: 10,
@@ -1065,12 +1088,20 @@ export default function PayerCompetitionAccountScreen(props) {
                 }}
               >
                 <Text style={{ color: "#FFFFFF", fontWeight: "800" }}>
-                  {cancellingId === "paidTime:" + item.paidTimeRequestId
-                    ? "שולח..."
-                    : "בטל"}
+                  {pastCancelCutoff
+                    ? "לא ניתן לבטל"
+                    : cancellingId === "paidTime:" + item.paidTimeRequestId
+                      ? "שולח..."
+                      : "בטל"}
                 </Text>
               </Pressable>
             </View>
+            {pastCancelCutoff ? (
+              <Text style={styles.itemMutedText}>
+                ניתן לבטל עד 24 שעות לפני מועד הפייד טיים
+              </Text>
+            ) : null}
+            </>
           ) : (
             renderCancelButton(
               "paidTime:" + item.paidTimeRequestId,
@@ -1528,6 +1559,22 @@ export default function PayerCompetitionAccountScreen(props) {
         isSubmitting={isSubmittingStallChange}
         onSubmit={doStallChangeRequest}
         onClose={closeStallChangeRequestModal}
+      />
+
+      <AppDialog
+        visible={!!confirmDialog}
+        title={confirmDialog?.title}
+        message={confirmDialog?.message}
+        confirmLabel={confirmDialog?.confirmLabel}
+        cancelLabel={confirmDialog?.cancelLabel}
+        destructive={confirmDialog?.destructive}
+        isBusy={!!confirmDialog && cancellingId === confirmDialog.key}
+        onConfirm={function () {
+          if (confirmDialog && typeof confirmDialog.onConfirm === "function") {
+            confirmDialog.onConfirm();
+          }
+        }}
+        onCancel={closeConfirmDialog}
       />
     </MobileScreenLayout>
   );

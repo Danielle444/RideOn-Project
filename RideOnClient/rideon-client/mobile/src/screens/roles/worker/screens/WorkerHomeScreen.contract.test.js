@@ -97,44 +97,59 @@ describe("WorkerHomeScreen - startup dual-failure alert dedup wiring", () => {
     );
   });
 
-  it("each loader's Alert.alert call is gated by startupAlertGuardRef.current.shouldAlert()", () => {
+  it("each loader's showToast call is gated by startupAlertGuardRef.current.shouldAlert()", () => {
     var source = readSource();
 
     expect(source).toContain(
       'if (startupAlertGuardRef.current.shouldAlert()) {\n' +
-        '        Alert.alert("שגיאה", "אירעה שגיאה בטעינת דף הבית");\n' +
+        '        showToast("אירעה שגיאה בטעינת דף הבית", "error");\n' +
         '      }',
     );
     expect(source).toContain(
       'if (startupAlertGuardRef.current.shouldAlert()) {\n' +
-        '        Alert.alert("שגיאה", "אירעה שגיאה בטעינת הזמנות הנסורת להיום");\n' +
+        '        showToast("אירעה שגיאה בטעינת הזמנות הנסורת להיום", "error");\n' +
         '      }',
     );
 
-    // Each of the two generic alert messages still appears exactly once in
+    // Each of the two generic toast messages still appears exactly once in
     // the whole file - the guard changed WHEN they fire, not how many
     // distinct call sites exist.
-    var competitionsAlertCount =
-      source.split('Alert.alert("שגיאה", "אירעה שגיאה בטעינת דף הבית");').length - 1;
-    var shavingsAlertCount =
-      source.split('Alert.alert("שגיאה", "אירעה שגיאה בטעינת הזמנות הנסורת להיום");')
+    var competitionsToastCount =
+      source.split('showToast("אירעה שגיאה בטעינת דף הבית", "error");').length - 1;
+    var shavingsToastCount =
+      source.split('showToast("אירעה שגיאה בטעינת הזמנות הנסורת להיום", "error");')
         .length - 1;
-    expect(competitionsAlertCount).toBe(1);
-    expect(shavingsAlertCount).toBe(1);
+    expect(competitionsToastCount).toBe(1);
+    expect(shavingsToastCount).toBe(1);
+
+    // No native Alert.alert remains anywhere in this file.
+    expect(source).not.toContain("Alert.alert");
   });
 
-  it("handleClaimShavingsOrder's own alerts are unguarded - unrelated to the startup cycle", () => {
+  it("imports showToast from the shared toast service", () => {
     var source = readSource();
 
-    // These two pre-existing alerts (409 conflict / generic claim failure)
-    // must stay exactly as they were - not routed through the startup
-    // guard, since they are a standalone user action, not part of the
-    // paired mount/refresh cycle.
     expect(source).toContain(
-      'Alert.alert("לא ניתן", "ההזמנה כבר נלקחה לטיפול על ידי עובד אחר");',
+      'import { showToast } from "../../../../services/toastService";',
+    );
+  });
+
+  it("handleClaimShavingsOrder's own toasts are unguarded - unrelated to the startup cycle", () => {
+    var source = readSource();
+
+    // These two pre-existing toasts (409 conflict / generic claim failure)
+    // must stay exactly as they were routed - not through the startup
+    // guard, since they are a standalone user action, not part of the
+    // paired mount/refresh cycle. The 409 branch keeps its exact special
+    // business copy verbatim (now a "warning"-type toast, since nothing
+    // actually broke - someone else just claimed it first); the generic
+    // branch is normalized through getApiErrorMessage (see the
+    // notification-normalization suite below), same fallback text as before.
+    expect(source).toContain(
+      'showToast("ההזמנה כבר נלקחה לטיפול על ידי עובד אחר", "warning");',
     );
     expect(source).toContain(
-      'Alert.alert("שגיאה", "לא ניתן לקחת את ההזמנה לטיפול");',
+      'getApiErrorMessage(error, "לא ניתן לקחת את ההזמנה לטיפול")',
     );
   });
 
@@ -150,6 +165,45 @@ describe("WorkerHomeScreen - startup dual-failure alert dedup wiring", () => {
 
     expect(source).toContain(
       "      loadWorkerHome();\n" + "    },\n" + "    [activeRole],",
+    );
+  });
+});
+
+describe("WorkerHomeScreen - getApiErrorMessage notification normalization (claim action only)", () => {
+  it("imports getApiErrorMessage from the shared auth-error helper", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";',
+    );
+  });
+
+  it("routes handleClaimShavingsOrder's generic failure through getApiErrorMessage - the exact duplicate of WorkerCompetitionShavingsOrdersScreen's handleClaimOrder pattern", () => {
+    var source = readSource();
+
+    var fnAt = source.indexOf("async function handleClaimShavingsOrder(order) {");
+    expect(fnAt).toBeGreaterThan(-1);
+    var fnEnd = source.indexOf("\n  }\n", fnAt);
+    var fnBody = source.substring(fnAt, fnEnd);
+
+    expect(fnBody).toContain(
+      'getApiErrorMessage(error, "לא ניתן לקחת את ההזמנה לטיפול")',
+    );
+  });
+
+  it("does NOT touch loadHomeCompetitions/loadShavingsFeed's startup-guarded toasts - different pattern, scoped out deliberately", () => {
+    var source = readSource();
+
+    // These remain the guarded, hardcoded startup-dedup messages pinned above
+    // (see "startup dual-failure alert dedup wiring") - they are not the
+    // claim/take-treatment action this normalization pass targets, and
+    // changing them would fight the shouldAlert() dedup design instead of
+    // fixing a notification-format mismatch.
+    expect(source).toContain(
+      'showToast("אירעה שגיאה בטעינת דף הבית", "error");',
+    );
+    expect(source).toContain(
+      'showToast("אירעה שגיאה בטעינת הזמנות הנסורת להיום", "error");',
     );
   });
 });

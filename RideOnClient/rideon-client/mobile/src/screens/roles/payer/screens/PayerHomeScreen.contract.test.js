@@ -34,13 +34,22 @@ describe("PayerHomeScreen - restored-session home retry", () => {
     );
   });
 
-  it("preserves the existing error alert and empty-state fallback unchanged", () => {
+  it("replaces the native alert with a styled error toast, empty-state fallback unchanged", () => {
     var source = readSource();
 
     expect(source).toContain("console.error(error);");
     expect(source).toContain("setCompetitions([]);");
     expect(source).toContain(
-      'Alert.alert("שגיאה", "אירעה שגיאה בטעינת דף הבית");',
+      'showToast("אירעה שגיאה בטעינת דף הבית", "error");',
+    );
+    expect(source).not.toMatch(/\bAlert\b/);
+  });
+
+  it("imports showToast from the shared toast service", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { showToast } from "../../../../services/toastService";',
     );
   });
 

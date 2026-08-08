@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   Image,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -18,8 +17,11 @@ import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
+import AppDialog from "../../components/common/AppDialog";
+
 import {
   register,
+  sendOtp,
   getRanchesForRegistration,
   createRanchRequest,
   getRoles,
@@ -71,6 +73,13 @@ export default function RegisterScreen() {
 
   var [error, setError] = useState("");
   var [success, setSuccess] = useState("");
+  var [showRegisterSuccessDialog, setShowRegisterSuccessDialog] = useState(false);
+
+  var [otpSent, setOtpSent] = useState(false);
+  var [otpCode, setOtpCode] = useState("");
+  var [otpLoading, setOtpLoading] = useState(false);
+  var [otpError, setOtpError] = useState("");
+  var [otpSuccess, setOtpSuccess] = useState("");
 
   var [checkingNationalId, setCheckingNationalId] = useState(false);
   var [nationalIdMessage, setNationalIdMessage] = useState("");
@@ -404,6 +413,28 @@ export default function RegisterScreen() {
     await tryAutoFillUsernameFromEmail(emailValue);
   }
 
+  async function handleSendOtp() {
+    setOtpError("");
+    setOtpSuccess("");
+
+    if (!form.email || !form.email.includes("@")) {
+      setOtpError("נא להזין כתובת מייל תקינה");
+      return;
+    }
+
+    setOtpLoading(true);
+
+    try {
+      await sendOtp(form.email.trim());
+      setOtpSent(true);
+      setOtpSuccess("קוד נשלח למייל שלך");
+    } catch (err) {
+      setOtpError("שגיאה בשליחת קוד האימות. נסה שוב.");
+    } finally {
+      setOtpLoading(false);
+    }
+  }
+
   function handleDateChange(event, selectedDate) {
     setShowDatePicker(false);
 
@@ -522,8 +553,6 @@ export default function RegisterScreen() {
 
       setShowRanchModal(false);
       setSuccess("בקשת חווה נשלחה בהצלחה. החווה תופיע לאחר אישור מנהל.");
-
-      Alert.alert("הצלחה", "בקשת החווה נשלחה בהצלחה");
     } catch (err) {
       var message = getApiErrorMessage(err, "שגיאה ביצירת בקשת חווה");
       setRanchModalError(String(message));
@@ -574,6 +603,7 @@ export default function RegisterScreen() {
         email: form.email,
         username: form.username,
         password: form.password,
+        otpCode: otpCode,
         ranchRoles: validPairs.map(function (pair) {
           return {
             ranchId: Number(pair.ranchId),
@@ -583,21 +613,18 @@ export default function RegisterScreen() {
       });
 
       setSuccess("הבקשה נשלחה בהצלחה");
-
-      Alert.alert("הצלחה", "הבקשה נשלחה בהצלחה", [
-        {
-          text: "אישור",
-          onPress: function () {
-            navigation.navigate("Login");
-          },
-        },
-      ]);
+      setShowRegisterSuccessDialog(true);
     } catch (err) {
       var message = getApiErrorMessage(err, "שגיאה בהרשמה");
       setError(String(message));
     } finally {
       setLoadingSubmit(false);
     }
+  }
+
+  function handleRegisterSuccessConfirm() {
+    setShowRegisterSuccessDialog(false);
+    navigation.navigate("Login");
   }
 
   function renderSectionHeader(title, sectionNumber) {
@@ -1047,6 +1074,50 @@ export default function RegisterScreen() {
                     emailLocked,
                   )}
 
+                  <View style={styles.otpSection}>
+                    <Pressable
+                      style={[
+                        styles.otpButton,
+                        otpLoading || !form.email || emailLocked
+                          ? styles.otpButtonDisabled
+                          : null,
+                      ]}
+                      onPress={handleSendOtp}
+                      disabled={otpLoading || !form.email || emailLocked}
+                    >
+                      <Text style={styles.otpButtonText}>
+                        {otpLoading
+                          ? "שולח קוד..."
+                          : otpSent
+                          ? "שלח קוד חדש"
+                          : "שלח קוד אימות למייל"}
+                      </Text>
+                    </Pressable>
+
+                    {!!otpSuccess && (
+                      <Text style={styles.otpFeedbackSuccess}>
+                        {otpSuccess}
+                      </Text>
+                    )}
+                    {!!otpError && (
+                      <Text style={styles.otpFeedbackError}>{otpError}</Text>
+                    )}
+
+                    {otpSent &&
+                      renderTextField(
+                        "קוד אימות",
+                        otpCode,
+                        setOtpCode,
+                        "הזן את הקוד שקיבלת במייל",
+                        {
+                          keyboardType: "number-pad",
+                          maxLength: 6,
+                        },
+                        "",
+                        false,
+                      )}
+                  </View>
+
                   <Pressable
                     style={styles.primaryButton}
                     onPress={goToUserSection}
@@ -1166,10 +1237,12 @@ export default function RegisterScreen() {
                     <Pressable
                       style={[
                         styles.primaryButtonCompact,
-                        loadingSubmit ? styles.primaryButtonDisabled : null,
+                        loadingSubmit || !otpCode
+                          ? styles.primaryButtonDisabled
+                          : null,
                       ]}
                       onPress={handleSubmit}
-                      disabled={loadingSubmit}
+                      disabled={loadingSubmit || !otpCode}
                     >
                       <Text style={styles.primaryButtonText}>
                         {loadingSubmit ? "שולח..." : "שלח בקשה"}
@@ -1308,6 +1381,15 @@ export default function RegisterScreen() {
           </View>
         </Modal>
       </KeyboardAvoidingView>
+
+      <AppDialog
+        visible={showRegisterSuccessDialog}
+        type="success"
+        title="הצלחה"
+        message="הבקשה נשלחה בהצלחה"
+        confirmLabel="אישור"
+        onConfirm={handleRegisterSuccessConfirm}
+      />
     </SafeAreaView>
   );
 }

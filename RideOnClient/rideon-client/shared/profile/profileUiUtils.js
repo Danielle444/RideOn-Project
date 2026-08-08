@@ -39,13 +39,15 @@ function buildMobileProfileRows(data) {
     var approvedItem = approvedLookup.get(key);
 
     if (!approvedItem) {
+      var isRejected = String(item.roleStatus || "").toLowerCase() === "rejected";
+
       return {
         ranchId: item.ranchId,
         ranchName: item.ranchName,
         roleId: item.roleId,
         roleName: item.roleName,
         roleStatus: item.roleStatus,
-        platformType: "pending",
+        platformType: isRejected ? "unsupported" : "pending",
       };
     }
 

@@ -380,3 +380,255 @@ describe("PayerCompetitionAccountScreen - mobile stall-map slice 1 entry point (
     expect(source).toContain("setIsStallMapOpen(false);");
   });
 });
+
+describe("PayerCompetitionAccountScreen - styled alert migration (AppDialog/AppToast)", () => {
+  it("no native Alert remains - not imported from react-native, not called anywhere", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("Alert.alert");
+    expect(source).not.toMatch(/from ["']react-native["'][\s\S]{0,300}\bAlert\b/);
+  });
+
+  it("imports AppDialog and showToast from the styled-alert foundation (PR #363)", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import AppDialog from "../../../../components/common/AppDialog";',
+    );
+    expect(source).toContain(
+      'import { showToast } from "../../../../services/toastService";',
+    );
+  });
+
+  it("renders exactly one AppDialog, driven by a single shared confirmDialog state slot", () => {
+    var source = readSource();
+
+    expect(countOccurrences(source, "<AppDialog")).toBe(1);
+    expect(source).toContain(
+      "var [confirmDialog, setConfirmDialog] = useState(null);",
+    );
+    expect(source).toContain("visible={!!confirmDialog}");
+  });
+
+  it("AppDialog's isBusy reflects cancellingId (existing UI state) without touching the in-flight guards", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      "isBusy={!!confirmDialog && cancellingId === confirmDialog.key}",
+    );
+  });
+
+  it("AppDialog's onCancel is wired only to closeConfirmDialog, which is a pure state-clear - cancel can never reach a service call or a guard", () => {
+    var source = readSource();
+
+    expect(source).toContain("onCancel={closeConfirmDialog}");
+
+    var fnStart = source.indexOf("function closeConfirmDialog() {");
+    var fnBody = source.slice(fnStart, source.indexOf("\n  }\n", fnStart));
+
+    expect(fnBody).toContain("setConfirmDialog(null);");
+    [
+      "cancelEntryByPayer",
+      "cancelPaidTimeRequestByPayer",
+      "cancelStallBookingByPayer",
+      "createShavingsOrderCancelRequest",
+      "GuardRef",
+    ].forEach(function (fragment) {
+      expect(fnBody).not.toContain(fragment);
+    });
+  });
+
+  it("AppDialog's onConfirm handler only ever invokes the stored confirmDialog.onConfirm callback, never a do* mutation directly", () => {
+    var source = readSource();
+    var dialogStart = source.indexOf("<AppDialog");
+    var dialogEnd = source.indexOf("/>", dialogStart);
+    var dialogBlock = source.slice(dialogStart, dialogEnd);
+
+    expect(dialogBlock).toContain("confirmDialog.onConfirm();");
+    [
+      "doCancelEntry(",
+      "doCancelPaidTime(",
+      "doCancelStall(",
+      "doCancelShavings(",
+    ].forEach(function (fragment) {
+      expect(dialogBlock).not.toContain(fragment);
+    });
+  });
+
+  [
+    {
+      confirmFn: "confirmCancelEntry",
+      doFn: "doCancelEntry",
+      key: '"entry:" + item.entryId',
+      title: '"ביטול הרשמה"',
+      message: '"האם לשלוח בקשת ביטול למזכירה? יתבצע רק לאחר אישור."',
+    },
+    {
+      confirmFn: "confirmCancelPaidTime",
+      doFn: "doCancelPaidTime",
+      key: '"paidTime:" + item.paidTimeRequestId',
+      title: '"ביטול פייד טיים"',
+      message: '"האם לבטל? ניתן לבטל רק עד 24 שעות לפני המועד."',
+    },
+    {
+      confirmFn: "confirmCancelStall",
+      doFn: "doCancelStall",
+      key: '"stall:" + item.stallBookingId',
+      title: '"ביטול תא"',
+      message: '"האם לשלוח בקשת ביטול תא למזכירה? יתבצע רק לאחר אישור."',
+    },
+    {
+      confirmFn: "confirmCancelShavings",
+      doFn: "doCancelShavings",
+      key: '"shavings:" + order.shavingsOrderId',
+      title: '"ביטול הזמנת נסורת"',
+      message:
+        '"האם לשלוח בקשת ביטול להזמנת הנסורת למזכירה? הביטול יתבצע רק לאחר אישור."',
+    },
+  ].forEach(function (c) {
+    it(
+      c.confirmFn +
+        " gates " +
+        c.doFn +
+        " behind an AppDialog confirmation - the mutation is only reachable from inside onConfirm, never called eagerly, and the exact prior wording/labels are preserved",
+      () => {
+        var source = readSource();
+        var block = getFunctionBlock(
+          source,
+          "function " + c.confirmFn + "(",
+          "async function " + c.doFn + "(",
+        );
+
+        expect(block).toContain("setConfirmDialog({");
+        expect(block).toContain("key: " + c.key + ",");
+        expect(block).toContain("title: " + c.title + ",");
+        expect(block).toContain(c.message);
+        expect(block).toContain("destructive: true,");
+        expect(block).toContain('confirmLabel: "כן",');
+        expect(block).toContain('cancelLabel: "לא",');
+
+        var onConfirmIndex = block.indexOf("onConfirm: function () {");
+        var doCallIndex = block.indexOf(c.doFn + "(", onConfirmIndex);
+
+        expect(onConfirmIndex).toBeGreaterThan(-1);
+        expect(doCallIndex).toBeGreaterThan(onConfirmIndex);
+
+        // the mutation name appears exactly once in this block (inside
+        // onConfirm) - proving confirmCancelX itself never fires it
+        expect(countOccurrences(block, c.doFn + "(")).toBe(1);
+      },
+    );
+  });
+
+  [
+    { doFn: "doCancelEntry", nextSignature: "function confirmCancelPaidTime(item) {" },
+    { doFn: "doCancelPaidTime", nextSignature: "function confirmCancelStall(item) {" },
+    { doFn: "doCancelStall", nextSignature: "function confirmCancelShavings(order) {" },
+    { doFn: "doCancelShavings", nextSignature: "function renderCancelButton(" },
+  ].forEach(function (c) {
+    it(
+      c.doFn +
+        " closes the confirmation dialog on both the success and the error path, right where the outcome becomes known - success/error feedback is the styled AppToast, not the native Alert",
+      () => {
+        var source = readSource();
+        var block = getFunctionBlock(
+          source,
+          "async function " + c.doFn + "(",
+          c.nextSignature,
+        );
+
+        var tryIndex = block.indexOf("try {");
+        var catchIndex = block.indexOf("} catch (err) {");
+        var finallyIndex = block.lastIndexOf("} finally {");
+
+        var tryBlock = block.slice(tryIndex, catchIndex);
+        var catchBlock = block.slice(catchIndex, finallyIndex);
+
+        expect(tryBlock).toContain("closeConfirmDialog();");
+        expect(tryBlock).toContain('showToast(');
+        expect(tryBlock).toContain('"success"');
+        expect(tryBlock.indexOf("closeConfirmDialog();")).toBeLessThan(
+          tryBlock.indexOf("showToast("),
+        );
+
+        expect(catchBlock).toContain("closeConfirmDialog();");
+        expect(catchBlock).toContain("showToast(extractErrorMessage(err), \"error\");");
+        expect(catchBlock.indexOf("closeConfirmDialog();")).toBeLessThan(
+          catchBlock.indexOf("showToast("),
+        );
+
+        // guard release / cancellingId cleanup stays in finally, untouched
+        // by the dialog-close change (same assertion style as the
+        // "independent in-flight guards" suite above)
+        var finallyBlock = block.slice(finallyIndex);
+        expect(finallyBlock).toContain("setCancellingId(null);");
+        expect(finallyBlock).toContain("GuardRef.current.release(guardKey);");
+      },
+    );
+  });
+
+  it("savePaidTimeEdit and doStallChangeRequest (non-destructive success/error notices) use showToast, not AppDialog", () => {
+    var source = readSource();
+
+    var editBlock = getFunctionBlock(
+      source,
+      "async function savePaidTimeEdit() {",
+      "function confirmStallChangeRequest(item) {",
+    );
+    expect(editBlock).toContain('showToast("ההערות עודכנו", "success");');
+    expect(editBlock).toContain(
+      'showToast(extractErrorMessage(err), "error");',
+    );
+    expect(editBlock).not.toContain("setConfirmDialog");
+
+    var stallChangeBlock = getFunctionBlock(
+      source,
+      "async function doStallChangeRequest(dates) {",
+      "function confirmCancelEntry(item) {",
+    );
+    expect(stallChangeBlock).toContain(
+      'showToast("בקשת שינוי התא נשלחה למזכירה", "success");',
+    );
+    expect(stallChangeBlock).toContain(
+      'showToast(extractErrorMessage(err), "error");',
+    );
+    expect(stallChangeBlock).not.toContain("setConfirmDialog");
+  });
+
+  it("every success/error notice routes through showToast with the correct type - exactly 12 calls (the 4 destructive confirmations became AppDialog instead)", () => {
+    var source = readSource();
+
+    expect(countOccurrences(source, "showToast(")).toBe(12);
+    expect(countOccurrences(source, 'showToast(extractErrorMessage(err), "error");')).toBe(6);
+    expect(countOccurrences(source, ', "success");')).toBe(6);
+  });
+
+  it("preserves the exact prior pending-request and 24h paid-time wording, unchanged by the migration", () => {
+    var source = readSource();
+
+    [
+      "האם לבטל? ניתן לבטל רק עד 24 שעות לפני המועד.",
+      "ניתן לבטל עד 24 שעות לפני מועד הפייד טיים",
+      "בקשת הביטול נשלחה למזכירה",
+      "בקשת שינוי התא נשלחה למזכירה",
+      "האם לשלוח בקשת ביטול להזמנת הנסורת למזכירה? הביטול יתבצע רק לאחר אישור.",
+      "הבקשה בוטלה",
+    ].forEach(function (fragment) {
+      expect(source).toContain(fragment);
+    });
+  });
+
+  it("extractErrorMessage (the hardened, shared error extractor) still backs every error toast - server error messages are preserved verbatim", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";',
+    );
+    expect(source).toContain(
+      'return getApiErrorMessage(err, "אירעה שגיאה");',
+    );
+    // "extractErrorMessage(err)," (trailing comma) only matches call sites,
+    // not the "function extractErrorMessage(err) {" declaration itself
+    expect(countOccurrences(source, "extractErrorMessage(err),")).toBe(6);
+  });
+});

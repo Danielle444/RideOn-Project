@@ -1,6 +1,5 @@
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -28,6 +27,9 @@ import useRegistrationStepStatus from "../../../../hooks/useRegistrationStepStat
 import { cancelPaidTimeRequest } from "../../../../services/paidTimeRequestsService";
 import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
 import { createInFlightGuard } from "../../../../utils/inFlightGuard";
+import { canEditPaidTimeRow } from "../../../../utils/paidTimeEditAvailability";
+import { showToast } from "../../../../services/toastService";
+import AppDialog from "../../../../components/common/AppDialog";
 
 import { LIFECYCLE_STATE } from "../../../../utils/payerAccountLifecycle";
 import { bandAndSortPaidTimes } from "../../../../utils/payerAccountBands";
@@ -143,6 +145,11 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   var [showFilters, setShowFilters] = useState(false);
   var [editingItem, setEditingItem] = useState(null);
   var [cancellingId, setCancellingId] = useState(null);
+
+  // Foundation-only AppDialog is a plain controlled component with no
+  // internal queue - this screen owns a single confirm-dialog slot for its
+  // one cancel flow, same pattern as AdminCompetitionPayerAccountScreen.
+  var [confirmDialog, setConfirmDialog] = useState(null);
   var [viewMode, setViewMode] = useState("list");
   var [expandedIds, setExpandedIds] = useState({});
   var [viewingSlotId, setViewingSlotId] = useState(null);
@@ -267,7 +274,7 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   }
 
   function openEdit(item) {
-    if (!availability.paidTimes.isEnabled) {
+    if (!canEditPaidTimeRow(item, availability.paidTimes)) {
       return;
     }
 
@@ -278,11 +285,13 @@ export default function AdminCompetitionPaidTimesScreen(props) {
     setEditingItem(null);
   }
 
+  // Cancellation is a separate, always-available business path (the server
+  // never blocks it after competition end) - it must never be gated on
+  // availability.paidTimes.isEnabled. Mirrors
+  // AdminCompetitionPayerAccountScreen's confirmCancelPaidTime/doCancelPaidTime,
+  // which carry no such gate. Item paid/cancelled state and the in-flight
+  // guard below still apply.
   function confirmCancel(item) {
-    if (!availability.paidTimes.isEnabled) {
-      return;
-    }
-
     var withinDay = item.hoursUntilStart != null && item.hoursUntilStart <= 24;
     var title = withinDay
       ? "ביטול בתוך 24 שעות - חיוב מלא"
@@ -291,28 +300,18 @@ export default function AdminCompetitionPaidTimesScreen(props) {
       ? "שים לב: הביטול מתבצע פחות מ-24 שעות לפני המועד. במידה ותאשר, תחויב בתשלום מלא. הסלוט יתפנה לרוכב אחר."
       : "ביטול הבקשה ישחרר את הסלוט לרוכב אחר. עפ\"י כללי העסק חיוב מלא חל. להמשיך?";
 
-    Alert.alert(
-      title,
-      body,
-      [
-        { text: "חזרה", style: "cancel" },
-        {
-          text: withinDay ? "אישור וחיוב" : "אישור ביטול",
-          style: "destructive",
-          onPress: function () {
-            handleCancel(item);
-          },
-        },
-      ],
-      { cancelable: true }
-    );
+    setConfirmDialog({
+      title: title,
+      message: body,
+      confirmLabel: withinDay ? "אישור וחיוב" : "אישור ביטול",
+      onConfirm: function () {
+        setConfirmDialog(null);
+        handleCancel(item);
+      },
+    });
   }
 
   async function handleCancel(item) {
-    if (!availability.paidTimes.isEnabled) {
-      return;
-    }
-
     var guardKey = item.paidTimeRequestId;
 
     if (!paidTimeCancelGuardRef.current.tryAcquire(guardKey)) {
@@ -325,10 +324,20 @@ export default function AdminCompetitionPaidTimesScreen(props) {
         paidTimeRequestId: item.paidTimeRequestId,
         ranchId: activeRole?.ranchId,
       });
-      await paidTimes.handleRefresh();
+
+      // The cancel succeeded - everything below is refresh, not mutation
+      // outcome, and must not be able to turn this into a reported failure.
+      // Mirrors AdminCompetitionPayerAccountScreen's doCancelPaidTime.
+      showToast("הבקשה בוטלה", "success");
+
+      try {
+        await paidTimes.handleRefresh();
+      } catch (refreshError) {
+        console.log("CANCEL PAID TIME REFRESH ERROR", refreshError);
+      }
     } catch (err) {
       var msg = getApiErrorMessage(err, "אירעה שגיאה");
-      Alert.alert("שגיאה", String(msg));
+      showToast(String(msg), "error");
     } finally {
       setCancellingId(null);
       paidTimeCancelGuardRef.current.release(guardKey);
@@ -498,6 +507,7 @@ export default function AdminCompetitionPaidTimesScreen(props) {
           formatDate={paidTimes.formatDate}
           formatTime={paidTimes.formatTime}
           onViewSlotSchedule={handleViewSlotSchedule}
+          paidTimesAvailability={availability.paidTimes}
         />
       );
     }
@@ -517,6 +527,7 @@ export default function AdminCompetitionPaidTimesScreen(props) {
           formatDate={paidTimes.formatDate}
           formatTime={paidTimes.formatTime}
           onViewSlotSchedule={handleViewSlotSchedule}
+          paidTimesAvailability={availability.paidTimes}
         />
       );
     });
@@ -754,6 +765,19 @@ export default function AdminCompetitionPaidTimesScreen(props) {
         />
       ) : null}
 
+      <AppDialog
+        visible={!!confirmDialog}
+        title={confirmDialog?.title}
+        message={confirmDialog?.message}
+        type="warning"
+        destructive={true}
+        confirmLabel={confirmDialog?.confirmLabel || "אישור"}
+        cancelLabel="חזרה"
+        onConfirm={confirmDialog?.onConfirm}
+        onCancel={function () {
+          setConfirmDialog(null);
+        }}
+      />
     </MobileScreenLayout>
   );
 }

@@ -61,7 +61,7 @@ export default function useCompetitionPaidTimeStep(options) {
         return aStart.localeCompare(bStart);
       }
 
-      return Number(a.PaidTimeSlotInCompId || 0) - Number(b.PaidTimeSlotInCompId || 0);
+      return Number(a.paidTimeSlotInCompId || 0) - Number(b.paidTimeSlotInCompId || 0);
     });
   }
 
@@ -122,9 +122,9 @@ export default function useCompetitionPaidTimeStep(options) {
 
       if (editPaidTimeItem) {
         var updateResponse = await updatePaidTimeSlotInCompetition(
-          editPaidTimeItem.PaidTimeSlotInCompId,
+          editPaidTimeItem.paidTimeSlotInCompId,
           {
-            PaidTimeSlotInCompId: editPaidTimeItem.PaidTimeSlotInCompId,
+            PaidTimeSlotInCompId: editPaidTimeItem.paidTimeSlotInCompId,
             competitionId: competitionId,
             hostRanchId: currentRanchId,
             paidTimeSlotId: formData.paidTimeSlotId,
@@ -141,7 +141,7 @@ export default function useCompetitionPaidTimeStep(options) {
 
         setPaidTimeSlotsInCompetition(function (prev) {
           var next = prev.map(function (item) {
-            if (item.PaidTimeSlotInCompId === updatedItem.PaidTimeSlotInCompId) {
+            if (item.paidTimeSlotInCompId === updatedItem.paidTimeSlotInCompId) {
               return updatedItem;
             }
 
@@ -208,7 +208,7 @@ export default function useCompetitionPaidTimeStep(options) {
       onConfirm: async function () {
         try {
           await deletePaidTimeSlotInCompetition(
-            item.PaidTimeSlotInCompId,
+            item.paidTimeSlotInCompId,
             competitionId,
             currentRanchId,
             false,
@@ -218,7 +218,7 @@ export default function useCompetitionPaidTimeStep(options) {
 
           setPaidTimeSlotsInCompetition(function (prev) {
             return prev.filter(function (currentItem) {
-              return currentItem.PaidTimeSlotInCompId !== item.PaidTimeSlotInCompId;
+              return currentItem.paidTimeSlotInCompId !== item.paidTimeSlotInCompId;
             });
           });
 
