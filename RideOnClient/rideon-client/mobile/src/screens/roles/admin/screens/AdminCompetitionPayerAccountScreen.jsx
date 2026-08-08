@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -54,6 +53,10 @@ import {
 } from "../../../../utils/payerAccountCopy";
 
 import { createInFlightGuard } from "../../../../utils/inFlightGuard";
+
+import { showToast } from "../../../../services/toastService";
+
+import AppDialog from "../../../../components/common/AppDialog";
 
 import ShavingsGroupCard from "../../../../components/payerAccount/ShavingsGroupCard";
 
@@ -279,6 +282,14 @@ export default function AdminCompetitionPayerAccountScreen(props) {
 
   var [cancellingId, setCancellingId] = useState(null);
 
+  // Foundation-only AppDialog is a plain controlled component (no internal
+  // queue/manager - see AppDialog.jsx) - this screen owns its own single
+  // confirm-dialog slot, same as the create/edit modals below. Only one
+  // cancel confirmation can ever be open at a time, so one slot covers all
+  // four cancel flows (entry/paidTime/stall/shavings) without duplicating
+  // per-action visibility state.
+  var [confirmDialog, setConfirmDialog] = useState(null);
+
   // Synchronous in-flight guards, one per action/target namespace (same
   // pattern PayerCompetitionAccountScreen.jsx uses) - cancellingId above is
   // UI feedback only (async state), not a correctness guard: two rapid taps
@@ -360,20 +371,14 @@ export default function AdminCompetitionPayerAccountScreen(props) {
   }
 
   function confirmCancelEntry(item) {
-    Alert.alert(
-      "ביטול הרשמה",
-      "האם לבטל את ההרשמה?",
-      [
-        { text: "לא", style: "cancel" },
-        {
-          text: "כן",
-          style: "destructive",
-          onPress: function () {
-            doCancelEntry(item);
-          },
-        },
-      ],
-    );
+    setConfirmDialog({
+      title: "ביטול הרשמה",
+      message: "האם לבטל את ההרשמה?",
+      onConfirm: function () {
+        setConfirmDialog(null);
+        doCancelEntry(item);
+      },
+    });
   }
 
   // Phase 3C: direct admin cancellation via usp_admincancelentry - no
@@ -410,7 +415,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
         activeRole?.ranchId,
       );
     } catch (err) {
-      Alert.alert("שגיאה", extractErrorMessage(err));
+      showToast(extractErrorMessage(err), "error");
       entryCancelGuardRef.current.release(guardKey);
       return;
     } finally {
@@ -419,10 +424,10 @@ export default function AdminCompetitionPayerAccountScreen(props) {
 
     // The cancel succeeded - everything below is refresh, not mutation
     // outcome, and must not be able to turn this into a reported failure.
-    Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);
+    showToast(DIRECT_CANCELLATION_COPY.text, "success");
 
     // account.reload() already owns its own failure UX (sets its screenError
-    // and shows its own Alert internally) and never rejects - this try/catch
+    // and shows its own toast internally) and never rejects - this try/catch
     // is a defensive backstop only, so a future reload implementation that
     // DOES reject can never be attributed to the cancel that already
     // succeeded above.
@@ -436,21 +441,29 @@ export default function AdminCompetitionPayerAccountScreen(props) {
   }
 
   function confirmCancelPaidTime(item) {
-    Alert.alert("ביטול פייד טיים", "האם לבטל את הבקשה?", [
-      { text: "לא", style: "cancel" },
-      {
-        text: "כן",
-        style: "destructive",
-        onPress: function () {
-          doCancelPaidTime(item);
-        },
+    setConfirmDialog({
+      title: "ביטול פייד טיים",
+      message: "האם לבטל את הבקשה?",
+      onConfirm: function () {
+        setConfirmDialog(null);
+        doCancelPaidTime(item);
       },
-    ]);
+    });
   }
 
   // Same synchronous in-flight guard pattern as doCancelEntry/doCancelStall -
   // acquired before setCancellingId, released in the outer finally alongside
   // it, so it stays held through the refresh just like the other guards.
+  //
+  // Hardened to match doCancelStall/doCancelShavings: account.reload() now
+  // runs in its own nested try/catch INSIDE the mutation's try, instead of
+  // sitting unguarded after the success toast. Previously a rejecting
+  // reload would fall into the outer catch and report the error toast even
+  // though the cancellation itself already succeeded and was already
+  // announced. account.reload() never actually rejects today (its own
+  // internal catch never rethrows), so this was latent, not live - but it
+  // keeps this handler structurally consistent with its siblings instead of
+  // being the one exception.
   async function doCancelPaidTime(item) {
     var guardKey = "paidTime:" + item.paidTimeRequestId;
 
@@ -466,11 +479,17 @@ export default function AdminCompetitionPayerAccountScreen(props) {
         ranchId: activeRole?.ranchId,
       });
 
-      Alert.alert("בוטל", "הבקשה בוטלה");
+      // The cancel succeeded - everything below is refresh, not mutation
+      // outcome, and must not be able to turn this into a reported failure.
+      showToast("הבקשה בוטלה", "success");
 
-      await account.reload();
+      try {
+        await account.reload();
+      } catch (refreshError) {
+        console.log("CANCEL PAID TIME REFRESH ERROR", refreshError);
+      }
     } catch (err) {
-      Alert.alert("שגיאה", extractErrorMessage(err));
+      showToast(extractErrorMessage(err), "error");
     } finally {
       setCancellingId(null);
       paidTimeCancelGuardRef.current.release(guardKey);
@@ -478,20 +497,14 @@ export default function AdminCompetitionPayerAccountScreen(props) {
   }
 
   function confirmCancelStall(item) {
-    Alert.alert(
-      "ביטול תא",
-      getCancellationConfirmationText(PAYER_ACCOUNT_ITEM_LABEL.stall),
-      [
-        { text: "לא", style: "cancel" },
-        {
-          text: "כן",
-          style: "destructive",
-          onPress: function () {
-            doCancelStall(item);
-          },
-        },
-      ],
-    );
+    setConfirmDialog({
+      title: "ביטול תא",
+      message: getCancellationConfirmationText(PAYER_ACCOUNT_ITEM_LABEL.stall),
+      onConfirm: function () {
+        setConfirmDialog(null);
+        doCancelStall(item);
+      },
+    });
   }
 
   // Direct admin cancellation via usp_admincancelstallbooking - no
@@ -518,20 +531,20 @@ export default function AdminCompetitionPayerAccountScreen(props) {
 
       // The cancel succeeded - everything below is refresh, not mutation
       // outcome, and must not be able to turn this into a reported failure.
-      Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);
+      showToast(DIRECT_CANCELLATION_COPY.text, "success");
 
       // account.reload() already owns its own failure UX (sets its own
-      // screenError and shows its own Alert internally) and never rejects -
+      // screenError and shows its own toast internally) and never rejects -
       // this try/catch is a defensive backstop only, so a refresh failure
       // can never be misreported as a failed cancel and can never suppress
-      // the success alert that already ran above.
+      // the success notice that already ran above.
       try {
         await account.reload();
       } catch (refreshError) {
         console.log("CANCEL STALL REFRESH ERROR", refreshError);
       }
     } catch (err) {
-      Alert.alert("שגיאה", extractErrorMessage(err));
+      showToast(extractErrorMessage(err), "error");
     } finally {
       setCancellingId(null);
       stallCancelGuardRef.current.release(guardKey);
@@ -539,20 +552,14 @@ export default function AdminCompetitionPayerAccountScreen(props) {
   }
 
   function confirmCancelShavings(order) {
-    Alert.alert(
-      "ביטול הזמנת נסורת",
-      getCancellationConfirmationText(PAYER_ACCOUNT_ITEM_LABEL.shavings),
-      [
-        { text: "לא", style: "cancel" },
-        {
-          text: "כן",
-          style: "destructive",
-          onPress: function () {
-            doCancelShavings(order);
-          },
-        },
-      ],
-    );
+    setConfirmDialog({
+      title: "ביטול הזמנת נסורת",
+      message: getCancellationConfirmationText(PAYER_ACCOUNT_ITEM_LABEL.shavings),
+      onConfirm: function () {
+        setConfirmDialog(null);
+        doCancelShavings(order);
+      },
+    });
   }
 
   // Direct admin cancellation via usp_admincancelshavingsorder - standalone,
@@ -571,7 +578,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
 
       await adminCancelShavingsOrder(order.shavingsOrderId, activeRole?.ranchId);
 
-      Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);
+      showToast(DIRECT_CANCELLATION_COPY.text, "success");
 
       try {
         await account.reload();
@@ -579,7 +586,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
         console.log("CANCEL SHAVINGS REFRESH ERROR", refreshError);
       }
     } catch (err) {
-      Alert.alert("שגיאה", extractErrorMessage(err));
+      showToast(extractErrorMessage(err), "error");
     } finally {
       setCancellingId(null);
       shavingsCancelGuardRef.current.release(guardKey);
@@ -1792,6 +1799,20 @@ export default function AdminCompetitionPayerAccountScreen(props) {
           setEditStallItem(null);
         }}
         onUpdated={account.reload}
+      />
+
+      <AppDialog
+        visible={!!confirmDialog}
+        title={confirmDialog?.title}
+        message={confirmDialog?.message}
+        type="warning"
+        destructive={true}
+        confirmLabel="כן"
+        cancelLabel="לא"
+        onConfirm={confirmDialog?.onConfirm}
+        onCancel={function () {
+          setConfirmDialog(null);
+        }}
       />
     </MobileScreenLayout>
   );

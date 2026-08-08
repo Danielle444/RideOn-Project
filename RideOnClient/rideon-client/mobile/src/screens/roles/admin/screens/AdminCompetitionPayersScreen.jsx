@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -19,6 +18,7 @@ import styles from "../../../../styles/adminCompetitionPayersStyles";
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 import { getAdminCompetitionMenuItems } from "../../../../navigation/competitionMenuConfigs";
+import { showToast } from "../../../../services/toastService";
 
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
@@ -79,9 +79,9 @@ export default function AdminCompetitionPayersScreen(props) {
       console.log("Active role:", activeRole);
       console.log("Active competition:", activeCompetition);
 
-      Alert.alert(
-        "שגיאה",
+      showToast(
         getApiErrorMessage(error, "אירעה שגיאה בטעינת משלמי התחרות"),
+        "error",
       );
 
       setPayers([]);

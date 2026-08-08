@@ -1,6 +1,5 @@
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -29,6 +28,8 @@ import { cancelPaidTimeRequest } from "../../../../services/paidTimeRequestsServ
 import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
 import { createInFlightGuard } from "../../../../utils/inFlightGuard";
 import { canEditPaidTimeRow } from "../../../../utils/paidTimeEditAvailability";
+import { showToast } from "../../../../services/toastService";
+import AppDialog from "../../../../components/common/AppDialog";
 
 import { LIFECYCLE_STATE } from "../../../../utils/payerAccountLifecycle";
 import { bandAndSortPaidTimes } from "../../../../utils/payerAccountBands";
@@ -144,6 +145,11 @@ export default function AdminCompetitionPaidTimesScreen(props) {
   var [showFilters, setShowFilters] = useState(false);
   var [editingItem, setEditingItem] = useState(null);
   var [cancellingId, setCancellingId] = useState(null);
+
+  // Foundation-only AppDialog is a plain controlled component with no
+  // internal queue - this screen owns a single confirm-dialog slot for its
+  // one cancel flow, same pattern as AdminCompetitionPayerAccountScreen.
+  var [confirmDialog, setConfirmDialog] = useState(null);
   var [viewMode, setViewMode] = useState("list");
   var [expandedIds, setExpandedIds] = useState({});
   var [viewingSlotId, setViewingSlotId] = useState(null);
@@ -294,21 +300,15 @@ export default function AdminCompetitionPaidTimesScreen(props) {
       ? "שים לב: הביטול מתבצע פחות מ-24 שעות לפני המועד. במידה ותאשר, תחויב בתשלום מלא. הסלוט יתפנה לרוכב אחר."
       : "ביטול הבקשה ישחרר את הסלוט לרוכב אחר. עפ\"י כללי העסק חיוב מלא חל. להמשיך?";
 
-    Alert.alert(
-      title,
-      body,
-      [
-        { text: "חזרה", style: "cancel" },
-        {
-          text: withinDay ? "אישור וחיוב" : "אישור ביטול",
-          style: "destructive",
-          onPress: function () {
-            handleCancel(item);
-          },
-        },
-      ],
-      { cancelable: true }
-    );
+    setConfirmDialog({
+      title: title,
+      message: body,
+      confirmLabel: withinDay ? "אישור וחיוב" : "אישור ביטול",
+      onConfirm: function () {
+        setConfirmDialog(null);
+        handleCancel(item);
+      },
+    });
   }
 
   async function handleCancel(item) {
@@ -327,7 +327,7 @@ export default function AdminCompetitionPaidTimesScreen(props) {
       await paidTimes.handleRefresh();
     } catch (err) {
       var msg = getApiErrorMessage(err, "אירעה שגיאה");
-      Alert.alert("שגיאה", String(msg));
+      showToast(String(msg), "error");
     } finally {
       setCancellingId(null);
       paidTimeCancelGuardRef.current.release(guardKey);
@@ -755,6 +755,19 @@ export default function AdminCompetitionPaidTimesScreen(props) {
         />
       ) : null}
 
+      <AppDialog
+        visible={!!confirmDialog}
+        title={confirmDialog?.title}
+        message={confirmDialog?.message}
+        type="warning"
+        destructive={true}
+        confirmLabel={confirmDialog?.confirmLabel || "אישור"}
+        cancelLabel="חזרה"
+        onConfirm={confirmDialog?.onConfirm}
+        onCancel={function () {
+          setConfirmDialog(null);
+        }}
+      />
     </MobileScreenLayout>
   );
 }
