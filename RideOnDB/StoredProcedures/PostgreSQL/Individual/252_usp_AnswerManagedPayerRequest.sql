@@ -24,6 +24,22 @@
 -- AnswerPayerManagerRequest): the JWT-authenticated currentPersonId must
 -- equal the payer's own personId. p_personid here is never client-suppliable
 -- independent of that check -- an admin can never answer their own request.
+--
+-- MODIFIED on fix/payer-manager-same-ranch-rule (P0, not yet applied live --
+-- see that branch's report before deploying). New business rule: an admin
+-- may only manage a payer when both hold an Approved role at the SAME
+-- ranch (admin "אדמין חווה", payer "משלם"). This proc had zero ranch logic
+-- before this change -- it is the only place that can gate the
+-- Payer-approval direction, since the answer DTO carries no ranchId and the
+-- controller performs no ranch check at all (see AnswerPayerManagerRequest
+-- in PayersController.cs). The guard runs ONLY on the Approved path --
+-- Rejected keeps its exact prior behavior. Existing-row/not-found detection
+-- was pulled out ahead of the guard so a request that doesn't exist (or
+-- isn't Pending) still raises the original, more specific
+-- "Pending managed payer request not found" instead of a same-ranch error
+-- that would be misleading when there is no pending row at all. Signature
+-- and the Rejected path are otherwise byte-identical to the pre-existing
+-- live definition -- safe as a plain CREATE OR REPLACE.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_answermanagedpayerrequest(
@@ -39,15 +55,39 @@ BEGIN
         RAISE EXCEPTION 'Invalid answer status';
     END IF;
 
+    IF NOT EXISTS (
+        SELECT 1
+        FROM personmanagedbysystemuser
+        WHERE systemuserid = p_systemuserid
+          AND personid = p_personid
+          AND approvalstatus = 'Pending'
+    ) THEN
+        RAISE EXCEPTION 'Pending managed payer request not found';
+    END IF;
+
+    IF p_answerstatus = 'Approved' THEN
+        IF NOT EXISTS (
+            SELECT 1
+            FROM personranchrole admin_prr
+            JOIN role admin_r ON admin_r.roleid = admin_prr.roleid
+            JOIN personranchrole payer_prr ON payer_prr.ranchid = admin_prr.ranchid
+            JOIN role payer_r ON payer_r.roleid = payer_prr.roleid
+            WHERE admin_prr.personid = p_systemuserid
+              AND admin_prr.rolestatus = 'Approved'
+              AND admin_r.rolename = 'אדמין חווה'
+              AND payer_prr.personid = p_personid
+              AND payer_prr.rolestatus = 'Approved'
+              AND payer_r.rolename = 'משלם'
+        ) THEN
+            RAISE EXCEPTION 'No shared approved ranch between admin and payer';
+        END IF;
+    END IF;
+
     UPDATE personmanagedbysystemuser
     SET approvalstatus = p_answerstatus,
         updatedate = NOW()
     WHERE systemuserid = p_systemuserid
       AND personid = p_personid
       AND approvalstatus = 'Pending';
-
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'Pending managed payer request not found';
-    END IF;
 END;
 $function$
