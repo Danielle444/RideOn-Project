@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -18,6 +17,7 @@ import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLa
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
 import CompetitionHorseCard from "../../../../components/competitions/CompetitionHorseCard";
 import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
+import { showToast } from "../../../../services/toastService";
 
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import horsesStyles from "../../../../styles/horsesStyles";
@@ -131,12 +131,12 @@ export default function AdminCompetitionHorsesScreen(props) {
   async function handleSaveBarnName() {
     try {
       if (!selectedHorse || !selectedHorse.horseId) {
-        Alert.alert("שגיאה", "לא נמצאו פרטי סוס לעדכון");
+        showToast("לא נמצאו פרטי סוס לעדכון", "error");
         return;
       }
 
       if (!activeRole || !activeRole.ranchId) {
-        Alert.alert("שגיאה", "לא נמצאה חווה פעילה");
+        showToast("לא נמצאה חווה פעילה", "error");
         return;
       }
 
@@ -163,11 +163,11 @@ export default function AdminCompetitionHorsesScreen(props) {
 
       closeEditBarnNameModal();
 
-      Alert.alert("נשמר", "כינוי הסוס עודכן בהצלחה");
+      showToast("כינוי הסוס עודכן בהצלחה", "success");
     } catch (error) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         getApiErrorMessage(error, "אירעה שגיאה בעדכון כינוי הסוס"),
+        "error",
       );
     } finally {
       setIsSavingBarnName(false);

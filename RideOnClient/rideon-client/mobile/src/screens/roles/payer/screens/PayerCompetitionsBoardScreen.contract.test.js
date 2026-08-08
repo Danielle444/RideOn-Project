@@ -68,3 +68,22 @@ describe("PayerCompetitionsBoardScreen - stale competition-menu reset on focus",
     expect(handleLogoutAt).toBeGreaterThan(focusEffectAt);
   });
 });
+
+describe("PayerCompetitionsBoardScreen - load-error styled feedback", () => {
+  it("imports showToast and shows an error toast on loadCompetitions failure", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { showToast } from "../../../../services/toastService";',
+    );
+    expect(source).toContain(
+      'showToast("אירעה שגיאה בטעינת התחרויות", "error");',
+    );
+  });
+
+  it("no native Alert remains", () => {
+    var source = readSource();
+
+    expect(source).not.toMatch(/\bAlert\b/);
+  });
+});
