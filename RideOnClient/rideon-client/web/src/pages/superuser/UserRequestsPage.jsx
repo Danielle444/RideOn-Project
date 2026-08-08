@@ -203,40 +203,48 @@ export default function UserRequestsPage() {
     }
   }
 
-  async function handleReject(item) {
-    const rowKey = getRowKey(item);
+  function handleReject(item) {
+    setConfirmDialog({
+      isOpen: true,
+      title: "דחיית בקשה",
+      message: "האם את בטוחה שברצונך לדחות את הבקשה?",
+      onConfirm: async function () {
+        const rowKey = getRowKey(item);
 
-    try {
-      setActionLoadingKey(rowKey);
+        try {
+          setActionLoadingKey(rowKey);
 
-      if (activeTab === "payer") {
-        await rejectPayerRegistration({
-          personId: item.personId,
-          ranchId: item.ranchId,
-          roleId: item.roleId,
-        });
-      } else if (activeTab === "ranch") {
-        await updateRanchRequestStatus({
-          requestId: item.requestId,
-          newStatus: "Rejected",
-        });
-      } else {
-        await updateRoleRequestStatus({
-          personId: item.personId,
-          ranchId: item.ranchId,
-          roleId: item.roleId,
-          roleStatus: "Rejected",
-        });
-      }
+          if (activeTab === "payer") {
+            await rejectPayerRegistration({
+              personId: item.personId,
+              ranchId: item.ranchId,
+              roleId: item.roleId,
+            });
+          } else if (activeTab === "ranch") {
+            await updateRanchRequestStatus({
+              requestId: item.requestId,
+              newStatus: "Rejected",
+            });
+          } else {
+            await updateRoleRequestStatus({
+              personId: item.personId,
+              ranchId: item.ranchId,
+              roleId: item.roleId,
+              roleStatus: "Rejected",
+            });
+          }
 
-      await refreshAfterAction();
-      showToast("success", "הבקשה נדחתה בהצלחה");
-    } catch (err) {
-      console.error("Reject failed:", err);
-      showToast("error", getErrorMessage(err, "שגיאה בדחיית הבקשה"));
-    } finally {
-      setActionLoadingKey("");
-    }
+          closeConfirmDialog();
+          await refreshAfterAction();
+          showToast("success", "הבקשה נדחתה בהצלחה");
+        } catch (err) {
+          console.error("Reject failed:", err);
+          showToast("error", getErrorMessage(err, "שגיאה בדחיית הבקשה"));
+        } finally {
+          setActionLoadingKey("");
+        }
+      },
+    });
   }
 
   function handleUndoApprove(item) {

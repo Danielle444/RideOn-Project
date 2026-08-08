@@ -17,7 +17,7 @@ export default function ProtectedRoute({
 
   function getSuperUserRoute() {
     if (user && user.mustChangePassword) {
-      return "/superuser-change-password";
+      return "/change-password";
     }
 
     return "/superuser/requests";
@@ -39,17 +39,21 @@ export default function ProtectedRoute({
 
     if (
       user.mustChangePassword &&
-      location.pathname !== "/superuser-change-password"
+      location.pathname !== "/change-password"
     ) {
-      return <Navigate to="/superuser-change-password" replace />;
+      return <Navigate to="/change-password" replace />;
     }
     //OrenNoteToFix - add a superuser change request (either on the reguler one or as a new page)
 
     return children;
   }
 
-  // סופר יוזר לא אמור להיכנס למסלולים רגילים
+  // סופר יוזר לא אמור להיכנס למסלולים רגילים, מלבד החלפת סיסמה בכפייה
   if (user.userType === "superUser") {
+    if (user.mustChangePassword && location.pathname === "/change-password") {
+      return children;
+    }
+
     return <Navigate to={getSuperUserRoute()} replace />;
   }
 
