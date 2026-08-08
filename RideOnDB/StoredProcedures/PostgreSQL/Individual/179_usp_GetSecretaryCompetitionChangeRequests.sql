@@ -13,6 +13,20 @@
 --
 -- These procs are live-only historically; this file is the first committed copy.
 -- Body captured from live via pg_get_functiondef on 2026-07-27.
+--
+-- fix/federation-fine-window-timezone-complete: this proc's preview logic
+-- (the "AmountAfter" case expression and the effective_fine lateral join,
+-- both keyed off cer.requestdatetime vs. registrationenddate/
+-- competitionstartdate) used the same implicit-timezone
+-- requestdatetime::date pattern as usp_answerchangeentryrequestsecured (221)
+-- before that function's own fix. Since 179 is the read/preview path shown
+-- to the secretary before answering, and 221 is the write/approval path,
+-- the two must resolve the same Israel-local business date for the same
+-- requestdatetime or the previewed amount can disagree with the amount
+-- actually charged on approval near the Asia/Jerusalem midnight boundary.
+-- All nine comparisons below now wrap cer.requestdatetime in
+-- (cer.requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date, matching 221's
+-- convention. No column, alias, join, or unrelated logic changed.
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_getsecretarycompetitionchangerequests(p_competitionid integer, p_ranchid integer, p_status text DEFAULT 'Pending'::text)
@@ -106,12 +120,12 @@ begin
 
         case
             when cer.iscancelled = true
-                 and cer.requestdatetime::date <= c.registrationenddate then
+                 and (cer.requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date <= c.registrationenddate then
                 0
 
             when cer.iscancelled = true
-                 and cer.requestdatetime::date > c.registrationenddate
-                 and cer.requestdatetime::date < c.competitionstartdate then
+                 and (cer.requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date > c.registrationenddate
+                 and (cer.requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date < c.competitionstartdate then
                 coalesce(
                     cer.fineamountsnapshot,
                     effective_fine.fineamount,
@@ -119,7 +133,7 @@ begin
                 )
 
             when cer.iscancelled = true
-                 and cer.requestdatetime::date >= c.competitionstartdate then
+                 and (cer.requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date >= c.competitionstartdate then
                 (
                     coalesce(original_cic.organizercost, 0)
                     + coalesce(original_cic.federationcost, 0)
@@ -220,8 +234,8 @@ begin
                     and f.triggermode = 'Between'
                     and f.startevent = 'RegistrationEnd'
                     and f.endevent = 'CompetitionStart'
-                    and cer.requestdatetime::date > c.registrationenddate
-                    and cer.requestdatetime::date < c.competitionstartdate
+                    and (cer.requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date > c.registrationenddate
+                    and (cer.requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date < c.competitionstartdate
                 )
                 or
                 (
@@ -232,14 +246,14 @@ begin
                             f.triggermode = 'Between'
                             and f.startevent = 'RegistrationEnd'
                             and f.endevent = 'CompetitionStart'
-                            and cer.requestdatetime::date > c.registrationenddate
-                            and cer.requestdatetime::date < c.competitionstartdate
+                            and (cer.requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date > c.registrationenddate
+                            and (cer.requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date < c.competitionstartdate
                         )
                         or
                         (
                             f.triggermode = 'After'
                             and f.startevent = 'CompetitionStart'
-                            and cer.requestdatetime::date >= c.competitionstartdate
+                            and (cer.requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date >= c.competitionstartdate
                         )
                     )
                 )
