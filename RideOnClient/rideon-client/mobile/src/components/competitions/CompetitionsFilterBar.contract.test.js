@@ -14,6 +14,18 @@ var SCREEN_SOURCE_PATH = path.resolve(
   "..",
   "screens/roles/admin/screens/AdminCompetitionsBoardScreen.jsx",
 );
+var WORKER_SCREEN_SOURCE_PATH = path.resolve(
+  __dirname,
+  "..",
+  "..",
+  "screens/roles/worker/screens/WorkerCompetitionsBoardScreen.jsx",
+);
+var PAYER_SCREEN_SOURCE_PATH = path.resolve(
+  __dirname,
+  "..",
+  "..",
+  "screens/roles/payer/screens/PayerCompetitionsBoardScreen.jsx",
+);
 
 function readSource() {
   return fs.readFileSync(SOURCE_PATH, "utf8");
@@ -161,6 +173,73 @@ describe("AdminCompetitionsBoardScreen wiring", () => {
 
   it("board filter state is initialized as arrays for status/host-ranch/field", () => {
     var screenSource = fs.readFileSync(SCREEN_SOURCE_PATH, "utf8");
+
+    expect(screenSource).toContain(
+      "var [hostRanchFilter, setHostRanchFilter] = useState([]);",
+    );
+    expect(screenSource).toContain(
+      "var [fieldFilter, setFieldFilter] = useState([]);",
+    );
+    expect(screenSource).toContain(
+      "var [statusFilter, setStatusFilter] = useState([]);",
+    );
+  });
+});
+
+// Regression coverage for the old-prop-contract bug: Worker (and Payer,
+// below) once still passed searchText/onSearchTextChange/hostRanchFilter/
+// onHostRanchFilterChange/... - the dead per-field prop contract from
+// before CompetitionsFilterBar switched to appliedFilters/onApply - which
+// silently no-ops the filter UI since the shared component no longer reads
+// those props. Pinned against AdminCompetitionsBoardScreen, the verified
+// working reference for the current contract.
+describe("WorkerCompetitionsBoardScreen wiring", () => {
+  it("passes appliedFilters + onApply, no more scalar per-field setters", () => {
+    var screenSource = fs.readFileSync(WORKER_SCREEN_SOURCE_PATH, "utf8");
+
+    expect(screenSource).toContain("appliedFilters={{");
+    expect(screenSource).toContain("onApply={handleApplyFilters}");
+    expect(screenSource).not.toContain("onSearchTextChange");
+    expect(screenSource).not.toContain("onHostRanchFilterChange");
+    expect(screenSource).not.toContain("onFieldFilterChange");
+    expect(screenSource).not.toContain("onStatusFilterChange");
+    expect(screenSource).not.toContain("onDateFromChange");
+    expect(screenSource).not.toContain("onDateToChange");
+    expect(screenSource).not.toContain("onReset={handleResetFilters}");
+  });
+
+  it("board filter state is initialized as arrays for status/host-ranch/field", () => {
+    var screenSource = fs.readFileSync(WORKER_SCREEN_SOURCE_PATH, "utf8");
+
+    expect(screenSource).toContain(
+      "var [hostRanchFilter, setHostRanchFilter] = useState([]);",
+    );
+    expect(screenSource).toContain(
+      "var [fieldFilter, setFieldFilter] = useState([]);",
+    );
+    expect(screenSource).toContain(
+      "var [statusFilter, setStatusFilter] = useState([]);",
+    );
+  });
+});
+
+describe("PayerCompetitionsBoardScreen wiring", () => {
+  it("passes appliedFilters + onApply, no more scalar per-field setters", () => {
+    var screenSource = fs.readFileSync(PAYER_SCREEN_SOURCE_PATH, "utf8");
+
+    expect(screenSource).toContain("appliedFilters={{");
+    expect(screenSource).toContain("onApply={handleApplyFilters}");
+    expect(screenSource).not.toContain("onSearchTextChange");
+    expect(screenSource).not.toContain("onHostRanchFilterChange");
+    expect(screenSource).not.toContain("onFieldFilterChange");
+    expect(screenSource).not.toContain("onStatusFilterChange");
+    expect(screenSource).not.toContain("onDateFromChange");
+    expect(screenSource).not.toContain("onDateToChange");
+    expect(screenSource).not.toContain("onReset={handleResetFilters}");
+  });
+
+  it("board filter state is initialized as arrays for status/host-ranch/field", () => {
+    var screenSource = fs.readFileSync(PAYER_SCREEN_SOURCE_PATH, "utf8");
 
     expect(screenSource).toContain(
       "var [hostRanchFilter, setHostRanchFilter] = useState([]);",

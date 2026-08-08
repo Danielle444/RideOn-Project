@@ -59,10 +59,14 @@ export default function PayerCompetitionsBoardScreen(props) {
   var [competitions, setCompetitions] = useState([]);
   var [loading, setLoading] = useState(false);
 
+  // CAP-1: status/host-ranch/field are multi-select sets now (an empty
+  // array means "no filtering for that facet"), owned here as the board's
+  // APPLIED filters - CompetitionsFilterBar owns its own draft copy
+  // internally and only calls handleApplyFilters on "החל".
   var [searchText, setSearchText] = useState("");
-  var [hostRanchFilter, setHostRanchFilter] = useState("");
-  var [fieldFilter, setFieldFilter] = useState("");
-  var [statusFilter, setStatusFilter] = useState("");
+  var [hostRanchFilter, setHostRanchFilter] = useState([]);
+  var [fieldFilter, setFieldFilter] = useState([]);
+  var [statusFilter, setStatusFilter] = useState([]);
   var [dateFrom, setDateFrom] = useState("");
   var [dateTo, setDateTo] = useState("");
 
@@ -157,13 +161,20 @@ export default function PayerCompetitionsBoardScreen(props) {
     ];
   }
 
-  function handleResetFilters() {
-    setSearchText("");
-    setHostRanchFilter("");
-    setFieldFilter("");
-    setStatusFilter("");
-    setDateFrom("");
-    setDateTo("");
+  // CAP-1: the sheet's own "החל" - commits its whole draft filter set to
+  // the board in one call. "איפוס" inside the sheet only clears the draft;
+  // it reaches the board only once the user also presses "החל".
+  function handleApplyFilters(nextFilters) {
+    setSearchText(nextFilters.searchText || "");
+    setHostRanchFilter(
+      Array.isArray(nextFilters.hostRanchIds) ? nextFilters.hostRanchIds : [],
+    );
+    setFieldFilter(Array.isArray(nextFilters.fieldIds) ? nextFilters.fieldIds : []);
+    setStatusFilter(
+      Array.isArray(nextFilters.statusValues) ? nextFilters.statusValues : [],
+    );
+    setDateFrom(nextFilters.dateFrom || "");
+    setDateTo(nextFilters.dateTo || "");
   }
 
   var hostRanchOptions = useMemo(
@@ -274,22 +285,18 @@ export default function PayerCompetitionsBoardScreen(props) {
       <Text style={roleSharedStyles.sectionTitle}>כל התחרויות</Text>
 
       <CompetitionsFilterBar
-        searchText={searchText}
-        onSearchTextChange={setSearchText}
         hostRanchOptions={hostRanchOptions}
-        hostRanchFilter={hostRanchFilter}
-        onHostRanchFilterChange={setHostRanchFilter}
         fieldOptions={fieldOptions}
-        fieldFilter={fieldFilter}
-        onFieldFilterChange={setFieldFilter}
         statusOptions={statusOptions}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        dateFrom={dateFrom}
-        onDateFromChange={setDateFrom}
-        dateTo={dateTo}
-        onDateToChange={setDateTo}
-        onReset={handleResetFilters}
+        appliedFilters={{
+          searchText: searchText,
+          hostRanchIds: hostRanchFilter,
+          fieldIds: fieldFilter,
+          statusValues: statusFilter,
+          dateFrom: dateFrom,
+          dateTo: dateTo,
+        }}
+        onApply={handleApplyFilters}
       />
 
       {loading ? (
