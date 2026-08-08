@@ -1419,11 +1419,12 @@ export default function PayerCompetitionAccountScreen(props) {
       subtitle=""
       activeBottomTab={null}
       bottomNavItems={getPayerBottomNavConfig(props.navigation)}
-      menuContent={function ({ closeMenu }) {
+      menuContent={function ({ closeMenu, requestExitConfirm }) {
         return (
           <CompetitionMenuTemplate
             activeKey="account-details"
             closeMenu={closeMenu}
+            requestExitConfirm={requestExitConfirm}
             competitionName={
               activeCompetition ? activeCompetition.competitionName : ""
             }
