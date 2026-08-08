@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import MobileScreenLayout from "../../../components/mobile-nav/MobileScreenLayout";
 import SideMenuTemplate from "../../../components/mobile-nav/SideMenuTemplate";
 import CompetitionMenuTemplate from "../../../components/mobile-nav/CompetitionMenuTemplate";
