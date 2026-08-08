@@ -191,11 +191,58 @@ describe("WorkerCompetitionShavingsOrdersScreen - future-tab rescoping (הוזמ
   it("still renders two explicitly labeled sub-sections inside the inMyCare tab - בטיפול שלי and בטיפול של עובד אחר", () => {
     var source = readSource();
 
-    expect(source).toContain("<Text style={roleSharedStyles.sectionTitle}>בטיפול שלי</Text>");
-    expect(source).toContain("בטיפול של עובד אחר");
+    expect(source).toContain('<CollapsibleCareSection title="בטיפול שלי"');
+    expect(source).toContain('title="בטיפול של עובד אחר"');
     expect(source).not.toContain("בטיפול על ידי עובדים אחרים");
     expect(source).toContain("dateSplitGroups.myCare.length > 0 && (");
     expect(source).toContain("dateSplitGroups.otherCare.length > 0 && (");
+  });
+});
+
+describe("WorkerCompetitionShavingsOrdersScreen - inMyCare collapsible sections (בטיפול שלי / בטיפול של עובד אחר)", () => {
+  it("defines a local CollapsibleCareSection component, not an import from a shared/component file", () => {
+    var source = readSource();
+
+    expect(source).toContain("function CollapsibleCareSection(props) {");
+    expect(source).not.toContain("import CollapsibleCareSection");
+  });
+
+  it("tracks its own expanded state, defaulted from props.defaultExpanded, toggled by a Pressable press", () => {
+    var source = readSource();
+
+    var fnAt = source.indexOf("function CollapsibleCareSection(props) {");
+    var fnEnd = source.indexOf("\n}\n", fnAt);
+    var fnBody = source.substring(fnAt, fnEnd);
+
+    expect(fnBody).toContain(
+      "const [expanded, setExpanded] = useState(props.defaultExpanded);",
+    );
+    expect(fnBody).toContain("setExpanded(!expanded);");
+    expect(fnBody).toContain("{expanded && props.children}");
+  });
+
+  it("renders בטיפול שלי EXPANDED by default and בטיפול של עובד אחר COLLAPSED by default", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      '<CollapsibleCareSection title="בטיפול שלי" defaultExpanded={true}>',
+    );
+    var otherBlockAt = source.indexOf('title="בטיפול של עובד אחר"');
+    expect(otherBlockAt).toBeGreaterThan(-1);
+    var otherBlockEnd = source.indexOf(">", otherBlockAt);
+    var otherOpenTag = source.substring(otherBlockAt, otherBlockEnd);
+    expect(otherOpenTag).toContain("defaultExpanded={false}");
+  });
+
+  it("both sections still render their content through renderDateSections, unchanged by the collapse wrapper", () => {
+    var source = readSource();
+
+    var myCareAt = source.indexOf('<CollapsibleCareSection title="בטיפול שלי"');
+    var otherCareAt = source.indexOf('title="בטיפול של עובד אחר"');
+    var inMyCareBlock = source.substring(myCareAt, source.indexOf("</>", otherCareAt));
+
+    expect(inMyCareBlock).toContain("{renderDateSections(dateSplitGroups.myCare)}");
+    expect(inMyCareBlock).toContain("{renderDateSections(dateSplitGroups.otherCare)}");
   });
 });
 
@@ -237,5 +284,100 @@ describe("WorkerCompetitionShavingsOrdersScreen - future-order action confirmati
     );
     expect(fnBody).toContain('{ text: "ביטול", style: "cancel" },');
     expect(fnBody).toContain('{ text: "המשך", onPress: action },');
+  });
+});
+
+describe("WorkerCompetitionShavingsOrdersScreen - successful claim switches to the inMyCare tab", () => {
+  function getClaimFnBody(source) {
+    var fnAt = source.indexOf("async function handleClaimOrder(order) {");
+    expect(fnAt).toBeGreaterThan(-1);
+    var fnEnd = source.indexOf("\n  }\n", fnAt);
+    return source.substring(fnAt, fnEnd);
+  }
+
+  it("sets activeTab to inMyCare only after a successful claim + reload, before the try block ends", () => {
+    var source = readSource();
+    var fnBody = getClaimFnBody(source);
+
+    var tryAt = fnBody.indexOf("try {");
+    var catchAt = fnBody.indexOf("} catch (err) {");
+    expect(tryAt).toBeGreaterThan(-1);
+    expect(catchAt).toBeGreaterThan(tryAt);
+
+    var trySlice = fnBody.substring(tryAt, catchAt);
+    expect(trySlice).toContain("await claimShavingsOrder(order.shavingsOrderId);");
+    expect(trySlice).toContain("await loadOrders(selectedCompetition);");
+    expect(trySlice).toContain('setActiveTab("inMyCare");');
+
+    // The tab-switch must come after the reload, not before it - claiming a future-dated
+    // order still switches tabs (no date/future special-case here), but only once the
+    // freshly-claimed order is actually in `orders`.
+    var reloadIndex = trySlice.indexOf("await loadOrders(selectedCompetition);");
+    var switchIndex = trySlice.indexOf('setActiveTab("inMyCare");');
+    expect(switchIndex).toBeGreaterThan(reloadIndex);
+  });
+
+  it("never sets activeTab to inMyCare inside the catch block - a failed claim must not switch tabs", () => {
+    var source = readSource();
+    var fnBody = getClaimFnBody(source);
+
+    var catchAt = fnBody.indexOf("} catch (err) {");
+    var financeAt = fnBody.indexOf("} finally {");
+    expect(financeAt).toBeGreaterThan(catchAt);
+
+    var catchSlice = fnBody.substring(catchAt, financeAt);
+    expect(catchSlice).not.toContain('setActiveTab("inMyCare")');
+    // Both the 409 branch and the generic-failure branch still reach this slice - confirms
+    // the assertion above covers the whole catch, not just one branch.
+    expect(catchSlice).toContain("err?.response?.status === 409");
+    expect(catchSlice).toContain(
+      'Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לקחת את ההזמנה לטיפול"));',
+    );
+  });
+});
+
+describe("WorkerCompetitionShavingsOrdersScreen - getApiErrorMessage notification normalization", () => {
+  it("imports getApiErrorMessage from the shared auth-error helper", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";',
+    );
+  });
+
+  it("routes every generic (non-409) shavings-action failure through getApiErrorMessage", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לטעון את התחרויות"));',
+    );
+    expect(source).toContain(
+      'Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לטעון את ההזמנות"));',
+    );
+    expect(source).toContain(
+      'Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לקחת את ההזמנה לטיפול"));',
+    );
+    expect(source).toContain(
+      'getApiErrorMessage(err, "ניתן לסמן את ההזמנה כסופקה גם ללא תמונה.")',
+    );
+    expect(source).toContain(
+      'Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לסמן את ההזמנה כסופקה"));',
+    );
+  });
+
+  it("preserves the two 409-specific business-copy alerts verbatim, untouched by the normalization", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'Alert.alert("לא ניתן", "ההזמנה כבר נלקחה לטיפול על ידי עובד אחר");',
+    );
+    expect(source).toContain('Alert.alert("לא ניתן", "ההזמנה כבר סופקה");');
+  });
+
+  it("preserves the two success alerts verbatim - no standardized success helper exists in this codebase", () => {
+    var source = readSource();
+
+    var successCount = source.split('Alert.alert("בוצע", "ההזמנה סופקה");').length - 1;
+    expect(successCount).toBe(2);
   });
 });

@@ -29,6 +29,7 @@ import {
 } from "../../../../utils/workerHomeShavingsFeed";
 import WorkerShavingsOrderCard from "../components/WorkerShavingsOrderCard";
 import { canWorkerEnterCompetition } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 import {
   selectCompetitionsShortlist,
   DEFAULT_SHORTLIST_CAP,
@@ -147,7 +148,10 @@ export default function WorkerHomeScreen(props) {
         Alert.alert("לא ניתן", "ההזמנה כבר נלקחה לטיפול על ידי עובד אחר");
         await loadShavingsFeed();
       } else {
-        Alert.alert("שגיאה", "לא ניתן לקחת את ההזמנה לטיפול");
+        Alert.alert(
+          "שגיאה",
+          getApiErrorMessage(error, "לא ניתן לקחת את ההזמנה לטיפול"),
+        );
       }
     } finally {
       setClaimingOrderId(null);

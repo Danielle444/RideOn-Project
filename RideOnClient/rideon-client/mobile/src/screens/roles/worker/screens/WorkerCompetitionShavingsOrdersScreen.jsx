@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import WorkerShavingsOrderCard from "../components/WorkerShavingsOrderCard";
@@ -17,6 +18,7 @@ import {
 } from "../../../../services/shavingsOrderService";
 import { getMobileWorkerCompetitionsBoard } from "../../../../services/competitionService";
 import { getCompetitionStatusLabel } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 import { supabase } from "../../../../lib/supabaseClient";
 import {
   bucketWorkerCompetitionOrders,
@@ -25,6 +27,39 @@ import {
   isFutureDatedOrder,
 } from "../../../../utils/workerHomeShavingsFeed";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
+
+// Smallest local accordion for the two inMyCare sub-sections (בטיפול שלי / בטיפול של עובד
+// אחר) - manual expand/collapse only, no styling beyond what sectionTitle/chevron already
+// establish elsewhere on this screen (see WorkerShavingsOrderCard's own resolved-state
+// chevron for the same visual language). Deliberately NOT a shared component: this is the
+// only screen with a two-group collapsible split today, so a local component is the smallest
+// change that satisfies "reusable/local" without a broader refactor.
+function CollapsibleCareSection(props) {
+  const [expanded, setExpanded] = useState(props.defaultExpanded);
+
+  return (
+    <View style={{ gap: 12 }}>
+      <Pressable
+        onPress={function () {
+          setExpanded(!expanded);
+        }}
+        style={{
+          flexDirection: "row-reverse",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Text style={roleSharedStyles.sectionTitle}>{props.title}</Text>
+        <Ionicons
+          name={expanded ? "chevron-up-outline" : "chevron-down-outline"}
+          size={20}
+          color="#8B6352"
+        />
+      </Pressable>
+      {expanded && props.children}
+    </View>
+  );
+}
 
 // The middle tab is deliberately labeled "בטיפול" (not "בטיפול שלי") - it also contains
 // orders claimed by another worker (read-only, secondary), and a "my care" label would
@@ -110,7 +145,7 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       const response = await getMobileWorkerCompetitionsBoard(activeRole.ranchId);
       setCompetitions(response.data || []);
     } catch (err) {
-      Alert.alert("שגיאה", "לא ניתן לטעון את התחרויות");
+      Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לטעון את התחרויות"));
     } finally {
       setLoadingCompetitions(false);
     }
@@ -125,7 +160,7 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       );
       setOrders(response.data?.data || []);
     } catch (err) {
-      Alert.alert("שגיאה", "לא ניתן לטעון את ההזמנות");
+      Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לטעון את ההזמנות"));
     } finally {
       setLoadingOrders(false);
     }
@@ -143,12 +178,17 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       setClaimingOrderId(order.shavingsOrderId);
       await claimShavingsOrder(order.shavingsOrderId);
       await loadOrders(selectedCompetition);
+      // Business rule: a successful claim always surfaces the claimed order under "בטיפול"
+      // immediately, including for a future-dated order - the worker just took responsibility
+      // for it and must see it land in their own active-care section. Only on success: the
+      // catch branches below (409 / generic failure) must never switch tabs.
+      setActiveTab("inMyCare");
     } catch (err) {
       if (err?.response?.status === 409) {
         Alert.alert("לא ניתן", "ההזמנה כבר נלקחה לטיפול על ידי עובד אחר");
         await loadOrders(selectedCompetition);
       } else {
-        Alert.alert("שגיאה", "לא ניתן לקחת את ההזמנה לטיפול");
+        Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לקחת את ההזמנה לטיפול"));
       }
     } finally {
       setClaimingOrderId(null);
@@ -211,7 +251,7 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       setPhotoFailedOrderId(order.shavingsOrderId);
       Alert.alert(
         "העלאת התמונה נכשלה",
-        "ניתן לסמן את ההזמנה כסופקה גם ללא תמונה."
+        getApiErrorMessage(err, "ניתן לסמן את ההזמנה כסופקה גם ללא תמונה.")
       );
     } finally {
       setUploadingOrderId(null);
@@ -230,7 +270,7 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
         Alert.alert("לא ניתן", "ההזמנה כבר סופקה");
         await loadOrders(selectedCompetition);
       } else {
-        Alert.alert("שגיאה", "לא ניתן לסמן את ההזמנה כסופקה");
+        Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לסמן את ההזמנה כסופקה"));
       }
     } finally {
       setMarkingOrderId(null);
@@ -413,18 +453,17 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       return (
         <>
           {dateSplitGroups.myCare.length > 0 && (
-            <View style={{ gap: 12 }}>
-              <Text style={roleSharedStyles.sectionTitle}>בטיפול שלי</Text>
+            <CollapsibleCareSection title="בטיפול שלי" defaultExpanded={true}>
               {renderDateSections(dateSplitGroups.myCare)}
-            </View>
+            </CollapsibleCareSection>
           )}
           {dateSplitGroups.otherCare.length > 0 && (
-            <View style={{ gap: 12 }}>
-              <Text style={roleSharedStyles.sectionTitle}>
-                בטיפול של עובד אחר
-              </Text>
+            <CollapsibleCareSection
+              title="בטיפול של עובד אחר"
+              defaultExpanded={false}
+            >
               {renderDateSections(dateSplitGroups.otherCare)}
-            </View>
+            </CollapsibleCareSection>
           )}
         </>
       );

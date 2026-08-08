@@ -127,14 +127,17 @@ describe("WorkerHomeScreen - startup dual-failure alert dedup wiring", () => {
     var source = readSource();
 
     // These two pre-existing alerts (409 conflict / generic claim failure)
-    // must stay exactly as they were - not routed through the startup
+    // must stay exactly as they were routed - not through the startup
     // guard, since they are a standalone user action, not part of the
-    // paired mount/refresh cycle.
+    // paired mount/refresh cycle. The 409 branch keeps its exact special
+    // business copy verbatim; the generic branch is now normalized through
+    // getApiErrorMessage (see the notification-normalization suite below),
+    // same fallback text as before.
     expect(source).toContain(
       'Alert.alert("לא ניתן", "ההזמנה כבר נלקחה לטיפול על ידי עובד אחר");',
     );
     expect(source).toContain(
-      'Alert.alert("שגיאה", "לא ניתן לקחת את ההזמנה לטיפול");',
+      'getApiErrorMessage(error, "לא ניתן לקחת את ההזמנה לטיפול")',
     );
   });
 
@@ -150,6 +153,45 @@ describe("WorkerHomeScreen - startup dual-failure alert dedup wiring", () => {
 
     expect(source).toContain(
       "      loadWorkerHome();\n" + "    },\n" + "    [activeRole],",
+    );
+  });
+});
+
+describe("WorkerHomeScreen - getApiErrorMessage notification normalization (claim action only)", () => {
+  it("imports getApiErrorMessage from the shared auth-error helper", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";',
+    );
+  });
+
+  it("routes handleClaimShavingsOrder's generic failure through getApiErrorMessage - the exact duplicate of WorkerCompetitionShavingsOrdersScreen's handleClaimOrder pattern", () => {
+    var source = readSource();
+
+    var fnAt = source.indexOf("async function handleClaimShavingsOrder(order) {");
+    expect(fnAt).toBeGreaterThan(-1);
+    var fnEnd = source.indexOf("\n  }\n", fnAt);
+    var fnBody = source.substring(fnAt, fnEnd);
+
+    expect(fnBody).toContain(
+      'getApiErrorMessage(error, "לא ניתן לקחת את ההזמנה לטיפול")',
+    );
+  });
+
+  it("does NOT touch loadHomeCompetitions/loadShavingsFeed's startup-guarded alerts - different pattern, scoped out deliberately", () => {
+    var source = readSource();
+
+    // These remain the guarded, hardcoded startup-dedup messages pinned above
+    // (see "startup dual-failure alert dedup wiring") - they are not the
+    // claim/take-treatment action this normalization pass targets, and
+    // changing them would fight the shouldAlert() dedup design instead of
+    // fixing a notification-format mismatch.
+    expect(source).toContain(
+      'Alert.alert("שגיאה", "אירעה שגיאה בטעינת דף הבית");',
+    );
+    expect(source).toContain(
+      'Alert.alert("שגיאה", "אירעה שגיאה בטעינת הזמנות הנסורת להיום");',
     );
   });
 });
