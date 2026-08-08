@@ -180,12 +180,11 @@ export default function AdminCompetitionHorsesScreen(props) {
       subtitle=""
       activeBottomTab={null}
       bottomNavItems={getAdminBottomNavConfig(props.navigation)}
-      menuContent={function ({ closeMenu, requestExitConfirm }) {
+      menuContent={function ({ closeMenu }) {
         return (
           <CompetitionMenuTemplate
             activeKey="my-horses"
             closeMenu={closeMenu}
-            requestExitConfirm={requestExitConfirm}
             competitionName={
               activeCompetition ? activeCompetition.competitionName : ""
             }

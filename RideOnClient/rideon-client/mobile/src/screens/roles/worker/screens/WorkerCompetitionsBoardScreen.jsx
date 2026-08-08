@@ -236,13 +236,12 @@ export default function WorkerCompetitionsBoardScreen(props) {
       subtitle=""
       activeBottomTab="board"
       bottomNavItems={getWorkerBottomNavConfig(props.navigation)}
-      menuContent={function ({ closeMenu, requestExitConfirm }) {
+      menuContent={function ({ closeMenu }) {
         if (menuMode === "competition" && selectedCompetition) {
           return (
             <CompetitionMenuTemplate
               activeKey=""
               closeMenu={closeMenu}
-              requestExitConfirm={requestExitConfirm}
               competitionName={selectedCompetition.competitionName}
               items={getWorkerCompetitionMenuItems()}
               onItemPress={handleCompetitionMenuPress}

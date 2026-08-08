@@ -305,7 +305,7 @@ export default function CompetitionInvitationScreen(props) {
       subtitle=""
       activeBottomTab="menu"
       bottomNavItems={getBottomNavItems()}
-      menuContent={function ({ closeMenu, requestExitConfirm }) {
+      menuContent={function ({ closeMenu }) {
         // אם נכנסנו לפרטי תחרות מתוך תחרות פעילה (אדמין) - הצג את תפריט התחרות
         // (לא תפריט הבית הראשי). זה משאיר את האדמין בהקשר התחרות.
         if (isAdmin && competitionContext?.activeCompetition?.competitionId) {
@@ -313,7 +313,6 @@ export default function CompetitionInvitationScreen(props) {
             <CompetitionMenuTemplate
               activeKey="competition-details"
               closeMenu={closeMenu}
-              requestExitConfirm={requestExitConfirm}
               competitionName={
                 details?.competition?.competitionName ||
                 competitionNameParam ||
