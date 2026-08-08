@@ -167,11 +167,17 @@ namespace RideOnServer.Tests
         }
 
         [Fact]
-        public void RequestManagedPayer_StillTakesNoRanchIdParameterAtTheDalLayer()
+        public void RequestManagedPayer_NowThreadsRanchIdIntoTheDalLayer()
         {
-            // Documents the existing (out-of-scope) gap rather than changing
-            // it: usp_RequestManagedPayer receives no @RanchId today, and this
-            // task must not alter that proc or its DAL call.
+            // SUPERSEDED by fix/payer-manager-same-ranch-rule (P0). The gap
+            // this test used to pin -- usp_requestmanagedpayer receiving no
+            // @RanchId, out of scope for the PII-hardening audit that wrote
+            // this file -- is exactly what that later P0 task closes: the
+            // resolved payer must hold an Approved "משלם" role at the
+            // admin's active ranch before a management request can even be
+            // created. See RideOnDB/StoredProcedures/PostgreSQL/Individual/
+            // 253_usp_RequestManagedPayer.sql for the new p_ranchid
+            // parameter and guard.
             string dalSource = PayerDalSource();
             int from = dalSource.IndexOf("public int RequestManagedPayer(", StringComparison.Ordinal);
             from.Should().BeGreaterThan(-1);
@@ -179,7 +185,7 @@ namespace RideOnServer.Tests
             to.Should().BeGreaterThan(-1);
             string body = dalSource.Substring(from, to - from);
 
-            body.Should().NotContain("@RanchId");
+            body.Should().Contain("{ \"@RanchId\", request.RanchId }");
         }
 
         [Fact]

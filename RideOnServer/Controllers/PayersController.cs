@@ -211,6 +211,13 @@ namespace RideOnServer.Controllers
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
             }
+            catch (ValidationException ex)
+            {
+                // Business-rule guard raised inside usp_requestmanagedpayer,
+                // already translated to Hebrew by
+                // PayerDAL.TranslateManagedPayerError.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+            }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in RequestManagedPayer: {ex.Message}");
@@ -407,6 +414,13 @@ namespace RideOnServer.Controllers
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ex.Message);
+            }
+            catch (ValidationException ex)
+            {
+                // Business-rule guard raised inside
+                // usp_addmanagingadminforpayer, already translated to Hebrew
+                // by PayerDAL.TranslateManagedPayerError.
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
             }
             catch (Exception ex)
             {

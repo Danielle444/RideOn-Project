@@ -112,6 +112,7 @@ namespace RideOnServer.DAL
             Dictionary<string, object> paramDic = new Dictionary<string, object>
             {
                 { "@SystemUserId", systemUserId },
+                { "@RanchId", request.RanchId },
                 { "@FirstName", request.FirstName },
                 { "@LastName", request.LastName },
                 { "@Email", (object?)request.Email ?? DBNull.Value },
@@ -133,6 +134,14 @@ namespace RideOnServer.DAL
                         return Convert.ToInt32(result);
                     }
                 }
+            }
+            catch (PostgresException ex) when (ex.SqlState == "P0001")
+            {
+                // Business-rule guard raised inside usp_requestmanagedpayer
+                // (same-ranch check added for the payer-manager same-ranch
+                // rule). See UpdateManagedPayerBasicDetails above for why
+                // P0001 (not RN001) is caught here.
+                throw new BL.ValidationException(TranslateManagedPayerError(ex.MessageText));
             }
             catch (NpgsqlException ex)
             {
@@ -391,6 +400,16 @@ namespace RideOnServer.DAL
                         command.ExecuteNonQuery();
                     }
                 }
+            }
+            catch (PostgresException ex) when (ex.SqlState == "P0001")
+            {
+                // Business-rule guard raised inside
+                // usp_addmanagingadminforpayer ("The selected manager is not
+                // an approved ranch admin", "This manager is already linked
+                // to this payer", or the new same-ranch check). See
+                // UpdateManagedPayerBasicDetails above for why P0001 (not
+                // RN001) is caught here.
+                throw new BL.ValidationException(TranslateManagedPayerError(ex.MessageText));
             }
             catch (NpgsqlException ex)
             {
