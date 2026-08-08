@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -9,6 +8,7 @@ import {
 } from "react-native";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
+import AppDialog from "../../../../components/common/AppDialog";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import styles from "../../../../styles/adminAddPayerStyles";
 
@@ -21,6 +21,7 @@ import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiE
 import { useCompetition } from "../../../../context/CompetitionContext";
 
 import { updateManagedPayer } from "../../../../services/payerService";
+import { showToast } from "../../../../services/toastService";
 
 export default function AdminEditPayerScreen(props) {
   var userContext = useUser();
@@ -37,6 +38,14 @@ export default function AdminEditPayerScreen(props) {
   var [cellPhone, setCellPhone] = useState(payer ? payer.cellPhone || "" : "");
   var [email, setEmail] = useState(payer ? payer.email || "" : "");
   var [isSubmitting, setIsSubmitting] = useState(false);
+  // Single-button success dialog - navigation.goBack() only fires once the
+  // user acknowledges, same gating the native Alert's OK button used to do.
+  var [showSuccessDialog, setShowSuccessDialog] = useState(false);
+
+  function handleSuccessDialogConfirm() {
+    setShowSuccessDialog(false);
+    props.navigation.goBack();
+  }
 
   async function handleLogout() {
     if (props.onLogout) {
@@ -50,12 +59,12 @@ export default function AdminEditPayerScreen(props) {
 
   async function handleSubmit() {
     if (!payer || !payer.personId) {
-      Alert.alert("שגיאה", "לא נמצאו פרטי משלם לעריכה");
+      showToast("לא נמצאו פרטי משלם לעריכה", "error");
       return;
     }
 
     if (!firstName.trim() || !lastName.trim()) {
-      Alert.alert("שגיאה", "יש להזין שם פרטי ושם משפחה");
+      showToast("יש להזין שם פרטי ושם משפחה", "error");
       return;
     }
 
@@ -71,18 +80,11 @@ export default function AdminEditPayerScreen(props) {
         cellPhone: cellPhone.trim() || null,
       });
 
-      Alert.alert("נשמר", "פרטי המשלם עודכנו בהצלחה", [
-        {
-          text: "אישור",
-          onPress: function () {
-            props.navigation.goBack();
-          },
-        },
-      ]);
+      setShowSuccessDialog(true);
     } catch (error) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         getApiErrorMessage(error, "אירעה שגיאה בעדכון המשלם"),
+        "error",
       );
     } finally {
       setIsSubmitting(false);
@@ -196,6 +198,14 @@ export default function AdminEditPayerScreen(props) {
           </Pressable>
         </View>
       </ScrollView>
+
+      <AppDialog
+        visible={showSuccessDialog}
+        title="נשמר"
+        message="פרטי המשלם עודכנו בהצלחה"
+        type="success"
+        onConfirm={handleSuccessDialogConfirm}
+      />
     </MobileScreenLayout>
   );
 }
