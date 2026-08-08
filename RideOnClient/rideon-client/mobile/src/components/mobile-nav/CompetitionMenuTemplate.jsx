@@ -49,10 +49,10 @@ export default function CompetitionMenuTemplate(props) {
                 isActive ? roleSharedStyles.activeMenuItem : null,
               ]}
               onPress={function () {
-                props.onItemPress(item);
                 if (props.closeMenu) {
                   props.closeMenu();
                 }
+                props.onItemPress(item);
               }}
             >
               <Text style={roleSharedStyles.menuItemText}>{item.label}</Text>
