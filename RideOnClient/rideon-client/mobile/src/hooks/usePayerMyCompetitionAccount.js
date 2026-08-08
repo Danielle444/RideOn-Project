@@ -1,7 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
 
-import { Alert } from "react-native";
-
 import { useFocusEffect } from "@react-navigation/native";
 
 import { getMyCompetitionAccount } from "../services/payerService";
@@ -255,8 +253,6 @@ export default function usePayerMyCompetitionAccount(params) {
         var msg = getApiErrorMessage(error, "אירעה שגיאה בטעינת החשבון שלך");
 
         setScreenError(msg);
-
-        Alert.alert("שגיאה", msg);
       } finally {
         setLoading(false);
       }

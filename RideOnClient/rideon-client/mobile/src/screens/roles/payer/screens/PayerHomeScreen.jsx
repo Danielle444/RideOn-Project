@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   RefreshControl,
   ScrollView,
   Text,
@@ -11,6 +10,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
+import { showToast } from "../../../../services/toastService";
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
 import { getPayerMenuItems } from "../../../../navigation/sideMenuConfigs";
@@ -59,7 +59,7 @@ export default function PayerHomeScreen(props) {
     } catch (error) {
       console.error(error);
       setCompetitions([]);
-      Alert.alert("שגיאה", "אירעה שגיאה בטעינת דף הבית");
+      showToast("אירעה שגיאה בטעינת דף הבית", "error");
     } finally {
       setLoading(false);
     }

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Text, View } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
+import { showToast } from "../../../../services/toastService";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import competitionBoardStyles from "../../../../styles/competitionBoardStyles";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
@@ -94,7 +95,7 @@ export default function PayerCompetitionsBoardScreen(props) {
       );
     } catch (error) {
       console.error(error);
-      Alert.alert("שגיאה", "אירעה שגיאה בטעינת התחרויות");
+      showToast("אירעה שגיאה בטעינת התחרויות", "error");
       setCompetitions([]);
     } finally {
       setLoading(false);

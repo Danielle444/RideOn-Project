@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Text, View } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
+import { showToast } from "../../../../services/toastService";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
 import CompetitionsFilterBar from "../../../../components/competitions/CompetitionsFilterBar";
@@ -69,7 +70,7 @@ export default function AdminCompetitionsBoardScreen(props) {
         ),
       );
     } catch (error) {
-      Alert.alert("שגיאה", "אירעה שגיאה בטעינת התחרויות");
+      showToast("אירעה שגיאה בטעינת התחרויות", "error");
       setCompetitions([]);
     } finally {
       setLoading(false);
