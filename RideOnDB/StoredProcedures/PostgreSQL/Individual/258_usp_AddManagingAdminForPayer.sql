@@ -11,8 +11,8 @@
 -- AddPayerManager, authorized only by currentPersonId == request.PersonId
 -- (no ranch check anywhere above this proc).
 --
--- MODIFIED on fix/payer-manager-same-ranch-rule (P0, NOT YET APPLIED LIVE --
--- see that branch's report). New business rule: an admin may only manage a
+-- MODIFIED on fix/payer-manager-same-ranch-rule (P0, confirmed applied live
+-- 2026-08-08). New business rule: an admin may only manage a
 -- payer when both hold an Approved role at the SAME ranch (admin
 -- "אדמין חווה", payer "משלם"). This proc had a same-admin-role check but NO
 -- ranch logic of any kind before this change -- since it auto-approves,
