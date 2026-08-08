@@ -6,10 +6,12 @@ import path from "node:path";
 // admin-direct endpoints AdminCompetitionPayerAccountScreen already uses
 // (POST /Entries/admin-edit via the shared CompetitionEntryCreateModal's
 // useDirectAdminEdit prop, DELETE /Entries/admin-cancel/{entryId} via
-// handleCancelEntry below) - no ChangeEntryRequest is created from this
-// screen anymore. The screen imports react-native/context modules not safe
-// to import under plain vitest, so this reads source text - same approach as
-// the repo's other *.contract.test.js files.
+// handleCancelEntryDialogConfirm below) - no ChangeEntryRequest is created
+// from this screen anymore. Styled-alert migration: cancel is now a
+// state-driven <AppDialog>, success/error notices are showToast() calls -
+// no native Alert.alert remains. The screen imports react-native/context
+// modules not safe to import under plain vitest, so this reads source text -
+// same approach as the repo's other *.contract.test.js files.
 
 var SOURCE_PATH = path.resolve(__dirname, "AdminCompetitionClassesScreen.jsx");
 
@@ -27,10 +29,18 @@ function getFunctionBlock(source, signature, nextSignature) {
   return source.slice(start, end);
 }
 
-function getHandleCancelEntryBlock(source) {
+function getCancelHandlersBlock(source) {
   return getFunctionBlock(
     source,
     "function handleCancelEntry(item) {",
+    "function renderFilterChip(",
+  );
+}
+
+function getConfirmHandlerBlock(source) {
+  return getFunctionBlock(
+    source,
+    "async function handleCancelEntryDialogConfirm() {",
     "function renderFilterChip(",
   );
 }
@@ -65,20 +75,18 @@ describe("AdminCompetitionClassesScreen - CAP-6 direct admin edit/cancel", () =>
   });
 
   it("handleCancelEntry's confirmation dialog no longer promises a secretary-bound request", () => {
-    var block = getHandleCancelEntryBlock(readSource());
+    var source = readSource();
 
-    expect(block).toContain(
+    expect(source).toContain(
       "getCancellationConfirmationText(PAYER_ACCOUNT_ITEM_LABEL.entry)",
     );
-    expect(block).not.toContain("האם לשלוח בקשת ביטול למזכירה");
+    expect(source).not.toContain("האם לשלוח בקשת ביטול למזכירה");
   });
 
-  it("handleCancelEntry calls adminCancelEntry(entryId, competitionId, ranchId) directly, not a ChangeEntryRequest", () => {
-    var block = getHandleCancelEntryBlock(readSource());
+  it("handleCancelEntryDialogConfirm calls adminCancelEntry(entryId, competitionId, ranchId) directly, not a ChangeEntryRequest", () => {
+    var block = getConfirmHandlerBlock(readSource());
 
-    expect(block).toContain(
-      "await adminCancelEntry(\n                item.entryId,",
-    );
+    expect(block).toContain("await adminCancelEntry(\n        item.entryId,");
     expect(block).toContain("activeCompetition?.competitionId,");
     expect(block).toContain("activeRole?.ranchId,");
     expect(block).not.toContain("createChangeEntryRequest");
@@ -86,11 +94,11 @@ describe("AdminCompetitionClassesScreen - CAP-6 direct admin edit/cancel", () =>
     expect(block).not.toContain("originalEntryId");
   });
 
-  it("the success alert uses DIRECT_CANCELLATION_COPY.text, never the send-to-secretary wording", () => {
-    var block = getHandleCancelEntryBlock(readSource());
+  it("the success notice uses DIRECT_CANCELLATION_COPY.text via showToast, never the send-to-secretary wording", () => {
+    var block = getConfirmHandlerBlock(readSource());
 
     expect(block).toContain(
-      'Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);',
+      'showToast(DIRECT_CANCELLATION_COPY.text, "success");',
     );
     expect(block).not.toContain("נשלח למזכירה");
     expect(block).not.toContain('"נשלח"');
@@ -116,7 +124,7 @@ describe("AdminCompetitionClassesScreen - CAP-6 direct admin edit/cancel", () =>
   });
 
   it("the guard key is 'entry:' + item.entryId, and is released only in the outer finally", () => {
-    var block = getHandleCancelEntryBlock(readSource());
+    var block = getConfirmHandlerBlock(readSource());
 
     expect(block).toContain('var guardKey = "entry:" + item.entryId;');
 
@@ -133,7 +141,7 @@ describe("AdminCompetitionClassesScreen - CAP-6 direct admin edit/cancel", () =>
   });
 
   it("the guard is acquired synchronously before the service call - a failed acquire returns immediately", () => {
-    var block = getHandleCancelEntryBlock(readSource());
+    var block = getConfirmHandlerBlock(readSource());
 
     var guardCheckIndex = block.indexOf(
       "if (!cancelGuardRef.current.tryAcquire(guardKey)) {",
@@ -146,11 +154,11 @@ describe("AdminCompetitionClassesScreen - CAP-6 direct admin edit/cancel", () =>
     expect(returnIndex).toBeLessThan(serviceCallIndex);
   });
 
-  it("a refresh failure cannot be reported as a cancel failure - the refresh runs in its own nested try/catch that only logs, never alerts, never rethrows", () => {
-    var block = getHandleCancelEntryBlock(readSource());
+  it("a refresh failure cannot be reported as a cancel failure - the refresh runs in its own nested try/catch that only logs, never toasts, never rethrows", () => {
+    var block = getConfirmHandlerBlock(readSource());
 
     var refreshTryIndex = block.indexOf(
-      "try {\n                await entries.handleRefresh();",
+      "try {\n        await entries.handleRefresh();",
     );
     expect(refreshTryIndex).toBeGreaterThan(-1);
 
@@ -167,29 +175,82 @@ describe("AdminCompetitionClassesScreen - CAP-6 direct admin edit/cancel", () =>
     expect(refreshCatchBlock).toContain(
       'console.log("CANCEL ENTRY REFRESH ERROR", refreshError);',
     );
-    expect(refreshCatchBlock).not.toContain("Alert.alert");
+    expect(refreshCatchBlock).not.toContain("showToast");
     expect(refreshCatchBlock).not.toContain("throw");
   });
 
-  it("on mutation failure: shows a plain error alert, not the old 'sending the request' wording, and never claims direct-cancel success", () => {
-    var block = getHandleCancelEntryBlock(readSource());
+  it("on mutation failure: shows a plain error toast, not the old 'sending the request' wording, and never claims direct-cancel success", () => {
+    var block = getConfirmHandlerBlock(readSource());
 
     var outerCatchIndex = block.indexOf("} catch (error) {");
     var outerFinallyIndex = block.indexOf("} finally {", outerCatchIndex);
     var outerCatchBlock = block.slice(outerCatchIndex, outerFinallyIndex);
 
     expect(outerCatchBlock).toContain(
-      'Alert.alert("שגיאה", "אירעה שגיאה בביטול ההרשמה");',
+      'showToast("אירעה שגיאה בביטול ההרשמה", "error");',
     );
     expect(outerCatchBlock).not.toContain("שליחת בקשת הביטול");
     expect(outerCatchBlock).not.toContain("DIRECT_CANCELLATION_COPY");
   });
 
-  it("existing Model-C availability guard (registrationStepStatus.availability.classes.isEnabled) is preserved at both the dialog-open and onPress checkpoints", () => {
-    var block = getHandleCancelEntryBlock(readSource());
+  it("existing Model-C availability guard (registrationStepStatus.availability.classes.isEnabled) is preserved at both the dialog-open and dialog-confirm checkpoints", () => {
+    var block = getCancelHandlersBlock(readSource());
 
     var occurrences =
-      block.split("if (!availability.classes.isEnabled) {").length - 1;
+      block.split("availability.classes.isEnabled").length - 1;
+    // One check in handleCancelEntry (dialog-open) and one in
+    // handleCancelEntryDialogConfirm (before the mutation runs).
     expect(occurrences).toBe(2);
+  });
+
+  it("no native Alert import or Alert.alert call remains in this screen", () => {
+    var source = readSource();
+
+    expect(source).not.toMatch(/\bAlert\b/);
+  });
+
+  it("imports AppDialog and showToast for the styled-alert replacements", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import AppDialog from "../../../../components/common/AppDialog";',
+    );
+    expect(source).toContain(
+      'import { showToast } from "../../../../services/toastService";',
+    );
+  });
+
+  it("cancel-entry confirmation renders as a destructive AppDialog gated on cancelEntryTarget, not an auto-firing action", () => {
+    var source = readSource();
+
+    var dialogStart = source.indexOf('<AppDialog\n          visible={!!cancelEntryTarget}');
+    expect(dialogStart).toBeGreaterThan(-1);
+
+    var dialogEnd = source.indexOf("/>", dialogStart);
+    var dialogBlock = source.slice(dialogStart, dialogEnd);
+
+    expect(dialogBlock).toContain("destructive={true}");
+    expect(dialogBlock).toContain("onConfirm={handleCancelEntryDialogConfirm}");
+    expect(dialogBlock).toContain("onCancel={handleCancelEntryDialogCancel}");
+  });
+
+  it("handleCancelEntry only opens the dialog (sets state) - it does not call adminCancelEntry itself", () => {
+    var source = readSource();
+    var start = source.indexOf("function handleCancelEntry(item) {");
+    var end = source.indexOf("function handleCancelEntryDialogCancel() {");
+    var block = source.slice(start, end);
+
+    expect(block).toContain("setCancelEntryTarget(item);");
+    expect(block).not.toContain("adminCancelEntry");
+  });
+
+  it("cancelling the dialog clears the target without ever calling adminCancelEntry", () => {
+    var source = readSource();
+    var start = source.indexOf("function handleCancelEntryDialogCancel() {");
+    var end = source.indexOf("async function handleCancelEntryDialogConfirm() {");
+    var block = source.slice(start, end);
+
+    expect(block).toContain("setCancelEntryTarget(null);");
+    expect(block).not.toContain("adminCancelEntry");
   });
 });

@@ -62,3 +62,43 @@ describe("handleFinishPaidTime stays on the registration screen", () => {
     expect(body).not.toMatch(/navigation\.navigate/);
   });
 });
+
+// This screen is a second, live consumer of useAdminCompetitionRegistrations
+// (proven reachable via real navigation.navigate("AdminCompetitionRegistrations")
+// call sites in CompetitionInvitationScreen.jsx and
+// AdminCompetitionStallsShavingsScreen.jsx, plus the competition menu config)
+// - its own CompetitionRegistrationsClassesTab wires
+// onSubmit={registration.handleCreateEntry} directly, so it can trigger the
+// same duplicate rider+horse confirm as CompetitionEntryCreateModal.jsx. The
+// wiring here is intentionally minimal: only the shared
+// duplicateConfirmDialogProps contract is rendered - no other alert/dialog
+// behavior on this screen was touched.
+describe("AdminCompetitionRegistrationsScreen - shared duplicate-confirm dialog wiring", () => {
+  it("imports AppDialog", () => {
+    expect(readSource()).toContain(
+      'import AppDialog from "../../../../components/common/AppDialog";',
+    );
+  });
+
+  it("renders the shared duplicate-confirm dialog by spreading the hook's dialog-props contract, not a local reimplementation", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      "<AppDialog {...registration.duplicateConfirmDialogProps} />",
+    );
+  });
+
+  it("registration.handleCreateEntry (the function that can trigger the duplicate confirm) is still wired as the classes tab's onSubmit, unchanged", () => {
+    var source = readSource();
+
+    expect(source).toContain("onSubmit={registration.handleCreateEntry}");
+  });
+
+  it("does not duplicate any business logic from the hook - no local duplicate-detection or confirm state on this screen", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("checkForDuplicateAndConfirm");
+    expect(source).not.toContain("findDuplicateActiveEntry");
+    expect(source).not.toMatch(/useState\(.*[Dd]uplicate/);
+  });
+});

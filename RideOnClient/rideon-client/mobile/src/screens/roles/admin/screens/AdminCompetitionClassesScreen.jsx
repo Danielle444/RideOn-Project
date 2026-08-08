@@ -6,7 +6,6 @@ import {
   Text,
   TextInput,
   View,
-  Alert,
 } from "react-native";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -14,6 +13,7 @@ import { useFocusEffect } from "@react-navigation/native";
 
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import CompetitionMenuTemplate from "../../../../components/mobile-nav/CompetitionMenuTemplate";
+import AppDialog from "../../../../components/common/AppDialog";
 
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import { getAdminCompetitionMenuItems } from "../../../../navigation/competitionMenuConfigs";
@@ -39,6 +39,7 @@ import DuplicateEntriesModal from "../../../../components/competitions/Duplicate
 import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
 
 import { adminCancelEntry } from "../../../../services/entriesService";
+import { showToast } from "../../../../services/toastService";
 import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
 import {
   getCancellationConfirmationText,
@@ -227,6 +228,8 @@ export default function AdminCompetitionClassesScreen(props) {
 
   var [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
 
+  var [cancelEntryTarget, setCancelEntryTarget] = useState(null);
+
   // Synchronous in-flight guard for direct entry cancellation - same
   // reusable helper and per-key-held-through-refresh pattern as
   // AdminCompetitionPayerAccountScreen's stall cancellation. Initialized
@@ -314,58 +317,52 @@ export default function AdminCompetitionClassesScreen(props) {
       return;
     }
 
-    Alert.alert(
-      "ביטול הרשמה",
-      getCancellationConfirmationText(PAYER_ACCOUNT_ITEM_LABEL.entry),
-      [
-        {
-          text: "לא",
-          style: "cancel",
-        },
+    setCancelEntryTarget(item);
+  }
 
-        {
-          text: "כן",
-          style: "destructive",
+  function handleCancelEntryDialogCancel() {
+    setCancelEntryTarget(null);
+  }
 
-          onPress: async function () {
-            if (!availability.classes.isEnabled) {
-              return;
-            }
+  async function handleCancelEntryDialogConfirm() {
+    var item = cancelEntryTarget;
 
-            var guardKey = "entry:" + item.entryId;
+    setCancelEntryTarget(null);
 
-            if (!cancelGuardRef.current.tryAcquire(guardKey)) {
-              return;
-            }
+    if (!item || !availability.classes.isEnabled) {
+      return;
+    }
 
-            try {
-              await adminCancelEntry(
-                item.entryId,
-                activeCompetition?.competitionId,
-                activeRole?.ranchId,
-              );
+    var guardKey = "entry:" + item.entryId;
 
-              // The cancel succeeded - refresh is best-effort and must not
-              // be able to turn this into a reported failure.
-              Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);
+    if (!cancelGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
 
-              try {
-                await entries.handleRefresh();
-                reloadRegistrationStepStatus();
-              } catch (refreshError) {
-                console.log("CANCEL ENTRY REFRESH ERROR", refreshError);
-              }
-            } catch (error) {
-              Alert.alert("שגיאה", "אירעה שגיאה בביטול ההרשמה");
+    try {
+      await adminCancelEntry(
+        item.entryId,
+        activeCompetition?.competitionId,
+        activeRole?.ranchId,
+      );
 
-              console.log(error);
-            } finally {
-              cancelGuardRef.current.release(guardKey);
-            }
-          },
-        },
-      ],
-    );
+      // The cancel succeeded - refresh is best-effort and must not
+      // be able to turn this into a reported failure.
+      showToast(DIRECT_CANCELLATION_COPY.text, "success");
+
+      try {
+        await entries.handleRefresh();
+        reloadRegistrationStepStatus();
+      } catch (refreshError) {
+        console.log("CANCEL ENTRY REFRESH ERROR", refreshError);
+      }
+    } catch (error) {
+      showToast("אירעה שגיאה בביטול ההרשמה", "error");
+
+      console.log(error);
+    } finally {
+      cancelGuardRef.current.release(guardKey);
+    }
   }
 
   function renderFilterChip(label, isActive, onPress, keyValue) {
@@ -686,6 +683,18 @@ export default function AdminCompetitionClassesScreen(props) {
             setEditingItem(null);
           }}
           onCreated={handleMutationSuccess}
+        />
+
+        <AppDialog
+          visible={!!cancelEntryTarget}
+          type="warning"
+          title="ביטול הרשמה"
+          message={getCancellationConfirmationText(PAYER_ACCOUNT_ITEM_LABEL.entry)}
+          confirmLabel="כן"
+          cancelLabel="לא"
+          destructive={true}
+          onConfirm={handleCancelEntryDialogConfirm}
+          onCancel={handleCancelEntryDialogCancel}
         />
 
         <EntriesViewModal
