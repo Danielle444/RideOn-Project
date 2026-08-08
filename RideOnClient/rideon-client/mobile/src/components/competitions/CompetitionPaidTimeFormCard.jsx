@@ -13,6 +13,10 @@ import {
   getUniqueOrderedValues,
   getBucketLabel,
 } from "../../utils/paidTimeSlotCascade";
+import {
+  computeCascadeFromSlot,
+  computeAutoResolveSlotAction,
+} from "../../utils/paidTimeSlotResolution";
 import styles from "../../styles/adminCompetitionPaidTimesStyles";
 
 var SLOT_EXPLANATION =
@@ -105,6 +109,11 @@ export default function CompetitionPaidTimeFormCard(props) {
   // המלא ליד אותו אפקט (הגנת ה-החייאה שמונעת את לולאת ה-Maximum update depth).
   var lastAutoResolvedSlotIdRef = useRef(null);
 
+  // זוכר את מזהה ה-selectedRequestedSlot האחרון שאפקט הרזולוציה האוטומטית
+  // (למטה) בפועל התבונן בו, כדי להבחין בין "המדרג עצמו השתנה" לבין "הסלוט
+  // הוחלף מבחוץ" - ראו ההסבר המלא ליד אותו אפקט (הגנת ה-hydration).
+  var observedExternalSlotIdRef = useRef(null);
+
   var fieldErrors = props.fieldErrors || {};
   var scrollRequest = props.scrollRequest || null;
   var onScrollToOffset = props.onScrollToOffset;
@@ -142,15 +151,11 @@ export default function CompetitionPaidTimeFormCard(props) {
   // כשמתחילים בקשה נוספת (איפוס), וכשמגיעים לטופס עם ערך כבר קיים.
   useEffect(
     function () {
-      var selected = props.selectedRequestedSlot;
+      var nextCascade = computeCascadeFromSlot(props.selectedRequestedSlot);
 
-      setCascadeDate(selected ? selected.slotDate || null : null);
-      setCascadeTimeOfDay(selected ? selected.timeOfDay || null : null);
-      setCascadeArenaName(
-        selected && selected.arenaName !== undefined
-          ? selected.arenaName
-          : null,
-      );
+      setCascadeDate(nextCascade.cascadeDate);
+      setCascadeTimeOfDay(nextCascade.cascadeTimeOfDay);
+      setCascadeArenaName(nextCascade.cascadeArenaName);
     },
     [props.selectedRequestedSlot],
   );
@@ -255,41 +260,53 @@ export default function CompetitionPaidTimeFormCard(props) {
   // עד ש-React זורק "Maximum update depth exceeded". לכן: אם המדרג עדיין מוביל
   // בדיוק לסלוט שהאפקט הזה בחר לאחרונה אבל הסלוט כרגע ריק, זו הייתה נקייה
   // מכוונת מבחוץ - לא מחזירים אותו, ונותנים לאפקט המדרג לסיים את הניקוי.
+  // הגנת hydration (observedExternalSlotIdRef, ראו computeAutoResolveSlotAction
+  // ב-utils/paidTimeSlotResolution.js): כשעריכה מתחילה, ה-hook
+  // (useAdminCompetitionPaidTimes) מיישר את
+  // selectedRequestedSlot ישירות לסלוט האמיתי - בלי לעבור דרך המדרג. באותו
+  // commit, האפקט שלמעלה (סלוט ← מדרג) רק *מתזמן* עדכון למדרג; הוא לא הוחל
+  // עדיין, אז slotsForFullSelection כאן עדיין נגזר מהמדרג הישן (לרוב ריק).
+  // בלי ההגנה הזו, האפקט הזה "יתקן" את הסלוט בחזרה ל-null לפי המדרג הישן,
+  // האפקט שלמעלה יתקן את המדרג לפי הסלוט האמיתי ברינדור הבא, ושניהם יקפצו
+  // זה על זה לנצח (אותה משפחת לולאה שהגנת a817ff6 למטה מטפלת בה בכיוון
+  // ההפוך - איפוס אחרי שליחה). לכן: כשהסלוט הנצפה מבחוץ השתנה מאז הריצה
+  // הקודמת של האפקט הזה (בין אם ע"י hydration ובין אם ע"י בחירה ישירה
+  // בדרופדאון "שעת התחלה מדויקת"), עוצרים לרינדור אחד ונותנים לאפקט שלמעלה
+  // לסנכרן את המדרג קודם - ברינדור הבא slotsForFullSelection כבר ישקף את
+  // הסלוט הנוכחי וההתאמה תתכנס נקי.
   useEffect(
     function () {
-      if (needsFinalDisambiguation) {
-        return;
-      }
-
-      var resolvedSlot =
-        slotsForFullSelection.length === 1 ? slotsForFullSelection[0] : null;
-
       var currentSlotId = props.selectedRequestedSlot
         ? props.selectedRequestedSlot.paidTimeSlotInCompId
         : null;
 
-      var resolvedSlotId = resolvedSlot
-        ? resolvedSlot.paidTimeSlotInCompId
-        : null;
+      var decision = computeAutoResolveSlotAction({
+        currentSlotId: currentSlotId,
+        observedExternalSlotId: observedExternalSlotIdRef.current,
+        needsFinalDisambiguation: needsFinalDisambiguation,
+        slotsForFullSelection: slotsForFullSelection,
+        lastAutoResolvedSlotId: lastAutoResolvedSlotIdRef.current,
+      });
 
-      if (currentSlotId === resolvedSlotId) {
+      if (decision.action === "observeExternalChange") {
+        observedExternalSlotIdRef.current = decision.nextObservedExternalSlotId;
+        lastAutoResolvedSlotIdRef.current = decision.nextLastAutoResolvedSlotId;
+        return;
+      }
+
+      if (decision.action === "wait" || decision.action === "declineResurrection") {
+        return;
+      }
+
+      if (decision.action === "settled") {
         // כבר מסונכרן (כולל שניהם ריקים) - מעדכנים את הזיכרון ולא כותבים שוב.
-        lastAutoResolvedSlotIdRef.current = resolvedSlotId;
+        lastAutoResolvedSlotIdRef.current = decision.nextLastAutoResolvedSlotId;
         return;
       }
 
-      if (
-        currentSlotId === null &&
-        resolvedSlotId !== null &&
-        resolvedSlotId === lastAutoResolvedSlotIdRef.current
-      ) {
-        // הסלוט נוקה מבחוץ (איפוס אחרי שליחה) והמדרג עדיין תקוע על הערך הישן -
-        // לא מחייים אותו, אחרת נכנסים ללולאה אינסופית מול אפקט המדרג שלמעלה.
-        return;
-      }
-
-      props.setSelectedRequestedSlot(resolvedSlot);
-      lastAutoResolvedSlotIdRef.current = resolvedSlotId;
+      // decision.action === "resolve"
+      props.setSelectedRequestedSlot(decision.resolvedSlot);
+      lastAutoResolvedSlotIdRef.current = decision.nextLastAutoResolvedSlotId;
     },
     [slotsForFullSelection, needsFinalDisambiguation, props.selectedRequestedSlot],
   );
