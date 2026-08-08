@@ -273,7 +273,7 @@ describe("WorkerCompetitionShavingsOrdersScreen - future-order action confirmati
     expect(fnBody).toContain("return;");
   });
 
-  it("shows a cancel/confirm Alert for a future-dated order, where cancel is a no-op and confirm runs the exact same action", () => {
+  it("stashes the pending action and opens the shared AppDialog for a future-dated order, instead of calling action() directly", () => {
     var source = readSource();
 
     var fnAt = source.indexOf("function confirmIfFutureDated(order, action) {");
@@ -281,10 +281,123 @@ describe("WorkerCompetitionShavingsOrdersScreen - future-order action confirmati
     var fnBody = source.substring(fnAt, fnEnd);
 
     expect(fnBody).toContain(
-      "Alert.alert(FUTURE_ORDER_CONFIRM_TITLE, FUTURE_ORDER_CONFIRM_MESSAGE, [",
+      "setFutureConfirmState({ visible: true, pendingAction: action });",
     );
-    expect(fnBody).toContain('{ text: "ביטול", style: "cancel" },');
-    expect(fnBody).toContain('{ text: "המשך", onPress: action },');
+
+    // The immediate (non-future) branch above still returns before reaching this line -
+    // opening the dialog and running the action immediately must stay mutually exclusive.
+    var immediateBranchEnd = fnBody.indexOf(
+      "setFutureConfirmState({ visible: true, pendingAction: action });",
+    );
+    var immediateBranch = fnBody.substring(0, immediateBranchEnd);
+    expect(immediateBranch).toContain("action();");
+    expect(immediateBranch).toContain("return;");
+  });
+
+  it("imports AppDialog from the shared common components", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import AppDialog from "../../../../components/common/AppDialog";',
+    );
+  });
+
+  it("renders one AppDialog for the future-order confirmation, with the title/message preserved verbatim and the same button labels as before", () => {
+    var source = readSource();
+
+    var dialogAt = source.indexOf("visible={futureConfirmState.visible}");
+    expect(dialogAt).toBeGreaterThan(-1);
+    var dialogBlockStart = source.lastIndexOf("<AppDialog", dialogAt);
+    var dialogBlockEnd = source.indexOf("/>", dialogAt);
+    var dialogBlock = source.substring(dialogBlockStart, dialogBlockEnd);
+
+    expect(dialogBlock).toContain("title={FUTURE_ORDER_CONFIRM_TITLE}");
+    expect(dialogBlock).toContain("message={FUTURE_ORDER_CONFIRM_MESSAGE}");
+    expect(dialogBlock).toContain('confirmLabel="המשך"');
+    expect(dialogBlock).toContain('cancelLabel="ביטול"');
+    expect(dialogBlock).toContain("onConfirm={handleFutureConfirm}");
+    expect(dialogBlock).toContain("onCancel={handleFutureCancel}");
+  });
+
+  it("handleFutureCancel closes the dialog and clears the pending action without ever invoking it", () => {
+    var source = readSource();
+
+    var fnAt = source.indexOf("function handleFutureCancel() {");
+    expect(fnAt).toBeGreaterThan(-1);
+    var fnEnd = source.indexOf("\n  }\n", fnAt);
+    var fnBody = source.substring(fnAt, fnEnd);
+
+    expect(fnBody).toContain(
+      "setFutureConfirmState({ visible: false, pendingAction: null });",
+    );
+    expect(fnBody).not.toContain("pendingAction()");
+  });
+
+  it("handleFutureConfirm closes the dialog BEFORE invoking the pending action exactly once", () => {
+    var source = readSource();
+
+    var fnAt = source.indexOf("function handleFutureConfirm() {");
+    expect(fnAt).toBeGreaterThan(-1);
+    var fnEnd = source.indexOf("\n  }\n", fnAt);
+    var fnBody = source.substring(fnAt, fnEnd);
+
+    var closeIndex = fnBody.indexOf(
+      "setFutureConfirmState({ visible: false, pendingAction: null });",
+    );
+    var invokeIndex = fnBody.indexOf("pendingAction();");
+    expect(closeIndex).toBeGreaterThan(-1);
+    expect(invokeIndex).toBeGreaterThan(closeIndex);
+
+    // Guarded by "if (pendingAction)" so a stray confirm with no pending action never throws.
+    expect(fnBody).toContain("if (pendingAction) {");
+
+    // Exactly one call site invokes the pending action - never fires it twice per confirm.
+    var invokeCount = fnBody.split("pendingAction();").length - 1;
+    expect(invokeCount).toBe(1);
+  });
+});
+
+describe("WorkerCompetitionShavingsOrdersScreen - camera permission denied (app-owned message, not the OS prompt)", () => {
+  it("never calls the native Alert.alert for the permission-denied message", () => {
+    var source = readSource();
+
+    var fnAt = source.indexOf("async function handleCapturePhoto(order) {");
+    expect(fnAt).toBeGreaterThan(-1);
+    var permissionBlockEnd = source.indexOf(
+      "const result = await ImagePicker.launchCameraAsync",
+      fnAt,
+    );
+    var permissionBlock = source.substring(fnAt, permissionBlockEnd);
+
+    expect(permissionBlock).not.toContain("Alert.alert");
+    expect(permissionBlock).toContain("if (!permission.granted) {");
+    expect(permissionBlock).toContain("setPermissionDialogVisible(true);");
+    expect(permissionBlock).toContain("return;");
+  });
+
+  it("still calls the real requestCameraPermissionsAsync - the OS prompt itself is untouched", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      "const permission = await ImagePicker.requestCameraPermissionsAsync();",
+    );
+  });
+
+  it("renders a single-button AppDialog (no onCancel/cancelLabel) with the original title/message, acknowledgement-only", () => {
+    var source = readSource();
+
+    var dialogAt = source.indexOf("visible={permissionDialogVisible}");
+    expect(dialogAt).toBeGreaterThan(-1);
+    var dialogBlockStart = source.lastIndexOf("<AppDialog", dialogAt);
+    var dialogBlockEnd = source.indexOf("/>", dialogAt);
+    var dialogBlock = source.substring(dialogBlockStart, dialogBlockEnd);
+
+    expect(dialogBlock).toContain('title="הרשאה נדרשת"');
+    expect(dialogBlock).toContain('message="נא לאשר גישה למצלמה בהגדרות הטלפון"');
+    expect(dialogBlock).not.toContain("onCancel");
+    expect(dialogBlock).not.toContain("cancelLabel");
+    expect(dialogBlock).toContain("onConfirm={function () {");
+    expect(dialogBlock).toContain("setPermissionDialogVisible(false);");
   });
 });
 
@@ -338,7 +451,7 @@ describe("WorkerCompetitionShavingsOrdersScreen - successful claim switches to t
     // the assertion above covers the whole catch, not just one branch.
     expect(catchSlice).toContain("err?.response?.status === 409");
     expect(catchSlice).toContain(
-      'Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לקחת את ההזמנה לטיפול"));',
+      'showToast(getApiErrorMessage(err, "לא ניתן לקחת את ההזמנה לטיפול"), "error");',
     );
   });
 
@@ -539,36 +652,97 @@ describe("WorkerCompetitionShavingsOrdersScreen - getApiErrorMessage notificatio
     );
   });
 
-  it("routes every generic (non-409) shavings-action failure through getApiErrorMessage", () => {
+  it("routes every generic (non-409) shavings-action failure through getApiErrorMessage, as an error-type toast", () => {
     var source = readSource();
 
     expect(source).toContain(
-      'Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לטעון את ההזמנות"));',
+      'showToast(getApiErrorMessage(err, "לא ניתן לטעון את ההזמנות"), "error");',
     );
     expect(source).toContain(
-      'Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לקחת את ההזמנה לטיפול"));',
+      'showToast(getApiErrorMessage(err, "לא ניתן לקחת את ההזמנה לטיפול"), "error");',
     );
     expect(source).toContain(
       'getApiErrorMessage(err, "ניתן לסמן את ההזמנה כסופקה גם ללא תמונה.")',
     );
     expect(source).toContain(
-      'Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לסמן את ההזמנה כסופקה"));',
+      'showToast(getApiErrorMessage(err, "לא ניתן לסמן את ההזמנה כסופקה"), "error");',
     );
   });
 
-  it("preserves the two 409-specific business-copy alerts verbatim, untouched by the normalization", () => {
+  it("preserves the two 409-specific business-copy toasts verbatim, untouched by the normalization - now warning-type, since nothing broke", () => {
     var source = readSource();
 
     expect(source).toContain(
-      'Alert.alert("לא ניתן", "ההזמנה כבר נלקחה לטיפול על ידי עובד אחר");',
+      'showToast("ההזמנה כבר נלקחה לטיפול על ידי עובד אחר", "warning");',
     );
-    expect(source).toContain('Alert.alert("לא ניתן", "ההזמנה כבר סופקה");');
+    expect(source).toContain('showToast("ההזמנה כבר סופקה", "warning");');
   });
 
-  it("preserves the two success alerts verbatim - no standardized success helper exists in this codebase", () => {
+  it("preserves the two success toasts verbatim - no standardized success helper exists in this codebase", () => {
     var source = readSource();
 
-    var successCount = source.split('Alert.alert("בוצע", "ההזמנה סופקה");').length - 1;
+    var successCount = source.split('showToast("ההזמנה סופקה", "success");').length - 1;
     expect(successCount).toBe(2);
+  });
+
+  it("the upload-failure toast keeps its distinct title framing folded into the message, not silently dropped like the generic \"שגיאה\" titles elsewhere", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      '"העלאת התמונה נכשלה: " +\n          getApiErrorMessage(err, "ניתן לסמן את ההזמנה כסופקה גם ללא תמונה."),',
+    );
+  });
+
+  it("the upload-failure catch still sets photoFailedOrderId, preserving the existing in-card no-photo recovery control - the toast migration must not touch this", () => {
+    var source = readSource();
+
+    var fnAt = source.indexOf("async function handleCapturePhoto(order) {");
+    expect(fnAt).toBeGreaterThan(-1);
+    var catchAt = source.indexOf("} catch (err) {", fnAt);
+    var catchEnd = source.indexOf("} finally {", catchAt);
+    var catchBody = source.substring(catchAt, catchEnd);
+
+    expect(catchBody).toContain("setPhotoFailedOrderId(order.shavingsOrderId);");
+    // The toast fires after the recovery flag is set, and does not itself carry the
+    // recovery action - showNoPhotoFallback on the card is what surfaces it.
+    var flagIndex = catchBody.indexOf("setPhotoFailedOrderId(order.shavingsOrderId);");
+    var toastIndex = catchBody.indexOf("showToast(");
+    expect(toastIndex).toBeGreaterThan(flagIndex);
+  });
+
+  it("showNoPhotoFallback on the rendered card is still driven by photoFailedOrderId, unchanged by the toast migration", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      "showNoPhotoFallback={photoFailedOrderId === order.shavingsOrderId}",
+    );
+  });
+});
+
+describe("WorkerCompetitionShavingsOrdersScreen - no native Alert.alert remains", () => {
+  it("does not import Alert from react-native", () => {
+    var source = readSource();
+
+    var reactNativeImportAt = source.indexOf('from "react-native";');
+    var reactNativeImportStart = source.lastIndexOf("import {", reactNativeImportAt);
+    var reactNativeImportBlock = source.substring(
+      reactNativeImportStart,
+      reactNativeImportAt,
+    );
+    expect(reactNativeImportBlock).not.toContain("Alert");
+  });
+
+  it("never calls Alert.alert anywhere in the file", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("Alert.alert");
+  });
+
+  it("imports showToast from the shared toast service", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { showToast } from "../../../../services/toastService";',
+    );
   });
 });
