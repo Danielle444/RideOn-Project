@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   Image,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
@@ -16,6 +15,7 @@ import { useNavigation } from "@react-navigation/native";
 import { validateLoginForm } from "../../../../shared/auth/validations/loginValidation";
 import { useAuth } from "../../context/AuthContext";
 import { getRememberMe } from "../../services/storageService";
+import { showToast } from "../../services/toastService";
 
 import styles from "../../styles/authStyles";
 
@@ -64,7 +64,7 @@ export default function LoginScreen() {
     const validationError = validateLoginForm(username, password);
 
     if (validationError) {
-      Alert.alert("שגיאה", validationError);
+      showToast(validationError, "error");
       return;
     }
 
@@ -74,7 +74,7 @@ export default function LoginScreen() {
       const result = await loginAndInitialize(username, password, rememberMe);
 
       if (!result.ok) {
-        Alert.alert("שגיאה", result.message);
+        showToast(result.message, "error");
       }
     } finally {
       setIsLoading(false);
@@ -82,7 +82,7 @@ export default function LoginScreen() {
   }
 
   function handleForgotPassword() {
-    Alert.alert("שכחתי סיסמה", "נחבר אחר כך");
+    showToast("נחבר אחר כך", "info");
   }
 
   function handleRegister() {
