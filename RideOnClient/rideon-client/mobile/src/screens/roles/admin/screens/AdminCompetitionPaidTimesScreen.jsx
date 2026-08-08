@@ -539,12 +539,11 @@ export default function AdminCompetitionPaidTimesScreen(props) {
       subtitle=""
       activeBottomTab={null}
       bottomNavItems={getAdminBottomNavConfig(props.navigation)}
-      menuContent={function ({ closeMenu, requestExitConfirm }) {
+      menuContent={function ({ closeMenu }) {
         return (
           <CompetitionMenuTemplate
             activeKey="paid-time"
             closeMenu={closeMenu}
-            requestExitConfirm={requestExitConfirm}
             competitionName={
               activeCompetition ? activeCompetition.competitionName : ""
             }

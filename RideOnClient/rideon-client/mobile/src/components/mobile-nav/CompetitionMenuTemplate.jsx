@@ -4,12 +4,17 @@ import roleSharedStyles from "../../styles/roleSharedStyles";
 import logo from "shared/assets/logo.png";
 
 export default function CompetitionMenuTemplate(props) {
-  // Exit confirmation is owned by MobileScreenLayout (requestExitConfirm),
-  // not rendered here - AppDialog must never be a native Modal nested
-  // inside MobileSideMenu's own native Modal (see the exit-competition
-  // touch-lockup regression this fixes).
+  // No confirmation dialog for exit - closeMenu() runs first so
+  // MobileSideMenu's native Modal is already dismissing before
+  // onExitCompetition() (often async, ends in navigation) fires. Some
+  // consumers navigate synchronously with no internal await (e.g.
+  // AdminCompetitionHealthCertificatesScreen) - calling onExitCompetition
+  // first would let navigation start while the Modal is still open.
   function handleExitPress() {
-    props.requestExitConfirm(props.onExitCompetition);
+    if (props.closeMenu) {
+      props.closeMenu();
+    }
+    props.onExitCompetition();
   }
 
   return (
