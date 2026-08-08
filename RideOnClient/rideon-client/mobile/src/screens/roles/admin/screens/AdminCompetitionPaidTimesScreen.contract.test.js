@@ -172,6 +172,93 @@ describe("AdminCompetitionPaidTimesScreen - PT-8 paid-time cancellation in-fligh
   });
 });
 
+// P2: hardening the structural gap flagged in the admin-alert-migration
+// audit - the mutation and the post-cancel refresh sat in one outer
+// try/catch, so a rejecting refresh could have reported a successful
+// cancellation as a failure, and there was no styled success feedback at
+// all. Mirrors AdminCompetitionPayerAccountScreen's doCancelPaidTime, which
+// already carries this exact shape and success wording.
+describe("AdminCompetitionPaidTimesScreen - cancellation success feedback and refresh isolation", () => {
+  it("shows the established paid-time cancellation success toast, matching AdminCompetitionPayerAccountScreen.doCancelPaidTime", () => {
+    var block = getHandleCancelBlock(readSource());
+
+    expect(block).toContain('showToast("הבקשה בוטלה", "success");');
+  });
+
+  it("the success toast fires after the mutation but before the refresh is attempted", () => {
+    var block = getHandleCancelBlock(readSource());
+
+    var mutationIndex = block.indexOf("await cancelPaidTimeRequest(");
+    var toastIndex = block.indexOf('showToast("הבקשה בוטלה", "success");');
+    var refreshIndex = block.indexOf("await paidTimes.handleRefresh();");
+
+    expect(mutationIndex).toBeGreaterThan(-1);
+    expect(toastIndex).toBeGreaterThan(mutationIndex);
+    expect(refreshIndex).toBeGreaterThan(toastIndex);
+  });
+
+  it("the refresh call is nested in its own try/catch, isolated from the mutation's outer catch", () => {
+    var block = getHandleCancelBlock(readSource());
+
+    var refreshTryIndex = block.indexOf(
+      "try {\n        await paidTimes.handleRefresh();",
+    );
+    var refreshCatchIndex = block.indexOf(
+      "} catch (refreshError) {\n        console.log(\"CANCEL PAID TIME REFRESH ERROR\", refreshError);\n      }",
+    );
+
+    expect(refreshTryIndex).toBeGreaterThan(-1);
+    expect(refreshCatchIndex).toBeGreaterThan(refreshTryIndex);
+  });
+
+  it("a refresh failure cannot reach the cancellation-failure toast - the outer catch's getApiErrorMessage/showToast pair appears exactly once, after the nested refresh catch", () => {
+    var block = getHandleCancelBlock(readSource());
+
+    expect(
+      countOccurrences(block, 'var msg = getApiErrorMessage(err, "אירעה שגיאה");'),
+    ).toBe(1);
+    expect(countOccurrences(block, 'showToast(String(msg), "error");')).toBe(1);
+
+    var nestedCatchIndex = block.indexOf("} catch (refreshError) {");
+    var outerCatchIndex = block.indexOf("} catch (err) {");
+
+    expect(nestedCatchIndex).toBeGreaterThan(-1);
+    expect(outerCatchIndex).toBeGreaterThan(nestedCatchIndex);
+  });
+
+  it("the in-flight guard and confirmation dialog remain intact alongside the hardened refresh", () => {
+    var source = readSource();
+    var block = getHandleCancelBlock(source);
+
+    expect(block).toContain(
+      "if (!paidTimeCancelGuardRef.current.tryAcquire(guardKey)) {",
+    );
+    expect(
+      countOccurrences(
+        block,
+        "paidTimeCancelGuardRef.current.release(guardKey);",
+      ),
+    ).toBe(1);
+    expect(countOccurrences(source, "<AppDialog")).toBe(1);
+  });
+
+  it("zero Alert references remain in the production file", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("Alert");
+  });
+
+  it("the confirmCancel dynamic 24h/full-charge copy is unchanged by this hardening", () => {
+    var block = getConfirmCancelBlock(readSource());
+
+    expect(block).toContain('"ביטול בתוך 24 שעות - חיוב מלא"');
+    expect(block).toContain('"ביטול פייד טיים"');
+    expect(block).toContain(
+      'confirmLabel: withinDay ? "אישור וחיוב" : "אישור ביטול"',
+    );
+  });
+});
+
 // Regression coverage for the submission-critical bug: both the "ערוך" and
 // "בטל פייד טיים" buttons on an expanded Paid Time card silently no-op'd
 // because openEdit AND confirmCancel both returned early on

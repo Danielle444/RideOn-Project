@@ -324,7 +324,17 @@ export default function AdminCompetitionPaidTimesScreen(props) {
         paidTimeRequestId: item.paidTimeRequestId,
         ranchId: activeRole?.ranchId,
       });
-      await paidTimes.handleRefresh();
+
+      // The cancel succeeded - everything below is refresh, not mutation
+      // outcome, and must not be able to turn this into a reported failure.
+      // Mirrors AdminCompetitionPayerAccountScreen's doCancelPaidTime.
+      showToast("הבקשה בוטלה", "success");
+
+      try {
+        await paidTimes.handleRefresh();
+      } catch (refreshError) {
+        console.log("CANCEL PAID TIME REFRESH ERROR", refreshError);
+      }
     } catch (err) {
       var msg = getApiErrorMessage(err, "אירעה שגיאה");
       showToast(String(msg), "error");
