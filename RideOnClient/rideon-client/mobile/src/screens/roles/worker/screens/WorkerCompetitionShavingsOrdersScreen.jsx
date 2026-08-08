@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
+import AppDialog from "../../../../components/common/AppDialog";
 import WorkerShavingsOrderCard from "../components/WorkerShavingsOrderCard";
 import WorkerShavingsStatusTabs from "../components/WorkerShavingsStatusTabs";
 import { getWorkerBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
@@ -17,6 +18,7 @@ import {
   saveDeliveryPhoto,
   markDelivered,
 } from "../../../../services/shavingsOrderService";
+import { showToast } from "../../../../services/toastService";
 import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 import { supabase } from "../../../../lib/supabaseClient";
 import {
@@ -106,6 +108,16 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
   const [markingOrderId, setMarkingOrderId] = useState(null);
   // Orders whose photo upload just failed — reveals the no-photo fallback button (CAP-4).
   const [photoFailedOrderId, setPhotoFailedOrderId] = useState(null);
+  // App-owned follow-up shown after the OS camera-permission prompt is denied - never the
+  // OS prompt itself, just this screen's own single-button AppDialog acknowledgement.
+  const [permissionDialogVisible, setPermissionDialogVisible] = useState(false);
+  // Single shared future-dated confirmation dialog for all three mutating actions (claim/
+  // photo/deliver) - confirmIfFutureDated below stashes whichever action is pending here
+  // instead of each action owning its own dialog instance.
+  const [futureConfirmState, setFutureConfirmState] = useState({
+    visible: false,
+    pendingAction: null,
+  });
 
   // Route-param hydration runs once on mount only. Every live entry into this screen (board
   // "כניסה", Home "כניסה", Home's today-shavings-feed card) always supplies a competitionId -
@@ -133,7 +145,7 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       );
       setOrders(response.data?.data || []);
     } catch (err) {
-      Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לטעון את ההזמנות"));
+      showToast(getApiErrorMessage(err, "לא ניתן לטעון את ההזמנות"), "error");
     } finally {
       setLoadingOrders(false);
     }
@@ -160,10 +172,10 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       setActiveTab(isFutureDatedOrder(order, new Date()) ? "future" : "inMyCare");
     } catch (err) {
       if (err?.response?.status === 409) {
-        Alert.alert("לא ניתן", "ההזמנה כבר נלקחה לטיפול על ידי עובד אחר");
+        showToast("ההזמנה כבר נלקחה לטיפול על ידי עובד אחר", "warning");
         await loadOrders(selectedCompetition);
       } else {
-        Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לקחת את ההזמנה לטיפול"));
+        showToast(getApiErrorMessage(err, "לא ניתן לקחת את ההזמנה לטיפול"), "error");
       }
     } finally {
       setClaimingOrderId(null);
@@ -174,7 +186,7 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
 
     if (!permission.granted) {
-      Alert.alert("הרשאה נדרשת", "נא לאשר גישה למצלמה בהגדרות הטלפון");
+      setPermissionDialogVisible(true);
       return;
     }
 
@@ -219,14 +231,15 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       await saveDeliveryPhoto(order.shavingsOrderId, urlData.publicUrl);
 
       setPhotoFailedOrderId(null);
-      Alert.alert("בוצע", "ההזמנה סופקה");
+      showToast("ההזמנה סופקה", "success");
       await loadOrders(selectedCompetition);
     } catch (err) {
       console.error("Photo upload error:", err);
       setPhotoFailedOrderId(order.shavingsOrderId);
-      Alert.alert(
-        "העלאת התמונה נכשלה",
-        getApiErrorMessage(err, "ניתן לסמן את ההזמנה כסופקה גם ללא תמונה.")
+      showToast(
+        "העלאת התמונה נכשלה: " +
+          getApiErrorMessage(err, "ניתן לסמן את ההזמנה כסופקה גם ללא תמונה."),
+        "error",
       );
     } finally {
       setUploadingOrderId(null);
@@ -238,14 +251,14 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       setMarkingOrderId(order.shavingsOrderId);
       await markDelivered(order.shavingsOrderId);
       setPhotoFailedOrderId(null);
-      Alert.alert("בוצע", "ההזמנה סופקה");
+      showToast("ההזמנה סופקה", "success");
       await loadOrders(selectedCompetition);
     } catch (err) {
       if (err?.response?.status === 409) {
-        Alert.alert("לא ניתן", "ההזמנה כבר סופקה");
+        showToast("ההזמנה כבר סופקה", "warning");
         await loadOrders(selectedCompetition);
       } else {
-        Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לסמן את ההזמנה כסופקה"));
+        showToast(getApiErrorMessage(err, "לא ניתן לסמן את ההזמנה כסופקה"), "error");
       }
     } finally {
       setMarkingOrderId(null);
@@ -312,11 +325,22 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
         return;
       }
 
-      Alert.alert(FUTURE_ORDER_CONFIRM_TITLE, FUTURE_ORDER_CONFIRM_MESSAGE, [
-        { text: "ביטול", style: "cancel" },
-        { text: "המשך", onPress: action },
-      ]);
+      setFutureConfirmState({ visible: true, pendingAction: action });
     };
+  }
+
+  // AppDialog auto-hides on confirm before the pending action runs, so there is never a
+  // window where it's visible mid-action and a second tap could double-fire it.
+  function handleFutureConfirm() {
+    var pendingAction = futureConfirmState.pendingAction;
+    setFutureConfirmState({ visible: false, pendingAction: null });
+    if (pendingAction) {
+      pendingAction();
+    }
+  }
+
+  function handleFutureCancel() {
+    setFutureConfirmState({ visible: false, pendingAction: null });
   }
 
   function renderOrderCard(order) {
@@ -561,6 +585,27 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
           {orders.length > 0 && renderActiveTabContent()}
         </View>
       )}
+
+      <AppDialog
+        visible={permissionDialogVisible}
+        title="הרשאה נדרשת"
+        message="נא לאשר גישה למצלמה בהגדרות הטלפון"
+        type="warning"
+        onConfirm={function () {
+          setPermissionDialogVisible(false);
+        }}
+      />
+
+      <AppDialog
+        visible={futureConfirmState.visible}
+        title={FUTURE_ORDER_CONFIRM_TITLE}
+        message={FUTURE_ORDER_CONFIRM_MESSAGE}
+        type="warning"
+        confirmLabel="המשך"
+        cancelLabel="ביטול"
+        onConfirm={handleFutureConfirm}
+        onCancel={handleFutureCancel}
+      />
     </MobileScreenLayout>
   );
 }

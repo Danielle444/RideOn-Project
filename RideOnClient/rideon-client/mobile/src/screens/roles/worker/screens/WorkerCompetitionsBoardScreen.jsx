@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Text, View } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate";
@@ -25,6 +25,7 @@ import {
   buildStatusOptions,
   filterCompetitionsForBoard,
 } from "../../../../utils/competitionsBoardFilters";
+import { showToast } from "../../../../services/toastService";
 
 export default function WorkerCompetitionsBoardScreen(props) {
   var userContext = useUser();
@@ -74,7 +75,7 @@ export default function WorkerCompetitionsBoardScreen(props) {
       );
     } catch (error) {
       console.error(error);
-      Alert.alert("שגיאה", "אירעה שגיאה בטעינת התחרויות");
+      showToast("אירעה שגיאה בטעינת התחרויות", "error");
       setCompetitions([]);
     } finally {
       setLoading(false);
