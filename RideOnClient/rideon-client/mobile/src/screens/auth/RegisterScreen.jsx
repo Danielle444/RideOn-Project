@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   Image,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,6 +16,8 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+
+import AppDialog from "../../components/common/AppDialog";
 
 import {
   register,
@@ -71,6 +72,7 @@ export default function RegisterScreen() {
 
   var [error, setError] = useState("");
   var [success, setSuccess] = useState("");
+  var [showRegisterSuccessDialog, setShowRegisterSuccessDialog] = useState(false);
 
   var [checkingNationalId, setCheckingNationalId] = useState(false);
   var [nationalIdMessage, setNationalIdMessage] = useState("");
@@ -522,8 +524,6 @@ export default function RegisterScreen() {
 
       setShowRanchModal(false);
       setSuccess("בקשת חווה נשלחה בהצלחה. החווה תופיע לאחר אישור מנהל.");
-
-      Alert.alert("הצלחה", "בקשת החווה נשלחה בהצלחה");
     } catch (err) {
       var message = getApiErrorMessage(err, "שגיאה ביצירת בקשת חווה");
       setRanchModalError(String(message));
@@ -583,21 +583,18 @@ export default function RegisterScreen() {
       });
 
       setSuccess("הבקשה נשלחה בהצלחה");
-
-      Alert.alert("הצלחה", "הבקשה נשלחה בהצלחה", [
-        {
-          text: "אישור",
-          onPress: function () {
-            navigation.navigate("Login");
-          },
-        },
-      ]);
+      setShowRegisterSuccessDialog(true);
     } catch (err) {
       var message = getApiErrorMessage(err, "שגיאה בהרשמה");
       setError(String(message));
     } finally {
       setLoadingSubmit(false);
     }
+  }
+
+  function handleRegisterSuccessConfirm() {
+    setShowRegisterSuccessDialog(false);
+    navigation.navigate("Login");
   }
 
   function renderSectionHeader(title, sectionNumber) {
@@ -1308,6 +1305,15 @@ export default function RegisterScreen() {
           </View>
         </Modal>
       </KeyboardAvoidingView>
+
+      <AppDialog
+        visible={showRegisterSuccessDialog}
+        type="success"
+        title="הצלחה"
+        message="הבקשה נשלחה בהצלחה"
+        confirmLabel="אישור"
+        onConfirm={handleRegisterSuccessConfirm}
+      />
     </SafeAreaView>
   );
 }

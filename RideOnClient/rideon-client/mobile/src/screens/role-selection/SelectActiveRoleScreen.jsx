@@ -3,12 +3,12 @@ import {
   View,
   Text,
   Pressable,
-  Alert,
   ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import styles from "../../styles/authStyles";
+import { showToast } from "../../services/toastService";
 
 import {
   mapRoleOptionForMobile,
@@ -55,7 +55,7 @@ export default function SelectActiveRoleScreen(props) {
     const result = resolveMobileRoleSelection(item);
 
     if (!result.ok) {
-      Alert.alert("שגיאה", result.message);
+      showToast(result.message, "error");
       return;
     }
 
@@ -67,7 +67,7 @@ export default function SelectActiveRoleScreen(props) {
       props.navigation.replace(result.destination);}, 0);
     } catch (error) {
       setIsNavigating(false);
-      Alert.alert("שגיאה", "אירעה שגיאה במעבר לתפקיד שנבחר");
+      showToast("אירעה שגיאה במעבר לתפקיד שנבחר", "error");
     }
   }
 

@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   Image,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
@@ -14,6 +13,8 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { useUser } from "../../context/UserContext";
 import { useAuth } from "../../context/AuthContext";
+import { showToast } from "../../services/toastService";
+import AppDialog from "../../components/common/AppDialog";
 import styles from "../../styles/authStyles";
 
 export default function ChangePasswordScreen(props) {
@@ -29,6 +30,7 @@ export default function ChangePasswordScreen(props) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   function validateForm() {
     if (!currentPassword.trim()) {
@@ -66,7 +68,7 @@ export default function ChangePasswordScreen(props) {
     const validationError = validateForm();
 
     if (validationError) {
-      Alert.alert("שגיאה", validationError);
+      showToast(validationError, "error");
       return;
     }
 
@@ -79,23 +81,22 @@ export default function ChangePasswordScreen(props) {
       );
 
       if (!result.ok) {
-        Alert.alert("שגיאה", result.message);
+        showToast(result.message, "error");
         return;
       }
 
-      Alert.alert("הצלחה", "הסיסמה הוחלפה בהצלחה", [
-        {
-          text: "אישור",
-          onPress: function () {
-            setTimeout(function () {
-              props.navigation.replace("MobileEntryGate");
-            }, 0);
-          },
-        },
-      ]);
+      setShowSuccessDialog(true);
     } finally {
       setIsLoading(false);
     }
+  }
+
+  function handleSuccessConfirm() {
+    setShowSuccessDialog(false);
+
+    setTimeout(function () {
+      props.navigation.replace("MobileEntryGate");
+    }, 0);
   }
 
   return (
@@ -233,6 +234,15 @@ export default function ChangePasswordScreen(props) {
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      <AppDialog
+        visible={showSuccessDialog}
+        type="success"
+        title="הצלחה"
+        message="הסיסמה הוחלפה בהצלחה"
+        confirmLabel="אישור"
+        onConfirm={handleSuccessConfirm}
+      />
     </SafeAreaView>
   );
 }

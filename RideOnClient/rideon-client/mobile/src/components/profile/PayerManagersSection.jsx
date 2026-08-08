@@ -1,34 +1,50 @@
-import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View, ActivityIndicator } from "react-native";
+import { useState } from "react";
+import { Modal, Pressable, ScrollView, Text, TextInput, View, ActivityIndicator } from "react-native";
 import ProfileSectionCard from "./ProfileSectionCard";
+import AppDialog from "../common/AppDialog";
 import profileStyles from "../../styles/profileStyles";
 
 export default function PayerManagersSection(props) {
+  var [isLastManagerDialogVisible, setIsLastManagerDialogVisible] = useState(false);
+  var [removeTarget, setRemoveTarget] = useState(null);
+  var [rejectTarget, setRejectTarget] = useState(null);
+
   function handleRemovePress(item) {
     if ((props.managers || []).length <= 1) {
-      Alert.alert("לא ניתן להסיר", "למשלם חייב להישאר לפחות מנהל אחד");
+      setIsLastManagerDialogVisible(true);
       return;
     }
 
-    var fullName = (item.firstName || "") + " " + (item.lastName || "");
-
-    Alert.alert(
-      "הסרת מנהל",
-      "האם להסיר את " + fullName.trim() + " מרשימת המנהלים שלך?",
-      [
-        {
-          text: "ביטול",
-          style: "cancel",
-        },
-        {
-          text: "הסר",
-          style: "destructive",
-          onPress: function () {
-            props.onRemoveManager(item.adminPersonId);
-          },
-        },
-      ]
-    );
+    setRemoveTarget(item);
   }
+
+  function handleRemoveCancel() {
+    setRemoveTarget(null);
+  }
+
+  function handleRemoveConfirm() {
+    var target = removeTarget;
+    setRemoveTarget(null);
+    props.onRemoveManager(target.adminPersonId);
+  }
+
+  function handleRejectCancel() {
+    setRejectTarget(null);
+  }
+
+  function handleRejectConfirm() {
+    var target = rejectTarget;
+    setRejectTarget(null);
+    props.onRejectManagerRequest(target.adminPersonId);
+  }
+
+  var removeTargetName = removeTarget
+    ? ((removeTarget.firstName || "") + " " + (removeTarget.lastName || "")).trim()
+    : "";
+
+  var rejectTargetName = rejectTarget
+    ? ((rejectTarget.firstName || "") + " " + (rejectTarget.lastName || "")).trim()
+    : "";
 
   return (
     <>
@@ -72,22 +88,7 @@ export default function PayerManagersSection(props) {
                       style={profileStyles.destructiveButton}
                       disabled={isAnswering}
                       onPress={function () {
-                        Alert.alert(
-                          "דחיית בקשה",
-                          "האם לדחות את בקשת הניהול מ" +
-                            ((item.firstName || "") + " " + (item.lastName || "")).trim() +
-                            "?",
-                          [
-                            { text: "ביטול", style: "cancel" },
-                            {
-                              text: "דחייה",
-                              style: "destructive",
-                              onPress: function () {
-                                props.onRejectManagerRequest(item.adminPersonId);
-                              },
-                            },
-                          ],
-                        );
+                        setRejectTarget(item);
                       }}
                     >
                       <Text style={profileStyles.destructiveButtonText}>
@@ -243,6 +244,41 @@ export default function PayerManagersSection(props) {
           </View>
         </View>
       </Modal>
+
+      <AppDialog
+        visible={isLastManagerDialogVisible}
+        type="warning"
+        title="לא ניתן להסיר"
+        message="למשלם חייב להישאר לפחות מנהל אחד"
+        confirmLabel="הבנתי"
+        onConfirm={function () {
+          setIsLastManagerDialogVisible(false);
+        }}
+      />
+
+      <AppDialog
+        visible={!!removeTarget}
+        type="warning"
+        destructive={true}
+        title="הסרת מנהל"
+        message={"האם להסיר את " + removeTargetName + " מרשימת המנהלים שלך?"}
+        confirmLabel="הסר"
+        cancelLabel="ביטול"
+        onConfirm={handleRemoveConfirm}
+        onCancel={handleRemoveCancel}
+      />
+
+      <AppDialog
+        visible={!!rejectTarget}
+        type="warning"
+        destructive={true}
+        title="דחיית בקשה"
+        message={"האם לדחות את בקשת הניהול מ" + rejectTargetName + "?"}
+        confirmLabel="דחייה"
+        cancelLabel="ביטול"
+        onConfirm={handleRejectConfirm}
+        onCancel={handleRejectCancel}
+      />
     </>
   );
 }
