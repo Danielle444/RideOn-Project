@@ -83,3 +83,63 @@ describe("RegisterScreen - styled alert migration", () => {
     );
   });
 });
+
+describe("RegisterScreen - OTP restoration (P0 mobile self-registration fix)", () => {
+  it("imports sendOtp from authService", () => {
+    var source = readSource();
+    expect(source).toContain(
+      "  sendOtp,\n",
+    );
+    expect(source).toContain('from "../../services/authService";');
+  });
+
+  it("handleSendOtp sends the OTP by email and surfaces styled inline feedback (no Alert)", () => {
+    var source = readSource();
+    var start = source.indexOf("async function handleSendOtp()");
+    var end = source.indexOf("\n  }\n", start);
+    var block = source.slice(start, end);
+
+    expect(start).toBeGreaterThan(-1);
+    expect(block).toContain("await sendOtp(form.email.trim());");
+    expect(block).toContain("setOtpSent(true);");
+    expect(block).toContain('setOtpSuccess("קוד נשלח למייל שלך");');
+    expect(block).toContain(
+      'setOtpError("שגיאה בשליחת קוד האימות. נסה שוב.");',
+    );
+    expect(block).not.toMatch(/\bAlert\b/);
+  });
+
+  it("the OTP code field only renders after a send has succeeded", () => {
+    var source = readSource();
+    expect(source).toContain("{otpSent &&");
+    expect(source).toContain("otpCode,");
+    expect(source).toContain("setOtpCode,");
+  });
+
+  it("final registration payload includes otpCode alongside the existing fields", () => {
+    var source = readSource();
+    var handleSubmitStart = source.indexOf("async function handleSubmit()");
+    var registerCallStart = source.indexOf("await register({", handleSubmitStart);
+    var registerCallEnd = source.indexOf("});", registerCallStart);
+    var registerCallBody = source.slice(registerCallStart, registerCallEnd);
+
+    expect(registerCallStart).toBeGreaterThan(-1);
+    expect(registerCallBody).toContain("otpCode: otpCode,");
+    expect(registerCallBody).toContain("email: form.email,");
+    expect(registerCallBody).toContain("username: form.username,");
+    expect(registerCallBody).toContain("ranchRoles: validPairs.map(");
+  });
+
+  it("the final submit button is disabled while no OTP code has been entered", () => {
+    var source = readSource();
+    expect(source).toContain("disabled={loadingSubmit || !otpCode}");
+  });
+
+  it("ranch-request flow (section 3 create-ranch modal) is untouched by the OTP addition", () => {
+    var source = readSource();
+    expect(source).toContain("async function handleCreateRanchRequest()");
+    expect(source).toContain(
+      'await createRanchRequest({',
+    );
+  });
+});
