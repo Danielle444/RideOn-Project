@@ -10,6 +10,7 @@ import SideMenuTemplate from "../../../../components/mobile-nav/SideMenuTemplate
 import { getWorkerMenuItems } from "../../../../navigation/sideMenuConfigs";
 import { useUser } from "../../../../context/UserContext";
 import { useActiveRole } from "../../../../context/ActiveRoleContext";
+import { useCompetition } from "../../../../context/CompetitionContext";
 import {
   getWorkerShavingsOrdersByCompetition,
   claimShavingsOrder,
@@ -96,6 +97,7 @@ const DELIVERY_BUCKET = "delivery-photos";
 export default function WorkerCompetitionShavingsOrdersScreen(props) {
   const { user } = useUser();
   const { activeRole } = useActiveRole();
+  const competitionContext = useCompetition();
 
   const [competitions, setCompetitions] = useState([]);
   const [selectedCompetition, setSelectedCompetition] = useState(null);
@@ -609,9 +611,16 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       ) : (
         <View style={{ gap: 12 }}>
           <Pressable
-            onPress={function () {
+            onPress={async function () {
+              // Defensive local cleanup: AppNavigator is a flat native-stack with no
+              // unmountOnBlur (same as WorkerCompetitionsBoardScreen's exitCompetitionMenu),
+              // so this screen instance stays mounted-but-blurred after navigating away and
+              // can be revisited later - reset it now so a future reopen doesn't show a
+              // stale selectedCompetition/orders from this session.
               setSelectedCompetition(null);
               setOrders([]);
+              await competitionContext.clearCompetition();
+              props.navigation.navigate("WorkerCompetitionsBoard");
             }}
             style={{
               flexDirection: "row-reverse",
