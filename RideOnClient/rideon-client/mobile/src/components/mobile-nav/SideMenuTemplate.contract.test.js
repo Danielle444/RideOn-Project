@@ -104,4 +104,25 @@ describe("SideMenuTemplate - logout/switch-role confirmation", () => {
     var source = readSource();
     expect(source).not.toContain("AuthContext");
   });
+
+  it("regular menu items close the menu before invoking onItemPress, matching CompetitionMenuTemplate's exit-press ordering", () => {
+    var source = readSource();
+    var fnStart = source.indexOf("onPress={function () {");
+    var fnEnd = source.indexOf("}}", fnStart);
+    var fnBody = source.slice(fnStart, fnEnd);
+
+    expect(fnStart).toBeGreaterThan(-1);
+    expect(fnBody).toContain("props.onItemPress(item);");
+    expect(fnBody).toContain("if (props.closeMenu) {");
+
+    var closeMenuAt = fnBody.indexOf("props.closeMenu();");
+    var itemPressAt = fnBody.indexOf("props.onItemPress(item);");
+
+    expect(closeMenuAt).toBeGreaterThan(-1);
+    expect(itemPressAt).toBeGreaterThan(-1);
+    // closeMenu must run before onItemPress - some callers' onItemPress
+    // navigates synchronously with no internal await, so the native side-menu
+    // Modal must already be told to close before navigation can happen.
+    expect(closeMenuAt).toBeLessThan(itemPressAt);
+  });
 });

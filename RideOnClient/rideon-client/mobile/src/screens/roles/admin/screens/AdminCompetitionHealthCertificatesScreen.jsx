@@ -52,6 +52,8 @@ export default function AdminCompetitionHealthCertificatesScreen(props) {
   }
 
   async function handleExitCompetition() {
+    await competitionContext.clearCompetition();
+
     props.navigation.navigate("AdminCompetitionsBoard");
   }
 

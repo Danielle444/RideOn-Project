@@ -93,9 +93,25 @@ describe("CompetitionMenuTemplate - direct exit-competition (no confirmation)", 
     expect(source).not.toContain("handleExitCompetition");
   });
 
-  it("other menu items (item press) are unaffected by the exit change", () => {
+  it("other menu items also close the menu before invoking onItemPress, matching the exit-press ordering", () => {
     var source = readSource();
-    expect(source).toContain("props.onItemPress(item);");
-    expect(source).toContain("if (props.closeMenu) {");
+    var fnStart = source.indexOf("onPress={function () {");
+    var fnEnd = source.indexOf("}}", fnStart);
+    var fnBody = source.slice(fnStart, fnEnd);
+
+    expect(fnStart).toBeGreaterThan(-1);
+    expect(fnBody).toContain("props.onItemPress(item);");
+    expect(fnBody).toContain("if (props.closeMenu) {");
+
+    var closeMenuAt = fnBody.indexOf("props.closeMenu();");
+    var itemPressAt = fnBody.indexOf("props.onItemPress(item);");
+
+    expect(closeMenuAt).toBeGreaterThan(-1);
+    expect(itemPressAt).toBeGreaterThan(-1);
+    // closeMenu must run before onItemPress for the same reason exit does -
+    // some callers' onItemPress navigates synchronously with no internal
+    // await, so the Modal must already be told to close before navigation
+    // can happen.
+    expect(closeMenuAt).toBeLessThan(itemPressAt);
   });
 });

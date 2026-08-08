@@ -54,4 +54,22 @@ describe("AdminCompetitionHealthCertificatesScreen - replace-approved-certificat
     expect(source).not.toMatch(/Alert\.alert\(/);
     expect(source).not.toMatch(/from "react-native"[\s\S]{0,120}Alert/);
   });
+
+  it("exit-competition clears the active competition before navigating back to the board, matching sibling admin competition screens", () => {
+    var source = readSource();
+    var fnStart = source.indexOf("async function handleExitCompetition()");
+    var fnEnd = source.indexOf("\n  }\n", fnStart);
+    var fnBody = source.slice(fnStart, fnEnd);
+
+    expect(fnStart).toBeGreaterThan(-1);
+    expect(fnBody).toContain("await competitionContext.clearCompetition();");
+    expect(fnBody).toContain('props.navigation.navigate("AdminCompetitionsBoard");');
+
+    var clearAt = fnBody.indexOf("competitionContext.clearCompetition()");
+    var navigateAt = fnBody.indexOf('props.navigation.navigate("AdminCompetitionsBoard")');
+
+    expect(clearAt).toBeGreaterThan(-1);
+    expect(navigateAt).toBeGreaterThan(-1);
+    expect(clearAt).toBeLessThan(navigateAt);
+  });
 });
