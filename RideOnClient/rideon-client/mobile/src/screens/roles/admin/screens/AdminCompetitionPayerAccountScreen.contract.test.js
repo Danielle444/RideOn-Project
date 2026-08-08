@@ -236,7 +236,7 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
       var catchBlock = doCancelEntryBlock.slice(catchStart, finallyStart);
 
       expect(catchBlock).toContain(
-        'showToast(extractErrorMessage(err), "error");',
+        'showToast(getApiErrorMessage(err, "אירעה שגיאה בביטול ההרשמה"), "error");',
       );
       expect(catchBlock).toContain("return;");
       expect(catchBlock).not.toContain("DIRECT_CANCELLATION_COPY");
@@ -440,7 +440,7 @@ describe("AdminCompetitionPayerAccountScreen - Phase 3C direct admin edit/cancel
       var outerCatchBlock = block.slice(outerCatchIndex, outerFinallyIndex);
 
       expect(outerCatchBlock).toContain(
-        'showToast(extractErrorMessage(err), "error");',
+        'showToast(getApiErrorMessage(err, "אירעה שגיאה בביטול הזמנת התא"), "error");',
       );
       expect(outerCatchBlock).not.toContain("DIRECT_CANCELLATION_COPY");
       expect(outerCatchBlock).not.toContain("account.reload");
@@ -498,7 +498,7 @@ describe("AdminCompetitionPayerAccountScreen - CE-4/PT-8 entry and paid-time in-
       var catchBlock = block.slice(catchStart, finallyStart);
 
       expect(catchBlock).toContain(
-        'showToast(extractErrorMessage(err), "error");',
+        'showToast(getApiErrorMessage(err, "אירעה שגיאה בביטול ההרשמה"), "error");',
       );
       expect(catchBlock).toContain(
         "entryCancelGuardRef.current.release(guardKey);",
@@ -965,7 +965,7 @@ describe("AdminCompetitionPayerAccountScreen - doCancelPaidTime refresh isolatio
     var outerCatchBlock = block.slice(outerCatchIndex, outerFinallyIndex);
 
     expect(outerCatchBlock).toContain(
-      'showToast(extractErrorMessage(err), "error");',
+      'showToast(getApiErrorMessage(err, "אירעה שגיאה"), "error");',
     );
     expect(outerCatchBlock).not.toContain("account.reload");
   });
@@ -993,5 +993,101 @@ describe("AdminCompetitionPayerAccountScreen - doCancelPaidTime refresh isolatio
 
     expect(block).toContain('showToast("הבקשה בוטלה", "success");');
     expect(block).not.toContain("DIRECT_CANCELLATION_COPY");
+  });
+});
+
+// P3.3: replaces the screen-local extractErrorMessage (which could surface a
+// raw backend JSON body, a "Database error: ..." string, or a bare SQLSTATE
+// prefix straight to the user) with the shared, hardened getApiErrorMessage
+// from shared/auth/utils/authApiErrors.js - same helper already adopted by
+// AdminCompetitionPaidTimesScreen and AdminCompetitionStallsShavingsScreen.
+describe("AdminCompetitionPayerAccountScreen - P3.3 safe error parsing (getApiErrorMessage migration)", () => {
+  function getDoCancelPaidTimeBlock(source) {
+    return getFunctionBlock(
+      source,
+      "async function doCancelPaidTime(item) {",
+      "function confirmCancelStall(item) {",
+    );
+  }
+
+  it("no longer defines a local extractErrorMessage helper - it was fully replaced, not left dead", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("function extractErrorMessage(");
+    expect(source).not.toContain("extractErrorMessage(");
+  });
+
+  it("imports getApiErrorMessage from the shared, hardened error helper", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";',
+    );
+  });
+
+  it("the old unsafe escape hatches (raw JSON.stringify, err.response.data.error, bare err.message fallback) are gone from this screen", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("JSON.stringify(data)");
+    expect(source).not.toContain("data.error");
+  });
+
+  it("all four cancellation catch blocks call getApiErrorMessage(err, <established fallback>) instead of the old local helper", () => {
+    var source = readSource();
+
+    expect(
+      countOccurrences(source, "showToast(getApiErrorMessage(err,"),
+    ).toBe(4);
+
+    // Entry cancel (doCancelEntry) - fallback matches the established copy
+    // already used for this exact action in AdminCompetitionClassesScreen.
+    expect(
+      getDoCancelEntryBlock(source),
+    ).toContain(
+      'showToast(getApiErrorMessage(err, "אירעה שגיאה בביטול ההרשמה"), "error");',
+    );
+
+    // Paid-time cancel (doCancelPaidTime) - generic fallback, matching
+    // AdminCompetitionPaidTimesScreen's own getApiErrorMessage call for the
+    // same cancelPaidTimeRequest action.
+    expect(
+      getDoCancelPaidTimeBlock(source),
+    ).toContain(
+      'showToast(getApiErrorMessage(err, "אירעה שגיאה"), "error");',
+    );
+
+    // Stall cancel (doCancelStall) - fallback matches
+    // AdminCompetitionStallsShavingsScreen's identical adminCancelStallBooking flow.
+    expect(
+      getDoCancelStallBlock(source),
+    ).toContain(
+      'showToast(getApiErrorMessage(err, "אירעה שגיאה בביטול הזמנת התא"), "error");',
+    );
+
+    // Shavings cancel (doCancelShavings) - fallback matches
+    // AdminCompetitionStallsShavingsScreen's identical adminCancelShavingsOrder flow.
+    var doCancelShavingsBlock = getFunctionBlock(
+      source,
+      "async function doCancelShavings(order) {",
+      "function renderActions(",
+    );
+    expect(doCancelShavingsBlock).toContain(
+      'showToast(getApiErrorMessage(err, "אירעה שגיאה בביטול הזמנת הנסורת"), "error");',
+    );
+  });
+
+  it("success/cancellation flow is unchanged - success toasts and refresh calls are untouched by this migration", () => {
+    var source = readSource();
+
+    expect(source).toContain('showToast(DIRECT_CANCELLATION_COPY.text, "success");');
+    expect(source).toContain('showToast("הבקשה בוטלה", "success");');
+    expect(countOccurrences(source, "await account.reload();")).toBeGreaterThan(0);
+  });
+
+  it("no unrelated error path in this screen was touched - account.screenError rendering and the retry button are unchanged", () => {
+    var source = readSource();
+
+    expect(source).toContain("{account.screenError}");
+    expect(source).toContain('onPress={account.reload}');
   });
 });
