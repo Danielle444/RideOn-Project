@@ -62,3 +62,60 @@ describe("ChangePasswordScreen - styled alert migration", () => {
     expect(source).toContain("onConfirm={handleSuccessConfirm}");
   });
 });
+
+// P0 fix (2026-08-08): validateForm() used to accept any 6-character new
+// password, weaker than the 8-char/upper/lower/digit policy enforced at
+// registration. It now delegates to the same shared validator registration
+// uses, so mobile change-password can no longer be a weaker path than
+// registration.
+describe("ChangePasswordScreen - password policy", () => {
+  it("imports getPasswordValidationMessage from the shared password validator", () => {
+    var source = readSource();
+    expect(source).toContain(
+      'import { getPasswordValidationMessage } from "../../../../shared/auth/validations/passwordValidation";',
+    );
+  });
+
+  it("validateForm calls the shared validator instead of a local length check", () => {
+    var source = readSource();
+    var fnStart = source.indexOf("function validateForm()");
+    var fnEnd = source.indexOf("\n  }\n", fnStart);
+    var fnBody = source.slice(fnStart, fnEnd);
+
+    expect(fnBody).toContain("getPasswordValidationMessage(newPassword)");
+  });
+
+  it("no longer contains the old weaker 6-character inline rule", () => {
+    var source = readSource();
+    expect(source).not.toMatch(/newPassword\.length\s*<\s*6/);
+    expect(source).not.toContain("לפחות 6 תווים");
+  });
+
+  it("still requires the current password before validating the new one", () => {
+    var source = readSource();
+    var fnStart = source.indexOf("function validateForm()");
+    var fnEnd = source.indexOf("\n  }\n", fnStart);
+    var fnBody = source.slice(fnStart, fnEnd);
+
+    var currentRequiredAt = fnBody.indexOf('"יש להזין סיסמה נוכחית"');
+    var policyCheckAt = fnBody.indexOf("getPasswordValidationMessage(newPassword)");
+
+    expect(currentRequiredAt).toBeGreaterThan(-1);
+    expect(policyCheckAt).toBeGreaterThan(-1);
+    expect(currentRequiredAt).toBeLessThan(policyCheckAt);
+  });
+
+  it("still rejects a new password that does not match its confirmation", () => {
+    var source = readSource();
+    expect(source).toContain("newPassword !== confirmPassword");
+    expect(source).toContain('"אימות הסיסמה אינו תואם"');
+  });
+
+  it("still rejects a new password identical to the current password", () => {
+    var source = readSource();
+    expect(source).toContain("newPassword === currentPassword");
+    expect(source).toContain(
+      '"הסיסמה החדשה חייבת להיות שונה מהסיסמה הנוכחית"',
+    );
+  });
+});

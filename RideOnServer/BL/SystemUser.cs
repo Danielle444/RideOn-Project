@@ -193,6 +193,8 @@ namespace RideOnServer.BL
                 throw new Exception("Current password is incorrect");
             }
 
+            PasswordPolicyValidator.ValidateOrThrow(request.NewPassword);
+
             string newSalt = PasswordHelper.GenerateSalt();
             string newHash = PasswordHelper.HashPassword(request.NewPassword, newSalt);
 
