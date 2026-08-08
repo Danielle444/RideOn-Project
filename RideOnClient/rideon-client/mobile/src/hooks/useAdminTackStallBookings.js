@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert } from "react-native";
 import { createTackStallBookings } from "../services/stallBookingsService";
+import { showToast } from "../services/toastService";
 import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 import {
   resolveEffectiveTackPayers,
@@ -265,34 +265,34 @@ export default function useAdminTackStallBookings(params) {
 
   async function handleSubmitTackDraft() {
     if (!selectedTackStallType || !selectedTackStallType.priceCatalogId) {
-      Alert.alert("שגיאה", "יש לבחור סוג תא ציוד");
+      showToast("יש לבחור סוג תא ציוד", "error");
       return false;
     }
 
     if (!tackStartDate || !tackEndDate) {
-      Alert.alert("שגיאה", "יש לבחור תאריכי כניסה ויציאה לתאי ציוד");
+      showToast("יש לבחור תאריכי כניסה ויציאה לתאי ציוד", "error");
       return false;
     }
 
     var quantityNumber = Number(tackQuantity || 0);
 
     if (!quantityNumber || quantityNumber <= 0) {
-      Alert.alert("שגיאה", "יש להזין כמות תקינה של תאי ציוד");
+      showToast("יש להזין כמות תקינה של תאי ציוד", "error");
       return false;
     }
 
     if (!effectiveTackPayers || effectiveTackPayers.length === 0) {
-      Alert.alert("שגיאה", "יש לבחור לפחות משלם אחד עבור תאי ציוד");
+      showToast("יש לבחור לפחות משלם אחד עבור תאי ציוד", "error");
       return false;
     }
 
     if (!user || !user.personId) {
-      Alert.alert("שגיאה", "לא נמצאו פרטי משתמש מחובר");
+      showToast("לא נמצאו פרטי משתמש מחובר", "error");
       return false;
     }
 
     if (!activeRole || !activeRole.ranchId) {
-      Alert.alert("שגיאה", "לא נמצאה חווה פעילה");
+      showToast("לא נמצאה חווה פעילה", "error");
       return false;
     }
 
@@ -303,7 +303,7 @@ export default function useAdminTackStallBookings(params) {
     // correct source: it is the ranch the current actor is authorized in,
     // already validated non-null above.
     if (!activeRole.ranchId || activeRole.ranchId <= 0) {
-      Alert.alert("שגיאה", "לא ניתן לקבוע את החווה המבקשת עבור תא הציוד");
+      showToast("לא ניתן לקבוע את החווה המבקשת עבור תא הציוד", "error");
       return false;
     }
 
@@ -333,7 +333,7 @@ export default function useAdminTackStallBookings(params) {
         await reloadStallBookings();
       }
 
-      Alert.alert("נשמר", "תאי הציוד הוזמנו בהצלחה");
+      showToast("תאי הציוד הוזמנו בהצלחה", "success");
 
       setTackQuantity("1");
       setTackSplitMode("equal");
@@ -342,9 +342,9 @@ export default function useAdminTackStallBookings(params) {
 
       return true;
     } catch (error) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         getApiErrorMessage(error, "אירעה שגיאה בשמירת תאי הציוד"),
+        "error",
       );
 
       return false;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert } from "react-native";
 import { createStallBooking } from "../services/stallBookingsService";
+import { showToast } from "../services/toastService";
 import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
 
 function uniqByPersonId(items) {
@@ -253,7 +253,7 @@ export default function useAdminHorseStallBookings(params) {
     var validationMessage = validateHorseBookingsForm();
 
     if (validationMessage) {
-      Alert.alert("שגיאה", validationMessage);
+      showToast(validationMessage, "error");
       return false;
     }
 
@@ -268,9 +268,9 @@ export default function useAdminHorseStallBookings(params) {
     });
 
     if (invalidHorseBooking) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         "יש לפחות סוס אחד עם משלם לא תקין. פתחי עריכה ובחרי משלם מחדש.",
+        "error",
       );
       return false;
     }
@@ -312,16 +312,16 @@ export default function useAdminHorseStallBookings(params) {
         await reloadStallBookings();
       }
 
-      Alert.alert("נשמר", "תאי הסוסים הוזמנו בהצלחה");
+      showToast("תאי הסוסים הוזמנו בהצלחה", "success");
 
       setSelectedHorseBookings([]);
       setExpandedHorseEditorId(null);
 
       return true;
     } catch (error) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         getApiErrorMessage(error, "אירעה שגיאה בשמירת הזמנת התאים"),
+        "error",
       );
 
       return false;

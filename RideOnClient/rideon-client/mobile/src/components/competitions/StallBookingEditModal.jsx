@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 import {
-  Alert,
   Modal,
   Pressable,
   SafeAreaView,
@@ -16,6 +15,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useActiveRole } from "../../context/ActiveRoleContext";
 
 import { adminEditStallBooking } from "../../services/stallBookingsService";
+
+import { showToast } from "../../services/toastService";
 
 import { getCompetitionInvitationDetails } from "../../services/competitionService";
 
@@ -266,7 +267,7 @@ export default function StallBookingEditModal(props) {
     var validationMessage = validateForm();
 
     if (validationMessage) {
-      Alert.alert("שגיאה", validationMessage);
+      showToast(validationMessage, "error");
       return;
     }
 
@@ -289,15 +290,15 @@ export default function StallBookingEditModal(props) {
         await props.onUpdated();
       }
 
-      Alert.alert("עודכן", "הזמנת התא עודכנה בהצלחה");
+      showToast("הזמנת התא עודכנה בהצלחה", "success");
 
       if (typeof props.onClose === "function") {
         props.onClose();
       }
     } catch (error) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         getApiErrorMessage(error, "אירעה שגיאה בעדכון הזמנת התא"),
+        "error",
       );
     } finally {
       setIsSaving(false);
