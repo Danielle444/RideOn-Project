@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "../context/UserContext";
 import { useActiveRole } from "../context/ActiveRoleContext";
 import { getApiErrorMessage } from "../../../shared/auth/utils/authApiErrors";
@@ -25,6 +25,7 @@ import {
   answerPayerManagerRequest,
 } from "../services/payerProfileService";
 import { showToast } from "../services/toastService";
+import { createInFlightGuard } from "../utils/inFlightGuard";
 
 export default function useProfileScreen() {
   const { user } = useUser();
@@ -84,6 +85,23 @@ export default function useProfileScreen() {
   const [submittingManagerId, setSubmittingManagerId] = useState(null);
   const [removingManagerId, setRemovingManagerId] = useState(null);
   const [answeringManagerId, setAnsweringManagerId] = useState(null);
+
+  // Synchronous, per-target in-flight guards for the destructive manager
+  // actions below - removingManagerId/answeringManagerId above are UI
+  // feedback only (async state), not a correctness guard: two rapid
+  // invocations for the same adminPersonId can both pass a "busy?" check
+  // before either render reflects the first one. Separate refs per action
+  // namespace, initialized lazily so createInFlightGuard() runs once, not on
+  // every render.
+  const removeManagerGuardRef = useRef(null);
+  if (removeManagerGuardRef.current === null) {
+    removeManagerGuardRef.current = createInFlightGuard();
+  }
+
+  const answerManagerGuardRef = useRef(null);
+  if (answerManagerGuardRef.current === null) {
+    answerManagerGuardRef.current = createInFlightGuard();
+  }
 
   const config = useMemo(
     function () {
@@ -420,6 +438,12 @@ export default function useProfileScreen() {
   }
 
   async function handleRemoveManager(adminPersonId) {
+    const guardKey = "removeManager:" + adminPersonId;
+
+    if (!removeManagerGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
       setRemovingManagerId(adminPersonId);
       await removePayerManager(user.personId, adminPersonId);
@@ -432,10 +456,17 @@ export default function useProfileScreen() {
       );
     } finally {
       setRemovingManagerId(null);
+      removeManagerGuardRef.current.release(guardKey);
     }
   }
 
   async function handleAnswerManagerRequest(adminPersonId, answerStatus) {
+    const guardKey = "answerManager:" + adminPersonId;
+
+    if (!answerManagerGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
     try {
       setAnsweringManagerId(adminPersonId);
       await answerPayerManagerRequest(
@@ -457,6 +488,7 @@ export default function useProfileScreen() {
       );
     } finally {
       setAnsweringManagerId(null);
+      answerManagerGuardRef.current.release(guardKey);
     }
   }
 
