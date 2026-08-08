@@ -19,15 +19,16 @@ import { useActiveRole } from "../../../../context/ActiveRoleContext";
 import { getAdminBottomNavConfig } from "../../../../navigation/bottomNavConfigs";
 import { getAdminMenuItems } from "../../../../navigation/sideMenuConfigs";
 import {
-  getHorsesByRanch,
+  getRealHorsesByRanch,
   updateHorseBarnName,
 } from "../../../../services/horsesService";
 
-// usp_gethorsesbyranch has no row limit, and a ranch with a large legacy
-// horse table can return thousands of rows - rendering all of them via
-// .map() into this screen's plain (non-virtualized) ScrollView is what
-// crashes/freezes the app. Cap the render client-side, same bound already
-// used for the picker-scoped usp_getrealhorsesbyranch (200 rows).
+// This screen loads via usp_getrealhorsesbyranch (getRealHorsesByRanch), which
+// excludes historical fabricated horses server-side and caps every result set
+// at 200 rows itself. MAX_VISIBLE_HORSES stays as client-side defense-in-depth
+// against rendering an unbounded list via .map() into this screen's plain
+// (non-virtualized) ScrollView, same bound already used by the picker-scoped
+// usp_getrealhorsesbyranch call.
 var MAX_VISIBLE_HORSES = 200;
 
 export default function AdminHorsesScreen(props) {
@@ -66,7 +67,7 @@ export default function AdminHorsesScreen(props) {
       setLoading(true);
       setScreenError("");
 
-      const response = await getHorsesByRanch(ranchId, nextSearchText);
+      const response = await getRealHorsesByRanch(ranchId, nextSearchText);
       setHorses(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.log("AdminHorsesScreen load error:", error?.response?.data || error);
