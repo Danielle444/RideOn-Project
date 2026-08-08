@@ -28,6 +28,10 @@ export default function ProfilesListSection(props) {
       return "ממתין";
     }
 
+    if (normalized === "rejected") {
+      return "נדחה";
+    }
+
     return roleStatus || "לא ידוע";
   }
 
