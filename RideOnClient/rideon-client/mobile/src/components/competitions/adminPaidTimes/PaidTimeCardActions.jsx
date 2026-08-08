@@ -1,13 +1,17 @@
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { canEditPaidTimeRow } from "../../../utils/paidTimeEditAvailability";
 
 // שורת פעולות לכרטיס פייד טיים: עריכה + ביטול.
-// כל כפתור מתחבא לפי הרשאות (canModify לעריכה, canCancel לביטול).
+// עריכה זמינה לפי canEditPaidTimeRow (לא שולם, לא בוטל, ושלב הפייד טיים
+// פעיל - אותו כלל בדיוק כמו ב-AdminCompetitionPayerAccountScreen). ביטול
+// זמין לפי canCancel שמגיע מהשרת בלבד ואינו תלוי בזמינות השלב - נתיב עסקי
+// שתמיד זמין (השרת עצמו אינו חוסם ביטול אחרי סיום התחרות).
 // אם אף אחד מהם זמין - מציג טקסט סיבת נעילה.
 export default function PaidTimeCardActions(props) {
   var item = props.item;
   var cancellingId = props.cancellingId;
   var isCancelling = cancellingId === item.paidTimeRequestId;
-  var canEdit = !!item.canCancel; // אפשרי לערוך כל עוד לא שולם ולא בוטל
+  var canEdit = canEditPaidTimeRow(item, props.paidTimesAvailability);
   var canCancel = !!item.canCancel;
   var isCancelled = item.status === "Cancelled";
 
