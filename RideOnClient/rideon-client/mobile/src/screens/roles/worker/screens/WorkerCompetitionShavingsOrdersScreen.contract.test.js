@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { isFutureDatedOrder } from "../../../../utils/workerHomeShavingsFeed";
 
 // WorkerCompetitionShavingsOrdersScreen imports react-native/expo-image-picker/supabase,
 // not safe to import under plain vitest - same reason as every other *.contract.test.js
@@ -287,7 +288,7 @@ describe("WorkerCompetitionShavingsOrdersScreen - future-order action confirmati
   });
 });
 
-describe("WorkerCompetitionShavingsOrdersScreen - successful claim switches to the inMyCare tab", () => {
+describe("WorkerCompetitionShavingsOrdersScreen - successful claim switches to the correct tab", () => {
   function getClaimFnBody(source) {
     var fnAt = source.indexOf("async function handleClaimOrder(order) {");
     expect(fnAt).toBeGreaterThan(-1);
@@ -295,7 +296,7 @@ describe("WorkerCompetitionShavingsOrdersScreen - successful claim switches to t
     return source.substring(fnAt, fnEnd);
   }
 
-  it("sets activeTab to inMyCare only after a successful claim + reload, before the try block ends", () => {
+  it("sets activeTab via the future-aware ternary only after a successful claim + reload, before the try block ends", () => {
     var source = readSource();
     var fnBody = getClaimFnBody(source);
 
@@ -307,17 +308,23 @@ describe("WorkerCompetitionShavingsOrdersScreen - successful claim switches to t
     var trySlice = fnBody.substring(tryAt, catchAt);
     expect(trySlice).toContain("await claimShavingsOrder(order.shavingsOrderId);");
     expect(trySlice).toContain("await loadOrders(selectedCompetition);");
-    expect(trySlice).toContain('setActiveTab("inMyCare");');
+    // A future-dated order is pulled out of "inMyCare" into "future" by
+    // splitFutureDatedShavingsBoardOrders regardless of who claimed it (see
+    // workerHomeShavingsFeed.js), so the tab we switch to after a claim must match - an
+    // unconditional setActiveTab("inMyCare") would land on a tab that never renders a
+    // future-dated claim.
+    expect(trySlice).toContain(
+      'setActiveTab(isFutureDatedOrder(order, new Date()) ? "future" : "inMyCare");',
+    );
 
-    // The tab-switch must come after the reload, not before it - claiming a future-dated
-    // order still switches tabs (no date/future special-case here), but only once the
-    // freshly-claimed order is actually in `orders`.
+    // The tab-switch must come after the reload, not before it - only once the freshly-claimed
+    // order is actually in `orders` does its classification (and this ternary) mean anything.
     var reloadIndex = trySlice.indexOf("await loadOrders(selectedCompetition);");
-    var switchIndex = trySlice.indexOf('setActiveTab("inMyCare");');
+    var switchIndex = trySlice.indexOf("setActiveTab(isFutureDatedOrder(");
     expect(switchIndex).toBeGreaterThan(reloadIndex);
   });
 
-  it("never sets activeTab to inMyCare inside the catch block - a failed claim must not switch tabs", () => {
+  it("never calls setActiveTab inside the catch block - a failed claim must not switch tabs", () => {
     var source = readSource();
     var fnBody = getClaimFnBody(source);
 
@@ -326,13 +333,35 @@ describe("WorkerCompetitionShavingsOrdersScreen - successful claim switches to t
     expect(financeAt).toBeGreaterThan(catchAt);
 
     var catchSlice = fnBody.substring(catchAt, financeAt);
-    expect(catchSlice).not.toContain('setActiveTab("inMyCare")');
+    expect(catchSlice).not.toContain("setActiveTab(");
     // Both the 409 branch and the generic-failure branch still reach this slice - confirms
     // the assertion above covers the whole catch, not just one branch.
     expect(catchSlice).toContain("err?.response?.status === 409");
     expect(catchSlice).toContain(
       'Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לקחת את ההזמנה לטיפול"));',
     );
+  });
+
+  // Regression coverage for the bug this ternary fixes: setActiveTab("inMyCare") was
+  // unconditional, but splitFutureDatedShavingsBoardOrders always moves a future-dated claim
+  // into the "future" bucket - so switching to "inMyCare" for a future-dated claim landed on a
+  // tab whose content never included the order the worker just claimed. This exercises the
+  // REAL isFutureDatedOrder used by the ternary above (not a re-implementation), proving the
+  // exact expression resolves to the tab that will actually display the claimed order.
+  it("resolves to the future tab for a future-dated claim, and inMyCare for a today/past claim", () => {
+    var now = new Date(2026, 0, 15, 12, 0, 0);
+
+    function resolveClaimTab(order) {
+      return isFutureDatedOrder(order, now) ? "future" : "inMyCare";
+    }
+
+    var futureOrder = { requestedDeliveryTime: "2026-01-20T09:00:00" };
+    var todayOrder = { requestedDeliveryTime: "2026-01-15T09:00:00" };
+    var pastOrder = { requestedDeliveryTime: "2026-01-10T09:00:00" };
+
+    expect(resolveClaimTab(futureOrder)).toBe("future");
+    expect(resolveClaimTab(todayOrder)).toBe("inMyCare");
+    expect(resolveClaimTab(pastOrder)).toBe("inMyCare");
   });
 });
 

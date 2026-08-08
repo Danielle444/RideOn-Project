@@ -178,11 +178,13 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       setClaimingOrderId(order.shavingsOrderId);
       await claimShavingsOrder(order.shavingsOrderId);
       await loadOrders(selectedCompetition);
-      // Business rule: a successful claim always surfaces the claimed order under "בטיפול"
-      // immediately, including for a future-dated order - the worker just took responsibility
-      // for it and must see it land in their own active-care section. Only on success: the
-      // catch branches below (409 / generic failure) must never switch tabs.
-      setActiveTab("inMyCare");
+      // Business rule: a successful claim always surfaces the claimed order on whichever tab
+      // will actually display it after the reload above. A future-dated order is pulled out of
+      // "בטיפול" into "הוזמנו להמשך" by splitFutureDatedShavingsBoardOrders regardless of who
+      // claimed it, so switching to "inMyCare" for a future-dated claim would land on a tab
+      // that never renders it. Only on success: the catch branches below (409 / generic
+      // failure) must never switch tabs.
+      setActiveTab(isFutureDatedOrder(order, new Date()) ? "future" : "inMyCare");
     } catch (err) {
       if (err?.response?.status === 409) {
         Alert.alert("לא ניתן", "ההזמנה כבר נלקחה לטיפול על ידי עובד אחר");
