@@ -423,3 +423,6 @@ FodyWeavers.xsd
 # BMad Method (installed via `npx bmad-method install`, not tracked)
 _bmad/
 .claude/skills/bmad-*/
+
+# Expo local dev-server metadata (mobile/.gitignore only covers mobile/ itself)
+.expo/
