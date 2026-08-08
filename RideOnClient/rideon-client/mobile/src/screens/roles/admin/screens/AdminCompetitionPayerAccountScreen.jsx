@@ -22,6 +22,8 @@ import { useActiveRole } from "../../../../context/ActiveRoleContext";
 
 import { useCompetition } from "../../../../context/CompetitionContext";
 
+import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
+
 import useAdminCompetitionPayerAccount from "../../../../hooks/useAdminCompetitionPayerAccount";
 
 import useRegistrationStepStatus from "../../../../hooks/useRegistrationStepStatus";
@@ -77,23 +79,6 @@ import PaidTimeCreateModal from "../../../../components/competitions/PaidTimeCre
 import StallBookingCreateModal from "../../../../components/competitions/StallBookingCreateModal";
 
 import StallBookingEditModal from "../../../../components/competitions/StallBookingEditModal";
-
-function extractErrorMessage(err) {
-  if (!err) return "אירעה שגיאה";
-  var data = err.response && err.response.data;
-  if (data) {
-    if (typeof data === "string") return data;
-    if (data.message) return String(data.message);
-    if (data.error) return String(data.error);
-    try {
-      return JSON.stringify(data);
-    } catch {
-      return "אירעה שגיאה";
-    }
-  }
-  if (err.message) return err.message;
-  return "אירעה שגיאה";
-}
 
 function pickDateKey(dateValue) {
   if (!dateValue) return "no-date";
@@ -415,7 +400,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
         activeRole?.ranchId,
       );
     } catch (err) {
-      showToast(extractErrorMessage(err), "error");
+      showToast(getApiErrorMessage(err, "אירעה שגיאה בביטול ההרשמה"), "error");
       entryCancelGuardRef.current.release(guardKey);
       return;
     } finally {
@@ -489,7 +474,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
         console.log("CANCEL PAID TIME REFRESH ERROR", refreshError);
       }
     } catch (err) {
-      showToast(extractErrorMessage(err), "error");
+      showToast(getApiErrorMessage(err, "אירעה שגיאה"), "error");
     } finally {
       setCancellingId(null);
       paidTimeCancelGuardRef.current.release(guardKey);
@@ -544,7 +529,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
         console.log("CANCEL STALL REFRESH ERROR", refreshError);
       }
     } catch (err) {
-      showToast(extractErrorMessage(err), "error");
+      showToast(getApiErrorMessage(err, "אירעה שגיאה בביטול הזמנת התא"), "error");
     } finally {
       setCancellingId(null);
       stallCancelGuardRef.current.release(guardKey);
@@ -586,7 +571,7 @@ export default function AdminCompetitionPayerAccountScreen(props) {
         console.log("CANCEL SHAVINGS REFRESH ERROR", refreshError);
       }
     } catch (err) {
-      showToast(extractErrorMessage(err), "error");
+      showToast(getApiErrorMessage(err, "אירעה שגיאה בביטול הזמנת הנסורת"), "error");
     } finally {
       setCancellingId(null);
       shavingsCancelGuardRef.current.release(guardKey);
