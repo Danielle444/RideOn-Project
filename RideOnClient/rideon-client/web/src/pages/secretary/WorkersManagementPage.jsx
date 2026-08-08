@@ -19,6 +19,12 @@ import WorkersFiltersBar from "../../components/secretary/workers/WorkersFilters
 import WorkersTable from "../../components/secretary/workers/WorkersTable";
 import EditWorkerModal from "../../components/secretary/workers/EditWorkerModal";
 
+// usp_getworkersbyranch has no row limit (same shape as the Horses defect).
+// Live worker counts are small today, but this caps the render defensively
+// with the same bound already used for Horses, rather than trusting that to
+// stay true.
+const MAX_VISIBLE_WORKERS = 200;
+
 export default function WorkersManagementPage() {
   const userContext = useUser();
   const activeRoleContext = useActiveRole();
@@ -74,6 +80,15 @@ export default function WorkersManagementPage() {
     },
     [activeRole],
   );
+
+  const visibleWorkers = useMemo(
+    function () {
+      return workers.slice(0, MAX_VISIBLE_WORKERS);
+    },
+    [workers],
+  );
+
+  const isWorkersListTruncated = workers.length > MAX_VISIBLE_WORKERS;
 
   useEffect(
     function () {
@@ -357,8 +372,14 @@ export default function WorkersManagementPage() {
         </div>
 
         <div className="px-6 pb-4">
+          {isWorkersListTruncated ? (
+            <div className="mb-4 rounded-xl border border-[#E9D8B5] bg-[#FFF9ED] px-4 py-3 text-right text-sm text-[#9A6A00]">
+              {`נמצאו ${workers.length} עובדים. מוצגים ${MAX_VISIBLE_WORKERS} הראשונים - השתמשו בסינון/חיפוש כדי לצמצם את התוצאות.`}
+            </div>
+          ) : null}
+
           <WorkersTable
-            workers={workers}
+            workers={visibleWorkers}
             loading={loading}
             actionLoadingKey={actionLoadingKey}
             getActionKey={getActionKey}

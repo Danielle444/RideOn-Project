@@ -23,6 +23,13 @@ import {
   updateHorseBarnName,
 } from "../../../../services/horsesService";
 
+// usp_gethorsesbyranch has no row limit, and a ranch with a large legacy
+// horse table can return thousands of rows - rendering all of them via
+// .map() into this screen's plain (non-virtualized) ScrollView is what
+// crashes/freezes the app. Cap the render client-side, same bound already
+// used for the picker-scoped usp_getrealhorsesbyranch (200 rows).
+var MAX_VISIBLE_HORSES = 200;
+
 export default function AdminHorsesScreen(props) {
   const { user } = useUser();
   const { activeRole } = useActiveRole();
@@ -129,6 +136,15 @@ export default function AdminHorsesScreen(props) {
     [user]
   );
 
+  const visibleHorses = useMemo(
+    function () {
+      return horses.slice(0, MAX_VISIBLE_HORSES);
+    },
+    [horses]
+  );
+
+  const isHorsesListTruncated = horses.length > MAX_VISIBLE_HORSES;
+
   return (
     <MobileScreenLayout
       title="ניהול סוסים"
@@ -198,7 +214,15 @@ export default function AdminHorsesScreen(props) {
           <View style={horsesStyles.listCard}>
             <Text style={horsesStyles.sectionTitle}>סוסי החווה</Text>
 
-            {horses.map(function (item) {
+            {isHorsesListTruncated ? (
+              <View style={horsesStyles.errorCard}>
+                <Text style={horsesStyles.errorText}>
+                  {`נמצאו ${horses.length} סוסים. מוצגים ${MAX_VISIBLE_HORSES} הראשונים - השתמשו בחיפוש כדי לצמצם את התוצאות.`}
+                </Text>
+              </View>
+            ) : null}
+
+            {visibleHorses.map(function (item) {
               return (
                 <HorseListItemCard
                   key={String(item.horseId)}

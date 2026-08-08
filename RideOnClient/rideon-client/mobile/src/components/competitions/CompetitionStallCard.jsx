@@ -194,8 +194,8 @@ export default function CompetitionStallCard(props) {
 
           <View style={styles.stallDetails}>
             <View style={styles.stallTitleBlock}>
-              <View style={{ flexDirection: "row-reverse", alignItems: "center", gap: 6, flex: 1 }}>
-                <Text style={styles.stallHorseName}>
+              <View style={{ flexDirection: "row-reverse", alignItems: "center", gap: 6, alignSelf: "stretch" }}>
+                <Text style={[styles.stallHorseName, { flex: 1 }]}>
                   {isTackBooking ? "תא ציוד" : item.horseName || "ללא סוס"}
                 </Text>
 
