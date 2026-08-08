@@ -365,6 +365,66 @@ describe("WorkerCompetitionShavingsOrdersScreen - successful claim switches to t
   });
 });
 
+describe("WorkerCompetitionShavingsOrdersScreen - \"חזור לבחירת תחרות\" returns to the canonical board", () => {
+  function getBackButtonHandlerBody(source) {
+    var labelAt = source.indexOf('"< חזור לבחירת תחרות"');
+    expect(labelAt).toBeGreaterThan(-1);
+
+    var pressableAt = source.lastIndexOf("<Pressable", labelAt);
+    expect(pressableAt).toBeGreaterThan(-1);
+
+    var onPressAt = source.indexOf("onPress={async function () {", pressableAt);
+    expect(onPressAt).toBeGreaterThan(-1);
+    expect(onPressAt).toBeLessThan(labelAt);
+
+    var onPressEnd = source.indexOf("}}", onPressAt);
+    return source.substring(onPressAt, onPressEnd);
+  }
+
+  it("imports useCompetition from CompetitionContext", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { useCompetition } from "../../../../context/CompetitionContext";',
+    );
+    expect(source).toContain("const competitionContext = useCompetition();");
+  });
+
+  it("clears the active competition via the existing CompetitionContext API, not a re-implementation", () => {
+    var source = readSource();
+    var handlerBody = getBackButtonHandlerBody(source);
+
+    expect(handlerBody).toContain("await competitionContext.clearCompetition();");
+  });
+
+  it("navigates to WorkerCompetitionsBoard - it does not merely reset local state and stay on this route", () => {
+    var source = readSource();
+    var handlerBody = getBackButtonHandlerBody(source);
+
+    expect(handlerBody).toContain(
+      'props.navigation.navigate("WorkerCompetitionsBoard");',
+    );
+  });
+
+  it("still resets the screen-local selectedCompetition/orders before navigating away, as defensive cleanup for this mounted-but-blurred stack screen", () => {
+    var source = readSource();
+    var handlerBody = getBackButtonHandlerBody(source);
+
+    expect(handlerBody).toContain("setSelectedCompetition(null);");
+    expect(handlerBody).toContain("setOrders([]);");
+
+    // Order matters: local resets happen before the async context clear + navigate,
+    // mirroring exitCompetitionMenu on WorkerCompetitionsBoardScreen.
+    var resetIndex = handlerBody.indexOf("setSelectedCompetition(null);");
+    var clearIndex = handlerBody.indexOf("await competitionContext.clearCompetition();");
+    var navigateIndex = handlerBody.indexOf(
+      'props.navigation.navigate("WorkerCompetitionsBoard");',
+    );
+    expect(resetIndex).toBeLessThan(clearIndex);
+    expect(clearIndex).toBeLessThan(navigateIndex);
+  });
+});
+
 describe("WorkerCompetitionShavingsOrdersScreen - getApiErrorMessage notification normalization", () => {
   it("imports getApiErrorMessage from the shared auth-error helper", () => {
     var source = readSource();
