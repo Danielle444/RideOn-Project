@@ -1,0 +1,22 @@
+[
+  {
+    "id": "iss_1753635600000",
+    "num": 69,
+    "title": "Arenas & Stalls page gives no onboarding for the arena → stall-type → compound dependency (empty-state guidance)",
+    "severity": "Low",
+    "priority": "Later",
+    "layer": "Frontend",
+    "usecase": "Host secretary sets up arenas and stall compounds for a ranch",
+    "component": "web/src/pages/secretary/ArenasAndStallsPage.jsx, components/secretary/arenas-stalls/* (StallCompoundsTable, ArenasTable, StallCompoundModal), cross-page dependency on ServicePricesPage stall-type services (product category 2)",
+    "desc": "Deferred UX item raised in the 2026-07-27 party-mode session while fixing #53/#56, and explicitly parked by Oren (edge case, not shown in the presentation, new ranches open rarely). Two related gaps: (1) EMPTY STATE — a brand-new ranch with no arenas and no compounds sees only a grey 'לא קיימים מתחמים להצגה' row and a lone add button; there is no guidance to add an arena first. (2) HIDDEN CROSS-PAGE DEPENDENCY — a stall compound requires a stall TYPE, and stall types come from the Service Prices page (product category 2 / usp_GetProductsByCategory). If the secretary has not defined a stall-type service yet, the StallCompoundModal type dropdown is empty and she gets no explanation of why or where to fix it (loadStallTypes in useArenasAndStallsPage.js filters sections to categoryId === 2). Neither is a bug in the code-works sense; both are onboarding/first-run UX. Needs a real spec (see handoff-arenas-stalls-service-delete.md → 'Spec handoff prompt') before implementation — no implementation decision has been made yet, so no impl prompt is drafted here. NOTE: issue number 69 assumed from Oren stating the last bug was 68; confirm the number the tracker actually assigns before citing it in code/commits.",
+    "status": "Open",
+    "dateFound": "2026-07-27",
+    "relatedTo": 56,
+    "prompt": "",
+    "promptStatus": "none",
+    "createdAt": 1753635600000,
+    "dateResolved": null,
+    "foundBy": "Oren",
+    "assignee": ""
+  }
+]
