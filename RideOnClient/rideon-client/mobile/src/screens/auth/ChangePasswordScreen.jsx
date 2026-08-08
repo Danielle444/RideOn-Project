@@ -15,6 +15,9 @@ import { useUser } from "../../context/UserContext";
 import { useAuth } from "../../context/AuthContext";
 import { showToast } from "../../services/toastService";
 import AppDialog from "../../components/common/AppDialog";
+
+import { getPasswordValidationMessage } from "../../../../shared/auth/validations/passwordValidation";
+
 import styles from "../../styles/authStyles";
 
 export default function ChangePasswordScreen(props) {
@@ -45,8 +48,10 @@ export default function ChangePasswordScreen(props) {
       return "יש לאשר את הסיסמה החדשה";
     }
 
-    if (newPassword.length < 6) {
-      return "הסיסמה החדשה חייבת להכיל לפחות 6 תווים";
+    var passwordValidationMessage = getPasswordValidationMessage(newPassword);
+
+    if (passwordValidationMessage) {
+      return passwordValidationMessage;
     }
 
     if (newPassword !== confirmPassword) {
