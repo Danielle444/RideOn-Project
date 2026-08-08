@@ -17,8 +17,6 @@ import {
   saveDeliveryPhoto,
   markDelivered,
 } from "../../../../services/shavingsOrderService";
-import { getMobileWorkerCompetitionsBoard } from "../../../../services/competitionService";
-import { getCompetitionStatusLabel } from "../../../../../../shared/auth/utils/competitions/competitionStatus";
 import { getApiErrorMessage } from "../../../../../../shared/auth/utils/authApiErrors";
 import { supabase } from "../../../../lib/supabaseClient";
 import {
@@ -99,13 +97,9 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
   const { activeRole } = useActiveRole();
   const competitionContext = useCompetition();
 
-  const [competitions, setCompetitions] = useState([]);
   const [selectedCompetition, setSelectedCompetition] = useState(null);
   const [orders, setOrders] = useState([]);
   const [activeTab, setActiveTab] = useState("requiresAttention");
-  // Start loading=true so the first frame shows a spinner, not "לא נמצאו תחרויות" before the
-  // fetch runs. loadCompetitions settles it to false when there is no active ranch.
-  const [loadingCompetitions, setLoadingCompetitions] = useState(true);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [uploadingOrderId, setUploadingOrderId] = useState(null);
   const [claimingOrderId, setClaimingOrderId] = useState(null);
@@ -113,17 +107,11 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
   // Orders whose photo upload just failed — reveals the no-photo fallback button (CAP-4).
   const [photoFailedOrderId, setPhotoFailedOrderId] = useState(null);
 
-  // Keyed on ranchId (not []) so a ranch that becomes known after mount actually triggers the
-  // fetch. With [] deps a late-arriving activeRole left loadingCompetitions=false and the list
-  // empty forever, showing a false "לא נמצאו תחרויות" that no fetch would ever clear.
-  useEffect(
-    function () {
-      loadCompetitions();
-    },
-    [activeRole?.ranchId],
-  );
-
-  // Route-param preselect runs once on mount only.
+  // Route-param hydration runs once on mount only. Every live entry into this screen (board
+  // "כניסה", Home "כניסה", Home's today-shavings-feed card) always supplies a competitionId -
+  // a missing one means this screen was reached without going through any of those, so redirect
+  // to the canonical board instead of rendering anything here (no embedded picker to fall back
+  // to anymore).
   useEffect(function () {
     const pid = props.route?.params?.competitionId;
     if (pid) {
@@ -131,27 +119,10 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
         competitionId: pid,
         competitionName: props.route?.params?.competitionName || "",
       });
+    } else {
+      props.navigation.navigate("WorkerCompetitionsBoard");
     }
   }, []);
-
-  async function loadCompetitions() {
-    if (!activeRole?.ranchId) {
-      // No active ranch yet: settle the initial loading=true so the screen shows its
-      // empty state rather than a stuck spinner (the effect re-runs when ranchId arrives).
-      setLoadingCompetitions(false);
-      return;
-    }
-
-    try {
-      setLoadingCompetitions(true);
-      const response = await getMobileWorkerCompetitionsBoard(activeRole.ranchId);
-      setCompetitions(response.data || []);
-    } catch (err) {
-      Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לטעון את התחרויות"));
-    } finally {
-      setLoadingCompetitions(false);
-    }
-  }
 
   async function loadOrders(competition) {
     try {
@@ -513,7 +484,7 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
       title="הזמנות נסורת"
       subtitle={selectedCompetition ? selectedCompetition.competitionName : ""}
       activeBottomTab="home"
-      loading={loadingCompetitions || loadingOrders}
+      loading={loadingOrders}
       bottomNavItems={getWorkerBottomNavConfig(props.navigation)}
       menuContent={function ({ closeMenu }) {
         return (
@@ -538,77 +509,7 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
         );
       }}
     >
-      {!selectedCompetition ? (
-        <View style={{ gap: 10 }}>
-          <Text
-            style={{
-              textAlign: "center",
-              color: "#5D4037",
-              fontSize: 15,
-              fontWeight: "600",
-              marginBottom: 6,
-            }}
-          >
-            בחר תחרות להצגת הזמנות
-          </Text>
-
-          {competitions.length === 0 && !loadingCompetitions && (
-            <Text
-              style={{
-                textAlign: "center",
-                color: "#8D6E63",
-                fontSize: 15,
-                marginTop: 20,
-              }}
-            >
-              לא נמצאו תחרויות
-            </Text>
-          )}
-
-          {competitions.map(function (comp) {
-            return (
-              <Pressable
-                key={comp.competitionId}
-                onPress={function () {
-                  handleSelectCompetition(comp);
-                }}
-                style={{
-                  backgroundColor: "#fff",
-                  borderRadius: 12,
-                  padding: 16,
-                  borderWidth: 1,
-                  borderColor: "#D7CCC8",
-                  shadowColor: "#000",
-                  shadowOpacity: 0.05,
-                  shadowRadius: 4,
-                  elevation: 2,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 15,
-                    fontWeight: "600",
-                    color: "#4E342E",
-                    textAlign: "right",
-                  }}
-                >
-                  {comp.competitionName}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: "#8D6E63",
-                    marginTop: 4,
-                    textAlign: "right",
-                  }}
-                >
-                  {getCompetitionStatusLabel(comp.competitionStatus)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : (
+      {selectedCompetition && (
         <View style={{ gap: 12 }}>
           <Pressable
             onPress={async function () {
@@ -620,7 +521,7 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
               // stays mounted-but-blurred and can be revisited later - reset it now so a future
               // reopen doesn't show a stale selectedCompetition/orders from this session.
               // Clearing selectedCompetition BEFORE navigate() would render this screen's own
-              // !selectedCompetition legacy-picker branch for a frame while it's still the
+              // {selectedCompetition && (...)} branch as empty for a frame while it's still the
               // visible focused screen - doing it after navigate() avoids that flash.
               setSelectedCompetition(null);
               setOrders([]);
