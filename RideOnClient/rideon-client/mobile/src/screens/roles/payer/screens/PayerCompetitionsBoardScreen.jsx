@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import MobileScreenLayout from "../../../../components/mobile-nav/MobileScreenLayout";
 import roleSharedStyles from "../../../../styles/roleSharedStyles";
 import competitionBoardStyles from "../../../../styles/competitionBoardStyles";
@@ -123,6 +124,21 @@ export default function PayerCompetitionsBoardScreen(props) {
     setMenuMode("general");
     await competitionContext.clearCompetition();
   }
+
+  // AppNavigator is one flat native-stack (no unmountOnBlur): navigating to
+  // "PayerCompetitionAccount"/"PayerCompetitionDetails" via setCompetitionAndNavigate
+  // pushes it on top and leaves this screen mounted-but-blurred underneath
+  // with menuMode/selectedCompetition still set to "competition"/the entered
+  // item. Coming back here via the bottom-nav board icon or the "לוח תחרויות"
+  // side-menu item just pops back to this SAME instance, so without this
+  // reset the side menu would keep showing the in-competition items instead
+  // of the normal board menu. Reuses the exact same reset already wired to
+  // the explicit "יציאה מהתחרות" action.
+  useFocusEffect(
+    useCallback(function () {
+      exitCompetitionMenu();
+    }, []),
+  );
 
   async function handleLogout() {
     if (props.onLogout) {
