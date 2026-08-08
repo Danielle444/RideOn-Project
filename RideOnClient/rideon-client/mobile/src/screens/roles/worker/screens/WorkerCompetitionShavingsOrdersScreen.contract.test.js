@@ -406,22 +406,31 @@ describe("WorkerCompetitionShavingsOrdersScreen - \"חזור לבחירת תחר
     );
   });
 
-  it("still resets the screen-local selectedCompetition/orders before navigating away, as defensive cleanup for this mounted-but-blurred stack screen", () => {
+  it("still resets the screen-local selectedCompetition/orders, as defensive cleanup for this mounted-but-blurred stack screen", () => {
     var source = readSource();
     var handlerBody = getBackButtonHandlerBody(source);
 
     expect(handlerBody).toContain("setSelectedCompetition(null);");
     expect(handlerBody).toContain("setOrders([]);");
+  });
 
-    // Order matters: local resets happen before the async context clear + navigate,
-    // mirroring exitCompetitionMenu on WorkerCompetitionsBoardScreen.
-    var resetIndex = handlerBody.indexOf("setSelectedCompetition(null);");
+  it("clears context and navigates BEFORE the local reset, so this screen never re-renders its !selectedCompetition legacy-picker branch while still the focused top-of-stack screen", () => {
+    var source = readSource();
+    var handlerBody = getBackButtonHandlerBody(source);
+
+    // Order matters: setSelectedCompetition(null) flipping this screen's own
+    // !selectedCompetition ternary while it's still the visible focused screen is exactly what
+    // produced the reported flash. Deferring the local reset until after navigate() has been
+    // dispatched means the re-render lands on a screen that is no longer the visible top of the
+    // stack (see WorkerCompetitionsBoardScreen's exitCompetitionMenu for the same reset pattern,
+    // used there without this ordering constraint since it never renders that same branch).
     var clearIndex = handlerBody.indexOf("await competitionContext.clearCompetition();");
     var navigateIndex = handlerBody.indexOf(
       'props.navigation.navigate("WorkerCompetitionsBoard");',
     );
-    expect(resetIndex).toBeLessThan(clearIndex);
+    var resetIndex = handlerBody.indexOf("setSelectedCompetition(null);");
     expect(clearIndex).toBeLessThan(navigateIndex);
+    expect(navigateIndex).toBeLessThan(resetIndex);
   });
 });
 

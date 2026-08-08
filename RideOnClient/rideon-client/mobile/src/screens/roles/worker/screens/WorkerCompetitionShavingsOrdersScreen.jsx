@@ -612,15 +612,18 @@ export default function WorkerCompetitionShavingsOrdersScreen(props) {
         <View style={{ gap: 12 }}>
           <Pressable
             onPress={async function () {
-              // Defensive local cleanup: AppNavigator is a flat native-stack with no
-              // unmountOnBlur (same as WorkerCompetitionsBoardScreen's exitCompetitionMenu),
-              // so this screen instance stays mounted-but-blurred after navigating away and
-              // can be revisited later - reset it now so a future reopen doesn't show a
-              // stale selectedCompetition/orders from this session.
-              setSelectedCompetition(null);
-              setOrders([]);
               await competitionContext.clearCompetition();
               props.navigation.navigate("WorkerCompetitionsBoard");
+              // Defensive local cleanup, deferred until after navigation is dispatched:
+              // AppNavigator is a flat native-stack with no unmountOnBlur (same as
+              // WorkerCompetitionsBoardScreen's exitCompetitionMenu), so this screen instance
+              // stays mounted-but-blurred and can be revisited later - reset it now so a future
+              // reopen doesn't show a stale selectedCompetition/orders from this session.
+              // Clearing selectedCompetition BEFORE navigate() would render this screen's own
+              // !selectedCompetition legacy-picker branch for a frame while it's still the
+              // visible focused screen - doing it after navigate() avoids that flash.
+              setSelectedCompetition(null);
+              setOrders([]);
             }}
             style={{
               flexDirection: "row-reverse",
