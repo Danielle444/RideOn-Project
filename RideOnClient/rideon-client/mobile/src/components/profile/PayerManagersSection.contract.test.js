@@ -44,14 +44,23 @@ describe("PayerManagersSection - styled alert migration", () => {
       "props.onRemoveManager",
     );
 
-    // Only handleRemoveConfirm actually calls it, and only after clearing
-    // the pending target (so a second tap after confirm can't refire it).
+    // Only handleRemoveConfirm actually calls it. The target is deliberately
+    // NOT cleared synchronously here anymore (that used to happen in the
+    // same tick as the mutation starting, which made the dialog's isBusy
+    // prop invisible) - it stays staged until useProfileScreen.js's busy id
+    // returns to null, via the pendingRemoveIdRef effect below.
     var confirmStart = source.indexOf("function handleRemoveConfirm()");
     var confirmEnd = source.indexOf("function handleRejectCancel()");
     var confirmBody = source.slice(confirmStart, confirmEnd);
 
-    expect(confirmBody).toContain("setRemoveTarget(null);");
-    expect(confirmBody).toContain("props.onRemoveManager(target.adminPersonId);");
+    expect(confirmBody).toContain("if (!removeTarget) {");
+    expect(confirmBody).toContain(
+      "pendingRemoveIdRef.current = removeTarget.adminPersonId;",
+    );
+    expect(confirmBody).toContain(
+      "props.onRemoveManager(removeTarget.adminPersonId);",
+    );
+    expect(confirmBody).not.toContain("setRemoveTarget(null);");
   });
 
   it("rejecting a manager request requires confirmation - stages a target instead of firing inline", () => {
@@ -67,9 +76,69 @@ describe("PayerManagersSection - styled alert migration", () => {
     var confirmEnd = source.indexOf("var removeTargetName");
     var confirmBody = source.slice(confirmStart, confirmEnd);
 
-    expect(confirmBody).toContain("setRejectTarget(null);");
+    expect(confirmBody).toContain("if (!rejectTarget) {");
     expect(confirmBody).toContain(
-      "props.onRejectManagerRequest(target.adminPersonId);",
+      "pendingRejectIdRef.current = rejectTarget.adminPersonId;",
+    );
+    expect(confirmBody).toContain(
+      "props.onRejectManagerRequest(rejectTarget.adminPersonId);",
+    );
+    expect(confirmBody).not.toContain("setRejectTarget(null);");
+  });
+
+  it("a pending-target ref defers clearing the dialog target until the hook's busy id settles back to null", () => {
+    var source = readSource();
+
+    expect(source).toContain("var pendingRemoveIdRef = useRef(null);");
+    expect(source).toContain("var pendingRejectIdRef = useRef(null);");
+
+    // The remove effect only fires once a confirm was staged (ref non-null)
+    // AND the hook reports the mutation has settled (removingManagerId back
+    // to null) - not simply whenever removingManagerId happens to be null.
+    var removeEffectStart = source.indexOf(
+      "pendingRemoveIdRef.current !== null &&",
+    );
+    var removeEffectSlice = source.slice(removeEffectStart, removeEffectStart + 200);
+    expect(removeEffectSlice).toContain("props.removingManagerId === null");
+    expect(removeEffectSlice).toContain("pendingRemoveIdRef.current = null;");
+    expect(removeEffectSlice).toContain("setRemoveTarget(null);");
+
+    var rejectEffectStart = source.indexOf(
+      "pendingRejectIdRef.current !== null &&",
+    );
+    var rejectEffectSlice = source.slice(rejectEffectStart, rejectEffectStart + 200);
+    expect(rejectEffectSlice).toContain("props.answeringManagerId === null");
+    expect(rejectEffectSlice).toContain("pendingRejectIdRef.current = null;");
+    expect(rejectEffectSlice).toContain("setRejectTarget(null);");
+  });
+
+  it("destructive dialogs receive isBusy scoped to the actual selected target, not just any in-flight action", () => {
+    var source = readSource();
+
+    var removeDialogStart = source.indexOf("visible={!!removeTarget}");
+    var removeDialogEnd = source.indexOf("/>", removeDialogStart);
+    var removeDialogProps = source.slice(removeDialogStart, removeDialogEnd);
+
+    expect(removeDialogProps).toContain("isBusy={");
+    expect(removeDialogProps).toContain(
+      "props.removingManagerId === removeTarget.adminPersonId",
+    );
+
+    var rejectDialogStart = source.indexOf("visible={!!rejectTarget}");
+    var rejectDialogEnd = source.indexOf("/>", rejectDialogStart);
+    var rejectDialogProps = source.slice(rejectDialogStart, rejectDialogEnd);
+
+    expect(rejectDialogProps).toContain("isBusy={");
+    expect(rejectDialogProps).toContain(
+      "props.answeringManagerId === rejectTarget.adminPersonId",
+    );
+
+    // The last-manager notice is a single-button informational dialog with
+    // no mutation behind it - it must not have gained isBusy wiring.
+    var lastManagerBlockStart = source.indexOf("visible={isLastManagerDialogVisible}");
+    var lastManagerBlockEnd = source.indexOf("/>", lastManagerBlockStart);
+    expect(source.slice(lastManagerBlockStart, lastManagerBlockEnd)).not.toContain(
+      "isBusy",
     );
   });
 
