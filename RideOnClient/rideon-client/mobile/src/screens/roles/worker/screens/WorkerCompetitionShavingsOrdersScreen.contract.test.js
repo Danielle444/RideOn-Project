@@ -414,16 +414,17 @@ describe("WorkerCompetitionShavingsOrdersScreen - \"חזור לבחירת תחר
     expect(handlerBody).toContain("setOrders([]);");
   });
 
-  it("clears context and navigates BEFORE the local reset, so this screen never re-renders its !selectedCompetition legacy-picker branch while still the focused top-of-stack screen", () => {
+  it("clears context and navigates BEFORE the local reset, so this screen never re-renders its {selectedCompetition && (...)} content as empty while still the focused top-of-stack screen", () => {
     var source = readSource();
     var handlerBody = getBackButtonHandlerBody(source);
 
     // Order matters: setSelectedCompetition(null) flipping this screen's own
-    // !selectedCompetition ternary while it's still the visible focused screen is exactly what
-    // produced the reported flash. Deferring the local reset until after navigate() has been
-    // dispatched means the re-render lands on a screen that is no longer the visible top of the
-    // stack (see WorkerCompetitionsBoardScreen's exitCompetitionMenu for the same reset pattern,
-    // used there without this ordering constraint since it never renders that same branch).
+    // {selectedCompetition && (...)} guard to empty while it's still the visible focused screen
+    // is exactly what produced the reported flash. Deferring the local reset until after
+    // navigate() has been dispatched means the re-render lands on a screen that is no longer the
+    // visible top of the stack (see WorkerCompetitionsBoardScreen's exitCompetitionMenu for the
+    // same reset pattern, used there without this ordering constraint since it never renders
+    // that same branch).
     var clearIndex = handlerBody.indexOf("await competitionContext.clearCompetition();");
     var navigateIndex = handlerBody.indexOf(
       'props.navigation.navigate("WorkerCompetitionsBoard");',
@@ -431,6 +432,101 @@ describe("WorkerCompetitionShavingsOrdersScreen - \"חזור לבחירת תחר
     var resetIndex = handlerBody.indexOf("setSelectedCompetition(null);");
     expect(clearIndex).toBeLessThan(navigateIndex);
     expect(navigateIndex).toBeLessThan(resetIndex);
+  });
+});
+
+describe("WorkerCompetitionShavingsOrdersScreen - embedded competition picker removed", () => {
+  it("no longer renders the picker's prompt/empty copy or per-competition status label", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("בחר תחרות להצגת הזמנות");
+    expect(source).not.toContain("לא נמצאו תחרויות");
+    expect(source).not.toContain("getCompetitionStatusLabel");
+  });
+
+  it("no longer fetches the Worker competitions board for its own internal picker", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("getMobileWorkerCompetitionsBoard");
+    expect(source).not.toContain("loadCompetitions");
+  });
+
+  it("no longer declares competitions/loadingCompetitions state - no stale loadingCompetitions references remain", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("[competitions, setCompetitions]");
+    expect(source).not.toContain("loadingCompetitions");
+  });
+
+  it("passes only loadingOrders as the screen's loading prop, not the old combined flag", () => {
+    var source = readSource();
+
+    expect(source).toContain("loading={loadingOrders}");
+    expect(source).not.toContain("loading={loadingCompetitions || loadingOrders}");
+  });
+
+  it("gates the shavings content on selectedCompetition alone, with no picker fallback branch", () => {
+    var source = readSource();
+
+    expect(source).toContain("{selectedCompetition && (");
+    expect(source).not.toContain("{!selectedCompetition ? (");
+  });
+});
+
+describe("WorkerCompetitionShavingsOrdersScreen - route-param hydration and missing-competitionId redirect", () => {
+  function getHydrationEffectBody(source) {
+    var marker = "// Route-param hydration runs once on mount only.";
+    var effectAt = source.indexOf(marker);
+    expect(effectAt).toBeGreaterThan(-1);
+
+    var effectEnd = source.indexOf("}, []);", effectAt);
+    expect(effectEnd).toBeGreaterThan(-1);
+
+    return source.substring(effectAt, effectEnd);
+  }
+
+  it("hydrates selectedCompetition via handleSelectCompetition when a competitionId route param is present - the valid-path entry still reaches the shavings workflow", () => {
+    var source = readSource();
+    var effectBody = getHydrationEffectBody(source);
+
+    expect(effectBody).toContain("const pid = props.route?.params?.competitionId;");
+    expect(effectBody).toContain("if (pid) {");
+    expect(effectBody).toContain("handleSelectCompetition({");
+    expect(effectBody).toContain("competitionId: pid,");
+  });
+
+  it("redirects to WorkerCompetitionsBoard when no competitionId route param is present", () => {
+    var source = readSource();
+    var effectBody = getHydrationEffectBody(source);
+
+    expect(effectBody).toContain("} else {");
+    expect(effectBody).toContain(
+      'props.navigation.navigate("WorkerCompetitionsBoard");',
+    );
+
+    // The redirect must live in the else branch of the same if(pid), not a second unconditional
+    // call - otherwise every valid entry would also bounce through the board.
+    var ifIndex = effectBody.indexOf("if (pid) {");
+    var elseIndex = effectBody.indexOf("} else {");
+    var redirectIndex = effectBody.indexOf(
+      'props.navigation.navigate("WorkerCompetitionsBoard");',
+    );
+    expect(ifIndex).toBeLessThan(elseIndex);
+    expect(elseIndex).toBeLessThan(redirectIndex);
+  });
+
+  it("runs the hydration/redirect effect once on mount only - empty dependency array, no render-loop risk", () => {
+    var source = readSource();
+    var marker = "// Route-param hydration runs once on mount only.";
+    var effectAt = source.indexOf(marker);
+    var closeAt = source.indexOf("}, []);", effectAt);
+    expect(closeAt).toBeGreaterThan(effectAt);
+
+    // Exactly one empty-deps effect exists in the whole file - the old ranch-keyed effect
+    // (which used to fetch the picker's competitions list on [activeRole?.ranchId]) is gone.
+    var allEmptyDepsEffects = source.split("}, []);").length - 1;
+    expect(allEmptyDepsEffects).toBe(1);
+    expect(source).not.toContain("[activeRole?.ranchId]");
   });
 });
 
@@ -446,9 +542,6 @@ describe("WorkerCompetitionShavingsOrdersScreen - getApiErrorMessage notificatio
   it("routes every generic (non-409) shavings-action failure through getApiErrorMessage", () => {
     var source = readSource();
 
-    expect(source).toContain(
-      'Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לטעון את התחרויות"));',
-    );
     expect(source).toContain(
       'Alert.alert("שגיאה", getApiErrorMessage(err, "לא ניתן לטעון את ההזמנות"));',
     );
