@@ -80,6 +80,22 @@
 -- per call, so no cross-call credit-lock ordering question can arise within
 -- a single execution of this function.
 -- ============================================================================
+-- fix/federation-fine-window-timezone-complete: the effective-fine lookup's
+-- date-window comparisons were still the same implicit-timezone
+-- v_requestdatetime::date pattern the Rule 1/Rule 2 split above was already
+-- fixed away from (see the 2026-08-04 note). v_requestdatetime is
+-- timestamp with time zone; registrationenddate/competitionstartdate are
+-- plain date. Casting a timestamptz straight to ::date resolves it in
+-- whatever timezone the connection defaults to (UTC on this DB), not
+-- Israel's -- a request made late evening Israel time could fall on the
+-- wrong calendar date relative to the registration/competition boundary,
+-- picking the wrong fine (or none) for requests near midnight. All five
+-- comparisons across the EntryCancellation and LateRegistration branches
+-- now wrap v_requestdatetime in the same (v_requestdatetime AT TIME ZONE
+-- 'Asia/Jerusalem')::date form already used above, so both date-window
+-- decisions in this function agree. No other logic, branch, or statement
+-- changed.
+-- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_answerchangeentryrequestsecured(
     p_changeentryrequestid   integer,
@@ -197,8 +213,8 @@ begin
               and f.triggermode = 'Between'
               and f.startevent = 'RegistrationEnd'
               and f.endevent = 'CompetitionStart'
-              and v_requestdatetime::date > v_registrationenddate
-              and v_requestdatetime::date < v_competitionstartdate
+              and (v_requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date > v_registrationenddate
+              and (v_requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date < v_competitionstartdate
             order by f.fineamount desc
             limit 1;
         else
@@ -216,14 +232,14 @@ begin
                         f.triggermode = 'Between'
                         and f.startevent = 'RegistrationEnd'
                         and f.endevent = 'CompetitionStart'
-                        and v_requestdatetime::date > v_registrationenddate
-                        and v_requestdatetime::date < v_competitionstartdate
+                        and (v_requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date > v_registrationenddate
+                        and (v_requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date < v_competitionstartdate
                     )
                     or
                     (
                         f.triggermode = 'After'
                         and f.startevent = 'CompetitionStart'
-                        and v_requestdatetime::date >= v_competitionstartdate
+                        and (v_requestdatetime AT TIME ZONE 'Asia/Jerusalem')::date >= v_competitionstartdate
                     )
                   )
             order by
