@@ -73,8 +73,6 @@ export default function StallMapUploader({
         const message = "שגיאה בקריאת קובץ ה-Excel. וודא שהקובץ תקין.";
         if (onError) {
           onError(message);
-        } else {
-          alert(message);
         }
         e.target.value = "";
       }

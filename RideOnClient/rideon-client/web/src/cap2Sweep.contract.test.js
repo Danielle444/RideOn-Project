@@ -103,14 +103,18 @@ describe("CAP-2 sweep — stall-booking cancel failure routes through the page's
   });
 });
 
-describe("CAP-2 sweep — Excel-upload failure can route through a toast instead of alert()", () => {
+describe("CAP-2 sweep — Excel-upload failure routes through onError, not alert()", () => {
   const uploaderSource = readSource(
     "./components/secretary/stall-map/StallMapUploader.jsx",
   );
 
-  it("StallMapUploader accepts an onError prop and prefers it over alert()", () => {
+  it("StallMapUploader contains no alert() fallback", () => {
+    expect(uploaderSource).not.toMatch(noAlertCall);
+  });
+
+  it("StallMapUploader accepts an onError prop and calls it on parse failure", () => {
     expect(uploaderSource).toContain("onError,\n}) {");
-    expect(uploaderSource).toContain("if (onError) {\n          onError(message);\n        } else {\n          alert(message);\n        }");
+    expect(uploaderSource).toContain("if (onError) {\n          onError(message);\n        }");
   });
 
   it("both call sites wire onError to a real toast", () => {
