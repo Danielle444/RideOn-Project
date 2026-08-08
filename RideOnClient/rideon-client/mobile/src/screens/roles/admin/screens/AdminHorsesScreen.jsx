@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   Text,
   View,
@@ -22,6 +21,7 @@ import {
   getRealHorsesByRanch,
   updateHorseBarnName,
 } from "../../../../services/horsesService";
+import { showToast } from "../../../../services/toastService";
 
 // This screen loads via usp_getrealhorsesbyranch (getRealHorsesByRanch), which
 // excludes historical fabricated horses server-side and caps every result set
@@ -113,11 +113,11 @@ export default function AdminHorsesScreen(props) {
       closeEditModal();
       await loadHorses(searchText);
 
-      Alert.alert("הצלחה", "הכינוי עודכן בהצלחה");
+      showToast("הכינוי עודכן בהצלחה", "success");
     } catch (error) {
-      Alert.alert(
-        "שגיאה",
+      showToast(
         getApiErrorMessage(error, "אירעה שגיאה בעדכון הכינוי"),
+        "error",
       );
     } finally {
       setIsSavingBarnName(false);

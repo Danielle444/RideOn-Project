@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   RefreshControl,
   ScrollView,
   Text,
@@ -27,6 +26,7 @@ import {
 import { MOBILE_COMPETITION_STATUS_ORDER } from "../../../../../../shared/auth/utils/competitions/competitionStatusOrder";
 import { buildAdminCompetitionActions } from "../utils/buildAdminCompetitionActions";
 import { withTransientRetry } from "../../../../utils/transientRequestRetry";
+import { showToast } from "../../../../services/toastService";
 
 export default function AdminHomeScreen(props) {
   var userContext = useUser();
@@ -69,7 +69,7 @@ export default function AdminHomeScreen(props) {
     } catch (error) {
       console.error(error);
       setCompetitions([]);
-      Alert.alert("שגיאה", "אירעה שגיאה בטעינת דף הבית");
+      showToast("אירעה שגיאה בטעינת דף הבית", "error");
     } finally {
       setLoading(false);
     }
