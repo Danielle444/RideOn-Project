@@ -145,7 +145,7 @@ describe("AdminCompetitionPaidTimesScreen - PT-8 paid-time cancellation in-fligh
     ).toBe(1);
   });
 
-  it("on failure, the error message goes through the shared hardened extractor, and the alert is unchanged", () => {
+  it("on failure, the error message goes through the shared hardened extractor, and the notice is unchanged", () => {
     var block = getHandleCancelBlock(readSource());
 
     // Promoted off the raw err?.response?.data echo (RideOn notification
@@ -154,7 +154,7 @@ describe("AdminCompetitionPaidTimesScreen - PT-8 paid-time cancellation in-fligh
     expect(block).toContain(
       'var msg = getApiErrorMessage(err, "אירעה שגיאה");',
     );
-    expect(block).toContain('Alert.alert("שגיאה", String(msg));');
+    expect(block).toContain('showToast(String(msg), "error");');
   });
 
   it("imports the shared hardened error extractor", () => {
@@ -211,6 +211,64 @@ describe("AdminCompetitionPaidTimesScreen - Edit eligibility uses the establishe
       "if (!canEditPaidTimeRow(item, availability.paidTimes)) {",
     );
     expect(block).not.toContain("if (!availability.paidTimes.isEnabled) {");
+  });
+});
+
+describe("AdminCompetitionPaidTimesScreen - AppDialog/AppToast migration", () => {
+  it("no longer imports or calls the native Alert.alert anywhere in the screen", () => {
+    var source = readSource();
+
+    expect(source).not.toContain("Alert");
+  });
+
+  it("imports showToast and AppDialog from the styled-alert foundation", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { showToast } from "../../../../services/toastService";',
+    );
+    expect(source).toContain(
+      'import AppDialog from "../../../../components/common/AppDialog";',
+    );
+  });
+
+  it("owns a confirmDialog state slot for its one cancel confirmation", () => {
+    var source = readSource();
+
+    expect(source).toContain("var [confirmDialog, setConfirmDialog] = useState(null);");
+  });
+
+  it("renders exactly one AppDialog instance, wired to confirmDialog and cleared via onCancel", () => {
+    var source = readSource();
+
+    expect(countOccurrences(source, "<AppDialog")).toBe(1);
+    expect(source).toContain("visible={!!confirmDialog}");
+    expect(source).toContain("title={confirmDialog?.title}");
+    expect(source).toContain("message={confirmDialog?.message}");
+    expect(source).toContain("confirmLabel={confirmDialog?.confirmLabel || \"אישור\"}");
+    expect(source).toContain("onConfirm={confirmDialog?.onConfirm}");
+    expect(source).toContain(
+      "onCancel={function () {\n          setConfirmDialog(null);\n        }}",
+    );
+  });
+
+  it("confirmCancel sets confirmDialog with the same dynamic 24h/full-charge title, body and confirm label it always had, and clears the dialog before invoking handleCancel", () => {
+    var block = getConfirmCancelBlock(readSource());
+
+    expect(block).toContain('"ביטול בתוך 24 שעות - חיוב מלא"');
+    expect(block).toContain('"ביטול פייד טיים"');
+    expect(block).toContain(
+      '"שים לב: הביטול מתבצע פחות מ-24 שעות לפני המועד. במידה ותאשר, תחויב בתשלום מלא. הסלוט יתפנה לרוכב אחר."',
+    );
+    expect(block).toContain(
+      '"ביטול הבקשה ישחרר את הסלוט לרוכב אחר. עפ\\"י כללי העסק חיוב מלא חל. להמשיך?"',
+    );
+    expect(block).toContain(
+      'confirmLabel: withinDay ? "אישור וחיוב" : "אישור ביטול"',
+    );
+    expect(block).toContain("setConfirmDialog({");
+    expect(block).toContain("setConfirmDialog(null);");
+    expect(block).toContain("handleCancel(item);");
   });
 });
 
