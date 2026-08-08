@@ -36,6 +36,16 @@ function register(data) {
   );
 }
 
+function sendOtp(email) {
+  return axios.post(
+    `${API_BASE_URL}/SystemUsers/send-otp`,
+    { email: normalizeIdentifier(email) },
+    {
+      timeout: 8000,
+    }
+  );
+}
+
 function getRanchesForRegistration() {
   return axios.get(`${API_BASE_URL}/Ranches/for-registration`, {
     timeout: 8000,
@@ -85,6 +95,7 @@ function changePassword(personId, currentPassword, newPassword) {
 export {
   login,
   register,
+  sendOtp,
   getRanchesForRegistration,
   createRanchRequest,
   getRoles,

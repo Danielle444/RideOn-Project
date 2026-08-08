@@ -542,6 +542,46 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
+  otpSection: {
+    marginTop: 4,
+    marginBottom: 16,
+    width: "100%",
+  },
+
+  otpButton: {
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1.3,
+    borderColor: "#D8C8C1",
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  otpButtonDisabled: {
+    opacity: 0.6,
+  },
+
+  otpButtonText: {
+    color: "#795548",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+
+  otpFeedbackSuccess: {
+    textAlign: "right",
+    color: "#2E7D32",
+    fontSize: 13,
+    marginTop: 8,
+  },
+
+  otpFeedbackError: {
+    textAlign: "right",
+    color: "#C62828",
+    fontSize: 13,
+    marginTop: 8,
+  },
+
   /* ---------- GENERIC MOBILE SCREENS ---------- */
 
 screenWrapper: {
