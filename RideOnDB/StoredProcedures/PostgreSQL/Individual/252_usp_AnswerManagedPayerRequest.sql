@@ -25,8 +25,8 @@
 -- equal the payer's own personId. p_personid here is never client-suppliable
 -- independent of that check -- an admin can never answer their own request.
 --
--- MODIFIED on fix/payer-manager-same-ranch-rule (P0, not yet applied live --
--- see that branch's report before deploying). New business rule: an admin
+-- MODIFIED on fix/payer-manager-same-ranch-rule (P0, confirmed applied live
+-- 2026-08-08). New business rule: an admin
 -- may only manage a payer when both hold an Approved role at the SAME
 -- ranch (admin "אדמין חווה", payer "משלם"). This proc had zero ranch logic
 -- before this change -- it is the only place that can gate the

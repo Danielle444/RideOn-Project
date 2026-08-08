@@ -8,10 +8,10 @@
 -- usp_addmanagingadminforpayer (258), which is the actual write-side
 -- authority.
 --
--- MODIFIED on fix/payer-manager-same-ranch-rule (P0, PROPOSED, NOT YET
--- APPLIED LIVE -- see that branch's report; this change is a UX filter, not
--- the enforcement point, so it is lower-risk and optional relative to
--- 252/253/258). New business rule: an admin may only manage a payer when
+-- MODIFIED on fix/payer-manager-same-ranch-rule (P0, confirmed applied live
+-- 2026-08-08; this change is a UX filter, not the enforcement point, so it
+-- was lower-risk and optional relative to 252/253/258). New business rule:
+-- an admin may only manage a payer when
 -- both hold an Approved role at the SAME ranch. Prior to this change this
 -- proc listed every Approved ranch admin in the whole system (minus
 -- already-linked ones) regardless of the requesting payer's own ranch

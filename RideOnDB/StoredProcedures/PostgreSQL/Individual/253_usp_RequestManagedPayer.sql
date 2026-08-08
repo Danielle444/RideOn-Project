@@ -16,8 +16,8 @@
 -- WHERE clause -- a pending request is not silently reset, and an approved
 -- relationship is never overwritten/reactivated by a later request.
 --
--- MODIFIED on fix/payer-manager-same-ranch-rule (P0, NOT YET APPLIED LIVE --
--- signature change, deploy-coupled, see that branch's report). New business
+-- MODIFIED on fix/payer-manager-same-ranch-rule (P0, confirmed applied live
+-- 2026-08-08, signature change already deployed). New business
 -- rule: an admin may only manage a payer when both hold an Approved role at
 -- the SAME ranch (admin "אדמין חווה", payer "משלם"). New required parameter
 -- p_ranchid inserted as the 2nd positional parameter (before the existing
@@ -38,9 +38,8 @@
 -- something to silently absorb.
 --
 -- REQUIRES DROP + CREATE (new required parameter is not appended at the
--- end -- see report for exact DROP statement). Do not apply to live ahead
--- of the matching PayerDAL.cs deploy: the currently-deployed backend still
--- calls the 5-parameter signature and would break immediately.
+-- end -- see report for exact DROP statement). Deployed live 2026-08-08
+-- alongside the matching PayerDAL.cs 6-parameter call -- confirmed in sync.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.usp_requestmanagedpayer(p_systemuserid integer, p_ranchid integer, p_firstname character varying, p_lastname character varying, p_email character varying DEFAULT NULL::character varying, p_cellphone character varying DEFAULT NULL::character varying)
