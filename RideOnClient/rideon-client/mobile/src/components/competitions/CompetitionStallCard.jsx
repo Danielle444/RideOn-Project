@@ -289,11 +289,16 @@ export default function CompetitionStallCard(props) {
               {props.onDelete && !isLocked ? (
                 <Pressable
                   style={styles.cancelStallButton}
+                  disabled={props.cancellingStallId === item.stallBookingId}
                   onPress={function () {
                     props.onDelete(item);
                   }}
                 >
-                  <Text style={styles.cancelStallButtonText}>ביטול תא</Text>
+                  <Text style={styles.cancelStallButtonText}>
+                    {props.cancellingStallId === item.stallBookingId
+                      ? "מבטלת..."
+                      : "ביטול תא"}
+                  </Text>
                 </Pressable>
               ) : null}
 

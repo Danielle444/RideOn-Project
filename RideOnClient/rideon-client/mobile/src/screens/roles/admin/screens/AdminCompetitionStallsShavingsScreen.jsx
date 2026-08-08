@@ -3,7 +3,6 @@ import { useFocusEffect } from "@react-navigation/native";
 
 import {
   ActivityIndicator,
-  Alert,
   RefreshControl,
   ScrollView,
   Text,
@@ -40,9 +39,13 @@ import StallMapModal from "../../../../components/competitions/StallMapModal";
 
 import RegistrationStepNotice from "../../../../components/competitions/RegistrationStepNotice";
 
+import AppDialog from "../../../../components/common/AppDialog";
+
 import { adminCancelStallBooking } from "../../../../services/stallBookingsService";
 import { adminCancelShavingsOrder } from "../../../../services/shavingsOrderService";
+import { showToast } from "../../../../services/toastService";
 import { buildRegistrationStepNoticeMessage } from "../../../../utils/registrationStepNoticeMessages";
+import { createInFlightGuard } from "../../../../utils/inFlightGuard";
 
 import {
   LIFECYCLE_STATE,
@@ -145,6 +148,18 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
   var [stallMapFocus, setStallMapFocus] = useState(null);
 
   var [cancellingShavingsId, setCancellingShavingsId] = useState(null);
+
+  var [stallCancelTarget, setStallCancelTarget] = useState(null);
+
+  var [cancellingStallId, setCancellingStallId] = useState(null);
+
+  var [shavingsCancelTarget, setShavingsCancelTarget] = useState(null);
+
+  var stallCancelGuardRef = useRef(null);
+
+  if (stallCancelGuardRef.current === null) {
+    stallCancelGuardRef.current = createInFlightGuard();
+  }
 
   var registrationStepStatus = useRegistrationStepStatus({
     competitionId: activeCompetition?.competitionId,
@@ -313,17 +328,17 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
     }
 
     if (!item || !item.stallBookingId) {
-      Alert.alert("שגיאה", "לא נמצא מזהה הזמנת תא תקין");
+      showToast("לא נמצא מזהה הזמנת תא תקין", "error");
       return;
     }
 
     if (item.isPaid) {
-      Alert.alert("לא ניתן לערוך", "לא ניתן לערוך תא שכבר שולם");
+      showToast("לא ניתן לערוך תא שכבר שולם", "error");
       return;
     }
 
     if (resolveStallLifecycleState(item) !== LIFECYCLE_STATE.ACTIVE) {
-      Alert.alert("לא ניתן לערוך", "קיימת בקשה פתוחה או שהתא כבר בוטל");
+      showToast("קיימת בקשה פתוחה או שהתא כבר בוטל", "error");
       return;
     }
 
@@ -350,22 +365,22 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
     }
 
     if (!item || !item.stallBookingId) {
-      Alert.alert("שגיאה", "לא נמצא מזהה הזמנת תא תקין");
+      showToast("לא נמצא מזהה הזמנת תא תקין", "error");
       return;
     }
 
     if (item.isPaid) {
-      Alert.alert("לא ניתן לבטל", "לא ניתן לבטל תא שכבר שולם");
+      showToast("לא ניתן לבטל תא שכבר שולם", "error");
       return;
     }
 
     if (resolveStallLifecycleState(item) !== LIFECYCLE_STATE.ACTIVE) {
-      Alert.alert("לא ניתן לבטל", "קיימת בקשה פתוחה או שהתא כבר בוטל");
+      showToast("קיימת בקשה פתוחה או שהתא כבר בוטל", "error");
       return;
     }
 
     if (!activeRole || !activeRole.ranchId) {
-      Alert.alert("שגיאה", "לא נמצאה חווה פעילה");
+      showToast("לא נמצאה חווה פעילה", "error");
       return;
     }
 
@@ -373,41 +388,58 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
     // (fix/competition-ended-and-delivery-guards, 2026-08-07) -- both Admin
     // surfaces now cancel a stall booking the same way instead of this
     // screen routing through a Pending secretary-approval request while the
-    // other screen cancelled immediately.
-    Alert.alert("ביטול הזמנת תא", "האם לבטל את הזמנת התא?", [
-      {
-        text: "לא",
-        style: "cancel",
-      },
-      {
-        text: "כן, בטלי",
-        style: "destructive",
-        onPress: async function () {
-          if (!availability.stalls.isEnabled) {
-            return;
-          }
+    // other screen cancelled immediately. The confirmation itself now opens
+    // the AppDialog below instead of the native Alert.alert - the actual
+    // mutation lives in handleConfirmCancelStallBooking so it can be gated
+    // by a synchronous in-flight guard (PROVEN BUG fix: this handler had no
+    // guard at all, unlike the sibling AdminCompetitionPayerAccountScreen).
+    setStallCancelTarget(item);
+  }
 
-          try {
-            await adminCancelStallBooking(
-              item.stallBookingId,
-              activeRole.ranchId,
-            );
+  async function handleConfirmCancelStallBooking() {
+    var item = stallCancelTarget;
 
-            await overview.reload();
-            reloadRegistrationStepStatus();
+    if (!item || !availability.stalls.isEnabled) {
+      setStallCancelTarget(null);
+      return;
+    }
 
-            Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);
-          } catch (error) {
-            console.log("ADMIN CANCEL STALL BOOKING ERROR", error);
+    var guardKey = "stall:" + item.stallBookingId;
 
-            Alert.alert(
-              "שגיאה",
-              getApiErrorMessage(error, "אירעה שגיאה בביטול הזמנת התא"),
-            );
-          }
-        },
-      },
-    ]);
+    // Synchronous guard, not React state: two rapid taps on the AppDialog
+    // confirm button (or a stale second dialog instance) can both observe
+    // isBusy=false before either state update lands, so the Set-based guard
+    // is the actual correctness mechanism - isBusy below is UI-only.
+    if (!stallCancelGuardRef.current.tryAcquire(guardKey)) {
+      return;
+    }
+
+    setCancellingStallId(item.stallBookingId);
+
+    try {
+      await adminCancelStallBooking(item.stallBookingId, activeRole.ranchId);
+
+      await overview.reload();
+      reloadRegistrationStepStatus();
+
+      setStallCancelTarget(null);
+      showToast(DIRECT_CANCELLATION_COPY.text, "success");
+    } catch (error) {
+      console.log("ADMIN CANCEL STALL BOOKING ERROR", error);
+
+      setStallCancelTarget(null);
+      showToast(
+        getApiErrorMessage(error, "אירעה שגיאה בביטול הזמנת התא"),
+        "error",
+      );
+    } finally {
+      setCancellingStallId(null);
+      stallCancelGuardRef.current.release(guardKey);
+    }
+  }
+
+  function handleDismissStallCancelDialog() {
+    setStallCancelTarget(null);
   }
 
   // Admin history cancel: the button is only ever shown when proc 176's
@@ -417,50 +449,55 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
   // for a race/stale-state tap.
   function handleCancelShavingsFromHistory(order) {
     if (!order || !order.shavingsOrderId) {
-      Alert.alert("שגיאה", "לא נמצא מזהה הזמנת נסורת תקין");
+      showToast("לא נמצא מזהה הזמנת נסורת תקין", "error");
       return;
     }
 
     if (!activeRole || !activeRole.ranchId) {
-      Alert.alert("שגיאה", "לא נמצאה חווה פעילה");
+      showToast("לא נמצאה חווה פעילה", "error");
       return;
     }
 
-    Alert.alert("ביטול הזמנת נסורת", "האם לבטל את הזמנת הנסורת?", [
-      {
-        text: "לא",
-        style: "cancel",
-      },
-      {
-        text: "כן, בטלי",
-        style: "destructive",
-        onPress: async function () {
-          var busyKey = "shavings:" + order.shavingsOrderId;
+    // Confirmation moves to the AppDialog below; the mutation itself stays
+    // in handleConfirmCancelShavingsFromHistory. Independent guard namespace
+    // ("shavings:" prefix on cancellingShavingsId) from the stall-cancel
+    // guard above - out of scope for the proven-bug fix, kept as-is.
+    setShavingsCancelTarget(order);
+  }
 
-          setCancellingShavingsId(busyKey);
+  async function handleConfirmCancelShavingsFromHistory() {
+    var order = shavingsCancelTarget;
 
-          try {
-            await adminCancelShavingsOrder(
-              order.shavingsOrderId,
-              activeRole.ranchId,
-            );
+    if (!order) {
+      return;
+    }
 
-            await overview.reload();
+    var busyKey = "shavings:" + order.shavingsOrderId;
 
-            Alert.alert("בוטל", DIRECT_CANCELLATION_COPY.text);
-          } catch (error) {
-            console.log("ADMIN CANCEL SHAVINGS ORDER ERROR", error);
+    setCancellingShavingsId(busyKey);
 
-            Alert.alert(
-              "שגיאה",
-              getApiErrorMessage(error, "אירעה שגיאה בביטול הזמנת הנסורת"),
-            );
-          } finally {
-            setCancellingShavingsId(null);
-          }
-        },
-      },
-    ]);
+    try {
+      await adminCancelShavingsOrder(order.shavingsOrderId, activeRole.ranchId);
+
+      await overview.reload();
+
+      setShavingsCancelTarget(null);
+      showToast(DIRECT_CANCELLATION_COPY.text, "success");
+    } catch (error) {
+      console.log("ADMIN CANCEL SHAVINGS ORDER ERROR", error);
+
+      setShavingsCancelTarget(null);
+      showToast(
+        getApiErrorMessage(error, "אירעה שגיאה בביטול הזמנת הנסורת"),
+        "error",
+      );
+    } finally {
+      setCancellingShavingsId(null);
+    }
+  }
+
+  function handleDismissShavingsCancelDialog() {
+    setShavingsCancelTarget(null);
   }
 
   function renderContent() {
@@ -505,6 +542,7 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           onViewCompound={handleViewCompoundForStall}
           onCancelShavings={handleCancelShavingsFromHistory}
           cancellingShavingsId={cancellingShavingsId}
+          cancellingStallId={cancellingStallId}
         />
       );
     });
@@ -661,6 +699,37 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
           focusCompoundId={stallMapFocus?.compoundId}
           focusStallNumber={stallMapFocus?.stallNumber}
           onClose={handleCloseStallMap}
+        />
+
+        <AppDialog
+          visible={!!stallCancelTarget}
+          title="ביטול הזמנת תא"
+          message="האם לבטל את הזמנת התא?"
+          confirmLabel="כן, בטלי"
+          cancelLabel="לא"
+          destructive={true}
+          isBusy={
+            !!stallCancelTarget &&
+            cancellingStallId === stallCancelTarget.stallBookingId
+          }
+          onConfirm={handleConfirmCancelStallBooking}
+          onCancel={handleDismissStallCancelDialog}
+        />
+
+        <AppDialog
+          visible={!!shavingsCancelTarget}
+          title="ביטול הזמנת נסורת"
+          message="האם לבטל את הזמנת הנסורת?"
+          confirmLabel="כן, בטלי"
+          cancelLabel="לא"
+          destructive={true}
+          isBusy={
+            !!shavingsCancelTarget &&
+            cancellingShavingsId ===
+              "shavings:" + shavingsCancelTarget.shavingsOrderId
+          }
+          onConfirm={handleConfirmCancelShavingsFromHistory}
+          onCancel={handleDismissShavingsCancelDialog}
         />
       </ScrollView>
     </MobileScreenLayout>
