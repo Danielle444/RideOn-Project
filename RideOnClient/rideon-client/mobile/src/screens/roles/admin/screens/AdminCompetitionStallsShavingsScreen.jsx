@@ -161,6 +161,12 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
     stallCancelGuardRef.current = createInFlightGuard();
   }
 
+  var shavingsCancelGuardRef = useRef(null);
+
+  if (shavingsCancelGuardRef.current === null) {
+    shavingsCancelGuardRef.current = createInFlightGuard();
+  }
+
   var registrationStepStatus = useRegistrationStepStatus({
     competitionId: activeCompetition?.competitionId,
     ranchId: activeRole?.ranchId,
@@ -459,9 +465,8 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
     }
 
     // Confirmation moves to the AppDialog below; the mutation itself stays
-    // in handleConfirmCancelShavingsFromHistory. Independent guard namespace
-    // ("shavings:" prefix on cancellingShavingsId) from the stall-cancel
-    // guard above - out of scope for the proven-bug fix, kept as-is.
+    // in handleConfirmCancelShavingsFromHistory, gated by its own dedicated
+    // in-flight guard instance (independent of the stall-cancel one above).
     setShavingsCancelTarget(order);
   }
 
@@ -473,6 +478,15 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
     }
 
     var busyKey = "shavings:" + order.shavingsOrderId;
+
+    // Synchronous guard, not React state - same rationale as the stall-cancel
+    // guard above (two rapid taps on the AppDialog confirm button can both
+    // observe isBusy=false before either state update lands). Dedicated
+    // guard instance/namespace so a shavings cancel can never contend with an
+    // in-flight stall cancel's key.
+    if (!shavingsCancelGuardRef.current.tryAcquire(busyKey)) {
+      return;
+    }
 
     setCancellingShavingsId(busyKey);
 
@@ -493,6 +507,7 @@ export default function AdminCompetitionStallsShavingsScreen(props) {
       );
     } finally {
       setCancellingShavingsId(null);
+      shavingsCancelGuardRef.current.release(busyKey);
     }
   }
 

@@ -209,6 +209,126 @@ describe("AdminCompetitionStallsShavingsScreen - PROVEN BUG fix: synchronous in-
   });
 });
 
+describe("AdminCompetitionStallsShavingsScreen - PROVEN BUG fix: synchronous in-flight guard on shavings-history cancel", () => {
+  it("imports createInFlightGuard once (shared import) and lazily initializes a dedicated shavingsCancelGuardRef, distinct from stallCancelGuardRef", () => {
+    var source = readSource();
+
+    expect(source).toContain(
+      'import { createInFlightGuard } from "../../../../utils/inFlightGuard";',
+    );
+    expect(source).toContain("var shavingsCancelGuardRef = useRef(null);");
+    expect(source).toContain(
+      "if (shavingsCancelGuardRef.current === null) {\n    shavingsCancelGuardRef.current = createInFlightGuard();\n  }",
+    );
+    expect(source).not.toContain("useRef(createInFlightGuard())");
+
+    // Dedicated instance: the stall guard's declaration/init block is untouched
+    // and still separate from the shavings guard's.
+    expect(source).toContain("var stallCancelGuardRef = useRef(null);");
+    expect(source).toContain(
+      "if (stallCancelGuardRef.current === null) {\n    stallCancelGuardRef.current = createInFlightGuard();\n  }",
+    );
+  });
+
+  it("acquires the guard synchronously, keyed by shavings:<shavingsOrderId>, before setCancellingShavingsId and the service call", () => {
+    var block = getHandleConfirmCancelShavingsFromHistoryBlock(readSource());
+
+    var busyKeyIndex = block.indexOf('var busyKey = "shavings:" + order.shavingsOrderId;');
+    var guardCheckIndex = block.indexOf(
+      "if (!shavingsCancelGuardRef.current.tryAcquire(busyKey)) {",
+    );
+    var returnIndex = block.indexOf("return;", guardCheckIndex);
+    var setCancellingIndex = block.indexOf("setCancellingShavingsId(busyKey);");
+    var serviceCallIndex = block.indexOf("await adminCancelShavingsOrder(");
+
+    expect(busyKeyIndex).toBeGreaterThan(-1);
+    expect(guardCheckIndex).toBeGreaterThan(busyKeyIndex);
+    expect(returnIndex).toBeGreaterThan(guardCheckIndex);
+    expect(returnIndex).toBeLessThan(setCancellingIndex);
+    expect(setCancellingIndex).toBeLessThan(serviceCallIndex);
+  });
+
+  it("a failed acquire returns before setCancellingShavingsId or the service call run - duplicate confirmation is a no-op", () => {
+    var block = getHandleConfirmCancelShavingsFromHistoryBlock(readSource());
+
+    var guardCheckIndex = block.indexOf(
+      "if (!shavingsCancelGuardRef.current.tryAcquire(busyKey)) {",
+    );
+    var guardCheckBlock = block.slice(
+      guardCheckIndex,
+      block.indexOf("}", guardCheckIndex) + 1,
+    );
+
+    expect(guardCheckBlock).toContain("return;");
+    expect(guardCheckBlock).not.toContain("setCancellingShavingsId");
+    expect(guardCheckBlock).not.toContain("adminCancelShavingsOrder");
+
+    // Only one acquisition path exists in the whole handler.
+    expect(
+      countOccurrences(block, "shavingsCancelGuardRef.current.tryAcquire(busyKey)"),
+    ).toBe(1);
+  });
+
+  it("releases the guard in the outer finally, alongside setCancellingShavingsId(null), exactly once", () => {
+    var block = getHandleConfirmCancelShavingsFromHistoryBlock(readSource());
+
+    var finallyIndex = block.lastIndexOf("} finally {");
+    var finallyBlock = block.slice(finallyIndex);
+
+    expect(finallyBlock).toContain("setCancellingShavingsId(null);");
+    expect(finallyBlock).toContain("shavingsCancelGuardRef.current.release(busyKey);");
+    expect(
+      countOccurrences(block, "shavingsCancelGuardRef.current.release(busyKey);"),
+    ).toBe(1);
+  });
+
+  it("does not rely only on React state for correctness - the tryAcquire check runs before any setState in the handler", () => {
+    var block = getHandleConfirmCancelShavingsFromHistoryBlock(readSource());
+
+    var firstSetStateIndex = block.indexOf("setCancellingShavingsId(");
+    var guardCheckIndex = block.indexOf(
+      "if (!shavingsCancelGuardRef.current.tryAcquire(busyKey)) {",
+    );
+
+    expect(guardCheckIndex).toBeGreaterThan(-1);
+    expect(guardCheckIndex).toBeLessThan(firstSetStateIndex);
+  });
+
+  it("the shavings guard is never referenced from the stall-cancel confirm handler, and vice versa - the two guards stay fully independent", () => {
+    var stallBlock = getHandleConfirmCancelStallBookingBlock(readSource());
+    var shavingsBlock = getHandleConfirmCancelShavingsFromHistoryBlock(readSource());
+
+    expect(stallBlock).not.toContain("shavingsCancelGuardRef");
+    expect(shavingsBlock).not.toContain("stallCancelGuardRef");
+  });
+
+  it("existing AppDialog isBusy wiring for the shavings dialog is unchanged (still compares cancellingShavingsId to the busy key)", () => {
+    var block = getFunctionBlock(
+      readSource(),
+      '<AppDialog\n          visible={!!shavingsCancelTarget}',
+      "</ScrollView>",
+    );
+
+    expect(block).toContain(
+      'cancellingShavingsId ===\n              "shavings:" + shavingsCancelTarget.shavingsOrderId',
+    );
+    expect(block).toContain("onConfirm={handleConfirmCancelShavingsFromHistory}");
+    expect(block).toContain("onCancel={handleDismissShavingsCancelDialog}");
+  });
+
+  it("the stall guard's own confirm handler is untouched by this fix (still one acquire/one release, keyed by stall:<id>)", () => {
+    var block = getHandleConfirmCancelStallBookingBlock(readSource());
+
+    expect(
+      countOccurrences(block, "stallCancelGuardRef.current.tryAcquire(guardKey)"),
+    ).toBe(1);
+    expect(
+      countOccurrences(block, "stallCancelGuardRef.current.release(guardKey);"),
+    ).toBe(1);
+    expect(block).toContain('var guardKey = "stall:" + item.stallBookingId;');
+  });
+});
+
 describe("AdminCompetitionStallsShavingsScreen - stall-cancel row/button is disabled while its own cancel is pending", () => {
   it("cancellingStallId is threaded from the screen into CompetitionStallCard", () => {
     var source = readSource();
